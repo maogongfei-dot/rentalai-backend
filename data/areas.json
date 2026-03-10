@@ -1,0 +1,26 @@
+{
+  "E1": {
+    "safety": 3,
+    "transport": 3,
+    "amenities": 3,
+    "cost": 3,
+    "noise": 3,
+    "area_score": 95
+  },
+  "SW11": {
+    "safety": 3,
+    "transport": 3,
+    "amenities": 3,
+    "cost": 3,
+    "noise": 3,
+    "area_score": 85
+  },
+  "MK40": {
+    "safety": 3,
+    "transport": 3,
+    "amenities": 3,
+    "cost": 3,
+    "noise": 3,
+    "area_score": 55
+  }
+}

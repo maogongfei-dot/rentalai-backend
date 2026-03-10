@@ -1,0 +1,12 @@
+[
+    {
+        "postcode": "MK40",
+        "area_name": "Bedford Centre",
+        "safety_score": 7.0,
+        "transport_score": 8.0,
+        "shopping_score": 9.0,
+        "quiet_score": 5.0,
+        "overall_area_score": 7.25,
+        "notes": "good transport"
+    }
+]

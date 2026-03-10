@@ -1,0 +1,18 @@
+[
+  {
+    "rent": 900,
+    "postcode": "E1 6AN",
+    "bills": true,
+    "commute_mins": 35,
+    "bedrooms": 1,
+    "bills_included": true
+  },
+  {
+    "rent": 1200,
+    "postcode": "SW11 2AA",
+    "bills": false,
+    "commute_mins": 55,
+    "bedrooms": 2,
+    "bills_included": false
+  }
+]

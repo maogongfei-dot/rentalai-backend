@@ -1,0 +1,133 @@
+{
+  "listings": [
+    {
+      "rent": 1200,
+      "area": "bedford",
+      "bills": true,
+      "postcode": "MK40 1AA",
+      "commute": 30,
+      "bedrooms": 1,
+      "distance_to_target": null,
+      "distance": null,
+      "distance_score": 0
+    },
+    {
+      "rent": 900,
+      "area": "bedford",
+      "bills": false,
+      "postcode": "MK41 7RS",
+      "commute": 20,
+      "bedrooms": 1,
+      "distance_to_target": null,
+      "distance": null,
+      "distance_score": 0
+    }
+  ],
+  "settings": {
+    "budget": 1500,
+    "areas": [],
+    "min_bed": null
+  },
+  "last_action": null,
+  "weights": {
+    "price": 35,
+    "commute": 30,
+    "bills": 15,
+    "area": 10,
+    "bedrooms": 10
+  },
+  "ranked_results": [
+    {
+      "house": {
+        "rent": 1200,
+        "area": "bedford",
+        "bills": true,
+        "postcode": "MK40 1AA",
+        "commute": 30,
+        "bedrooms": 1,
+        "distance_to_target": null,
+        "distance": null,
+        "distance_score": 0
+      },
+      "base_score": 31.0,
+      "final_score": 31.0,
+      "base_detail": {
+        "penalties": [],
+        "price": {
+          "points": 6.0,
+          "reason": "低于预算，加分"
+        },
+        "commute": {
+          "points": 0,
+          "reason": "commute_mins 缺失，不计分"
+        },
+        "bills": {
+          "points": 15,
+          "reason": "bills 包含，加分"
+        },
+        "bedrooms": {
+          "points": 10,
+          "reason": "卧室数 1 >= 需求 1，加分"
+        },
+        "distance": {
+          "points": 0,
+          "reason": "distance missing"
+        }
+      },
+      "area_detail": {
+        "postcode": "MK40 1AA",
+        "base_score": 31.0,
+        "area_score": 0,
+        "area_weight": 0.2,
+        "area_add": 0.0,
+        "final_score": 31.0
+      }
+    },
+    {
+      "house": {
+        "rent": 900,
+        "area": "bedford",
+        "bills": false,
+        "postcode": "MK41 7RS",
+        "commute": 20,
+        "bedrooms": 1,
+        "distance_to_target": null,
+        "distance": null,
+        "distance_score": 0
+      },
+      "base_score": 22.0,
+      "final_score": 22.0,
+      "base_detail": {
+        "penalties": [],
+        "price": {
+          "points": 12.0,
+          "reason": "低于预算，加分"
+        },
+        "commute": {
+          "points": 0,
+          "reason": "commute_mins 缺失，不计分"
+        },
+        "bills": {
+          "points": 0,
+          "reason": "bills 不包含，不加分"
+        },
+        "bedrooms": {
+          "points": 10,
+          "reason": "卧室数 1 >= 需求 1，加分"
+        },
+        "distance": {
+          "points": 0,
+          "reason": "distance missing"
+        }
+      },
+      "area_detail": {
+        "postcode": "MK41 7RS",
+        "base_score": 22.0,
+        "area_score": 0,
+        "area_weight": 0.2,
+        "area_add": 0.0,
+        "final_score": 22.0
+      }
+    }
+  ]
+}
