@@ -22,7 +22,7 @@ from actions import (
 )
 
 # Scoring
-from scoring_adapter import get_top_n
+from scoring_adapter import get_top_n, explain_score
 
 # State
 from state import init_state, save_state, load_state
@@ -492,6 +492,9 @@ def main():
                         f"| postcode={h.get('postcode')} | distance={h.get('distance_to_target')} miles "
                         f"| commute={h.get('commute')} | bedrooms={h.get('bedrooms')}"
                     )
+                    reasons = explain_score(h, budget)
+                    if reasons:
+                        print("推荐原因:", ", ".join(reasons))
         elif choice == "4":
             save_state(state)
 
@@ -547,6 +550,9 @@ def main():
                         f"| postcode={h.get('postcode')} | commute={h.get('commute')} | bedrooms={h.get('bedrooms')} "
                         f"| score={r.get('final_score', r.get('_score', r.get('score')))}"
                     )
+                    reasons = explain_score(h, budget)
+                    if reasons:
+                        print("推荐原因:", ", ".join(reasons))
         elif choice.upper() == "P":
             budget, weights, area_rank_scores, target_postcode = set_preferences()
 

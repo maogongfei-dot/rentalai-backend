@@ -17,5 +17,20 @@ def get_top_n(state, n=3):
     ranked = state.get("ranked_results", [])
     return ranked[:n]
 
+def explain_score(house, budget):
+    reasons = []
 
+    rent = house.get("rent")
+    commute = house.get("commute")
+
+    if rent and rent <= budget:
+        reasons.append("价格低于预算")
+
+    if commute and commute <= 30:
+        reasons.append("通勤时间合理")
+
+    if house.get("bills"):
+        reasons.append("包含 bills")
+
+    return reasons
 
