@@ -25,7 +25,7 @@ from actions import (
 from scoring_adapter import get_top_n, explain_score
 
 # Module3: Contract risk (demo only, not in final_score)
-from contract_risk import calculate_contract_risk_score
+from contract_risk import calculate_contract_risk_score, calculate_structured_risk_score
 
 # State
 from state import init_state, save_state, load_state
@@ -433,6 +433,7 @@ def print_menu():
     print("G) 评分排序Top5")
     print("P) 设置偏好(预算/区域/模式)")
     print("K) 合同风险测试(输入文本)")
+    print("L) 结构化风险测试(示例listing)")
     print("0) 退出")
 
 def handle_add_listing(state):
@@ -599,6 +600,55 @@ def main():
                 print("命中关键词:", ", ".join(result["matched_keywords"]))
             if result.get("risk_reasons"):
                 print("原因:")
+                for line in result["risk_reasons"]:
+                    print(" -", line)
+
+        elif choice.upper() == "L":
+            print("\n--- 结构化风险识别（最小可运行版）---")
+            print("1) 低风险示例")
+            print("2) deposit 风险示例")
+            print("3) no viewing + transfer only 高风险示例")
+            print("4) no contract + deposit + urgent payment 组合高风险示例")
+            sub = input("请选择示例(1-4): ").strip()
+
+            if sub == "1":
+                listing = {
+                    "rent": 1500,
+                    "deposit_amount": 1500,
+                    "viewing_available": True,
+                    "contract_available": True,
+                    "payment_method": "bank transfer",
+                    "notes": "Viewing available. Standard tenancy agreement.",
+                    "bills": True,
+                }
+            elif sub == "2":
+                listing = {
+                    "rent": "1200",
+                    "deposit_amount": "2200",
+                    "holding_deposit": "holding deposit non-refundable",
+                    "notes": "deposit required",
+                }
+            elif sub == "3":
+                listing = {
+                    "rent": 1400,
+                    "viewing_available": False,
+                    "payment_method": "bank transfer only",
+                    "description": "No viewing. Urgent payment needed. Bank transfer only. Pay now.",
+                }
+            else:
+                listing = {
+                    "rent": 1300,
+                    "deposit_amount": 2200,
+                    "contract_available": False,
+                    "notes": "No contract, verbal only. Cash only. Urgent payment, pay now.",
+                }
+
+            result = calculate_structured_risk_score(listing)
+            print(f"\nstructured_risk_score（0-10）：{result.get('structured_risk_score')}")
+            if result.get("matched_rules"):
+                print("matched_rules:", ", ".join(result["matched_rules"]))
+            if result.get("risk_reasons"):
+                print("risk_reasons:")
                 for line in result["risk_reasons"]:
                     print(" -", line)
 

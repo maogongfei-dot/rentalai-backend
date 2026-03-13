@@ -102,6 +102,193 @@ def _dedupe_preserve_order(items: List[str]) -> List[str]:
     return out
 
 
+def _to_float(x: Any) -> float | None:
+    if x is None:
+        return None
+    if isinstance(x, (int, float)):
+        return float(x)
+    s = str(x).strip().lower()
+    if not s:
+        return None
+    # keep digits and dot only
+    filtered = "".join(ch for ch in s if (ch.isdigit() or ch == "."))
+    if not filtered:
+        return None
+    try:
+        return float(filtered)
+    except ValueError:
+        return None
+
+
+def _get_text_fields(listing: Dict[str, Any], keys: List[str]) -> str:
+    parts: List[str] = []
+    for k in keys:
+        v = listing.get(k)
+        if v is None:
+            continue
+        s = str(v).strip()
+        if s:
+            parts.append(s)
+    return " ".join(parts)
+
+
+def calculate_structured_risk_score(listing: Dict[str, Any] | None) -> Dict[str, Any]:
+    """
+    Structured risk engine (Module3 Phase2 - first half).
+    Input: listing dict (safe for None/missing fields)
+    Output:
+      {
+        "structured_risk_score": 0-10,
+        "matched_rules": list[str],
+        "risk_reasons": list[str]
+      }
+    """
+    if not isinstance(listing, dict):
+        return {
+            "structured_risk_score": 0,
+            "matched_rules": [],
+            "risk_reasons": ["listing is None/invalid; default low risk."],
+        }
+
+    matched_rules: List[str] = []
+    risk_reasons: List[str] = []
+    points = 0
+
+    # Gather free-text signals from multiple fields (safe)
+    text = _norm_text(
+        _get_text_fields(
+            listing,
+            [
+                "notes",
+                "description",
+                "contract_text",
+                "payment_method",
+                "deposit",
+                "holding_deposit",
+            ],
+        )
+    )
+
+    # --- Rule group 1: Deposit / holding deposit ---
+    rent = _to_float(listing.get("rent"))
+    deposit_amount = _to_float(listing.get("deposit_amount"))
+    if deposit_amount is None:
+        # allow "deposit" field to be numeric-like
+        deposit_amount = _to_float(listing.get("deposit"))
+
+    if rent is not None and deposit_amount is not None:
+        # risk if deposit > 1.5 months rent (simplified threshold)
+        if deposit_amount > 1.5 * rent:
+            matched_rules.append("deposit_too_high")
+            risk_reasons.append(f"Deposit amount unusually high vs rent: deposit={deposit_amount}, rent={rent}")
+            points += 3
+
+    holding_deposit = listing.get("holding_deposit")
+    holding_text = _norm_text(holding_deposit)
+    if holding_text and ("non-refundable" in holding_text or "non refundable" in holding_text):
+        matched_rules.append("holding_deposit_non_refundable")
+        risk_reasons.append("Holding deposit described as non-refundable.")
+        points += 4
+
+    # --- Rule group 2: Payment method / urgent payment ---
+    if any(k in text for k in ["cash only", "bank transfer only", "pay now", "urgent payment"]):
+        matched_rules.append("suspicious_payment_terms")
+        risk_reasons.append("Suspicious payment terms detected (cash only / bank transfer only / pay now / urgent payment).")
+        points += 3
+
+    # --- Rule group 3: Viewing availability ---
+    viewing_available = listing.get("viewing_available")
+    viewing = listing.get("viewing")
+    if viewing_available is False:
+        matched_rules.append("no_viewing_flag")
+        risk_reasons.append("Viewing available flag is False.")
+        points += 4
+    if isinstance(viewing, str) and "unavailable" in _norm_text(viewing):
+        matched_rules.append("viewing_unavailable_text")
+        risk_reasons.append("Viewing marked unavailable.")
+        points += 4
+    if any(k in text for k in ["no viewing", "viewing unavailable"]):
+        matched_rules.append("no_viewing_text")
+        risk_reasons.append("No viewing mentioned in text.")
+        points += 4
+
+    # --- Rule group 4: Contract availability ---
+    contract_available = listing.get("contract_available")
+    contract = listing.get("contract")
+    if contract_available is False:
+        matched_rules.append("no_contract_flag")
+        risk_reasons.append("Contract available flag is False.")
+        points += 3
+    if isinstance(contract, str) and any(k in _norm_text(contract) for k in ["no contract", "verbal only"]):
+        matched_rules.append("no_contract_text_field")
+        risk_reasons.append("Contract field indicates no contract / verbal only.")
+        points += 3
+    if any(k in text for k in ["no contract", "verbal only"]):
+        matched_rules.append("no_contract_text")
+        risk_reasons.append("No contract / verbal only mentioned in text.")
+        points += 3
+
+    # --- Rule group 5: Bills ambiguity ---
+    if any(k in text for k in ["bills not clear", "ask later", "depends"]):
+        matched_rules.append("bills_unclear")
+        risk_reasons.append("Bills information unclear (bills not clear / ask later / depends).")
+        points += 2
+
+    # --- Rule group 6: Verification flags (if present) ---
+    if "landlord_verified" in listing and listing.get("landlord_verified") is False:
+        matched_rules.append("landlord_not_verified")
+        risk_reasons.append("Landlord explicitly not verified.")
+        points += 2
+    if "agent_verified" in listing and listing.get("agent_verified") is False:
+        matched_rules.append("agent_not_verified")
+        risk_reasons.append("Agent explicitly not verified.")
+        points += 2
+
+    # --- Combination escalation ---
+    has_no_viewing = any(r.startswith("no_viewing") or r.startswith("viewing_") for r in matched_rules)
+    has_transfer_only = "suspicious_payment_terms" in matched_rules and ("bank transfer only" in text)
+    has_cash_only = "suspicious_payment_terms" in matched_rules and ("cash only" in text)
+    has_urgent = "suspicious_payment_terms" in matched_rules and (("urgent payment" in text) or ("pay now" in text))
+    has_no_contract = any(r.startswith("no_contract") for r in matched_rules)
+    has_deposit_issue = any(r.startswith("deposit_") or r.startswith("holding_deposit") for r in matched_rules)
+
+    if has_no_viewing and has_transfer_only:
+        matched_rules.append("combo_no_viewing_transfer_only")
+        risk_reasons.append("High-risk combo: no viewing + bank transfer only.")
+        points += 4
+    if has_no_contract and has_deposit_issue:
+        matched_rules.append("combo_no_contract_deposit")
+        risk_reasons.append("High-risk combo: no contract + deposit issue.")
+        points += 3
+    if has_urgent and has_cash_only:
+        matched_rules.append("combo_urgent_cash_only")
+        risk_reasons.append("High-risk combo: urgent payment + cash only.")
+        points += 3
+
+    matched_rules = _dedupe_preserve_order(matched_rules)
+    risk_reasons = _dedupe_preserve_order(risk_reasons)
+
+    # --- Map points -> 0~10 (stable bands) ---
+    if not matched_rules:
+        score = 1
+    else:
+        if points <= 3:
+            score = 3
+        elif points <= 7:
+            score = 6
+        elif points <= 11:
+            score = 8
+        else:
+            score = 10
+
+    score = max(0, min(10, int(score)))
+    return {
+        "structured_risk_score": score,
+        "matched_rules": matched_rules,
+        "risk_reasons": risk_reasons,
+    }
+
+
 def calculate_contract_risk_score(text: str | None) -> Dict[str, Any]:
     """
     Input: listing/contract description text (string)
