@@ -183,16 +183,15 @@ def calculate_area_quality_score(area: Any) -> float:
 
 def calculate_area_preference_score(house: dict, settings: dict) -> Tuple[float, str]:
     """
-    Module5 Phase2-A: Area Score Engine 基础版.
+    Module5 Phase2-B(2)-A: Area Score Engine 细化版.
     Returns (area_score 0~10, area_score_reason).
 
-    Rules:
-      1) If house.area in preferred_areas -> 10
-      2) If house.postcode in preferred_postcodes -> 10
-      3) If no match:
-         - if area/postcode missing -> 5 (neutral)
-         - else -> 6 (slightly positive)
-      4) If both match, still cap at 10 (no stacking).
+    Priority rules (highest wins, no stacking):
+      1) area 精确命中 或 postcode 精确命中 -> 10
+      2) postcode 前缀命中 -> 8
+      3) area 弱匹配（包含关系） -> 8
+      4) area/postcode 均缺失 -> 5
+      5) 其余情况 -> 6
     """
     try:
         preferred_areas = [
@@ -208,9 +207,35 @@ def calculate_area_preference_score(house: dict, settings: dict) -> Tuple[float,
     raw_postcode = house.get("postcode") or house.get("post_code") or ""
     listing_postcode = _norm(raw_postcode)
 
+    def _postcode_prefix_match(listing: str, prefs: list[str]) -> bool:
+        if not listing or not prefs:
+            return False
+        # 去除空格后做前缀匹配，例如 "mk40" vs "mk40 2ab"
+        lp = listing.replace(" ", "")
+        for p in prefs:
+            if not p:
+                continue
+            pp = p.replace(" ", "")
+            if lp.startswith(pp):
+                return True
+        return False
+
+    def _area_loose_match(listing: str, prefs: list[str]) -> bool:
+        if not listing or not prefs:
+            return False
+        for p in prefs:
+            if not p:
+                continue
+            if listing in p or p in listing:
+                return True
+        return False
+
     in_preferred_area = bool(listing_area) and listing_area in preferred_areas
     in_preferred_postcode = bool(listing_postcode) and listing_postcode in preferred_postcodes
+    has_postcode_prefix = _postcode_prefix_match(listing_postcode, preferred_postcodes)
+    has_area_loose = _area_loose_match(listing_area, preferred_areas)
 
+    # 1) 精确命中（area 或 postcode）
     if in_preferred_area and in_preferred_postcode:
         return 10.0, "Matched preferred area and postcode"
     if in_preferred_area:
@@ -218,9 +243,19 @@ def calculate_area_preference_score(house: dict, settings: dict) -> Tuple[float,
     if in_preferred_postcode:
         return 10.0, "Matched preferred postcode"
 
+    # 2) postcode 前缀命中
+    if has_postcode_prefix:
+        return 8.0, "Matched preferred postcode prefix"
+
+    # 3) area 弱匹配（包含关系）
+    if has_area_loose:
+        return 8.0, "Matched preferred area loosely"
+
+    # 4) 缺失信息 -> 中性
     if not listing_area and not listing_postcode:
         return 5.0, "Area/postcode missing, neutral score applied"
 
+    # 5) 其他 -> 略正向分数
     return 6.0, "No preference match"
 
 
