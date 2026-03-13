@@ -234,3 +234,37 @@ def generate_overall_summary(
 
     return summaries
 
+
+def generate_confidence_level(house: Dict[str, Any], result: Dict[str, Any]) -> str:
+    """
+    Explain Engine MVP Phase2:
+    Generate a simple confidence level: High / Medium / Low.
+    """
+    risk_score = _to_float_safe(result.get("risk_score"))
+    final_score = _to_float_safe(result.get("final_score"))
+
+    # Defensive defaults
+    if risk_score is None:
+        risk_score = 0.0
+    if final_score is None:
+        final_score = 0.0
+
+    # 1) High risk -> Low confidence
+    if risk_score >= 7:
+        return "Low"
+
+    # 2) Strong score & low risk -> High
+    if final_score >= 8 and risk_score <= 2:
+        return "High"
+
+    # 3) Good score & low-moderate risk -> Medium
+    if final_score >= 6 and risk_score <= 4:
+        return "Medium"
+
+    # 4) Low score -> Low
+    if final_score < 6:
+        return "Low"
+
+    # 5) Fallback
+    return "Medium"
+

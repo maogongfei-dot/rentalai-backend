@@ -30,6 +30,7 @@ from explain_engine import (
     explain_why_not,
     generate_final_verdict,
     generate_overall_summary,
+    generate_confidence_level,
 )
 
 # Module3: Contract risk (demo only, not in final_score)
@@ -442,6 +443,7 @@ def print_menu():
     print("P) 设置偏好(预算/区域/模式)")
     print("K) 合同风险测试(输入文本)")
     print("L) 结构化风险测试(示例listing)")
+    print("D) Demo dataset")
     print("0) 退出")
 
 def handle_add_listing(state):
@@ -503,27 +505,63 @@ def main():
                     distance_text = h.get("distance_to_target")
                     if distance_text is None:
                         distance_text = "N/A"
+
+                    print("--------------------------------")
+                    if i == 1:
+                        print("⭐ Best Choice")
+
+                    # 1. 房源标题（第几名 + 核心字段）
                     print(
-                        f"{i}. area={h.get('area')} | rent={h.get('rent')} | bills={h.get('bills')} "
+                        f"Top{i}: area={h.get('area')} | rent={h.get('rent')} | bills={h.get('bills')} "
                         f"| postcode={h.get('postcode')} | distance={distance_text} miles "
                         f"| commute={h.get('commute')} | bedrooms={h.get('bedrooms')}"
                     )
+
+                    # 2. 评分信息
+                    if r.get("final_score") is not None or r.get("_score") is not None:
+                        print(f"   final_score: {r.get('final_score', r.get('_score'))}")
+                    confidence = generate_confidence_level(h, r)
+                    print(f"   confidence: {confidence}")
                     if r.get("area_preference_score") is not None:
-                        print(f"   地区偏好分: {r.get('area_preference_score')} - {r.get('area_preference_reason', '')}")
+                        print(f"   area_preference_score: {r.get('area_preference_score')} "
+                              f"({r.get('area_preference_reason', '')})")
                     if r.get("area_quality_score") is not None:
-                        print(f"   区域质量分: {r.get('area_quality_score')}")
+                        print(f"   area_quality_score: {r.get('area_quality_score')}")
                     if r.get("risk_score") is not None:
-                        print(f"   Risk score: {r.get('risk_score')}")
-                        print(f"   Risk penalty: {r.get('risk_penalty')}")
-                        reasons = r.get("risk_reasons") or []
-                        if reasons:
-                            print("   Risk reasons:")
-                            for line in reasons:
-                                print("     -", line)
+                        print(f"   risk_score: {r.get('risk_score')}")
+                        print(f"   risk_penalty: {r.get('risk_penalty')}")
+
+                    # 3. 推荐原因（沿用 Module2 的 explain_score）
                     reasons = explain_score(h, budget)
                     if reasons:
-                        print("推荐原因:", ", ".join(reasons))
-                print("----- AI Summary -----")
+                        print("推荐原因：")
+                        for reason in reasons:
+                            print(f"   ✔ {reason}")
+
+                    # 4. 不推荐原因（Phase3）
+                    why_not = explain_why_not(h, r, state.get("settings"))
+                    if why_not:
+                        print("不推荐原因：")
+                        for reason in why_not:
+                            print(f"   ✗ {reason}")
+
+                    # 5. 风险提示（Phase2）
+                    risk_reasons = r.get("risk_reasons") or []
+                    if risk_reasons:
+                        print("⚠ 风险提示:")
+                        risk_score = r.get("risk_score")
+                        if risk_score is not None and risk_score >= 7:
+                            print("⚠ High risk listing")
+                        for line in risk_reasons:
+                            print(f"⚠ {line}")
+
+                    # 6. AI 结论（Phase4）
+                    verdict = generate_final_verdict(h, r, state.get("settings"))
+                    if verdict:
+                        print("AI结论：")
+                        print(f"   {verdict}")
+
+                print("=============== AI Summary ===============")
                 summary = generate_overall_summary(top3, state.get("settings"))
                 for s in summary:
                     print("•", s)
@@ -582,32 +620,44 @@ def main():
                         distance_text = "N/A"
                     score_text = r.get("final_score", r.get("_score", "N/A"))
                     detail_text = r.get("detail") or r.get("_detail")
+                    print("--------------------------------")
+                    # 1. 房源标题
                     print(
-                        f"{i}. area={h.get('area')} | rent={h.get('rent')} | bills={h.get('bills')} "
+                        f"Top{i}: area={h.get('area')} | rent={h.get('rent')} | bills={h.get('bills')} "
                         f"| postcode={h.get('postcode')} | distance={distance_text} miles "
-                        f"| commute={h.get('commute')} | bedrooms={h.get('bedrooms')} "
-                        f"| score={r.get('final_score', r.get('_score', r.get('score')))}"
+                        f"| commute={h.get('commute')} | bedrooms={h.get('bedrooms')}"
                     )
-                    print(f"   总分：{score_text}")
+
+                    # 2. 评分信息
+                    print(f"   final_score: {r.get('final_score', r.get('_score', r.get('score')))}")
+                    confidence = generate_confidence_level(h, r)
+                    print(f"   confidence: {confidence}")
                     if detail_text:
                         print(f"   评分明细：{detail_text}")
                     if r.get("area_preference_score") is not None:
-                        print(f"   地区偏好分: {r.get('area_preference_score')} - {r.get('area_preference_reason', '')}")
+                        print(f"   area_preference_score: {r.get('area_preference_score')} "
+                              f"({r.get('area_preference_reason', '')})")
                     if r.get("area_quality_score") is not None:
-                        print(f"   区域质量分: {r.get('area_quality_score')}")
+                        print(f"   area_quality_score: {r.get('area_quality_score')}")
                     if r.get("risk_score") is not None:
-                        print(f"   Risk score: {r.get('risk_score')}")
-                        print(f"   Risk penalty: {r.get('risk_penalty')}")
+                        print(f"   risk_score: {r.get('risk_score')}")
+                        print(f"   risk_penalty: {r.get('risk_penalty')}")
+
+                    # 3. 推荐原因（Phase1）
                     rec_reasons = explain_recommendation_score(h, r)
                     if rec_reasons:
                         print("推荐原因：")
                         for reason in rec_reasons:
                             print(f"   ✔ {reason}")
+
+                    # 4. 不推荐原因（Phase3）
                     why_not = explain_why_not(h, r, state.get("settings"))
                     if why_not:
                         print("不推荐原因：")
                         for reason in why_not:
                             print(f"   ✗ {reason}")
+
+                    # 5. 风险提示（Phase2）
                     risk_reasons = r.get("risk_reasons") or []
                     if risk_reasons:
                         print("⚠ 风险提示:")
@@ -616,10 +666,124 @@ def main():
                             print("⚠ High risk listing")
                         for reason in risk_reasons:
                             print(f"⚠ {reason}")
+
+                    # 6. AI结论（Phase4）
                     verdict = generate_final_verdict(h, r, state.get("settings"))
                     if verdict:
                         print("AI结论：")
                         print(f"   {verdict}")
+        elif choice.upper() == "D":
+            # Demo dataset: 3 sample listings to showcase full AI flow
+            demo_list = [
+                {
+                    "rent": 900,
+                    "area": "bedford",
+                    "bills": False,
+                    "postcode": "MK41",
+                    "commute": 20,
+                    "bedrooms": 1,
+                },
+                {
+                    "rent": 1200,
+                    "area": "bedford",
+                    "bills": True,
+                    "postcode": "MK40",
+                    "commute": 30,
+                    "bedrooms": 1,
+                },
+                {
+                    "rent": 1400,
+                    "area": "milton keynes",
+                    "bills": True,
+                    "postcode": "MK9",
+                    "commute": 40,
+                    "bedrooms": 2,
+                },
+            ]
+
+            if houses:
+                print(f"\n📦 当前已有 {len(houses)} 条房源，将在此基础上追加 Demo 样例。")
+            houses.extend(demo_list)
+            state["listings"] = houses
+            current_list = houses
+
+            print("\n✅ Demo dataset loaded（已追加 3 条示例房源）。")
+            print("👉 正在自动生成 Top3 推荐...\n")
+
+            top3 = get_top_n(state, 3)
+            target_postcode = state["settings"].get("target_postcode", "N/A")
+            print(f"\n🏆 Demo Top3（按评分排序，目标postcode: {target_postcode}）：\n")
+
+            if not top3:
+                print("⚠️ 暂无可推荐房源")
+            else:
+                for i, r in enumerate(top3, 1):
+                    h = r.get("house", {})
+                    distance_text = h.get("distance_to_target")
+                    if distance_text is None:
+                        distance_text = "N/A"
+
+                    print("--------------------------------")
+                    if i == 1:
+                        print("⭐ Best Choice")
+
+                    # 1. 房源标题
+                    print(
+                        f"Top{i}: area={h.get('area')} | rent={h.get('rent')} | bills={h.get('bills')} "
+                        f"| postcode={h.get('postcode')} | distance={distance_text} miles "
+                        f"| commute={h.get('commute')} | bedrooms={h.get('bedrooms')}"
+                    )
+
+                    # 2. 评分信息
+                    if r.get("final_score") is not None or r.get("_score") is not None:
+                        print(f"   final_score: {r.get('final_score', r.get('_score'))}")
+                    confidence = generate_confidence_level(h, r)
+                    print(f"   confidence: {confidence}")
+                    if r.get("area_preference_score") is not None:
+                        print(
+                            f"   area_preference_score: {r.get('area_preference_score')} "
+                            f"({r.get('area_preference_reason', '')})"
+                        )
+                    if r.get("area_quality_score") is not None:
+                        print(f"   area_quality_score: {r.get('area_quality_score')}")
+                    if r.get("risk_score") is not None:
+                        print(f"   risk_score: {r.get('risk_score')}")
+                        print(f"   risk_penalty: {r.get('risk_penalty')}")
+
+                    # 3. 推荐原因
+                    reasons = explain_score(h, budget)
+                    if reasons:
+                        print("推荐原因：")
+                        for reason in reasons:
+                            print(f"   ✔ {reason}")
+
+                    # 4. 不推荐原因
+                    why_not = explain_why_not(h, r, state.get("settings"))
+                    if why_not:
+                        print("不推荐原因：")
+                        for reason in why_not:
+                            print(f"   ✗ {reason}")
+
+                    # 5. 风险提示
+                    risk_reasons = r.get("risk_reasons") or []
+                    if risk_reasons:
+                        print("⚠ 风险提示:")
+                        risk_score = r.get("risk_score")
+                        if risk_score is not None and risk_score >= 7:
+                            print("⚠ High risk listing")
+                        for line in risk_reasons:
+                            print(f"⚠ {line}")
+
+                    # 6. AI结论
+                    verdict = generate_final_verdict(h, r, state.get("settings"))
+                    if verdict:
+                        print("AI结论：")
+                        print(f"   {verdict}")
+
+                print("=============== AI Summary ===============")
+                summary = generate_overall_summary(top3, state.get("settings"))
+                for s in summary:
+                    print("•", s)
         elif choice.upper() == "P":
             budget, weights, area_rank_scores, target_postcode = set_preferences()
 
