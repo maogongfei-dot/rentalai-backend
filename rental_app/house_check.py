@@ -24,6 +24,9 @@ from actions import (
 # Scoring
 from scoring_adapter import get_top_n, explain_score
 
+# Module3: Contract risk (demo only, not in final_score)
+from contract_risk import calculate_contract_risk_score
+
 # State
 from state import init_state, save_state, load_state
 
@@ -429,6 +432,7 @@ def print_menu():
     print("R) 重置当前列表(全部房源)")
     print("G) 评分排序Top5")
     print("P) 设置偏好(预算/区域/模式)")
+    print("K) 合同风险测试(输入文本)")
     print("0) 退出")
 
 def handle_add_listing(state):
@@ -583,6 +587,20 @@ def main():
             print("✅ 偏好已更新")
             print(f"budget = {state['settings'].get('budget')}")
             print(f"target_postcode = {state['settings'].get('target_postcode')}")
+
+        elif choice.upper() == "K":
+            print("\n--- 合同/风险识别（最小可运行版）---")
+            text = input("请输入房源描述/合同文本（可直接粘贴，回车结束）:\n").strip()
+            result = calculate_contract_risk_score(text)
+            print(f"\n风险分（0-10）：{result.get('risk_score')}")
+            if result.get("matched_categories"):
+                print("命中类别:", ", ".join(result["matched_categories"]))
+            if result.get("matched_keywords"):
+                print("命中关键词:", ", ".join(result["matched_keywords"]))
+            if result.get("risk_reasons"):
+                print("原因:")
+                for line in result["risk_reasons"]:
+                    print(" -", line)
 
         elif choice == "0":
             print("已退出。")
