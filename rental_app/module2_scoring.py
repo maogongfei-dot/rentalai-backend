@@ -14,6 +14,14 @@ DEFAULT_WEIGHTS = {
     "bedrooms": 10,
 }
 
+# Module5 Area Score config (Phase2-B)
+AREA_SCORE_EXACT_MATCH = 10.0
+AREA_SCORE_POSTCODE_PREFIX = 8.0
+AREA_SCORE_AREA_LOOSE = 8.0
+AREA_SCORE_MISSING = 5.0
+AREA_SCORE_NO_MATCH = 6.0
+AREA_SCORE_AVOIDED = 2.0
+
 from module5_area.area_service import AreaService
 from contract_risk import calculate_structured_risk_score, calculate_risk_penalty
 
@@ -197,11 +205,14 @@ def calculate_area_preference_score(house: dict, settings: dict) -> Tuple[float,
         preferred_areas = [
             _norm(x) for x in (settings.get("preferred_areas") or []) if x is not None
         ]
+        avoided_areas = [
+            _norm(x) for x in (settings.get("avoided_areas") or []) if x is not None
+        ]
         preferred_postcodes = [
             _norm(x) for x in (settings.get("preferred_postcodes") or []) if x is not None
         ]
     except (TypeError, AttributeError):
-        return 5.0, "Area/postcode preferences not set, neutral score applied"
+        return AREA_SCORE_MISSING, "Area/postcode preferences not set, neutral score applied"
 
     listing_area = _norm(house.get("area"))
     raw_postcode = house.get("postcode") or house.get("post_code") or ""
@@ -232,31 +243,39 @@ def calculate_area_preference_score(house: dict, settings: dict) -> Tuple[float,
 
     in_preferred_area = bool(listing_area) and listing_area in preferred_areas
     in_preferred_postcode = bool(listing_postcode) and listing_postcode in preferred_postcodes
+    in_avoided_area = bool(listing_area) and listing_area in avoided_areas
+    has_avoided_loose = _area_loose_match(listing_area, avoided_areas)
     has_postcode_prefix = _postcode_prefix_match(listing_postcode, preferred_postcodes)
-    has_area_loose = _area_loose_match(listing_area, preferred_areas)
+    has_area_loose_pref = _area_loose_match(listing_area, preferred_areas)
 
-    # 1) 精确命中（area 或 postcode）
+    # 1) 精确命中（area 或 postcode）——最高优先级
     if in_preferred_area and in_preferred_postcode:
-        return 10.0, "Matched preferred area and postcode"
+        return AREA_SCORE_EXACT_MATCH, "Matched preferred area and postcode"
     if in_preferred_area:
-        return 10.0, "Matched preferred area"
+        return AREA_SCORE_EXACT_MATCH, "Matched preferred area"
     if in_preferred_postcode:
-        return 10.0, "Matched preferred postcode"
+        return AREA_SCORE_EXACT_MATCH, "Matched preferred postcode"
 
-    # 2) postcode 前缀命中
+    # 2) 避免区域（精确或弱匹配）——第二优先级
+    if in_avoided_area:
+        return AREA_SCORE_AVOIDED, "Matched avoided area"
+    if has_avoided_loose:
+        return AREA_SCORE_AVOIDED, "Matched avoided area loosely"
+
+    # 3) postcode 前缀命中
     if has_postcode_prefix:
-        return 8.0, "Matched preferred postcode prefix"
+        return AREA_SCORE_POSTCODE_PREFIX, "Matched preferred postcode prefix"
 
-    # 3) area 弱匹配（包含关系）
-    if has_area_loose:
-        return 8.0, "Matched preferred area loosely"
+    # 4) area 弱匹配（包含关系）
+    if has_area_loose_pref:
+        return AREA_SCORE_AREA_LOOSE, "Matched preferred area loosely"
 
-    # 4) 缺失信息 -> 中性
+    # 5) 缺失信息 -> 中性
     if not listing_area and not listing_postcode:
-        return 5.0, "Area/postcode missing, neutral score applied"
+        return AREA_SCORE_MISSING, "Area/postcode missing, neutral score applied"
 
-    # 5) 其他 -> 略正向分数
-    return 6.0, "No preference match"
+    # 6) 其他 -> 略正向分数
+    return AREA_SCORE_NO_MATCH, "No preference match"
 
 
 def score_distance(distance):
