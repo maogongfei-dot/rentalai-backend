@@ -24,6 +24,9 @@ from actions import (
 # Scoring
 from scoring_adapter import get_top_n, explain_score
 
+# Explain Engine (Phase1, for Top5 recommendations)
+from explain_engine import explain_score as explain_recommendation_score
+
 # Module3: Contract risk (demo only, not in final_score)
 from contract_risk import calculate_contract_risk_score, calculate_structured_risk_score
 
@@ -591,9 +594,11 @@ def main():
                             print("   Risk reasons:")
                             for line in reasons:
                                 print("     -", line)
-                    reasons = explain_score(h, budget)
-                    if reasons:
-                        print("推荐原因:", ", ".join(reasons))
+                    rec_reasons = explain_recommendation_score(h, r)
+                    if rec_reasons:
+                        print("推荐原因：")
+                        for reason in rec_reasons:
+                            print(f"   ✔ {reason}")
         elif choice.upper() == "P":
             budget, weights, area_rank_scores, target_postcode = set_preferences()
 
