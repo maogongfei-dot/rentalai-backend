@@ -24,8 +24,13 @@ from actions import (
 # Scoring
 from scoring_adapter import get_top_n, explain_score
 
-# Explain Engine (Phase1, for Top5 recommendations)
-from explain_engine import explain_score as explain_recommendation_score
+# Explain Engine (Phase1-5, for Top3/Top5 recommendations)
+from explain_engine import (
+    explain_score as explain_recommendation_score,
+    explain_why_not,
+    generate_final_verdict,
+    generate_overall_summary,
+)
 
 # Module3: Contract risk (demo only, not in final_score)
 from contract_risk import calculate_contract_risk_score, calculate_structured_risk_score
@@ -518,6 +523,10 @@ def main():
                     reasons = explain_score(h, budget)
                     if reasons:
                         print("推荐原因:", ", ".join(reasons))
+                print("----- AI Summary -----")
+                summary = generate_overall_summary(top3, state.get("settings"))
+                for s in summary:
+                    print("•", s)
         elif choice == "4":
             save_state(state)
 
@@ -594,6 +603,11 @@ def main():
                         print("推荐原因：")
                         for reason in rec_reasons:
                             print(f"   ✔ {reason}")
+                    why_not = explain_why_not(h, r, state.get("settings"))
+                    if why_not:
+                        print("不推荐原因：")
+                        for reason in why_not:
+                            print(f"   ✗ {reason}")
                     risk_reasons = r.get("risk_reasons") or []
                     if risk_reasons:
                         print("⚠ 风险提示:")
@@ -602,6 +616,10 @@ def main():
                             print("⚠ High risk listing")
                         for reason in risk_reasons:
                             print(f"⚠ {reason}")
+                    verdict = generate_final_verdict(h, r, state.get("settings"))
+                    if verdict:
+                        print("AI结论：")
+                        print(f"   {verdict}")
         elif choice.upper() == "P":
             budget, weights, area_rank_scores, target_postcode = set_preferences()
 
