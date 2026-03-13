@@ -16,11 +16,15 @@ DEFAULT_WEIGHTS = {
 
 # Module5 Area Score config (Phase2-B)
 AREA_SCORE_EXACT_MATCH = 10.0
-AREA_SCORE_POSTCODE_PREFIX = 8.0
 AREA_SCORE_AREA_LOOSE = 8.0
 AREA_SCORE_MISSING = 5.0
 AREA_SCORE_NO_MATCH = 6.0
 AREA_SCORE_AVOIDED = 2.0
+
+# Postcode prefix tiered scores (Phase2-B(2)-B2-A)
+POSTCODE_PREFIX_SCORE_LONG = 9.0   # e.g. "MK40 2", "MK402"
+POSTCODE_PREFIX_SCORE_MEDIUM = 8.0 # e.g. "MK40"
+POSTCODE_PREFIX_SCORE_SHORT = 7.0  # e.g. "MK"
 
 from module5_area.area_service import AreaService
 from contract_risk import calculate_structured_risk_score, calculate_risk_penalty
@@ -218,18 +222,48 @@ def calculate_area_preference_score(house: dict, settings: dict) -> Tuple[float,
     raw_postcode = house.get("postcode") or house.get("post_code") or ""
     listing_postcode = _norm(raw_postcode)
 
-    def _postcode_prefix_match(listing: str, prefs: list[str]) -> bool:
+    def _postcode_prefix_match(listing: str, prefs: list[str]) -> Tuple[bool, str, float, str]:
+        """
+        返回 (matched, best_prefix, score, level)
+        level in {"long", "medium", "short"} when matched is True.
+        """
         if not listing or not prefs:
-            return False
-        # 去除空格后做前缀匹配，例如 "mk40" vs "mk40 2ab"
+            return False, "", 0.0, ""
         lp = listing.replace(" ", "")
+        best_prefix = ""
+        best_score = 0.0
+        best_level = ""
+
         for p in prefs:
             if not p:
                 continue
             pp = p.replace(" ", "")
+            if not pp:
+                continue
             if lp.startswith(pp):
-                return True
-        return False
+                length = len(pp)
+                # 长前缀: 长度 >= 5
+                if length >= 5:
+                    score = POSTCODE_PREFIX_SCORE_LONG
+                    level = "long"
+                # 中前缀: 长度 == 4
+                elif length == 4:
+                    score = POSTCODE_PREFIX_SCORE_MEDIUM
+                    level = "medium"
+                # 短前缀: 长度 <= 3
+                else:
+                    score = POSTCODE_PREFIX_SCORE_SHORT
+                    level = "short"
+
+                # longest prefix wins (比较长度优先，其次分值防御性)
+                if len(pp) > len(best_prefix) or (len(pp) == len(best_prefix) and score > best_score):
+                    best_prefix = pp
+                    best_score = score
+                    best_level = level
+
+        if best_prefix:
+            return True, best_prefix, best_score, best_level
+        return False, "", 0.0, ""
 
     def _area_loose_match(listing: str, prefs: list[str]) -> bool:
         if not listing or not prefs:
@@ -245,7 +279,9 @@ def calculate_area_preference_score(house: dict, settings: dict) -> Tuple[float,
     in_preferred_postcode = bool(listing_postcode) and listing_postcode in preferred_postcodes
     in_avoided_area = bool(listing_area) and listing_area in avoided_areas
     has_avoided_loose = _area_loose_match(listing_area, avoided_areas)
-    has_postcode_prefix = _postcode_prefix_match(listing_postcode, preferred_postcodes)
+    has_postcode_prefix, best_prefix, best_prefix_score, best_prefix_level = _postcode_prefix_match(
+        listing_postcode, preferred_postcodes
+    )
     has_area_loose_pref = _area_loose_match(listing_area, preferred_areas)
 
     # 1) 精确命中（area 或 postcode）——最高优先级
@@ -262,9 +298,16 @@ def calculate_area_preference_score(house: dict, settings: dict) -> Tuple[float,
     if has_avoided_loose:
         return AREA_SCORE_AVOIDED, "Matched avoided area loosely"
 
-    # 3) postcode 前缀命中
+    # 3) postcode 前缀命中（分层）
     if has_postcode_prefix:
-        return AREA_SCORE_POSTCODE_PREFIX, "Matched preferred postcode prefix"
+        # best_prefix_score 已根据长度映射到 long/medium/short
+        if best_prefix_level == "long":
+            level_desc = "long"
+        elif best_prefix_level == "medium":
+            level_desc = "medium"
+        else:
+            level_desc = "short"
+        return best_prefix_score, f"Matched preferred postcode prefix ({level_desc})"
 
     # 4) area 弱匹配（包含关系）
     if has_area_loose_pref:
