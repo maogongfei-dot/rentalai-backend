@@ -589,16 +589,19 @@ def main():
                     if r.get("risk_score") is not None:
                         print(f"   Risk score: {r.get('risk_score')}")
                         print(f"   Risk penalty: {r.get('risk_penalty')}")
-                        reasons = r.get("risk_reasons") or []
-                        if reasons:
-                            print("   Risk reasons:")
-                            for line in reasons:
-                                print("     -", line)
                     rec_reasons = explain_recommendation_score(h, r)
                     if rec_reasons:
                         print("推荐原因：")
                         for reason in rec_reasons:
                             print(f"   ✔ {reason}")
+                    risk_reasons = r.get("risk_reasons") or []
+                    if risk_reasons:
+                        print("⚠ 风险提示:")
+                        risk_score = r.get("risk_score")
+                        if risk_score is not None and risk_score >= 7:
+                            print("⚠ High risk listing")
+                        for reason in risk_reasons:
+                            print(f"⚠ {reason}")
         elif choice.upper() == "P":
             budget, weights, area_rank_scores, target_postcode = set_preferences()
 
