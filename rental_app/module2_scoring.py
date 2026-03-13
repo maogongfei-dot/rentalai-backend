@@ -183,37 +183,45 @@ def calculate_area_quality_score(area: Any) -> float:
 
 def calculate_area_preference_score(house: dict, settings: dict) -> Tuple[float, str]:
     """
-    Module5 Area Score Engine (mild version).
-    Returns (score 0~10, reason string).
-    - preferred_areas match -> 8~10; avoided_areas -> 0~3;
-    - preferred_postcodes match -> 8~10; both area+postcode preferred -> 10;
-    - else or missing -> 5 (neutral). Safe for None/empty.
+    Module5 Phase2-A: Area Score Engine 基础版.
+    Returns (area_score 0~10, area_score_reason).
+
+    Rules:
+      1) If house.area in preferred_areas -> 10
+      2) If house.postcode in preferred_postcodes -> 10
+      3) If no match:
+         - if area/postcode missing -> 5 (neutral)
+         - else -> 6 (slightly positive)
+      4) If both match, still cap at 10 (no stacking).
     """
     try:
-        preferred_areas = [ _norm(x) for x in (settings.get("preferred_areas") or []) if x is not None ]
-        avoided_areas = [ _norm(x) for x in (settings.get("avoided_areas") or []) if x is not None ]
-        preferred_postcodes = [ _norm(x) for x in (settings.get("preferred_postcodes") or []) if x is not None ]
+        preferred_areas = [
+            _norm(x) for x in (settings.get("preferred_areas") or []) if x is not None
+        ]
+        preferred_postcodes = [
+            _norm(x) for x in (settings.get("preferred_postcodes") or []) if x is not None
+        ]
     except (TypeError, AttributeError):
-        return 5.0, "地区偏好未设置，中性分"
+        return 5.0, "Area/postcode preferences not set, neutral score applied"
 
     listing_area = _norm(house.get("area"))
-    listing_postcode = _norm(house.get("postcode") or house.get("post_code") or "")
+    raw_postcode = house.get("postcode") or house.get("post_code") or ""
+    listing_postcode = _norm(raw_postcode)
 
-    in_preferred_area = listing_area and listing_area in preferred_areas
-    in_avoided_area = listing_area and listing_area in avoided_areas
-    in_preferred_postcode = listing_postcode and listing_postcode in preferred_postcodes
+    in_preferred_area = bool(listing_area) and listing_area in preferred_areas
+    in_preferred_postcode = bool(listing_postcode) and listing_postcode in preferred_postcodes
 
-    if in_avoided_area and not in_preferred_area:
-        return 2.0, "区域在避免列表中，低分"
     if in_preferred_area and in_preferred_postcode:
-        return 10.0, "区域与邮编均在偏好中，高分"
+        return 10.0, "Matched preferred area and postcode"
     if in_preferred_area:
-        return 9.0, "区域在偏好中，加分"
+        return 10.0, "Matched preferred area"
     if in_preferred_postcode:
-        return 8.0, "邮编在偏好中，加分"
-    if in_avoided_area:
-        return 3.0, "区域在避免列表中"
-    return 5.0, "未命中偏好，中性分"
+        return 10.0, "Matched preferred postcode"
+
+    if not listing_area and not listing_postcode:
+        return 5.0, "Area/postcode missing, neutral score applied"
+
+    return 6.0, "No preference match"
 
 
 def score_distance(distance):
@@ -320,6 +328,13 @@ def score_house(house, prefs, weights):
         except ValueError:
             breakdown["bedrooms"] = {"points": 0, "reason": f"bedrooms 无法解析: {bedrooms}，不计分"}
 
+    # --- AREA PREFERENCE (for breakdown only, scoring加权在 rank_houses 中处理) ---
+    area_pref_score, area_pref_reason = calculate_area_preference_score(house, prefs)
+    breakdown["area"] = {
+        "points": area_pref_score,
+        "reason": area_pref_reason,
+    }
+
     # --- PENALTIES total ---
     for p in breakdown.get("penalties", []):
         score += p.get("points", 0)
@@ -395,9 +410,15 @@ def rank_houses(houses, prefs, weights):
             "final_score": final_score,
             "base_detail": base_detail,
             "area_detail": area_detail,
+            # area preference score (Module5 Phase2-A)
             "area_preference_score": round(area_pref_score, 2),
             "area_preference_reason": area_pref_reason,
+            # alias for clarity in输出层
+            "area_score": round(area_pref_score, 2),
+            "area_score_reason": area_pref_reason,
+            # area quality score (Module5 Phase2 后半)
             "area_quality_score": round(area_quality, 2),
+            # structured risk
             "risk_score": int(risk_score) if isinstance(risk_score, (int, float)) else risk_score,
             "risk_penalty": risk_penalty,
             "risk_reasons": risk_struct.get("risk_reasons", []),

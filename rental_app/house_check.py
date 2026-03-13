@@ -522,9 +522,9 @@ def main():
                         print(f"   final_score: {r.get('final_score', r.get('_score'))}")
                     confidence = generate_confidence_level(h, r)
                     print(f"   confidence: {confidence}")
-                    if r.get("area_preference_score") is not None:
-                        print(f"   area_preference_score: {r.get('area_preference_score')} "
-                              f"({r.get('area_preference_reason', '')})")
+                    if r.get("area_score") is not None:
+                        print(f"   area_score: {r.get('area_score')} "
+                              f"({r.get('area_score_reason', '')})")
                     if r.get("area_quality_score") is not None:
                         print(f"   area_quality_score: {r.get('area_quality_score')}")
                     if r.get("risk_score") is not None:
@@ -634,9 +634,9 @@ def main():
                     print(f"   confidence: {confidence}")
                     if detail_text:
                         print(f"   评分明细：{detail_text}")
-                    if r.get("area_preference_score") is not None:
-                        print(f"   area_preference_score: {r.get('area_preference_score')} "
-                              f"({r.get('area_preference_reason', '')})")
+                    if r.get("area_score") is not None:
+                        print(f"   area_score: {r.get('area_score')} "
+                              f"({r.get('area_score_reason', '')})")
                     if r.get("area_quality_score") is not None:
                         print(f"   area_quality_score: {r.get('area_quality_score')}")
                     if r.get("risk_score") is not None:
