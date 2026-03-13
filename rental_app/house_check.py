@@ -504,6 +504,14 @@ def main():
                         print(f"   地区偏好分: {r.get('area_preference_score')} - {r.get('area_preference_reason', '')}")
                     if r.get("area_quality_score") is not None:
                         print(f"   区域质量分: {r.get('area_quality_score')}")
+                    if r.get("risk_score") is not None:
+                        print(f"   Risk score: {r.get('risk_score')}")
+                        print(f"   Risk penalty: {r.get('risk_penalty')}")
+                        reasons = r.get("risk_reasons") or []
+                        if reasons:
+                            print("   Risk reasons:")
+                            for line in reasons:
+                                print("     -", line)
                     reasons = explain_score(h, budget)
                     if reasons:
                         print("推荐原因:", ", ".join(reasons))
@@ -575,6 +583,14 @@ def main():
                         print(f"   地区偏好分: {r.get('area_preference_score')} - {r.get('area_preference_reason', '')}")
                     if r.get("area_quality_score") is not None:
                         print(f"   区域质量分: {r.get('area_quality_score')}")
+                    if r.get("risk_score") is not None:
+                        print(f"   Risk score: {r.get('risk_score')}")
+                        print(f"   Risk penalty: {r.get('risk_penalty')}")
+                        reasons = r.get("risk_reasons") or []
+                        if reasons:
+                            print("   Risk reasons:")
+                            for line in reasons:
+                                print("     -", line)
                     reasons = explain_score(h, budget)
                     if reasons:
                         print("推荐原因:", ", ".join(reasons))

@@ -15,6 +15,7 @@ DEFAULT_WEIGHTS = {
 }
 
 from module5_area.area_service import AreaService
+from contract_risk import calculate_structured_risk_score, calculate_risk_penalty
 
 def score_commute(commute_mins):
     if commute_mins is None:
@@ -382,6 +383,12 @@ def rank_houses(houses, prefs, weights):
         area_quality_weight = 0.15
         final_score = round(final_score + area_quality_weight * area_quality, 2)
 
+        # Module3 Phase2: Structured contract risk penalty
+        risk_struct = calculate_structured_risk_score(h)
+        risk_score = risk_struct.get("structured_risk_score", 0)
+        risk_penalty = calculate_risk_penalty(risk_score)
+        final_score = round(final_score + risk_penalty, 2)
+
         results.append({
             "house": h,
             "base_score": base_score,
@@ -391,6 +398,9 @@ def rank_houses(houses, prefs, weights):
             "area_preference_score": round(area_pref_score, 2),
             "area_preference_reason": area_pref_reason,
             "area_quality_score": round(area_quality, 2),
+            "risk_score": int(risk_score) if isinstance(risk_score, (int, float)) else risk_score,
+            "risk_penalty": risk_penalty,
+            "risk_reasons": risk_struct.get("risk_reasons", []),
         })
 
     results.sort(key=lambda x: x["final_score"], reverse=True)

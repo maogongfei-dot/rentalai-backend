@@ -289,6 +289,38 @@ def calculate_structured_risk_score(listing: Dict[str, Any] | None) -> Dict[str,
     }
 
 
+def calculate_risk_penalty(score: int | float | None) -> float:
+    """
+    Map structured_risk_score (0-10) to a numeric penalty added to final_score.
+    Spec:
+      0-1  ->  0
+      2-3  -> -0.5
+      4-6  -> -1.5
+      7-8  -> -3
+      9-10 -> -5
+    """
+    if score is None:
+        return 0.0
+    try:
+        v = float(score)
+    except (TypeError, ValueError):
+        return 0.0
+    if v < 0:
+        v = 0.0
+    if v > 10:
+        v = 10.0
+
+    if v <= 1:
+        return 0.0
+    if v <= 3:
+        return -0.5
+    if v <= 6:
+        return -1.5
+    if v <= 8:
+        return -3.0
+    return -5.0
+
+
 def calculate_contract_risk_score(text: str | None) -> Dict[str, Any]:
     """
     Input: listing/contract description text (string)
