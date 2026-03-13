@@ -487,11 +487,18 @@ def main():
             else:
                 for i, r in enumerate(top3, 1):
                     h = r.get("house", {})
+                    distance_text = h.get("distance_to_target")
+                    if distance_text is None:
+                        distance_text = "N/A"
                     print(
                         f"{i}. area={h.get('area')} | rent={h.get('rent')} | bills={h.get('bills')} "
-                        f"| postcode={h.get('postcode')} | distance={h.get('distance_to_target')} miles "
+                        f"| postcode={h.get('postcode')} | distance={distance_text} miles "
                         f"| commute={h.get('commute')} | bedrooms={h.get('bedrooms')}"
                     )
+                    if r.get("area_preference_score") is not None:
+                        print(f"   地区偏好分: {r.get('area_preference_score')} - {r.get('area_preference_reason', '')}")
+                    if r.get("area_quality_score") is not None:
+                        print(f"   区域质量分: {r.get('area_quality_score')}")
                     reasons = explain_score(h, budget)
                     if reasons:
                         print("推荐原因:", ", ".join(reasons))
@@ -545,11 +552,24 @@ def main():
                 for i, r in enumerate(top5, 1):
 
                     h = r["house"]
+                    distance_text = h.get("distance_to_target")
+                    if distance_text is None:
+                        distance_text = "N/A"
+                    score_text = r.get("final_score", r.get("_score", "N/A"))
+                    detail_text = r.get("detail") or r.get("_detail")
                     print(
                         f"{i}. area={h.get('area')} | rent={h.get('rent')} | bills={h.get('bills')} "
-                        f"| postcode={h.get('postcode')} | commute={h.get('commute')} | bedrooms={h.get('bedrooms')} "
+                        f"| postcode={h.get('postcode')} | distance={distance_text} miles "
+                        f"| commute={h.get('commute')} | bedrooms={h.get('bedrooms')} "
                         f"| score={r.get('final_score', r.get('_score', r.get('score')))}"
                     )
+                    print(f"   总分：{score_text}")
+                    if detail_text:
+                        print(f"   评分明细：{detail_text}")
+                    if r.get("area_preference_score") is not None:
+                        print(f"   地区偏好分: {r.get('area_preference_score')} - {r.get('area_preference_reason', '')}")
+                    if r.get("area_quality_score") is not None:
+                        print(f"   区域质量分: {r.get('area_quality_score')}")
                     reasons = explain_score(h, budget)
                     if reasons:
                         print("推荐原因:", ", ".join(reasons))

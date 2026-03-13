@@ -1,0 +1,9 @@
+{
+  "A": { "safety": 7, "transport": 6, "amenities": 5, "cost": 4, "noise": 6 },
+  "B": { "safety": 5, "transport": 4, "amenities": 5, "cost": 6, "noise": 5 },
+  "E1": { "safety": 6, "transport": 9, "amenities": 8, "cost": 3, "noise": 5 },
+  "SW11": { "safety": 7, "transport": 7, "amenities": 8, "cost": 4, "noise": 6 },
+  "CR4": { "safety": 6, "transport": 5, "amenities": 5, "cost": 6, "noise": 7 },
+  "bedford": { "safety": 7, "transport": 5, "amenities": 6, "cost": 7, "noise": 8 },
+  "mk40": { "safety": 7, "transport": 5, "amenities": 6, "cost": 7, "noise": 8 }
+}

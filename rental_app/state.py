@@ -9,7 +9,10 @@ def init_state():
         "settings": {
             "budget": 1500,
             "areas": [],
-            "min_bed": None
+            "min_bed": None,
+            "preferred_areas": [],
+            "avoided_areas": [],
+            "preferred_postcodes": [],
         },
         "last_action": None,
         "weights": DEFAULT_WEIGHTS,
@@ -29,6 +32,14 @@ def load_state(state, filepath=DEFAULT_STATE_FILE):
         # 只更新我们关心的key，避免文件缺字段就崩
         state["listings"] = loaded.get("listings", [])
         state["settings"] = loaded.get("settings", state.get("settings", {}))
+        # 确保 Module5 地区偏好字段存在，旧存档无则用默认空列表
+        s = state["settings"]
+        if not isinstance(s.get("preferred_areas"), list):
+            s["preferred_areas"] = []
+        if not isinstance(s.get("avoided_areas"), list):
+            s["avoided_areas"] = []
+        if not isinstance(s.get("preferred_postcodes"), list):
+            s["preferred_postcodes"] = []
         state["weights"] = loaded.get("weights", state.get("weights", DEFAULT_WEIGHTS))
         state["last_action"] = loaded.get("last_action", None)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
+import json
 import math
+import os
 from typing import Optional, Tuple
 
 from area_module import get_area_score
@@ -99,6 +101,119 @@ def _to_int(x: Any, default: int | None = None) -> int | None:
 
 def _clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, x))
+
+
+def _norm(s: Any) -> str:
+    """Normalize string for comparison: strip + lower. Empty/None -> ''."""
+    if s is None:
+        return ""
+    return str(s).strip().lower()
+
+
+def get_area_from_postcode(postcode: Any) -> str:
+    """
+    Module5 Phase3: postcode -> area 自动识别.
+    MK40/MK41 -> bedford, E1 -> london_east, SW11 -> london_sw, CR4 -> croydon.
+    不匹配或 postcode 为空则返回 "unknown".
+    """
+    if postcode is None or not str(postcode).strip():
+        return "unknown"
+    raw = str(postcode).strip().upper()
+    # 取 outward code（空格前一段，如 MK40 1AB -> MK40）
+    parts = raw.split()
+    prefix = parts[0] if parts else raw[:4] or ""
+    if prefix.startswith("MK40") or prefix.startswith("MK41"):
+        return "bedford"
+    if prefix.startswith("E1"):
+        return "london_east"
+    if prefix.startswith("SW11"):
+        return "london_sw"
+    if prefix.startswith("CR4"):
+        return "croydon"
+    return "unknown"
+
+
+_AREA_DATA_CACHE = None
+
+def _load_area_data() -> dict:
+    """Load data/area_data.json once; return {} on missing/invalid."""
+    global _AREA_DATA_CACHE
+    if _AREA_DATA_CACHE is not None:
+        return _AREA_DATA_CACHE
+    try:
+        base = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(base, "data", "area_data.json")
+        with open(path, "r", encoding="utf-8") as f:
+            _AREA_DATA_CACHE = json.load(f)
+        return _AREA_DATA_CACHE
+    except Exception:
+        _AREA_DATA_CACHE = {}
+        return _AREA_DATA_CACHE
+
+
+def calculate_area_quality_score(area: Any) -> float:
+    """
+    Module5 Phase2 后半: 根据 area_data.json 的 safety/transport/amenities/cost/noise 计算区域质量分 (0-10).
+    area 不存在或缺失时返回中性分 5.
+    """
+    if area is None or (isinstance(area, str) and not area.strip()):
+        return 5.0
+    key = _norm(area)
+    if not key:
+        return 5.0
+    data = _load_area_data()
+    row = data.get(key) or data.get(area.strip()) or data.get(area.strip().upper())
+    if not row or not isinstance(row, dict):
+        return 5.0
+    dims = ["safety", "transport", "amenities", "cost", "noise"]
+    values = []
+    for d in dims:
+        v = row.get(d)
+        if v is not None:
+            try:
+                values.append(float(v))
+            except (TypeError, ValueError):
+                pass
+    if not values:
+        return 5.0
+    avg = sum(values) / len(values)
+    return round(max(0.0, min(10.0, avg)), 2)
+
+
+def calculate_area_preference_score(house: dict, settings: dict) -> Tuple[float, str]:
+    """
+    Module5 Area Score Engine (mild version).
+    Returns (score 0~10, reason string).
+    - preferred_areas match -> 8~10; avoided_areas -> 0~3;
+    - preferred_postcodes match -> 8~10; both area+postcode preferred -> 10;
+    - else or missing -> 5 (neutral). Safe for None/empty.
+    """
+    try:
+        preferred_areas = [ _norm(x) for x in (settings.get("preferred_areas") or []) if x is not None ]
+        avoided_areas = [ _norm(x) for x in (settings.get("avoided_areas") or []) if x is not None ]
+        preferred_postcodes = [ _norm(x) for x in (settings.get("preferred_postcodes") or []) if x is not None ]
+    except (TypeError, AttributeError):
+        return 5.0, "地区偏好未设置，中性分"
+
+    listing_area = _norm(house.get("area"))
+    listing_postcode = _norm(house.get("postcode") or house.get("post_code") or "")
+
+    in_preferred_area = listing_area and listing_area in preferred_areas
+    in_avoided_area = listing_area and listing_area in avoided_areas
+    in_preferred_postcode = listing_postcode and listing_postcode in preferred_postcodes
+
+    if in_avoided_area and not in_preferred_area:
+        return 2.0, "区域在避免列表中，低分"
+    if in_preferred_area and in_preferred_postcode:
+        return 10.0, "区域与邮编均在偏好中，高分"
+    if in_preferred_area:
+        return 9.0, "区域在偏好中，加分"
+    if in_preferred_postcode:
+        return 8.0, "邮编在偏好中，加分"
+    if in_avoided_area:
+        return 3.0, "区域在避免列表中"
+    return 5.0, "未命中偏好，中性分"
+
 
 def score_distance(distance):
     if distance is None:
@@ -242,7 +357,11 @@ def rank_houses(houses, prefs, weights):
 
     for h in houses:
         if "distance" not in h:
-            h["distance"] = None 
+            h["distance"] = None
+
+        # Module5 Phase3: 无 area 但有 postcode 时自动推断 area（仅用于本轮评分，不覆盖已有 area）
+        if not (h.get("area") or "").strip() and h.get("postcode"):
+            h["area"] = get_area_from_postcode(h["postcode"])
 
         base_score, base_detail = score_house(h, prefs, weights)
 
@@ -253,12 +372,25 @@ def rank_houses(houses, prefs, weights):
             area_weight=0.2
         )
 
+        # Module5: 地区偏好分，轻量接入，不破坏原排序
+        area_pref_score, area_pref_reason = calculate_area_preference_score(h, prefs)
+        area_pref_weight = 0.1
+        final_score = round(final_score + area_pref_weight * area_pref_score, 2)
+
+        # Module5 Phase2 后半: 区域质量分 (area_data.json)
+        area_quality = calculate_area_quality_score(h.get("area"))
+        area_quality_weight = 0.15
+        final_score = round(final_score + area_quality_weight * area_quality, 2)
+
         results.append({
             "house": h,
             "base_score": base_score,
             "final_score": final_score,
             "base_detail": base_detail,
-            "area_detail": area_detail
+            "area_detail": area_detail,
+            "area_preference_score": round(area_pref_score, 2),
+            "area_preference_reason": area_pref_reason,
+            "area_quality_score": round(area_quality, 2),
         })
 
     results.sort(key=lambda x: x["final_score"], reverse=True)
