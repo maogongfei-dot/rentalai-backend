@@ -7,6 +7,8 @@
 
 from datetime import datetime
 
+from routing_metadata import build_routing_metadata
+
 MODULE3_VERSION = "module3_risk_baseline_v1"
 
 # ---------- Phase1-A1: 基础风险标签与关键词规则（集中定义） ----------
@@ -322,6 +324,22 @@ def build_contract_risk_result(
     status = "ok" if has_input else "empty"
     message = "Contract risk result generated." if has_input else "No input provided; returning baseline structure."
 
+    # Phase1-A5-7: 统一路由元数据生成，一次调用得到 input_type / analysis_mode / response_focus / guided_summary / recommended_path / next_step_hint
+    routing = build_routing_metadata(raw)
+    detected_input_type = routing["input_type"]
+    analysis_mode = routing["analysis_mode"]
+    response_focus = routing["response_focus"]
+    guided_summary = routing["guided_summary"]
+    recommended_path = routing["recommended_path"]
+    next_step_hint = routing["next_step_hint"]
+    # Phase1-A6-1: recommended_actions 由 routing 提供（基于 recommended_path 的基础动作建议）
+    recommended_actions = routing["recommended_actions"]
+    # Phase1-A6-2: action_details 为 recommended_actions 的中文可展示版
+    action_details = routing["action_details"]
+    # Phase1-A6-3: 动作优先级映射与按优先级排序的可展示列表
+    action_priority_map = routing["action_priority_map"]
+    ordered_action_details = routing["ordered_action_details"]
+
     if risk_flags is None and has_input:
         risk_flags = _detect_risk_flags(raw)
     elif risk_flags is None:
@@ -339,11 +357,6 @@ def build_contract_risk_result(
     else:
         risk_summary = str(risk_summary)
 
-    if recommended_actions is None or (isinstance(recommended_actions, list) and len(recommended_actions) == 0):
-        recommended_actions = _build_recommended_actions(risk_flags)
-    else:
-        recommended_actions = list(recommended_actions)
-
     now = datetime.now()
     metadata = {
         "module_name": "Module3",
@@ -352,7 +365,7 @@ def build_contract_risk_result(
     }
     text_len = len(raw)
     input_summary = {
-        "input_type": input_type if input_type in ("question", "text", "document_excerpt") else "text",
+        "input_type": detected_input_type,
         "text_length": text_len,
         "length": text_len,
         "preview": (raw[:80] + "..." if text_len > 80 else raw) if raw else None,
@@ -363,12 +376,21 @@ def build_contract_risk_result(
         "message": message,
         "metadata": metadata,
         "input_summary": input_summary,
+        "input_type": detected_input_type,
+        "analysis_mode": analysis_mode,
+        "response_focus": response_focus,
+        "guided_summary": guided_summary,
+        "recommended_path": recommended_path,
+        "next_step_hint": next_step_hint,
         "risk_flags": risk_flags,
         "risk_explanations": risk_explanations,
         "grouped_risks": grouped_risks,
         "overall_risk_level": overall_risk_level,
         "risk_summary": risk_summary,
         "recommended_actions": recommended_actions,
+        "action_details": action_details,
+        "action_priority_map": action_priority_map,
+        "ordered_action_details": ordered_action_details,
         "grouped_actions": grouped_actions,
     }
 
