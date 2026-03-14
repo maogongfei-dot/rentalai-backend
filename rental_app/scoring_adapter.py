@@ -1,4 +1,4 @@
-from module2_scoring import rank_houses as rank_houses_m2
+from module2_scoring import rank_houses as rank_houses_m2, build_compare_explain, build_decision_hints
 
 def rank_listings(state):
     listings = state["listings"]
@@ -9,6 +9,8 @@ def rank_listings(state):
 
     ranked = rank_houses_m2(listings, state["settings"], state["weights"])
     state["ranked_results"] = ranked   # ✅ 评分结果单独放这里
+    state["ranked_compare_explain"] = build_compare_explain(ranked)  # B2-B2-B2-B2-A
+    state["ranked_decision_hints"] = build_decision_hints(ranked, state.get("ranked_compare_explain") or {})  # B2-B2-B2-B2-B1
     print("✅ 已按评分排序完成")
     return state
 

@@ -22,24 +22,25 @@ def explain_score(house: Dict[str, Any], result: Dict[str, Any]) -> List[str]:
     """
     reasons: List[str] = []
 
-    # 1) Rent advantage: use price dimension from base_detail if available
+    # 1) Rent advantage: prefer normalized price_score (0–100), else base_detail
     base_detail = result.get("base_detail") or {}
-    price_info = base_detail.get("price") or {}
-    rent_points = _to_float_safe(price_info.get("points"))
-    if rent_points is None:
-        # fallback: maybe a normalized price_score field was added later
-        rent_points = _to_float_safe(result.get("price_score"))
-
-    if rent_points is not None and rent_points >= 7:
+    price_score_100 = _to_float_safe(result.get("price_score"))
+    if price_score_100 is None:
+        price_info = base_detail.get("price") or {}
+        rent_points = _to_float_safe(price_info.get("points"))
+        if rent_points is not None and rent_points >= 7:
+            reasons.append("Rent is competitive for the area")
+    elif price_score_100 >= 70:
         reasons.append("Rent is competitive for the area")
 
-    # 2) Commute advantage
-    commute_info = base_detail.get("commute") or {}
-    commute_points = _to_float_safe(commute_info.get("points"))
-    if commute_points is None:
-        commute_points = _to_float_safe(result.get("commute_score"))
-
-    if commute_points is not None and commute_points >= 7:
+    # 2) Commute advantage: prefer commute_score (0–100)
+    commute_score_100 = _to_float_safe(result.get("commute_score"))
+    if commute_score_100 is None:
+        commute_info = base_detail.get("commute") or {}
+        commute_points = _to_float_safe(commute_info.get("points"))
+        if commute_points is not None and commute_points >= 7:
+            reasons.append("Short commute time")
+    elif commute_score_100 >= 70:
         reasons.append("Short commute time")
 
     # 3) Area quality
@@ -47,7 +48,35 @@ def explain_score(house: Dict[str, Any], result: Dict[str, Any]) -> List[str]:
     if area_quality_score is not None and area_quality_score >= 7:
         reasons.append("Good area quality")
 
-    # 4 & 5) Risk level (structured_risk_score already mapped into risk_score)
+    # 4) Area preference / 统一权重 (B2-B2-A)
+    area_contrib = _to_float_safe(result.get("area_score_contribution"))
+    area_weight = _to_float_safe(result.get("area_weight"))
+    if area_contrib is not None and area_contrib > 0:
+        if area_weight is not None and area_weight != 1.0:
+            reasons.append(f"Area preference 计入总分: {area_contrib} (area_score × area_weight={area_weight})")
+        else:
+            reasons.append("Area preference matched")
+    # 统一权重已生效且存在非默认权重时提示 (B2-B2-A)
+    wbd = result.get("weighted_base_score_detail") or {}
+    if wbd and isinstance(wbd, dict):
+        non_default = []
+        for k in ("price_weight", "commute_weight", "bills_weight", "bedrooms_weight", "area_weight"):
+            w = _to_float_safe(result.get(k))
+            if w is not None and w != 1.0:
+                non_default.append(f"{k.replace('_weight', '')}={w}")
+        if non_default:
+            reasons.append(f"Unified weights applied: {', '.join(non_default)}")
+    # B2-B2-B1: 权重已校验；B2-B2-B2-A: 当前 preset
+    if result.get("weight_preset"):
+        reasons.append(f"Weight preset: {result.get('weight_preset')}")
+    if result.get("validated_weights") is not None:
+        ww = result.get("weight_warnings") or []
+        if ww:
+            reasons.append(f"Weights validated with warnings: {ww[0]}" + (" (+%d more)" % (len(ww) - 1) if len(ww) > 1 else ""))
+        else:
+            reasons.append("Score weights validated")
+
+    # 5) Risk level (structured_risk_score already mapped into risk_score)
     risk_score = _to_float_safe(result.get("risk_score"))
     if risk_score is not None:
         if risk_score <= 2:

@@ -23,6 +23,7 @@ from actions import (
 
 # Scoring
 from scoring_adapter import get_top_n, explain_score
+from module2_scoring import WEIGHT_PRESETS
 
 # Explain Engine (Phase1-5, for Top3/Top5 recommendations)
 from explain_engine import (
@@ -440,6 +441,7 @@ def print_menu():
     print("F) 运行筛选(增强)")
     print("R) 重置当前列表(全部房源)")
     print("G) 评分排序Top5")
+    print("W) 设置权重预设(balanced/price_first/area_first/commute_first)")
     print("P) 设置偏好(预算/区域/模式)")
     print("K) 合同风险测试(输入文本)")
     print("L) 结构化风险测试(示例listing)")
@@ -457,6 +459,299 @@ def handle_rank_top_n(state):
 
 def handle_preferences(state):
     pass
+
+
+def _parse_one_weight(raw: str):
+    """仅做清洗：strip；空视为未输入返回 None。不做过重校验。"""
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    return s
+
+
+def prompt_weight_preset(state):
+    """B2-B2-B2-B1/B2-B2-A: 权重预设 + 可选手动 override，写回 state['settings']。"""
+    options = list(WEIGHT_PRESETS.keys())
+    current = (state.get("settings") or {}).get("weight_preset") or "balanced"
+    prompt = (
+        f"权重预设 [{', '.join(options)}]，回车=balanced\n"
+        f"  当前: {current} → "
+    )
+    raw = input(prompt).strip()
+    if not raw:
+        chosen = "balanced"
+    else:
+        chosen = str(raw).strip().lower()
+    if chosen not in WEIGHT_PRESETS:
+        chosen = "balanced"
+        print("  ⚠ 未知预设，已使用 balanced")
+    state.setdefault("settings", {})["weight_preset"] = chosen
+    print(f"  ✅ 已设置 weight_preset = {chosen}")
+
+    # B2-B2-B2-A: 5 个可选手动 override，回车=保持 preset（不写回，便于 resolve 用 preset）
+    for key in ("price_weight", "commute_weight", "bills_weight", "bedrooms_weight", "area_weight"):
+        raw_val = input(f"  Enter {key} override (press Enter to keep preset): ").strip()
+        parsed = _parse_one_weight(raw_val)
+        if parsed is None:
+            state["settings"].pop(key, None)
+            continue
+        try:
+            state["settings"][key] = float(parsed)
+        except (TypeError, ValueError):
+            state["settings"][key] = parsed
+    print("  ✅ 权重设置完成（未填项沿用 preset）")
+    return state
+
+
+def _print_compare_block(compare_explain: dict, n_show: int = 4):
+    """B2-B2-B2-B2-A: 打印排名对比摘要，n_show 为最多显示几条（Top3 用 2，Top5 用 4）。"""
+    comp_list = compare_explain.get("pairwise_comparisons") or []
+    if not comp_list:
+        return
+    print("\n--- 排名对比 ---")
+    for c in comp_list[:n_show]:
+        print(f"  {c.get('better_house_label', '')} vs {c.get('lower_house_label', '')}: {c.get('comparison_summary', '')}")
+        kd = c.get("key_differences") or []
+        if kd:
+            print(f"    key differences: {', '.join(kd)}")
+
+
+def _print_decision_hints(decision_hints: dict, n_show_checklist: int = 5):
+    """B2-B2-B2-B2-B1(+A): 打印决策提示与条件化建议、线下核实清单。"""
+    if not decision_hints:
+        return
+    print("\n--- 决策提示 ---")
+    primary = decision_hints.get("primary_recommendation")
+    if primary:
+        print(f"  Primary choice: {primary.get('house_label', '')} — {primary.get('summary', '')}")
+        if primary.get("best_if"):
+            print(f"  Primary best if: {primary.get('best_if')}")
+    backup = decision_hints.get("backup_option")
+    if backup:
+        print(f"  Backup option: {backup.get('house_label', '')} — {backup.get('summary', '')}")
+        if backup.get("best_if"):
+            print(f"  Backup best if: {backup.get('best_if')}")
+    caution = decision_hints.get("caution_option")
+    if caution:
+        print(f"  Caution: {caution.get('house_label', '')} — {caution.get('summary', '')}")
+        if caution.get("caution_if"):
+            print(f"  Caution if: {caution.get('caution_if')}")
+    checklist = decision_hints.get("viewing_checklist") or []
+    if checklist:
+        print("  Viewing checks:")
+        for item in checklist[:n_show_checklist]:
+            label = item.get("house_label", "")
+            checks = item.get("checks") or []
+            for c in checks:
+                print(f"    - {label}: {c}")
+    switch_hints = decision_hints.get("preference_switch_hints") or []
+    if switch_hints:
+        h = switch_hints[0]
+        print("  Preference switch hint:")
+        print(f"    {h.get('summary', '')}")
+    sim_list = decision_hints.get("preference_simulation") or []
+    if sim_list:
+        print("  Preference simulation:")
+        for s in sim_list[:3]:
+            factor = s.get("simulated_factor", "")
+            disp = {"price": "price/affordability", "commute": "commute", "bills": "bills", "bedrooms": "bedrooms", "area": "area"}.get(factor, factor)
+            print(f"    If {disp} matters more: {s.get('summary', '')}")
+    multi_sim = decision_hints.get("multi_factor_simulation") or []
+    if multi_sim:
+        _disp = {"price": "price/affordability", "commute": "commute", "bills": "bills", "bedrooms": "bedrooms", "area": "area"}
+        print("  Multi-factor simulation:")
+        for m in multi_sim[:3]:
+            factors = m.get("simulated_factors") or []
+            if len(factors) >= 2:
+                a, b = _disp.get(factors[0], factors[0]), _disp.get(factors[1], factors[1])
+                print(f"    If {a} and {b} matter more: {m.get('summary', '')}")
+            else:
+                print(f"    {m.get('summary', '')}")
+
+    ap = decision_hints.get("action_plan") or {}
+    if ap:
+        print("  --- Action Plan ---")
+        for key, label in [("contact_first", "Contact first"), ("view_first", "View first"), ("keep_as_backup", "Keep as backup"), ("investigate_before_committing", "Investigate before committing")]:
+            node = ap.get(key)
+            if node:
+                print(f"  {label}: {node.get('house_label', '')} — {node.get('summary', '')}")
+
+
+# ---------- C2-A: 模块化 CLI 输出（统一顺序、标题、长度控制） ----------
+
+def print_recommendation_overview(first_result):
+    """1. Recommendation Overview: weight_preset, validated_weights, weight_warnings."""
+    if not first_result:
+        return
+    preset = first_result.get("weight_preset")
+    vw = first_result.get("validated_weights") or {}
+    ww = first_result.get("weight_warnings") or []
+    print("=== Recommendation Overview ===")
+    print(f"  weight_preset: {preset or 'balanced'}")
+    if vw:
+        parts = [f"{k}={vw.get(k, 1)}" for k in ("price", "commute", "bills", "bedrooms", "area")]
+        print(f"  validated_weights: {', '.join(parts)}")
+    if ww:
+        print("  weight_warnings: " + "; ".join(ww[:3]) + (" ..." if len(ww) > 3 else ""))
+    print()
+
+
+def print_top_recommendations(ranked_results, n_show=3):
+    """2. Top Recommendations: rank, house_label, final_score, area_score, area_score_reason, recommendation_summary."""
+    if not ranked_results:
+        return
+    print("=== Top Recommendations ===")
+    for i, r in enumerate(ranked_results[:n_show], 1):
+        h = r.get("house") or {}
+        label = f"Rank {i}"
+        score = r.get("final_score") or r.get("_score") or r.get("score")
+        area_s = r.get("area_score")
+        area_reason = r.get("area_score_reason") or ""
+        ex = r.get("explain") or {}
+        summary = ex.get("recommendation_summary") or ""
+        print(f"  {label}: {h.get('area', '')} | {h.get('postcode', '')} | rent={h.get('rent')}")
+        print(f"    final_score: {score}")
+        if area_s is not None:
+            print(f"    area_score: {area_s} ({area_reason})")
+        if summary:
+            print(f"    recommendation_summary: {summary}")
+    print()
+
+
+def print_comparison_insights(compare_explain, n_show=2):
+    """3. Comparison Insights: Rank1 vs Rank2, Rank2 vs Rank3 (max n_show)."""
+    comp_list = compare_explain.get("pairwise_comparisons") or [] if compare_explain else []
+    if not comp_list:
+        return
+    print("=== Comparison Insights ===")
+    for c in comp_list[:n_show]:
+        print(f"  {c.get('better_house_label', '')} vs {c.get('lower_house_label', '')}: {c.get('comparison_summary', '')}")
+        kd = c.get("key_differences") or []
+        if kd:
+            print(f"    key_differences: {', '.join(kd)}")
+    print()
+
+
+def print_decision_hints_block(decision_hints):
+    """4. Decision Hints: Primary, Backup, Caution only."""
+    if not decision_hints:
+        return
+    primary = decision_hints.get("primary_recommendation")
+    backup = decision_hints.get("backup_option")
+    caution = decision_hints.get("caution_option")
+    if not primary and not backup and not caution:
+        return
+    print("=== Decision Hints ===")
+    if primary:
+        print(f"  Primary: {primary.get('house_label', '')} — {primary.get('summary', '')}")
+    if backup:
+        print(f"  Backup: {backup.get('house_label', '')} — {backup.get('summary', '')}")
+    if caution:
+        print(f"  Caution: {caution.get('house_label', '')} — {caution.get('summary', '')}")
+    print()
+
+
+def print_preference_switch_hint(decision_hints):
+    """5. Preference Switch Hint: at most 1."""
+    switch_hints = (decision_hints or {}).get("preference_switch_hints") or []
+    if not switch_hints:
+        return
+    print("=== Preference Switch Hint ===")
+    print(f"  {switch_hints[0].get('summary', '')}")
+    print()
+
+
+def print_preference_simulations(decision_hints, n_single=2, n_multi=2):
+    """6. Preference Simulations: single-dim n_single, multi-dim n_multi."""
+    if not decision_hints:
+        return
+    sim_list = decision_hints.get("preference_simulation") or []
+    multi_sim = decision_hints.get("multi_factor_simulation") or []
+    if not sim_list and not multi_sim:
+        return
+    _disp = {"price": "price/affordability", "commute": "commute", "bills": "bills", "bedrooms": "bedrooms", "area": "area"}
+    print("=== Preference Simulations ===")
+    for s in sim_list[:n_single]:
+        factor = s.get("simulated_factor", "")
+        disp = _disp.get(factor, factor)
+        print(f"  If {disp} matters more: {s.get('summary', '')}")
+    for m in multi_sim[:n_multi]:
+        factors = m.get("simulated_factors") or []
+        if len(factors) >= 2:
+            a, b = _disp.get(factors[0], factors[0]), _disp.get(factors[1], factors[1])
+            print(f"  If {a} and {b} matter more: {m.get('summary', '')}")
+        else:
+            print(f"  {m.get('summary', '')}")
+    print()
+
+
+def print_viewing_checklist(decision_hints, per_house_max=2):
+    """7. Viewing Checklist: up to per_house_max checks per house."""
+    checklist = (decision_hints or {}).get("viewing_checklist") or []
+    if not checklist:
+        return
+    print("=== Viewing Checklist ===")
+    for item in checklist:
+        label = item.get("house_label", "")
+        checks = (item.get("checks") or [])[:per_house_max]
+        for c in checks:
+            print(f"  {label}: {c}")
+    print()
+
+
+def print_action_plan(decision_hints):
+    """8. Action Plan: contact_first, view_first, keep_as_backup, investigate_before_committing."""
+    ap = (decision_hints or {}).get("action_plan") or {}
+    if not ap:
+        return
+    print("=== Action Plan ===")
+    for key, label in [("contact_first", "Contact first"), ("view_first", "View first"), ("keep_as_backup", "Keep as backup"), ("investigate_before_committing", "Investigate before committing")]:
+        node = ap.get(key)
+        if node:
+            print(f"  {label}: {node.get('house_label', '')} — {node.get('summary', '')}")
+    print()
+
+
+def print_ranking_report(state, ranked_results, n_show_top=3):
+    """Unified CLI output in fixed order: 1–8. Only prints blocks that have data."""
+    if not ranked_results:
+        print("⚠️ 暂无可推荐房源")
+        return
+    print_recommendation_overview(ranked_results[0])
+    print_top_recommendations(ranked_results, n_show=n_show_top)
+    print_comparison_insights(state.get("ranked_compare_explain") or {}, n_show=2)
+    hints = state.get("ranked_decision_hints") or {}
+    print_decision_hints_block(hints)
+    print_preference_switch_hint(hints)
+    print_preference_simulations(hints, n_single=2, n_multi=2)
+    print_viewing_checklist(hints, per_house_max=2)
+    print_action_plan(hints)
+
+
+def print_scoring_summary(first_result):
+    """在 TopN 结果前打印一轮总览：preset、resolved、validated、override 来源、warnings。"""
+    if not first_result:
+        return
+    preset = first_result.get("weight_preset")
+    rw = first_result.get("resolved_weights") or {}
+    vw = first_result.get("validated_weights") or {}
+    overrides = first_result.get("override_keys") or []
+    ww = first_result.get("weight_warnings") or []
+    print("--- 本轮评分总览 ---")
+    print(f"  preset: {preset or 'balanced'}")
+    if rw:
+        parts = [f"{k}={rw.get(k, 1)}" for k in ("price", "commute", "bills", "bedrooms", "area")]
+        print(f"  resolved_weights: {', '.join(parts)}")
+    if vw:
+        parts = [f"{k}={vw.get(k, 1)}" for k in ("price", "commute", "bills", "bedrooms", "area")]
+        print(f"  validated_weights: {', '.join(parts)}")
+    if overrides:
+        print(f"  overrides (manual): {', '.join(overrides)}")
+    if ww:
+        print("  warnings: " + "; ".join(ww[:3]) + (" ..." if len(ww) > 3 else ""))
+    print("------------------------")
 
 def main():
     state = init_state()
@@ -496,71 +791,8 @@ def main():
             top3 = get_top_n(state, 3)
             target_postcode = state["settings"].get("target_postcode", "N/A")
             print(f"\n🏆 推荐Top3（按评分排序，目标postcode: {target_postcode}）：\n")
-
-            if not top3:
-                print("⚠️ 暂无可推荐房源")
-            else:
-                for i, r in enumerate(top3, 1):
-                    h = r.get("house", {})
-                    distance_text = h.get("distance_to_target")
-                    if distance_text is None:
-                        distance_text = "N/A"
-
-                    print("--------------------------------")
-                    if i == 1:
-                        print("⭐ Best Choice")
-
-                    # 1. 房源标题（第几名 + 核心字段）
-                    print(
-                        f"Top{i}: area={h.get('area')} | rent={h.get('rent')} | bills={h.get('bills')} "
-                        f"| postcode={h.get('postcode')} | distance={distance_text} miles "
-                        f"| commute={h.get('commute')} | bedrooms={h.get('bedrooms')}"
-                    )
-
-                    # 2. 评分信息
-                    if r.get("final_score") is not None or r.get("_score") is not None:
-                        print(f"   final_score: {r.get('final_score', r.get('_score'))}")
-                    confidence = generate_confidence_level(h, r)
-                    print(f"   confidence: {confidence}")
-                    if r.get("area_score") is not None:
-                        print(f"   area_score: {r.get('area_score')} "
-                              f"({r.get('area_score_reason', '')})")
-                    if r.get("area_quality_score") is not None:
-                        print(f"   area_quality_score: {r.get('area_quality_score')}")
-                    if r.get("risk_score") is not None:
-                        print(f"   risk_score: {r.get('risk_score')}")
-                        print(f"   risk_penalty: {r.get('risk_penalty')}")
-
-                    # 3. 推荐原因（沿用 Module2 的 explain_score）
-                    reasons = explain_score(h, budget)
-                    if reasons:
-                        print("推荐原因：")
-                        for reason in reasons:
-                            print(f"   ✔ {reason}")
-
-                    # 4. 不推荐原因（Phase3）
-                    why_not = explain_why_not(h, r, state.get("settings"))
-                    if why_not:
-                        print("不推荐原因：")
-                        for reason in why_not:
-                            print(f"   ✗ {reason}")
-
-                    # 5. 风险提示（Phase2）
-                    risk_reasons = r.get("risk_reasons") or []
-                    if risk_reasons:
-                        print("⚠ 风险提示:")
-                        risk_score = r.get("risk_score")
-                        if risk_score is not None and risk_score >= 7:
-                            print("⚠ High risk listing")
-                        for line in risk_reasons:
-                            print(f"⚠ {line}")
-
-                    # 6. AI 结论（Phase4）
-                    verdict = generate_final_verdict(h, r, state.get("settings"))
-                    if verdict:
-                        print("AI结论：")
-                        print(f"   {verdict}")
-
+            print_ranking_report(state, top3, n_show_top=3)
+            if top3:
                 print("=============== AI Summary ===============")
                 summary = generate_overall_summary(top3, state.get("settings"))
                 for s in summary:
@@ -605,73 +837,15 @@ def main():
         elif choice.upper() == "R":
             current_list = houses
             print("已重置为全部房源。")
+        elif choice.upper() == "W":
+            state = prompt_weight_preset(state)
         elif choice.upper() == "G":
             top5 = get_top_n(state, 5)
-
             if not top5:
                 print("⚠️ 暂无评分结果（请先录入房源或加载数据）")
             else:
                 print("\n🏆 评分排序 Top5:\n")
-                for i, r in enumerate(top5, 1):
-
-                    h = r["house"]
-                    distance_text = h.get("distance_to_target")
-                    if distance_text is None:
-                        distance_text = "N/A"
-                    score_text = r.get("final_score", r.get("_score", "N/A"))
-                    detail_text = r.get("detail") or r.get("_detail")
-                    print("--------------------------------")
-                    # 1. 房源标题
-                    print(
-                        f"Top{i}: area={h.get('area')} | rent={h.get('rent')} | bills={h.get('bills')} "
-                        f"| postcode={h.get('postcode')} | distance={distance_text} miles "
-                        f"| commute={h.get('commute')} | bedrooms={h.get('bedrooms')}"
-                    )
-
-                    # 2. 评分信息
-                    print(f"   final_score: {r.get('final_score', r.get('_score', r.get('score')))}")
-                    confidence = generate_confidence_level(h, r)
-                    print(f"   confidence: {confidence}")
-                    if detail_text:
-                        print(f"   评分明细：{detail_text}")
-                    if r.get("area_score") is not None:
-                        print(f"   area_score: {r.get('area_score')} "
-                              f"({r.get('area_score_reason', '')})")
-                    if r.get("area_quality_score") is not None:
-                        print(f"   area_quality_score: {r.get('area_quality_score')}")
-                    if r.get("risk_score") is not None:
-                        print(f"   risk_score: {r.get('risk_score')}")
-                        print(f"   risk_penalty: {r.get('risk_penalty')}")
-
-                    # 3. 推荐原因（Phase1）
-                    rec_reasons = explain_recommendation_score(h, r)
-                    if rec_reasons:
-                        print("推荐原因：")
-                        for reason in rec_reasons:
-                            print(f"   ✔ {reason}")
-
-                    # 4. 不推荐原因（Phase3）
-                    why_not = explain_why_not(h, r, state.get("settings"))
-                    if why_not:
-                        print("不推荐原因：")
-                        for reason in why_not:
-                            print(f"   ✗ {reason}")
-
-                    # 5. 风险提示（Phase2）
-                    risk_reasons = r.get("risk_reasons") or []
-                    if risk_reasons:
-                        print("⚠ 风险提示:")
-                        risk_score = r.get("risk_score")
-                        if risk_score is not None and risk_score >= 7:
-                            print("⚠ High risk listing")
-                        for reason in risk_reasons:
-                            print(f"⚠ {reason}")
-
-                    # 6. AI结论（Phase4）
-                    verdict = generate_final_verdict(h, r, state.get("settings"))
-                    if verdict:
-                        print("AI结论：")
-                        print(f"   {verdict}")
+                print_ranking_report(state, top5, n_show_top=3)
         elif choice.upper() == "D":
             # Demo dataset: 3 sample listings to showcase full AI flow
             demo_list = [
@@ -713,73 +887,8 @@ def main():
             top3 = get_top_n(state, 3)
             target_postcode = state["settings"].get("target_postcode", "N/A")
             print(f"\n🏆 Demo Top3（按评分排序，目标postcode: {target_postcode}）：\n")
-
-            if not top3:
-                print("⚠️ 暂无可推荐房源")
-            else:
-                for i, r in enumerate(top3, 1):
-                    h = r.get("house", {})
-                    distance_text = h.get("distance_to_target")
-                    if distance_text is None:
-                        distance_text = "N/A"
-
-                    print("--------------------------------")
-                    if i == 1:
-                        print("⭐ Best Choice")
-
-                    # 1. 房源标题
-                    print(
-                        f"Top{i}: area={h.get('area')} | rent={h.get('rent')} | bills={h.get('bills')} "
-                        f"| postcode={h.get('postcode')} | distance={distance_text} miles "
-                        f"| commute={h.get('commute')} | bedrooms={h.get('bedrooms')}"
-                    )
-
-                    # 2. 评分信息
-                    if r.get("final_score") is not None or r.get("_score") is not None:
-                        print(f"   final_score: {r.get('final_score', r.get('_score'))}")
-                    confidence = generate_confidence_level(h, r)
-                    print(f"   confidence: {confidence}")
-                    if r.get("area_preference_score") is not None:
-                        print(
-                            f"   area_preference_score: {r.get('area_preference_score')} "
-                            f"({r.get('area_preference_reason', '')})"
-                        )
-                    if r.get("area_quality_score") is not None:
-                        print(f"   area_quality_score: {r.get('area_quality_score')}")
-                    if r.get("risk_score") is not None:
-                        print(f"   risk_score: {r.get('risk_score')}")
-                        print(f"   risk_penalty: {r.get('risk_penalty')}")
-
-                    # 3. 推荐原因
-                    reasons = explain_score(h, budget)
-                    if reasons:
-                        print("推荐原因：")
-                        for reason in reasons:
-                            print(f"   ✔ {reason}")
-
-                    # 4. 不推荐原因
-                    why_not = explain_why_not(h, r, state.get("settings"))
-                    if why_not:
-                        print("不推荐原因：")
-                        for reason in why_not:
-                            print(f"   ✗ {reason}")
-
-                    # 5. 风险提示
-                    risk_reasons = r.get("risk_reasons") or []
-                    if risk_reasons:
-                        print("⚠ 风险提示:")
-                        risk_score = r.get("risk_score")
-                        if risk_score is not None and risk_score >= 7:
-                            print("⚠ High risk listing")
-                        for line in risk_reasons:
-                            print(f"⚠ {line}")
-
-                    # 6. AI结论
-                    verdict = generate_final_verdict(h, r, state.get("settings"))
-                    if verdict:
-                        print("AI结论：")
-                        print(f"   {verdict}")
-
+            print_ranking_report(state, top3, n_show_top=3)
+            if top3:
                 print("=============== AI Summary ===============")
                 summary = generate_overall_summary(top3, state.get("settings"))
                 for s in summary:

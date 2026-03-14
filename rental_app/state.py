@@ -13,6 +13,14 @@ def init_state():
             "preferred_areas": [],
             "avoided_areas": [],
             "preferred_postcodes": [],
+            # 统一权重 (Module5 B2-B2-A)，缺省 1.0
+            "price_weight": 1.0,
+            "commute_weight": 1.0,
+            "bills_weight": 1.0,
+            "bedrooms_weight": 1.0,
+            "area_weight": 1.0,
+            # B2-B2-B2-A: 权重预设，缺省 balanced
+            "weight_preset": "balanced",
         },
         "last_action": None,
         "weights": DEFAULT_WEIGHTS,
@@ -40,6 +48,22 @@ def load_state(state, filepath=DEFAULT_STATE_FILE):
             s["avoided_areas"] = []
         if not isinstance(s.get("preferred_postcodes"), list):
             s["preferred_postcodes"] = []
+        # B2-B2-B2-A: weight_preset，缺省 balanced
+        wp = s.get("weight_preset")
+        if wp is None or (isinstance(wp, str) and not wp.strip()):
+            s["weight_preset"] = "balanced"
+        else:
+            s["weight_preset"] = str(wp).strip().lower()
+        # 统一权重 (B2-B2-A)：缺字段用 1.0，非法值回退 1.0
+        for key in ("price_weight", "commute_weight", "bills_weight", "bedrooms_weight", "area_weight"):
+            v = s.get(key)
+            if v is None:
+                s[key] = 1.0
+            else:
+                try:
+                    s[key] = float(v)
+                except (TypeError, ValueError):
+                    s[key] = 1.0
         state["weights"] = loaded.get("weights", state.get("weights", DEFAULT_WEIGHTS))
         state["last_action"] = loaded.get("last_action", None)
 
