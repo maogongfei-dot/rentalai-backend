@@ -296,6 +296,204 @@ def _build_risk_summary(risk_flags, risk_explanations=None):
     return f"This text raises medium-level concerns around {', '.join(readable[:-1])}, and {readable[-1]}."
 
 
+# ---------- Phase1 Final: 统一 Module3 最终输出结构 ----------
+MODULE3_RESULT_KEYS = (
+    "input_type",
+    "scenario",
+    "risk_flags",
+    "severity",
+    "explanation",
+    "recommended_actions",
+    "action_details",
+    "ordered_action_details",
+    "law_topics",
+    "legal_references",
+    "legal_reasoning",
+    "legal_summary",
+)
+
+# Phase2-1: 基于风险标记 / 输入类型 / 场景的法律主题映射（与需求一一对应，含别名以兼容后续扩展）
+LAW_TOPIC_FLAG_MAP = {
+    "deposit_risk": ["deposit_protection"],
+    "deposit_dispute": ["deposit_protection"],
+    "rent_increase_risk": ["rent_increase"],
+    "rent_increase_clause": ["rent_increase"],
+    "termination_risk": ["termination_notice"],
+    "notice_risk": ["termination_notice"],
+    "eviction_risk": ["termination_notice"],
+    "repair_risk": ["repair_obligation"],
+    "repair_issue": ["repair_obligation"],
+    "fee_charge_risk": ["prohibited_fees"],
+    "fee_issue": ["prohibited_fees"],
+    "illegal_fee": ["prohibited_fees"],
+    "unfair_clause": ["unfair_terms"],
+}
+
+
+def get_law_topics(risk_flags, input_type: str = "", scenario: str = "") -> list:
+    """
+    Phase2-1：根据 risk_flags / input_type / scenario 生成基础法律主题列表（law_topics）。
+    - 优先基于已知 risk flag 映射到主题；
+    - 若存在不公平条款类 flag（unfair_clause / *_unfair），补充 unfair_terms；
+    - 若没有任何主题且为合同条款审查场景（contract_review_path 或 input_type=contract_clause），补充 unfair_terms。
+    """
+    topics = []
+    seen = set()
+    flags = list(risk_flags or [])
+
+    # 1) flag -> 主题映射
+    for flag in flags:
+        for t in LAW_TOPIC_FLAG_MAP.get(flag, []) or []:
+            if t not in seen:
+                seen.add(t)
+                topics.append(t)
+
+    # 2) 不公平条款类 flag -> unfair_terms
+    if any(
+        isinstance(f, str)
+        and (f == "unfair_clause" or f.endswith("_unfair"))
+        for f in flags
+    ):
+        if "unfair_terms" not in seen:
+            seen.add("unfair_terms")
+            topics.append("unfair_terms")
+
+    # 3) 场景兜底：合同条款审查但未命中具体主题时，给一个 unfair_terms 主题
+    if not topics and (
+        scenario == "contract_review_path" or (input_type or "") == "contract_clause"
+    ):
+        if "unfair_terms" not in seen:
+            seen.add("unfair_terms")
+            topics.append("unfair_terms")
+
+    return topics
+
+
+# Phase2-2: law_topic -> legal_reference (source) 与 legal_reasoning 文案
+LEGAL_REFERENCE_REASONING_MAP = {
+    "deposit_protection": {
+        "source": "Housing Act 2004 / tenancy deposit protection rules",
+        "reasoning": "该问题涉及押金是否依法受到保护，以及押金处理规则。",
+    },
+    "rent_increase": {
+        "source": "tenancy rent increase rules / contract fairness considerations",
+        "reasoning": "该问题涉及房租调整条件、通知方式以及条款公平性。",
+    },
+    "termination_notice": {
+        "source": "tenancy notice / possession notice related rules",
+        "reasoning": "该问题涉及租约终止、通知要求或收回房屋流程。",
+    },
+    "repair_obligation": {
+        "source": "landlord repair obligations",
+        "reasoning": "该问题涉及房东与租客之间的维修责任分配。",
+    },
+    "prohibited_fees": {
+        "source": "Tenant Fees Act 2019",
+        "reasoning": "该问题涉及租房过程中的不合理收费或被禁止的收费项目。",
+    },
+    "unfair_terms": {
+        "source": "contract fairness / unfair terms principles",
+        "reasoning": "该问题涉及合同条款是否存在明显失衡、不清晰或偏向单方。",
+    },
+}
+
+
+def get_legal_references(law_topics):
+    """
+    Phase2-2：根据 law_topics 生成 legal_references 与 legal_reasoning，按 topic 去重。
+    返回 (list[dict], list[str])，分别对应 legal_references 与 legal_reasoning。
+    """
+    refs = []
+    reasoning_list = []
+    seen = set()
+    for topic in law_topics or []:
+        if not isinstance(topic, str) or topic in seen:
+            continue
+        seen.add(topic)
+        entry = LEGAL_REFERENCE_REASONING_MAP.get(topic)
+        if not entry:
+            continue
+        refs.append({"topic": topic, "source": entry.get("source") or ""})
+        r = entry.get("reasoning")
+        if r:
+            reasoning_list.append(r)
+    return refs, reasoning_list
+
+
+def build_legal_summary(
+    explanation: str,
+    law_topics,
+    legal_references,
+    legal_reasoning,
+) -> str:
+    """
+    Phase2-3：将 explanation、law_topics、legal_references、legal_reasoning 组合成一段易读的 legal_summary。
+    先说明涉及的法律主题，再说明为什么相关，最后说明参考依据；多主题时简单合并，保持简洁。
+    """
+    explanation = (explanation or "").strip()
+    topics = [t for t in (law_topics or []) if isinstance(t, str) and t.strip()]
+    refs = [r for r in (legal_references or []) if isinstance(r, dict) and r.get("topic")]
+    reasons = [r for r in (legal_reasoning or []) if isinstance(r, str) and r.strip()]
+
+    if not topics and not refs:
+        return explanation or "当前未识别到明确的法律主题；可根据具体条款或纠纷再细化。"
+
+    parts = []
+    # 1) 涉及什么法律主题
+    if topics:
+        if len(topics) == 1:
+            parts.append(f"本问题主要涉及与「{topics[0]}」相关的法律主题。")
+        else:
+            parts.append(f"本问题主要涉及「{'」「'.join(topics)}」等法律主题。")
+    # 2) 为什么相关（结合 legal_reasoning）
+    if reasons:
+        if len(reasons) == 1:
+            parts.append(reasons[0])
+        else:
+            parts.append("具体而言，" + "；".join(reasons))
+    # 3) 参考依据（结合 legal_references）
+    if refs:
+        sources = [r.get("source") or "" for r in refs if r.get("source")]
+        if sources:
+            parts.append("参考依据包括：" + "；".join(sources) + "。")
+
+    return " ".join(parts) if parts else (explanation or "")
+
+
+def build_module3_result(
+    input_type="",
+    scenario="",
+    risk_flags=None,
+    severity="",
+    explanation="",
+    recommended_actions=None,
+    action_details=None,
+    ordered_action_details=None,
+    law_topics=None,
+    legal_references=None,
+    legal_reasoning=None,
+    legal_summary=None,
+):
+    """
+    Phase1 Final：统一 Module3 的最终输出结构。
+    将输入类型、场景、风险标记、严重度、解释、推荐行动、法律主题、法律依据及 legal_summary 整理为固定字段的 result。
+    """
+    return {
+        "input_type": input_type or "",
+        "scenario": scenario or "",
+        "risk_flags": list(risk_flags) if risk_flags is not None else [],
+        "severity": severity or "",
+        "explanation": explanation or "",
+        "recommended_actions": list(recommended_actions) if recommended_actions is not None else [],
+        "action_details": list(action_details) if action_details is not None else [],
+        "ordered_action_details": list(ordered_action_details) if ordered_action_details is not None else [],
+        "law_topics": list(law_topics) if law_topics is not None else [],
+        "legal_references": list(legal_references) if legal_references is not None else [],
+        "legal_reasoning": list(legal_reasoning) if legal_reasoning is not None else [],
+        "legal_summary": (legal_summary or "").strip() if legal_summary is not None else "",
+    }
+
+
 def build_contract_risk_result(
     input_text=None,
     input_type="text",
@@ -371,26 +569,46 @@ def build_contract_risk_result(
         "preview": (raw[:80] + "..." if text_len > 80 else raw) if raw else None,
     }
 
+    # Phase1 Final: 统一写入标准 result 结构
+    scenario = recommended_path  # 使用 recommended_path 作为 scenario 标识
+    # Phase2-1: 基于风险与场景生成法律主题 law_topics
+    law_topics = get_law_topics(risk_flags, detected_input_type, scenario)
+    # Phase2-2: 根据 law_topics 生成 legal_references 与 legal_reasoning
+    legal_references, legal_reasoning = get_legal_references(law_topics)
+    # Phase2-3: 组合成易读的 legal_summary
+    legal_summary = build_legal_summary(risk_summary, law_topics, legal_references, legal_reasoning)
+    unified_result = build_module3_result(
+        input_type=detected_input_type,
+        scenario=scenario,
+        risk_flags=risk_flags,
+        severity=overall_risk_level,
+        explanation=risk_summary,
+        recommended_actions=recommended_actions,
+        action_details=action_details,
+        ordered_action_details=ordered_action_details,
+        law_topics=law_topics,
+        legal_references=legal_references,
+        legal_reasoning=legal_reasoning,
+        legal_summary=legal_summary,
+    )
+
+    # 返回统一 result 与兼容字段，便于既有调用方使用
     return {
+        **unified_result,
         "status": status,
         "message": message,
         "metadata": metadata,
         "input_summary": input_summary,
-        "input_type": detected_input_type,
         "analysis_mode": analysis_mode,
         "response_focus": response_focus,
         "guided_summary": guided_summary,
         "recommended_path": recommended_path,
         "next_step_hint": next_step_hint,
-        "risk_flags": risk_flags,
         "risk_explanations": risk_explanations,
         "grouped_risks": grouped_risks,
         "overall_risk_level": overall_risk_level,
         "risk_summary": risk_summary,
-        "recommended_actions": recommended_actions,
-        "action_details": action_details,
         "action_priority_map": action_priority_map,
-        "ordered_action_details": ordered_action_details,
         "grouped_actions": grouped_actions,
     }
 

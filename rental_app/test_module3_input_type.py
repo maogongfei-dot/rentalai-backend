@@ -4,19 +4,71 @@
 from module3_risk_result import build_contract_risk_result
 from routing_metadata import build_routing_metadata
 
-# (文本, ..., expected recommended_actions, expected action_details 关键片段, expected action_priority_map, ordered_action_details 首项关键片段)
+# (文本, ..., expected recommended_actions, expected action_details 关键片段, expected action_priority_map, ordered_action_details 首项关键片段, expected law_topics)
 SAMPLES = [
-    ("Can my landlord increase rent?", "contract_clause", "clause_risk_review", "review_contract_risk", "contract clause for review", "contract_review_path", "审查合同条款", ["review_clause_risk", "highlight_unfair_terms"], ["不公平、模糊或偏向单方", "不合理或需要重点关注"], {"review_clause_risk": 1, "highlight_unfair_terms": 2}, "不公平、模糊或偏向单方"),
-    ("The tenant must pay rent on the first day.", "contract_clause", "clause_risk_review", "review_contract_risk", "unfair, unclear, or risky", "contract_review_path", "不公平、模糊或高风险", ["review_clause_risk", "highlight_unfair_terms"], ["不公平、模糊或偏向单方", "不合理或需要重点关注"], {"review_clause_risk": 1, "highlight_unfair_terms": 2}, "不公平、模糊或偏向单方"),
-    ("My landlord refused to return my deposit.", "dispute", "dispute_support", "suggest_next_steps", "dispute description", "dispute_resolution_path", "纠纷事实、证据", ["collect_evidence", "prepare_next_steps", "suggest_formal_contact"], ["聊天记录、合同、付款记录", "争议点", "正式沟通"], {"collect_evidence": 1, "prepare_next_steps": 2, "suggest_formal_contact": 3}, "聊天记录、合同、付款记录"),
+    (
+        "Can my landlord increase rent?",
+        "contract_clause",
+        "clause_risk_review",
+        "review_contract_risk",
+        "contract clause for review",
+        "contract_review_path",
+        "审查合同条款",
+        ["review_clause_risk", "highlight_unfair_terms"],
+        ["不公平、模糊或偏向单方", "不合理或需要重点关注"],
+        {"review_clause_risk": 1, "highlight_unfair_terms": 2},
+        "不公平、模糊或偏向单方",
+        ["rent_increase"],
+    ),
+    (
+        "The tenant must pay rent on the first day.",
+        "contract_clause",
+        "clause_risk_review",
+        "review_contract_risk",
+        "unfair, unclear, or risky",
+        "contract_review_path",
+        "不公平、模糊或高风险",
+        ["review_clause_risk", "highlight_unfair_terms"],
+        ["不公平、模糊或偏向单方", "不合理或需要重点关注"],
+        {"review_clause_risk": 1, "highlight_unfair_terms": 2},
+        "不公平、模糊或偏向单方",
+        ["unfair_terms"],
+    ),
+    (
+        "My landlord refused to return my deposit.",
+        "dispute",
+        "dispute_support",
+        "suggest_next_steps",
+        "dispute description",
+        "dispute_resolution_path",
+        "纠纷事实、证据",
+        ["collect_evidence", "prepare_next_steps", "suggest_formal_contact"],
+        ["聊天记录、合同、付款记录", "争议点", "正式沟通"],
+        {"collect_evidence": 1, "prepare_next_steps": 2, "suggest_formal_contact": 3},
+        "聊天记录、合同、付款记录",
+        ["deposit_protection"],
+    ),
 ]
 
 
 def test_input_type_in_result():
-    """三种输入均应在结果中带上正确的 ...、recommended_actions、action_details、action_priority_map、ordered_action_details（A6-1/A6-2/A6-3）。"""
+    """三种输入均应在结果中带上正确的 ...、recommended_actions、action_details、action_priority_map、ordered_action_details、law_topics（Phase2-1）。"""
     seen_summaries = set()
     for row in SAMPLES:
-        text, exp_type, exp_mode, exp_focus, exp_guided_contains, exp_path, exp_hint_contains, exp_actions, exp_details_contains, exp_priority_map, exp_ordered_first = row
+        (
+            text,
+            exp_type,
+            exp_mode,
+            exp_focus,
+            exp_guided_contains,
+            exp_path,
+            exp_hint_contains,
+            exp_actions,
+            exp_details_contains,
+            exp_priority_map,
+            exp_ordered_first,
+            exp_law_topics,
+        ) = row
         result = build_contract_risk_result(input_text=text)
         assert result.get("input_type") == exp_type
         assert result.get("analysis_mode") == exp_mode
@@ -31,20 +83,37 @@ def test_input_type_in_result():
         ordered = result.get("ordered_action_details") or []
         assert len(ordered) == len(exp_actions)
         assert exp_ordered_first in (ordered[0] if ordered else ""), f"ordered_action_details 首项应包含 {exp_ordered_first!r}"
+        # law_topics 至少包含预期主题
+        law_topics = result.get("law_topics") or []
+        for t in exp_law_topics:
+            assert t in law_topics, f"law_topics 应包含 {t!r}, 得到 {law_topics!r}"
         hint = result.get("next_step_hint") or ""
         assert exp_hint_contains in hint
         guided = result.get("guided_summary") or ""
         assert exp_guided_contains in guided
         seen_summaries.add(guided)
     assert len(seen_summaries) >= 2
-    print("Module3 ... / recommended_actions / action_details / action_priority_map / ordered_action_details 测试通过。")
+    print("Module3 ... / recommended_actions / action_details / action_priority_map / ordered_action_details / law_topics 测试通过。")
 
 
 def test_build_routing_metadata():
     """三种输入通过 build_routing_metadata 均返回完整路由元数据（含 action_priority_map、ordered_action_details），且字段正确。"""
     required_keys = ("input_type", "analysis_mode", "response_focus", "guided_summary", "recommended_path", "next_step_hint", "recommended_actions", "action_details", "action_priority_map", "ordered_action_details")
     for row in SAMPLES:
-        text, exp_type, exp_mode, exp_focus, exp_guided_contains, exp_path, exp_hint_contains, exp_actions, exp_details_contains, exp_priority_map, exp_ordered_first = row
+        (
+            text,
+            exp_type,
+            exp_mode,
+            exp_focus,
+            exp_guided_contains,
+            exp_path,
+            exp_hint_contains,
+            exp_actions,
+            exp_details_contains,
+            exp_priority_map,
+            exp_ordered_first,
+            _exp_law_topics,
+        ) = row
         meta = build_routing_metadata(text)
         for key in required_keys:
             assert key in meta, f"build_routing_metadata 应包含 {key!r}"
@@ -63,6 +132,60 @@ def test_build_routing_metadata():
     print("build_routing_metadata 三种输入均返回完整 routing metadata（含 action_priority_map、ordered_action_details），测试通过。")
 
 
+# Phase2-1 / Phase2-2：法律主题与法律依据最小测试（使用需求中的三句样例）
+# (文本, 期望 law_topics, 期望 legal_references 中某条的 topic, legal_reasoning 中应包含的片段)
+LAW_TOPICS_SAMPLES = [
+    ("Can my landlord increase rent during the fixed term?", ["rent_increase"], "rent_increase", "房租调整条件"),
+    ("The tenant must pay rent on the first day.", ["unfair_terms"], "unfair_terms", "合同条款"),
+    ("My landlord refused to return my deposit.", ["deposit_protection"], "deposit_protection", "押金"),
+]
+
+
+def test_law_topics():
+    """不同输入应生成合理的 law_topics（Phase2-1）。"""
+    for row in LAW_TOPICS_SAMPLES:
+        text, exp_topics, _topic, _reason_frag = row
+        result = build_contract_risk_result(input_text=text)
+        law_topics = result.get("law_topics") or []
+        for t in exp_topics:
+            assert t in law_topics, f"输入 {text!r} 的 law_topics 应包含 {t!r}, 得到 {law_topics!r}"
+    print("Phase2-1 law_topics 最小测试通过。")
+
+
+def test_legal_references_and_reasoning():
+    """不同输入应生成合理的 legal_references 与 legal_reasoning（Phase2-2）。"""
+    for row in LAW_TOPICS_SAMPLES:
+        text, exp_topics, exp_ref_topic, exp_reason_frag = row
+        result = build_contract_risk_result(input_text=text)
+        law_topics = result.get("law_topics") or []
+        for t in exp_topics:
+            assert t in law_topics
+        refs = result.get("legal_references") or []
+        topics_in_refs = [r.get("topic") for r in refs if isinstance(r, dict) and r.get("topic")]
+        assert exp_ref_topic in topics_in_refs, f"legal_references 应包含 topic={exp_ref_topic!r}, 得到 {topics_in_refs!r}"
+        reasoning = result.get("legal_reasoning") or []
+        assert any(exp_reason_frag in r for r in reasoning), f"legal_reasoning 中应有包含 {exp_reason_frag!r} 的项, 得到 {reasoning!r}"
+    print("Phase2-2 legal_references / legal_reasoning 最小测试通过。")
+
+
+def test_legal_summary():
+    """不同输入应生成合理的 legal_summary（Phase2-3）：非空且包含法律主题/参考依据或相关关键词。"""
+    for row in LAW_TOPICS_SAMPLES:
+        text, _exp_topics, _topic, reason_frag = row
+        result = build_contract_risk_result(input_text=text)
+        summary = result.get("legal_summary") or ""
+        assert isinstance(summary, str), "legal_summary 应为 str"
+        assert len(summary.strip()) > 0, f"输入 {text!r} 的 legal_summary 不应为空"
+        # 应包含组合内容：法律主题或参考依据，以及与该条相关的 reasoning 片段
+        assert "法律主题" in summary or "参考依据" in summary or reason_frag in summary, (
+            f"legal_summary 应包含法律主题/参考依据或片段 {reason_frag!r}, 得到: {summary[:200]!r}..."
+        )
+    print("Phase2-3 legal_summary 最小测试通过。")
+
+
 if __name__ == "__main__":
     test_input_type_in_result()
     test_build_routing_metadata()
+    test_law_topics()
+    test_legal_references_and_reasoning()
+    test_legal_summary()
