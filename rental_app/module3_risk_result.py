@@ -41,7 +41,7 @@ RISK_KEYWORDS = {
     ],
     "rent_increase_risk": [
         "rent increase", "raise rent", "increased rent", "rent rise",
-        "rent review", "increase rent", "涨租", "加租",
+        "rent review", "increase rent", "increase the rent", "涨租", "加租",
     ],
     "eviction_risk": [
         "eviction", "section 21", "section 8", "forced to leave",
@@ -310,6 +310,9 @@ MODULE3_RESULT_KEYS = (
     "legal_references",
     "legal_reasoning",
     "legal_summary",
+    "evidence_required",
+    "recommended_steps",
+    "possible_outcomes",
 )
 
 # Phase2-1: 基于风险标记 / 输入类型 / 场景的法律主题映射（与需求一一对应，含别名以兼容后续扩展）
@@ -367,6 +370,189 @@ def get_law_topics(risk_flags, input_type: str = "", scenario: str = "") -> list
             topics.append("unfair_terms")
 
     return topics
+
+
+# Phase3-1: 根据 risk_flags / law_topics / input_type 识别具体租房场景（优先级：先匹配先返回）
+def detect_scenario(risk_flags, law_topics, input_type: str = "") -> str:
+    """
+    根据当前风险标记、法律主题和输入类型识别具体租房场景，供证据-动作-结果闭环使用。
+    无法明确识别时返回 general_rental_issue。
+    """
+    flags = set(f for f in (risk_flags or []) if isinstance(f, str))
+    topics = set(t for t in (law_topics or []) if isinstance(t, str))
+
+    if "deposit_risk" in flags or "deposit_dispute" in flags or "deposit_protection" in topics:
+        return "deposit_dispute"
+    if "rent_increase_risk" in flags or "rent_increase" in topics:
+        return "rent_increase"
+    if "notice_risk" in flags or "eviction_risk" in flags or "termination_risk" in flags or "termination_notice" in topics:
+        return "termination_exit"
+    if "repair_risk" in flags or "repair_issue" in flags or "repair_obligation" in topics:
+        return "repair_issue"
+    if "fee_charge_risk" in flags or "fee_issue" in flags or "illegal_fee" in flags or "prohibited_fees" in topics:
+        return "fee_issue"
+    if "unfair_clause" in flags or "unfair_terms" in topics:
+        return "unfair_contract_clause"
+    return "general_rental_issue"
+
+
+# Phase3-2: scenario -> 建议准备的证据清单
+EVIDENCE_REQUIRED_MAP = {
+    "deposit_dispute": [
+        "tenancy agreement",
+        "deposit payment record",
+        "deposit protection information",
+        "move-in and move-out photos",
+        "chat or email history",
+    ],
+    "rent_increase": [
+        "tenancy agreement",
+        "rent clause",
+        "rent increase notice",
+        "payment history",
+        "chat or email history",
+    ],
+    "termination_exit": [
+        "tenancy agreement",
+        "break clause or termination clause",
+        "notice emails or messages",
+        "move-out timeline",
+        "payment history",
+    ],
+    "repair_issue": [
+        "tenancy agreement",
+        "repair messages or emails",
+        "photos or videos of the issue",
+        "inspection records",
+        "timeline notes",
+    ],
+    "unfair_contract_clause": [
+        "tenancy agreement",
+        "exact contract clause text",
+        "related messages or emails",
+    ],
+    "fee_issue": [
+        "tenancy agreement",
+        "fee request or invoice",
+        "payment record",
+        "chat or email history",
+    ],
+    "general_rental_issue": [
+        "tenancy agreement",
+        "chat or email history",
+        "payment record",
+        "related photos or files",
+    ],
+}
+
+
+def get_evidence_required(scenario: str) -> list:
+    """Phase3-2：根据 scenario 返回建议准备的证据清单。"""
+    return list(EVIDENCE_REQUIRED_MAP.get(scenario, EVIDENCE_REQUIRED_MAP["general_rental_issue"]))
+
+
+# Phase3-3: scenario -> 建议处理步骤（动作层，适合前端展示）
+RECOMMENDED_STEPS_MAP = {
+    "deposit_dispute": [
+        "确认押金是否已进入保护机制。",
+        "整理合同、押金付款记录、入住和退房证据。",
+        "明确房东或中介扣款/拒退押金的理由。",
+        "准备正式沟通，必要时继续追讨或升级处理。",
+    ],
+    "rent_increase": [
+        "先查看合同中的涨租条款。",
+        "确认当前是否仍处于固定租期或其他租期状态。",
+        "核对通知方式、通知时间和涨租条件。",
+        "再决定是否需要回应、协商或进一步处理。",
+    ],
+    "termination_exit": [
+        "查看合同中的解约条款、break clause 或 notice 条款。",
+        "整理已经发送或收到的通知记录。",
+        "确认当前租期状态、搬离时间和付款情况。",
+        "准备正式沟通，避免因流程不清导致额外争议。",
+    ],
+    "repair_issue": [
+        "整理问题照片、视频和报修记录。",
+        "确认合同中关于维修责任的约定。",
+        "保存催修沟通记录和时间线。",
+        "如问题持续未解决，再考虑升级处理。",
+    ],
+    "unfair_contract_clause": [
+        "标出需要重点审查的合同条款。",
+        "分析条款是否存在明显失衡、模糊或偏向单方。",
+        "结合合同上下文一起理解该条款。",
+        "如有必要，要求对方解释、修改或重新确认。",
+    ],
+    "fee_issue": [
+        "核对收费项目名称和金额。",
+        "查看合同中是否有明确收费依据。",
+        "保存付款记录、收费通知和相关沟通记录。",
+        "如收费不清晰或不合理，要求说明或拒绝不当收费。",
+    ],
+    "general_rental_issue": [
+        "先整理合同、付款记录和沟通记录。",
+        "明确当前问题的核心争议点。",
+        "确认问题更接近合同、押金、维修还是收费场景。",
+        "再决定下一步处理方向。",
+    ],
+}
+
+
+def get_recommended_steps(scenario: str) -> list:
+    """Phase3-3：根据 scenario 返回建议处理步骤（动作层）。"""
+    return list(RECOMMENDED_STEPS_MAP.get(scenario, RECOMMENDED_STEPS_MAP["general_rental_issue"]))
+
+
+# Phase3-4: scenario -> 可能结果（补完证据-动作-结果闭环）
+POSSIBLE_OUTCOMES_MAP = {
+    "deposit_dispute": [
+        "房东或中介说明扣款理由。",
+        "部分押金被退回。",
+        "全部押金被退回。",
+        "争议继续升级，需要进入进一步处理流程。",
+    ],
+    "rent_increase": [
+        "租客接受涨租安排。",
+        "双方进入协商。",
+        "涨租依据被质疑或需要进一步解释。",
+        "租约后续安排需要重新决定。",
+    ],
+    "termination_exit": [
+        "双方就解约或搬离安排达成一致。",
+        "围绕通知、租金或责任产生争议。",
+        "可能出现额外付款或责任风险。",
+        "搬离流程最终被确认。",
+    ],
+    "repair_issue": [
+        "维修问题得到处理。",
+        "维修继续拖延。",
+        "问题升级为正式投诉或进一步争议。",
+        "证据和时间线变得更加重要。",
+    ],
+    "unfair_contract_clause": [
+        "条款得到解释。",
+        "条款被修改或重新确认。",
+        "条款公平性继续受到质疑。",
+        "签约风险仍然存在。",
+    ],
+    "fee_issue": [
+        "收费项目被解释清楚。",
+        "收费被撤回或调整。",
+        "收费问题进入争议状态。",
+        "可能需要进一步投诉或处理。",
+    ],
+    "general_rental_issue": [
+        "问题逐渐被澄清。",
+        "仍需补充更多证据。",
+        "双方开始协商。",
+        "后续可能需要升级处理。",
+    ],
+}
+
+
+def get_possible_outcomes(scenario: str) -> list:
+    """Phase3-4：根据 scenario 返回可能结果列表。"""
+    return list(POSSIBLE_OUTCOMES_MAP.get(scenario, POSSIBLE_OUTCOMES_MAP["general_rental_issue"]))
 
 
 # Phase2-2: law_topic -> legal_reference (source) 与 legal_reasoning 文案
@@ -473,10 +659,13 @@ def build_module3_result(
     legal_references=None,
     legal_reasoning=None,
     legal_summary=None,
+    evidence_required=None,
+    recommended_steps=None,
+    possible_outcomes=None,
 ):
     """
     Phase1 Final：统一 Module3 的最终输出结构。
-    将输入类型、场景、风险标记、严重度、解释、推荐行动、法律主题、法律依据及 legal_summary 整理为固定字段的 result。
+    将输入类型、场景、风险标记、严重度、解释、推荐行动、法律主题、法律依据、legal_summary、evidence_required、recommended_steps、possible_outcomes 整理为固定字段的 result。
     """
     return {
         "input_type": input_type or "",
@@ -491,6 +680,9 @@ def build_module3_result(
         "legal_references": list(legal_references) if legal_references is not None else [],
         "legal_reasoning": list(legal_reasoning) if legal_reasoning is not None else [],
         "legal_summary": (legal_summary or "").strip() if legal_summary is not None else "",
+        "evidence_required": list(evidence_required) if evidence_required is not None else [],
+        "recommended_steps": list(recommended_steps) if recommended_steps is not None else [],
+        "possible_outcomes": list(possible_outcomes) if possible_outcomes is not None else [],
     }
 
 
@@ -570,9 +762,16 @@ def build_contract_risk_result(
     }
 
     # Phase1 Final: 统一写入标准 result 结构
-    scenario = recommended_path  # 使用 recommended_path 作为 scenario 标识
-    # Phase2-1: 基于风险与场景生成法律主题 law_topics
-    law_topics = get_law_topics(risk_flags, detected_input_type, scenario)
+    # Phase2-1: 基于风险与路径生成法律主题 law_topics（此处仍用 recommended_path 作 fallback）
+    law_topics = get_law_topics(risk_flags, detected_input_type, recommended_path)
+    # Phase3-1: 根据 risk_flags / law_topics / input_type 识别具体租房场景
+    scenario = detect_scenario(risk_flags, law_topics, detected_input_type)
+    # Phase3-2: 根据 scenario 生成证据清单
+    evidence_required = get_evidence_required(scenario)
+    # Phase3-3: 根据 scenario 生成建议处理步骤
+    recommended_steps = get_recommended_steps(scenario)
+    # Phase3-4: 根据 scenario 生成可能结果
+    possible_outcomes = get_possible_outcomes(scenario)
     # Phase2-2: 根据 law_topics 生成 legal_references 与 legal_reasoning
     legal_references, legal_reasoning = get_legal_references(law_topics)
     # Phase2-3: 组合成易读的 legal_summary
@@ -590,6 +789,9 @@ def build_contract_risk_result(
         legal_references=legal_references,
         legal_reasoning=legal_reasoning,
         legal_summary=legal_summary,
+        evidence_required=evidence_required,
+        recommended_steps=recommended_steps,
+        possible_outcomes=possible_outcomes,
     )
 
     # 返回统一 result 与兼容字段，便于既有调用方使用

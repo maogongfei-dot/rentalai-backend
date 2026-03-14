@@ -1,7 +1,7 @@
 # Module3 Phase1-A5-2～A5-7：input_type、analysis_mode、response_focus、guided_summary、recommended_path、next_step_hint、routing_metadata — 最小测试
 # 验证三种典型输入在结果中带有正确的字段；并验证 build_routing_metadata 返回完整路由元数据
 
-from module3_risk_result import build_contract_risk_result
+from module3_risk_result import build_contract_risk_result, get_evidence_required, get_possible_outcomes, get_recommended_steps
 from routing_metadata import build_routing_metadata
 
 # (文本, ..., expected recommended_actions, expected action_details 关键片段, expected action_priority_map, ordered_action_details 首项关键片段, expected law_topics)
@@ -183,9 +183,66 @@ def test_legal_summary():
     print("Phase2-3 legal_summary 最小测试通过。")
 
 
+# Phase3-1：场景识别最小测试（使用需求中的三句样例）
+SCENARIO_SAMPLES = [
+    ("Can my landlord increase rent during the fixed term?", "rent_increase"),
+    ("The landlord may increase the rent by giving one month notice.", "rent_increase"),
+    ("My landlord refused to return my deposit.", "deposit_dispute"),
+]
+
+
+def test_scenario_detection():
+    """不同输入应生成合理的 scenario（Phase3-1）。"""
+    for text, exp_scenario in SCENARIO_SAMPLES:
+        result = build_contract_risk_result(input_text=text)
+        scenario = result.get("scenario") or ""
+        assert scenario == exp_scenario, f"输入 {text!r} 的 scenario 期望 {exp_scenario!r}, 得到 {scenario!r}"
+    print("Phase3-1 scenario 最小测试通过。")
+
+
+def test_evidence_required():
+    """不同输入应生成合理的 evidence_required（Phase3-2），与 scenario 一致。"""
+    for text, exp_scenario in SCENARIO_SAMPLES:
+        result = build_contract_risk_result(input_text=text)
+        scenario = result.get("scenario") or ""
+        assert scenario == exp_scenario
+        evidence = result.get("evidence_required") or []
+        expected = get_evidence_required(exp_scenario)
+        assert evidence == expected, f"输入 {text!r} 的 evidence_required 期望 {expected!r}, 得到 {evidence!r}"
+    print("Phase3-2 evidence_required 最小测试通过。")
+
+
+def test_recommended_steps():
+    """不同输入应生成合理的 recommended_steps（Phase3-3），与 scenario 一致。"""
+    for text, exp_scenario in SCENARIO_SAMPLES:
+        result = build_contract_risk_result(input_text=text)
+        scenario = result.get("scenario") or ""
+        assert scenario == exp_scenario
+        steps = result.get("recommended_steps") or []
+        expected = get_recommended_steps(exp_scenario)
+        assert steps == expected, f"输入 {text!r} 的 recommended_steps 期望 {expected!r}, 得到 {steps!r}"
+    print("Phase3-3 recommended_steps 最小测试通过。")
+
+
+def test_possible_outcomes():
+    """不同输入应生成合理的 possible_outcomes（Phase3-4），与 scenario 一致。"""
+    for text, exp_scenario in SCENARIO_SAMPLES:
+        result = build_contract_risk_result(input_text=text)
+        scenario = result.get("scenario") or ""
+        assert scenario == exp_scenario
+        outcomes = result.get("possible_outcomes") or []
+        expected = get_possible_outcomes(exp_scenario)
+        assert outcomes == expected, f"输入 {text!r} 的 possible_outcomes 期望 {expected!r}, 得到 {outcomes!r}"
+    print("Phase3-4 possible_outcomes 最小测试通过。")
+
+
 if __name__ == "__main__":
     test_input_type_in_result()
     test_build_routing_metadata()
     test_law_topics()
     test_legal_references_and_reasoning()
     test_legal_summary()
+    test_scenario_detection()
+    test_evidence_required()
+    test_recommended_steps()
+    test_possible_outcomes()
