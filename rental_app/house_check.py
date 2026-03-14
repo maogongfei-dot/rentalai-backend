@@ -580,9 +580,46 @@ def _print_decision_hints(decision_hints: dict, n_show_checklist: int = 5):
 
 
 # ---------- C2-A: 模块化 CLI 输出（统一顺序、标题、长度控制） ----------
+# ---------- A2-A: 显示层对齐 ranking_result，轻量辅助读取 ----------
+
+def _get_house_area_score(item):
+    """从单条房源项读取 area_score，优先标准字段 scores.area_score，否则 fallback 旧字段。"""
+    if not item:
+        return None
+    scores = item.get("scores") if isinstance(item.get("scores"), dict) else None
+    if scores is not None and "area_score" in scores:
+        return scores.get("area_score")
+    return item.get("area_score")
+
+
+def _get_house_area_reason(item):
+    """从单条房源项读取 area_score_reason，优先标准字段 reasons.area_score_reason。"""
+    if not item:
+        return ""
+    reasons = item.get("reasons") if isinstance(item.get("reasons"), dict) else None
+    if reasons is not None:
+        v = reasons.get("area_score_reason")
+        if v is not None:
+            return str(v)
+    return str(item.get("area_score_reason") or "")
+
+
+def _get_house_summary(item):
+    """从单条房源项读取 recommendation_summary，优先标准字段 explain.recommendation_summary。"""
+    if not item:
+        return ""
+    ex = item.get("explain") if isinstance(item.get("explain"), dict) else None
+    if ex is not None:
+        v = ex.get("recommendation_summary")
+        if v is not None:
+            return str(v)
+    ex = item.get("explain") or {}
+    return str(ex.get("recommendation_summary") or "")
+
 
 def print_recommendation_overview(first_result):
-    """1. Recommendation Overview: weight_preset, validated_weights, weight_warnings."""
+    """1. Recommendation Overview: weight_preset, validated_weights, weight_warnings.
+    支持从 ranking_result 拼出的 first_result（weight_preset/user_preferences + weights）。"""
     if not first_result:
         return
     preset = first_result.get("weight_preset")
@@ -598,19 +635,18 @@ def print_recommendation_overview(first_result):
     print()
 
 
-def print_top_recommendations(ranked_results, n_show=3):
-    """2. Top Recommendations: rank, house_label, final_score, area_score, area_score_reason, recommendation_summary."""
-    if not ranked_results:
+def print_top_recommendations(houses_list, n_show=3):
+    """2. Top Recommendations. 优先从标准字段读取：rank, house_label, final_score, scores.area_score, reasons.area_score_reason, explain.recommendation_summary；缺时 fallback 旧字段。"""
+    if not houses_list:
         return
     print("=== Top Recommendations ===")
-    for i, r in enumerate(ranked_results[:n_show], 1):
-        h = r.get("house") or {}
-        label = f"Rank {i}"
+    for i, r in enumerate(houses_list[:n_show], 1):
+        label = r.get("house_label") or f"Rank {i}"
         score = r.get("final_score") or r.get("_score") or r.get("score")
-        area_s = r.get("area_score")
-        area_reason = r.get("area_score_reason") or ""
-        ex = r.get("explain") or {}
-        summary = ex.get("recommendation_summary") or ""
+        area_s = _get_house_area_score(r)
+        area_reason = _get_house_area_reason(r)
+        summary = _get_house_summary(r)
+        h = r.get("house") or {}
         print(f"  {label}: {h.get('area', '')} | {h.get('postcode', '')} | rent={h.get('rent')}")
         print(f"    final_score: {score}")
         if area_s is not None:
@@ -714,20 +750,68 @@ def print_action_plan(decision_hints):
     print()
 
 
-def print_ranking_report(state, ranked_results, n_show_top=3):
-    """Unified CLI output in fixed order: 1–8. Only prints blocks that have data."""
-    if not ranked_results:
-        print("⚠️ 暂无可推荐房源")
-        return
-    print_recommendation_overview(ranked_results[0])
-    print_top_recommendations(ranked_results, n_show=n_show_top)
-    print_comparison_insights(state.get("ranked_compare_explain") or {}, n_show=2)
-    hints = state.get("ranked_decision_hints") or {}
-    print_decision_hints_block(hints)
-    print_preference_switch_hint(hints)
-    print_preference_simulations(hints, n_single=2, n_multi=2)
-    print_viewing_checklist(hints, per_house_max=2)
-    print_action_plan(hints)
+def print_ranking_report(state, n_show_top=3):
+    """Unified CLI output in fixed order: 1–8. 全部优先从标准 ranking_result 读取（A2-A 收口）；无 rr 时从 state 散字段 fallback。缺数据区块自动跳过。"""
+    rr = state.get("ranking_result")
+    ranked_results = state.get("ranked_results") or []
+
+    if rr:
+        # 仅从 ranking_result 顶层字段读取
+        metadata = rr.get("metadata") or {}
+        weights_block = rr.get("weights") or {}
+        user_prefs = rr.get("user_preferences") or {}
+        houses = rr.get("houses") or []
+        compare_explain = rr.get("compare_explain") or {}
+        decision_hints = rr.get("decision_hints") or {}
+        preference_switch_hints = rr.get("preference_switch_hints") or []
+        preference_simulation = rr.get("preference_simulation") or []
+        multi_factor_simulation = rr.get("multi_factor_simulation") or []
+        viewing_checklist = rr.get("viewing_checklist") or []
+        action_plan = rr.get("action_plan") or {}
+
+        if not metadata and not houses and not ranked_results:
+            print("⚠️ 暂无可推荐房源")
+            return
+        first_result = {
+            "weight_preset": user_prefs.get("weight_preset"),
+            "validated_weights": weights_block.get("validated_weights"),
+            "weight_warnings": weights_block.get("weight_warnings"),
+        }
+        print_recommendation_overview(first_result)
+        print_top_recommendations(houses, n_show=n_show_top)
+        if compare_explain and (compare_explain.get("pairwise_comparisons") or []):
+            print_comparison_insights(compare_explain, n_show=2)
+        if decision_hints and (decision_hints.get("primary_recommendation") or decision_hints.get("backup_option") or decision_hints.get("caution_option")):
+            print_decision_hints_block(decision_hints)
+        if preference_switch_hints:
+            print_preference_switch_hint({"preference_switch_hints": preference_switch_hints})
+        if preference_simulation or multi_factor_simulation:
+            print_preference_simulations({"preference_simulation": preference_simulation, "multi_factor_simulation": multi_factor_simulation}, n_single=2, n_multi=2)
+        if viewing_checklist:
+            print_viewing_checklist({"viewing_checklist": viewing_checklist}, per_house_max=2)
+        if action_plan:
+            print_action_plan({"action_plan": action_plan})
+    else:
+        if not ranked_results:
+            print("⚠️ 暂无可推荐房源")
+            return
+        first_result = {
+            "weight_preset": (ranked_results[0] or {}).get("weight_preset"),
+            "validated_weights": (ranked_results[0] or {}).get("validated_weights"),
+            "weight_warnings": (ranked_results[0] or {}).get("weight_warnings"),
+        }
+        print_recommendation_overview(first_result)
+        print_top_recommendations(ranked_results, n_show=n_show_top)
+        compare_explain = state.get("ranked_compare_explain") or {}
+        if compare_explain and (compare_explain.get("pairwise_comparisons") or []):
+            print_comparison_insights(compare_explain, n_show=2)
+        hints = state.get("ranked_decision_hints") or {}
+        if hints:
+            print_decision_hints_block(hints)
+        print_preference_switch_hint(hints)
+        print_preference_simulations(hints, n_single=2, n_multi=2)
+        print_viewing_checklist(hints, per_house_max=2)
+        print_action_plan(hints)
 
 
 def print_scoring_summary(first_result):
@@ -791,7 +875,7 @@ def main():
             top3 = get_top_n(state, 3)
             target_postcode = state["settings"].get("target_postcode", "N/A")
             print(f"\n🏆 推荐Top3（按评分排序，目标postcode: {target_postcode}）：\n")
-            print_ranking_report(state, top3, n_show_top=3)
+            print_ranking_report(state, n_show_top=3)
             if top3:
                 print("=============== AI Summary ===============")
                 summary = generate_overall_summary(top3, state.get("settings"))
@@ -845,7 +929,7 @@ def main():
                 print("⚠️ 暂无评分结果（请先录入房源或加载数据）")
             else:
                 print("\n🏆 评分排序 Top5:\n")
-                print_ranking_report(state, top5, n_show_top=3)
+                print_ranking_report(state, n_show_top=3)
         elif choice.upper() == "D":
             # Demo dataset: 3 sample listings to showcase full AI flow
             demo_list = [
@@ -887,7 +971,7 @@ def main():
             top3 = get_top_n(state, 3)
             target_postcode = state["settings"].get("target_postcode", "N/A")
             print(f"\n🏆 Demo Top3（按评分排序，目标postcode: {target_postcode}）：\n")
-            print_ranking_report(state, top3, n_show_top=3)
+            print_ranking_report(state, n_show_top=3)
             if top3:
                 print("=============== AI Summary ===============")
                 summary = generate_overall_summary(top3, state.get("settings"))
