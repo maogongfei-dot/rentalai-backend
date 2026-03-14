@@ -126,6 +126,19 @@ DEFAULT_ACTIONS_WHEN_NO_RISK = [
     "No obvious baseline risk was detected, but you may still want to check the tenancy details carefully.",
 ]
 
+# ---------- Phase1-A3: 风险严重度与动作优先级（集中定义，默认映射） ----------
+RISK_SEVERITY_PRIORITY_MAP = {
+    "eviction_risk": {"severity": "high", "priority": "high"},
+    "landlord_entry_risk": {"severity": "high", "priority": "high"},
+    "deposit_risk": {"severity": "medium", "priority": "medium"},
+    "repair_risk": {"severity": "medium", "priority": "medium"},
+    "notice_risk": {"severity": "medium", "priority": "medium"},
+    "rent_increase_risk": {"severity": "medium", "priority": "medium"},
+    "fee_charge_risk": {"severity": "low", "priority": "low"},
+}
+
+PRIORITY_ORDER = ("high", "medium", "low")  # 用于 recommended_actions 排序
+
 
 def _normalize_text(text):
     """Lower-case 标准化，缺输入返回空字符串。"""
@@ -157,49 +170,128 @@ def _detect_risk_flags(text):
 
 
 def _build_risk_explanations(risk_flags):
-    """基于命中的 risk_flags 生成 risk_explanations 列表，顺序与 risk_flags 一致。"""
+    """基于命中的 risk_flags 生成 risk_explanations 列表，含 severity / priority；顺序与 risk_flags 一致。"""
     out = []
     for flag in risk_flags or []:
         m = RISK_EXPLANATIONS_MAP.get(flag)
-        if not m:
-            out.append({"flag": flag, "title": flag.replace("_", " ").title(), "explanation": ""})
-            continue
-        out.append({
+        sp = RISK_SEVERITY_PRIORITY_MAP.get(flag) or {}
+        entry = {
             "flag": flag,
-            "title": m.get("title") or flag.replace("_", " ").title(),
-            "explanation": m.get("explanation") or "",
-        })
+            "title": (m.get("title") if m else None) or flag.replace("_", " ").title(),
+            "explanation": (m.get("explanation") if m else None) or "",
+            "severity": sp.get("severity") or "medium",
+            "priority": sp.get("priority") or "medium",
+        }
+        out.append(entry)
     return out
 
 
 def _build_recommended_actions(risk_flags):
-    """收集各命中 flag 的默认 actions，去重、稳定顺序；无命中时返回默认建议。"""
+    """收集各命中 flag 的 actions，按 priority 高→中→低排序后去重；无命中时返回默认建议。"""
     if not risk_flags:
         return list(DEFAULT_ACTIONS_WHEN_NO_RISK)
+    items = []
+    for flag in risk_flags:
+        sp = RISK_SEVERITY_PRIORITY_MAP.get(flag) or {}
+        p = sp.get("priority") or "medium"
+        rank = PRIORITY_ORDER.index(p) if p in PRIORITY_ORDER else 1
+        for a in (RISK_EXPLANATIONS_MAP.get(flag) or {}).get("actions") or []:
+            a = (a or "").strip()
+            if a:
+                items.append((rank, a))
+    items.sort(key=lambda x: x[0])
     seen = set()
     out = []
-    for flag in risk_flags:
-        m = RISK_EXPLANATIONS_MAP.get(flag)
-        if not m:
-            continue
-        for a in m.get("actions") or []:
-            a = (a or "").strip()
-            if a and a not in seen:
-                seen.add(a)
-                out.append(a)
+    for _, a in items:
+        if a not in seen:
+            seen.add(a)
+            out.append(a)
     return out if out else list(DEFAULT_ACTIONS_WHEN_NO_RISK)
 
 
-def _build_risk_summary(risk_flags):
-    """根据 risk_flags 生成一句自然语言 risk_summary；无命中时返回默认句。"""
+def _build_overall_risk_level(risk_flags):
+    """根据命中 flags 的 severity 生成 overall_risk_level：任一 high->high，否则任一 medium->medium，否则任一 low->low，否则 none。"""
+    if not risk_flags:
+        return "none"
+    severities = set()
+    for flag in risk_flags:
+        s = (RISK_SEVERITY_PRIORITY_MAP.get(flag) or {}).get("severity") or "medium"
+        severities.add(s)
+    if "high" in severities:
+        return "high"
+    if "medium" in severities:
+        return "medium"
+    if "low" in severities:
+        return "low"
+    return "none"
+
+
+def _build_grouped_risks(risk_explanations):
+    """按 severity 分组为 high / medium / low；无命中时返回空结构。"""
+    out = {"high": [], "medium": [], "low": []}
+    for e in risk_explanations or []:
+        s = (e.get("severity") or "medium").lower()
+        if s not in out:
+            out["medium"].append(e)
+            continue
+        out[s].append(e)
+    return out
+
+
+def _build_grouped_actions(risk_flags):
+    """按 priority 将推荐动作分到 high_priority / medium_priority / low_priority；去重、稳定顺序。无命中时默认动作放 medium_priority。"""
+    out = {"high_priority": [], "medium_priority": [], "low_priority": []}
+    if not risk_flags:
+        out["medium_priority"] = list(DEFAULT_ACTIONS_WHEN_NO_RISK)
+        return out
+    key_order = ("high_priority", "medium_priority", "low_priority")
+    rank_to_key = {0: "high_priority", 1: "medium_priority", 2: "low_priority"}
+    items = []
+    for flag in risk_flags:
+        sp = RISK_SEVERITY_PRIORITY_MAP.get(flag) or {}
+        p = sp.get("priority") or "medium"
+        rank = PRIORITY_ORDER.index(p) if p in PRIORITY_ORDER else 1
+        for a in (RISK_EXPLANATIONS_MAP.get(flag) or {}).get("actions") or []:
+            a = (a or "").strip()
+            if a:
+                items.append((rank, a))
+    items.sort(key=lambda x: x[0])
+    seen = set()
+    for rank, a in items:
+        if a in seen:
+            continue
+        seen.add(a)
+        out[rank_to_key[rank]].append(a)
+    return out
+
+
+def _build_risk_summary(risk_flags, risk_explanations=None):
+    """根据 risk_flags 与 grouped 严重度生成一句 risk_summary；可轻量呼应分组数量。无命中时返回默认句。"""
     if not risk_flags:
         return "No obvious baseline contract or dispute risk flags were detected."
+    explanations = risk_explanations or _build_risk_explanations(risk_flags)
+    n_high = sum(1 for e in explanations if (e.get("severity") or "").lower() == "high")
+    n_medium = sum(1 for e in explanations if (e.get("severity") or "").lower() == "medium")
+    n_low = sum(1 for e in explanations if (e.get("severity") or "").lower() == "low")
     readable = [FLAG_TO_READABLE.get(f, f.replace("_", " ")) for f in risk_flags]
+    parts = []
+    if n_high > 0:
+        parts.append(f"{'one' if n_high == 1 else n_high} high-priority concern{'s' if n_high != 1 else ''}")
+    if n_medium > 0:
+        parts.append(f"{'one' if n_medium == 1 else n_medium} medium-level concern{'s' if n_medium != 1 else ''}")
+    if n_low > 0:
+        parts.append(f"{'one' if n_low == 1 else n_low} low-level concern{'s' if n_low != 1 else ''}")
+    if len(parts) >= 2:
+        return "This text raises " + " and ".join(parts) + "."
+    if n_high == 1 and not n_medium and not n_low:
+        return f"This text raises a high-priority concern around {readable[0]}."
+    if n_low >= 1 and not n_high and not n_medium:
+        return f"Only a low-level concern around {readable[0]} was detected." if len(readable) == 1 else f"This text raises low-level concerns around {', '.join(readable[:2])}{' and more' if len(readable) > 2 else ''}."
     if len(readable) == 1:
-        return f"This text mainly raises a {readable[0]}-related concern."
+        return f"This text raises a medium-level concern around {readable[0]}."
     if len(readable) == 2:
-        return f"This text mainly raises {readable[0]} and {readable[1]} concerns."
-    return f"This text raises multiple concerns, mainly around {', '.join(readable[:-1])}, and {readable[-1]}."
+        return f"This text mainly raises medium-level concerns around {readable[0]} and {readable[1]}."
+    return f"This text raises medium-level concerns around {', '.join(readable[:-1])}, and {readable[-1]}."
 
 
 def build_contract_risk_result(
@@ -220,7 +312,7 @@ def build_contract_risk_result(
       risk_summary: 一句话风险摘要，默认 ""
       recommended_actions: 行动建议列表，默认 []
 
-    输出: 标准 result dict（status, message, metadata, input_summary, risk_flags, risk_explanations, risk_summary, recommended_actions）
+    输出: 标准 result dict（含 risk_explanations.severity/priority、overall_risk_level、risk_summary、recommended_actions 按优先级排序）
     当 risk_flags 未传入且有 input_text 时，自动识别 risk_flags，并生成 risk_explanations、risk_summary、recommended_actions。
     """
     recommended_actions_raw = recommended_actions
@@ -237,12 +329,16 @@ def build_contract_risk_result(
     else:
         risk_flags = list(risk_flags)
 
+    risk_explanations = _build_risk_explanations(risk_flags)
+    overall_risk_level = _build_overall_risk_level(risk_flags)
+    grouped_risks = _build_grouped_risks(risk_explanations)
+    grouped_actions = _build_grouped_actions(risk_flags)
+
     if risk_summary is None or (isinstance(risk_summary, str) and not risk_summary.strip()):
-        risk_summary = _build_risk_summary(risk_flags)
+        risk_summary = _build_risk_summary(risk_flags, risk_explanations)
     else:
         risk_summary = str(risk_summary)
 
-    risk_explanations = _build_risk_explanations(risk_flags)
     if recommended_actions is None or (isinstance(recommended_actions, list) and len(recommended_actions) == 0):
         recommended_actions = _build_recommended_actions(risk_flags)
     else:
@@ -269,29 +365,35 @@ def build_contract_risk_result(
         "input_summary": input_summary,
         "risk_flags": risk_flags,
         "risk_explanations": risk_explanations,
+        "grouped_risks": grouped_risks,
+        "overall_risk_level": overall_risk_level,
         "risk_summary": risk_summary,
         "recommended_actions": recommended_actions,
+        "grouped_actions": grouped_actions,
     }
 
 
 def demo_module3_contract_risk_result():
     """
-    演示 Phase1-A2：风险标签、解释与推荐动作。
-    覆盖示例：deposit+repair、notice+landlord entry、无风险关键词。
+    演示 Phase1-A4：风险标签、分组(grouped_risks/grouped_actions)、risk_summary。
+    覆盖：eviction(high)、deposit+repair(medium)、fee_charge(low)、无命中(none)。
     """
     cases = [
-        ("deposit + repair", "The deposit was not protected and the boiler is broken with mould in the bathroom."),
-        ("notice + landlord entry", "They gave me two months notice and the landlord did an inspection without notice."),
-        ("no risk keywords", "The flat is nice and the area is quiet."),
+        ("eviction_risk -> high", "The landlord sent a section 21 notice and I might face eviction."),
+        ("deposit + repair -> medium", "The deposit was not protected and the boiler is broken with mould."),
+        ("fee_charge_risk -> low", "They charged an admin fee and a check-out fee."),
+        ("no risk -> none", "The flat is nice and the area is quiet."),
     ]
     for label, text in cases:
         result = build_contract_risk_result(input_text=text, input_type="text")
         print(f"--- {label} ---")
         print("  risk_flags:", result.get("risk_flags"))
+        print("  overall_risk_level:", result.get("overall_risk_level"))
         print("  risk_summary:", result.get("risk_summary"))
-        print("  risk_explanations:", [(e.get("flag"), e.get("title")) for e in result.get("risk_explanations", [])])
-        print("  recommended_actions:", result.get("recommended_actions"))
-    print("--- Module3 Phase1-A2 demo 结束 ---")
+        print("  grouped_risks keys:", {k: len(v) for k, v in result.get("grouped_risks", {}).items()})
+        print("  grouped_actions keys:", {k: len(v) for k, v in result.get("grouped_actions", {}).items()})
+        print("  recommended_actions (first 3):", (result.get("recommended_actions") or [])[:3])
+    print("--- Module3 Phase1-A4 demo 结束 ---")
     return result
 
 
