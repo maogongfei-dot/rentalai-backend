@@ -1,7 +1,13 @@
 # Module3 Phase1-A5-2～A5-7：input_type、analysis_mode、response_focus、guided_summary、recommended_path、next_step_hint、routing_metadata — 最小测试
 # 验证三种典型输入在结果中带有正确的字段；并验证 build_routing_metadata 返回完整路由元数据
 
-from module3_risk_result import build_contract_risk_result, get_evidence_required, get_possible_outcomes, get_recommended_steps
+from module3_risk_result import (
+    build_contract_risk_result,
+    build_scenario_block,
+    get_evidence_required,
+    get_possible_outcomes,
+    get_recommended_steps,
+)
 from routing_metadata import build_routing_metadata
 
 # (文本, ..., expected recommended_actions, expected action_details 关键片段, expected action_priority_map, ordered_action_details 首项关键片段, expected law_topics)
@@ -236,6 +242,30 @@ def test_possible_outcomes():
     print("Phase3-4 possible_outcomes 最小测试通过。")
 
 
+def test_scenario_block():
+    """不同输入应稳定生成完整的场景闭环 scenario_block（Phase3 Final）。"""
+    for text, exp_scenario in SCENARIO_SAMPLES:
+        result = build_contract_risk_result(input_text=text)
+        block = result.get("scenario_block")
+        assert block is not None, f"输入 {text!r} 应有 scenario_block"
+        assert isinstance(block, dict), "scenario_block 应为 dict"
+        for key in ("scenario", "evidence_required", "recommended_steps", "possible_outcomes"):
+            assert key in block, f"scenario_block 应包含键 {key!r}"
+        assert block["scenario"] == exp_scenario, f"输入 {text!r} 的 scenario_block.scenario 期望 {exp_scenario!r}, 得到 {block['scenario']!r}"
+        assert block["evidence_required"] == (result.get("evidence_required") or []), "scenario_block 与扁平字段 evidence_required 一致"
+        assert block["recommended_steps"] == (result.get("recommended_steps") or []), "scenario_block 与扁平字段 recommended_steps 一致"
+        assert block["possible_outcomes"] == (result.get("possible_outcomes") or []), "scenario_block 与扁平字段 possible_outcomes 一致"
+        # 与 build_scenario_block 返回值一致
+        expected_block = build_scenario_block(
+            result["scenario"],
+            result.get("evidence_required") or [],
+            result.get("recommended_steps") or [],
+            result.get("possible_outcomes") or [],
+        )
+        assert block == expected_block, f"scenario_block 应与 build_scenario_block(...) 一致"
+    print("Phase3 Final scenario_block 最小测试通过。")
+
+
 if __name__ == "__main__":
     test_input_type_in_result()
     test_build_routing_metadata()
@@ -246,3 +276,4 @@ if __name__ == "__main__":
     test_evidence_required()
     test_recommended_steps()
     test_possible_outcomes()
+    test_scenario_block()

@@ -1,0 +1,4 @@
+# Module3 Phase4-1 文档读取依赖（PDF / DOCX 文本提取）
+# 安装：pip install -r requirements-docs.txt
+pypdf>=4.0.0
+python-docx>=1.0.0

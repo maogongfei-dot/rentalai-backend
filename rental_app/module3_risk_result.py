@@ -313,6 +313,7 @@ MODULE3_RESULT_KEYS = (
     "evidence_required",
     "recommended_steps",
     "possible_outcomes",
+    "scenario_block",  # Phase3 Final: 场景闭环统一结构
 )
 
 # Phase2-1: 基于风险标记 / 输入类型 / 场景的法律主题映射（与需求一一对应，含别名以兼容后续扩展）
@@ -555,6 +556,25 @@ def get_possible_outcomes(scenario: str) -> list:
     return list(POSSIBLE_OUTCOMES_MAP.get(scenario, POSSIBLE_OUTCOMES_MAP["general_rental_issue"]))
 
 
+# Phase3 Final: 场景闭环统一结构（证据-动作-结果）
+def build_scenario_block(
+    scenario: str,
+    evidence_required: list,
+    recommended_steps: list,
+    possible_outcomes: list,
+) -> dict:
+    """
+    将 Phase3 场景闭环四要素整理为稳定结构，供下游 Phase4 等使用。
+    返回: { scenario, evidence_required, recommended_steps, possible_outcomes }
+    """
+    return {
+        "scenario": scenario or "",
+        "evidence_required": list(evidence_required) if evidence_required is not None else [],
+        "recommended_steps": list(recommended_steps) if recommended_steps is not None else [],
+        "possible_outcomes": list(possible_outcomes) if possible_outcomes is not None else [],
+    }
+
+
 # Phase2-2: law_topic -> legal_reference (source) 与 legal_reasoning 文案
 LEGAL_REFERENCE_REASONING_MAP = {
     "deposit_protection": {
@@ -772,6 +792,8 @@ def build_contract_risk_result(
     recommended_steps = get_recommended_steps(scenario)
     # Phase3-4: 根据 scenario 生成可能结果
     possible_outcomes = get_possible_outcomes(scenario)
+    # Phase3 Final: 场景闭环统一收口
+    scenario_block = build_scenario_block(scenario, evidence_required, recommended_steps, possible_outcomes)
     # Phase2-2: 根据 law_topics 生成 legal_references 与 legal_reasoning
     legal_references, legal_reasoning = get_legal_references(law_topics)
     # Phase2-3: 组合成易读的 legal_summary
@@ -794,9 +816,10 @@ def build_contract_risk_result(
         possible_outcomes=possible_outcomes,
     )
 
-    # 返回统一 result 与兼容字段，便于既有调用方使用
+    # 返回统一 result 与兼容字段；scenario_block 为 Phase3 场景闭环统一结构
     return {
         **unified_result,
+        "scenario_block": scenario_block,
         "status": status,
         "message": message,
         "metadata": metadata,
