@@ -9,6 +9,16 @@ from datetime import datetime
 
 from routing_metadata import build_routing_metadata
 
+# Phase4-2/4-3/4-4：文档条款切分、风险条款识别、重点条款摘要（按需导入，避免循环依赖）
+try:
+    from clause_locator import build_clause_blocks
+    from risk_clause_detector import detect_risk_clauses
+    from highlighted_clause_builder import build_highlighted_clauses
+except ImportError:
+    build_clause_blocks = None
+    detect_risk_clauses = None
+    build_highlighted_clauses = None
+
 MODULE3_VERSION = "module3_risk_baseline_v1"
 
 # ---------- Phase1-A1: 基础风险标签与关键词规则（集中定义） ----------
@@ -314,6 +324,10 @@ MODULE3_RESULT_KEYS = (
     "recommended_steps",
     "possible_outcomes",
     "scenario_block",  # Phase3 Final: 场景闭环统一结构
+    # Phase4：文档条款与风险条款（由 build_contract_risk_result_from_document 填充）
+    # "clause_blocks",
+    # "risk_clauses",
+    # "risk_clause_count",
 )
 
 # Phase2-1: 基于风险标记 / 输入类型 / 场景的法律主题映射（与需求一一对应，含别名以兼容后续扩展）
@@ -836,6 +850,30 @@ def build_contract_risk_result(
         "action_priority_map": action_priority_map,
         "grouped_actions": grouped_actions,
     }
+
+
+def build_contract_risk_result_from_document(document_data: dict) -> dict:
+    """
+    Phase4：基于文档读取结果生成 Module3 风格 result，并附加 clause_blocks、risk_clauses、risk_clause_count、highlighted_clauses、highlighted_clause_count。
+    输入为 read_document() 的返回值；先用 full_text 走一遍 build_contract_risk_result，再切分条款、识别风险条款并提炼重点条款。
+    """
+    base = build_contract_risk_result(input_text=(document_data or {}).get("full_text") or "")
+    if build_clause_blocks is None or detect_risk_clauses is None:
+        base["clause_blocks"] = []
+        base["risk_clauses"] = []
+        base["risk_clause_count"] = 0
+        base["highlighted_clauses"] = []
+        base["highlighted_clause_count"] = 0
+        return base
+    clause_blocks = build_clause_blocks(document_data)
+    risk_clauses = detect_risk_clauses(clause_blocks)
+    highlighted_clauses = (build_highlighted_clauses(risk_clauses, max_items=3) if build_highlighted_clauses else [])
+    base["clause_blocks"] = clause_blocks
+    base["risk_clauses"] = risk_clauses
+    base["risk_clause_count"] = len(risk_clauses)
+    base["highlighted_clauses"] = highlighted_clauses
+    base["highlighted_clause_count"] = len(highlighted_clauses)
+    return base
 
 
 def demo_module3_contract_risk_result():
