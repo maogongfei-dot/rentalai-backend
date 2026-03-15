@@ -9,7 +9,7 @@ from datetime import datetime
 
 from routing_metadata import build_routing_metadata
 
-# Phase4-2/4-3/4-4/4-Final、Phase5-1/5-2：文档条款切分、风险条款识别、重点条款摘要、文档分析块、缺失条款检测、弱条款检测（按需导入，避免循环依赖）
+# Phase4-2/4-3/4-4/4-Final、Phase5-1/5-2/5-3：文档条款切分、风险条款识别、重点条款摘要、文档分析块、缺失/弱条款检测、合同完整性检查（按需导入，避免循环依赖）
 try:
     from clause_locator import build_clause_blocks
     from risk_clause_detector import detect_risk_clauses
@@ -17,6 +17,8 @@ try:
     from document_analysis_builder import build_document_analysis_block
     from missing_clause_detector import detect_missing_clauses
     from weak_clause_detector import detect_weak_clauses
+    from contract_completeness_checker import build_contract_completeness
+    from completeness_builder import build_completeness_block
 except ImportError:
     build_clause_blocks = None
     detect_risk_clauses = None
@@ -24,6 +26,8 @@ except ImportError:
     build_document_analysis_block = None
     detect_missing_clauses = None
     detect_weak_clauses = None
+    build_contract_completeness = None
+    build_completeness_block = None
 
 MODULE3_VERSION = "module3_risk_baseline_v1"
 
@@ -877,6 +881,28 @@ def build_contract_risk_result_from_document(document_data: dict) -> dict:
         highlighted_clauses = (build_highlighted_clauses(risk_clauses, max_items=3) if build_highlighted_clauses else [])
         missing_clauses = (detect_missing_clauses(clause_blocks) if detect_missing_clauses else [])
         weak_clauses = (detect_weak_clauses(clause_blocks) if detect_weak_clauses else [])
+    # Phase5-3：合同完整性检查
+    contract_completeness = (
+        build_contract_completeness(missing_clauses, weak_clauses)
+        if build_contract_completeness
+        else {
+            "completeness_level": "",
+            "missing_clause_count": len(missing_clauses) if missing_clauses else 0,
+            "weak_clause_count": len(weak_clauses) if weak_clauses else 0,
+            "total_issue_count": 0,
+            "completeness_summary": "",
+        }
+    )
+    # Phase5 Final：缺失条款与完整性输出收口
+    completeness_block = (
+        build_completeness_block(missing_clauses, weak_clauses, contract_completeness)
+        if build_completeness_block
+        else {
+            "missing_clauses": list(missing_clauses) if missing_clauses else [],
+            "weak_clauses": list(weak_clauses) if weak_clauses else [],
+            "contract_completeness": contract_completeness,
+        }
+    )
     # Phase4 Final：统一文档分析输出块
     document_analysis_block = (
         build_document_analysis_block(doc, clause_blocks, risk_clauses, highlighted_clauses)
@@ -899,6 +925,10 @@ def build_contract_risk_result_from_document(document_data: dict) -> dict:
     base["missing_clause_count"] = len(missing_clauses)
     base["weak_clauses"] = weak_clauses
     base["weak_clause_count"] = len(weak_clauses)
+    base["contract_completeness"] = contract_completeness
+    base["completeness_level"] = contract_completeness.get("completeness_level", "")
+    base["completeness_summary"] = contract_completeness.get("completeness_summary", "")
+    base["completeness_block"] = completeness_block
     return base
 
 
