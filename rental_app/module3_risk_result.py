@@ -9,15 +9,21 @@ from datetime import datetime
 
 from routing_metadata import build_routing_metadata
 
-# Phase4-2/4-3/4-4：文档条款切分、风险条款识别、重点条款摘要（按需导入，避免循环依赖）
+# Phase4-2/4-3/4-4/4-Final、Phase5-1/5-2：文档条款切分、风险条款识别、重点条款摘要、文档分析块、缺失条款检测、弱条款检测（按需导入，避免循环依赖）
 try:
     from clause_locator import build_clause_blocks
     from risk_clause_detector import detect_risk_clauses
     from highlighted_clause_builder import build_highlighted_clauses
+    from document_analysis_builder import build_document_analysis_block
+    from missing_clause_detector import detect_missing_clauses
+    from weak_clause_detector import detect_weak_clauses
 except ImportError:
     build_clause_blocks = None
     detect_risk_clauses = None
     build_highlighted_clauses = None
+    build_document_analysis_block = None
+    detect_missing_clauses = None
+    detect_weak_clauses = None
 
 MODULE3_VERSION = "module3_risk_baseline_v1"
 
@@ -854,25 +860,45 @@ def build_contract_risk_result(
 
 def build_contract_risk_result_from_document(document_data: dict) -> dict:
     """
-    Phase4：基于文档读取结果生成 Module3 风格 result，并附加 clause_blocks、risk_clauses、risk_clause_count、highlighted_clauses、highlighted_clause_count。
-    输入为 read_document() 的返回值；先用 full_text 走一遍 build_contract_risk_result，再切分条款、识别风险条款并提炼重点条款。
+    Phase4：基于文档读取结果生成 Module3 风格 result，并附加文档分析块（document_analysis_block）及扁平字段 clause_blocks、risk_clauses、highlighted_clauses 等。
+    输入为 read_document() 的返回值；文档分析逻辑收口于 build_document_analysis_block，再写入 result。
     """
     base = build_contract_risk_result(input_text=(document_data or {}).get("full_text") or "")
+    doc = document_data or {}
     if build_clause_blocks is None or detect_risk_clauses is None:
-        base["clause_blocks"] = []
-        base["risk_clauses"] = []
-        base["risk_clause_count"] = 0
-        base["highlighted_clauses"] = []
-        base["highlighted_clause_count"] = 0
-        return base
-    clause_blocks = build_clause_blocks(document_data)
-    risk_clauses = detect_risk_clauses(clause_blocks)
-    highlighted_clauses = (build_highlighted_clauses(risk_clauses, max_items=3) if build_highlighted_clauses else [])
+        clause_blocks = []
+        risk_clauses = []
+        highlighted_clauses = []
+        missing_clauses = []
+        weak_clauses = []
+    else:
+        clause_blocks = build_clause_blocks(document_data)
+        risk_clauses = detect_risk_clauses(clause_blocks)
+        highlighted_clauses = (build_highlighted_clauses(risk_clauses, max_items=3) if build_highlighted_clauses else [])
+        missing_clauses = (detect_missing_clauses(clause_blocks) if detect_missing_clauses else [])
+        weak_clauses = (detect_weak_clauses(clause_blocks) if detect_weak_clauses else [])
+    # Phase4 Final：统一文档分析输出块
+    document_analysis_block = (
+        build_document_analysis_block(doc, clause_blocks, risk_clauses, highlighted_clauses)
+        if build_document_analysis_block
+        else {
+            "document_summary": {"file_name": doc.get("file_name") or "", "file_type": doc.get("file_type") or "", "block_count": 0, "risk_clause_count": 0, "highlighted_clause_count": 0},
+            "clause_blocks": [],
+            "risk_clauses": [],
+            "highlighted_clauses": [],
+        }
+    )
+    base["document_analysis_block"] = document_analysis_block
+    # 保留原扁平字段，便于既有调用方使用；Phase5-1 缺失条款
     base["clause_blocks"] = clause_blocks
     base["risk_clauses"] = risk_clauses
     base["risk_clause_count"] = len(risk_clauses)
     base["highlighted_clauses"] = highlighted_clauses
     base["highlighted_clause_count"] = len(highlighted_clauses)
+    base["missing_clauses"] = missing_clauses
+    base["missing_clause_count"] = len(missing_clauses)
+    base["weak_clauses"] = weak_clauses
+    base["weak_clause_count"] = len(weak_clauses)
     return base
 
 
