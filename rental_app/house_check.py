@@ -34,7 +34,7 @@ from explain_engine import (
     generate_confidence_level,
 )
 # Module7 Explain Engine: 统一解释结构
-from engines.explain_engine import build_explanation, format_explanation_for_cli
+from engines.explain_engine import build_explanation, format_explanation_for_cli, format_explanation_summary_for_cli, attach_explanation_snapshot, format_comparison_for_cli, format_top_house_summary_for_cli
 
 # Module3: Contract risk (demo only, not in final_score)
 from contract_risk import calculate_contract_risk_score, calculate_structured_risk_score
@@ -655,13 +655,21 @@ def print_top_recommendations(houses_list, n_show=3):
             print(f"    area_score: {area_s} ({area_reason})")
         if summary:
             print(f"    recommendation_summary: {summary}")
-        # Module7: Explanation Summary
+        # Phase3-A3: 若有 ranking_explanation 则简短展示
+        if r.get("ranking_explanation"):
+            print(f"    ranking_note: {r['ranking_explanation']}")
+        # Module7: Explanation Summary（优先用 explanation_summary，Phase3-A1）
+        summary = r.get("explanation_summary")
         expl = r.get("explanation")
-        if expl:
-            txt = format_explanation_for_cli(expl, max_items=3)
-            if txt:
-                print("  --- Explanation Summary ---")
-                print(txt)
+        if summary:
+            txt = format_explanation_summary_for_cli(summary, max_items=2)
+        elif expl:
+            txt = format_explanation_for_cli(expl)
+        else:
+            txt = ""
+        if txt:
+            print("  --- Explanation Summary ---")
+            print(txt)
     print()
 
 
@@ -790,6 +798,22 @@ def print_ranking_report(state, n_show_top=3):
         print_top_recommendations(houses, n_show=n_show_top)
         if compare_explain and (compare_explain.get("pairwise_comparisons") or []):
             print_comparison_insights(compare_explain, n_show=2)
+        # Phase3-A2: 简短展示 comparison_explanation（Top2 对比）
+        comp_expl = rr.get("comparison_explanation") or {}
+        if comp_expl and comp_expl.get("summary"):
+            txt = format_comparison_for_cli(comp_expl, max_items=2)
+            if txt:
+                print("=== Top 2 Comparison (Phase3-A2) ===")
+                print(txt)
+                print()
+        # Phase3-A3: TopN 推荐理由汇总
+        top_sum = rr.get("top_house_summary") or {}
+        if top_sum and top_sum.get("summary"):
+            txt = format_top_house_summary_for_cli(top_sum, max_items=2)
+            if txt:
+                print("=== TopN Ranking Summary (Phase3-A3) ===")
+                print(txt)
+                print()
         if decision_hints and (decision_hints.get("primary_recommendation") or decision_hints.get("backup_option") or decision_hints.get("caution_option")):
             print_decision_hints_block(decision_hints)
         if preference_switch_hints:
@@ -1013,6 +1037,7 @@ def main():
                     "neutral_notes": [],
                     "next_actions": [],
                 }
+            attach_explanation_snapshot(result)
             print(f"\n风险分（0-10）：{result.get('risk_score')}")
             if result.get("matched_categories"):
                 print("命中类别:", ", ".join(result["matched_categories"]))
@@ -1022,13 +1047,18 @@ def main():
                 print("原因:")
                 for line in result["risk_reasons"]:
                     print(" -", line)
-            # Module7: Risk Explanation Summary
+            # Module7: Risk Explanation Summary（优先用 explanation_summary，Phase3-A1）
+            summary = result.get("explanation_summary")
             expl = result.get("explanation")
-            if expl:
-                txt = format_explanation_for_cli(expl, max_items=3)
-                if txt:
-                    print("\n--- Risk Explanation Summary ---")
-                    print(txt)
+            if summary:
+                txt = format_explanation_summary_for_cli(summary, max_items=2)
+            elif expl:
+                txt = format_explanation_for_cli(expl)
+            else:
+                txt = ""
+            if txt:
+                print("\n--- Risk Explanation Summary ---")
+                print(txt)
 
         elif choice.upper() == "L":
             print("\n--- 结构化风险识别（最小可运行版）---")
@@ -1083,6 +1113,7 @@ def main():
                     "neutral_notes": [],
                     "next_actions": [],
                 }
+            attach_explanation_snapshot(result)
             print(f"\nstructured_risk_score（0-10）：{result.get('structured_risk_score')}")
             if result.get("matched_rules"):
                 print("matched_rules:", ", ".join(result["matched_rules"]))
@@ -1090,13 +1121,18 @@ def main():
                 print("risk_reasons:")
                 for line in result["risk_reasons"]:
                     print(" -", line)
-            # Module7: Risk Explanation Summary
+            # Module7: Risk Explanation Summary（优先用 explanation_summary，Phase3-A1）
+            summary = result.get("explanation_summary")
             expl = result.get("explanation")
-            if expl:
-                txt = format_explanation_for_cli(expl, max_items=3)
-                if txt:
-                    print("\n--- Risk Explanation Summary ---")
-                    print(txt)
+            if summary:
+                txt = format_explanation_summary_for_cli(summary, max_items=2)
+            elif expl:
+                txt = format_explanation_for_cli(expl)
+            else:
+                txt = ""
+            if txt:
+                print("\n--- Risk Explanation Summary ---")
+                print(txt)
 
         elif choice == "0":
             print("已退出。")

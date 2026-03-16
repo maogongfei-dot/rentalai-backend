@@ -66,6 +66,8 @@ def load_state(state, filepath=DEFAULT_STATE_FILE):
                     s[key] = 1.0
         state["weights"] = loaded.get("weights", state.get("weights", DEFAULT_WEIGHTS))
         state["last_action"] = loaded.get("last_action", None)
+        # Phase3-A1: 恢复 ranked_results（含 explanation_summary），便于 save/load 后不丢失
+        state["ranked_results"] = loaded.get("ranked_results", [])
 
         print(f"✅ 已加载 state（房源 {len(state['listings'])} 条），来自 {filepath}")
     except FileNotFoundError:

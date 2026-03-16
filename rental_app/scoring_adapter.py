@@ -1,6 +1,6 @@
 from datetime import datetime
 from module2_scoring import rank_houses as rank_houses_m2, build_compare_explain, build_decision_hints
-from engines.explain_engine import build_explanation
+from engines.explain_engine import build_explanation, attach_explanation_snapshot, compare_house_results, build_top_house_summary, attach_top_house_summary_to_results
 
 # ---------- A2-B2-B2-B2-A: 输出契约冻结（Module5 API-ready 最终冻结） ----------
 # Module5 作为 API-ready baseline 保持冻结；后续如无必要不再修改其输出契约；新开发重点转向 Module3（合同与纠纷风险）。
@@ -24,6 +24,8 @@ RANKING_RESULT_CONTRACT_EXAMPLE = {
     "weights": {"resolved_weights": {}, "validated_weights": {}, "weight_warnings": []},
     "houses": [],
     "compare_explain": {},
+    "comparison_explanation": {},
+    "top_house_summary": {},
     "decision_hints": {},
     "preference_switch_hints": [],
     "preference_simulation": [],
@@ -223,6 +225,8 @@ def _empty_ranking_result(state):
         "weights": {"resolved_weights": {}, "validated_weights": {}, "weight_warnings": []},
         "houses": [],
         "compare_explain": {},
+        "comparison_explanation": {},
+        "top_house_summary": {},
         "decision_hints": {},
         "preference_switch_hints": [],
         "preference_simulation": [],
@@ -287,6 +291,7 @@ def build_ranking_result(state):
             h["explanation"] = build_explanation(r, "house")
         except Exception:
             h["explanation"] = _FAILED_EXPLANATION.copy()
+        attach_explanation_snapshot(h)
 
     primary = decision_hints.get("primary_recommendation") or {}
     backup = decision_hints.get("backup_option") or {}
@@ -297,6 +302,28 @@ def build_ranking_result(state):
         "preset_used": user_preferences.get("weight_preset") or "balanced",
     }
 
+    # Phase3-A2: 为 Top2 生成 comparison_explanation
+    comparison_explanation = {}
+    if len(houses) >= 2:
+        try:
+            comparison_explanation = compare_house_results(
+                houses[0], houses[1],
+                primary_label=houses[0].get("house_label") or "Rank 1",
+                secondary_label=houses[1].get("house_label") or "Rank 2",
+            )
+        except Exception:
+            comparison_explanation = {}
+
+    # Phase3-A3: TopN 推荐理由汇总，并为每个房源附加 rank / ranking_explanation / ranking_role
+    top_house_summary = {}
+    if houses:
+        try:
+            labels = [h.get("house_label") or f"Rank {i+1}" for i, h in enumerate(houses)]
+            top_house_summary = build_top_house_summary(houses, labels=labels, top_n=min(3, len(houses)))
+            houses = attach_top_house_summary_to_results(houses, top_house_summary)
+        except Exception:
+            top_house_summary = {}
+
     return {
         "status": "ok",
         "message": "Ranking generated successfully.",
@@ -306,6 +333,8 @@ def build_ranking_result(state):
         "weights": weights_block,
         "houses": houses,
         "compare_explain": compare_explain,
+        "comparison_explanation": comparison_explanation,
+        "top_house_summary": top_house_summary,
         "decision_hints": decision_hints,
         "preference_switch_hints": decision_hints.get("preference_switch_hints") or [],
         "preference_simulation": decision_hints.get("preference_simulation") or [],
@@ -366,6 +395,11 @@ def explain_score(house, budget):
 #       return generate_ranking_api_response(state)
 #
 # FastAPI: return 上述返回值即可；Flask: return jsonify(...)。
+#
+# Explain Engine 展示层格式化（Phase2-A4）:
+#   - CLI 用: from engines.explain_engine import format_explanation_for_cli
+#   - API 用: from engines.explain_engine import format_explanation_for_api
+#   - Agent 用: from engines.explain_engine import format_explanation_for_agent
 
 
 # ---------- A2-B2-B2-B1: 导出链路验证 demo ----------
