@@ -1,5 +1,6 @@
 from datetime import datetime
 from module2_scoring import rank_houses as rank_houses_m2, build_compare_explain, build_decision_hints
+from engines.explain_engine import build_explanation
 
 # ---------- A2-B2-B2-B2-A: 输出契约冻结（Module5 API-ready 最终冻结） ----------
 # Module5 作为 API-ready baseline 保持冻结；后续如无必要不再修改其输出契约；新开发重点转向 Module3（合同与纠纷风险）。
@@ -270,6 +271,22 @@ def build_ranking_result(state):
         "weight_warnings": weight_warnings,
     }
     houses = [_standard_house_from_result(r, i + 1) for i, r in enumerate(ranked)]
+
+    # Module7 Explain Engine: 为每个房源追加 explanation
+    _FAILED_EXPLANATION = {
+        "summary": "Explanation generation failed.",
+        "recommended": None,
+        "positive_reasons": [],
+        "not_recommended_reasons": [],
+        "neutral_notes": [],
+        "next_actions": [],
+    }
+    for i, h in enumerate(houses):
+        try:
+            r = ranked[i]
+            h["explanation"] = build_explanation(r, "house")
+        except Exception:
+            h["explanation"] = _FAILED_EXPLANATION.copy()
 
     primary = decision_hints.get("primary_recommendation") or {}
     backup = decision_hints.get("backup_option") or {}

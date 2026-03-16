@@ -33,6 +33,8 @@ from explain_engine import (
     generate_overall_summary,
     generate_confidence_level,
 )
+# Module7 Explain Engine: 统一解释结构
+from engines.explain_engine import build_explanation, format_explanation_for_cli
 
 # Module3: Contract risk (demo only, not in final_score)
 from contract_risk import calculate_contract_risk_score, calculate_structured_risk_score
@@ -636,7 +638,7 @@ def print_recommendation_overview(first_result):
 
 
 def print_top_recommendations(houses_list, n_show=3):
-    """2. Top Recommendations. 优先从标准字段读取：rank, house_label, final_score, scores.area_score, reasons.area_score_reason, explain.recommendation_summary；缺时 fallback 旧字段。"""
+    """2. Top Recommendations. 优先从标准字段读取：rank, house_label, final_score, scores.area_score, reasons.area_score_reason, explain.recommendation_summary；缺时 fallback 旧字段。Module7: 附带 explanation 摘要。"""
     if not houses_list:
         return
     print("=== Top Recommendations ===")
@@ -653,6 +655,13 @@ def print_top_recommendations(houses_list, n_show=3):
             print(f"    area_score: {area_s} ({area_reason})")
         if summary:
             print(f"    recommendation_summary: {summary}")
+        # Module7: Explanation Summary
+        expl = r.get("explanation")
+        if expl:
+            txt = format_explanation_for_cli(expl, max_items=3)
+            if txt:
+                print("  --- Explanation Summary ---")
+                print(txt)
     print()
 
 
@@ -992,6 +1001,18 @@ def main():
             print("\n--- 合同/风险识别（最小可运行版）---")
             text = input("请输入房源描述/合同文本（可直接粘贴，回车结束）:\n").strip()
             result = calculate_contract_risk_score(text)
+            # Module7: 追加 explanation
+            try:
+                result["explanation"] = build_explanation(result, "risk")
+            except Exception:
+                result["explanation"] = {
+                    "summary": "Explanation generation failed.",
+                    "recommended": None,
+                    "positive_reasons": [],
+                    "not_recommended_reasons": [],
+                    "neutral_notes": [],
+                    "next_actions": [],
+                }
             print(f"\n风险分（0-10）：{result.get('risk_score')}")
             if result.get("matched_categories"):
                 print("命中类别:", ", ".join(result["matched_categories"]))
@@ -1001,6 +1022,13 @@ def main():
                 print("原因:")
                 for line in result["risk_reasons"]:
                     print(" -", line)
+            # Module7: Risk Explanation Summary
+            expl = result.get("explanation")
+            if expl:
+                txt = format_explanation_for_cli(expl, max_items=3)
+                if txt:
+                    print("\n--- Risk Explanation Summary ---")
+                    print(txt)
 
         elif choice.upper() == "L":
             print("\n--- 结构化风险识别（最小可运行版）---")
@@ -1043,6 +1071,18 @@ def main():
                 }
 
             result = calculate_structured_risk_score(listing)
+            # Module7: 追加 explanation
+            try:
+                result["explanation"] = build_explanation(result, "risk")
+            except Exception:
+                result["explanation"] = {
+                    "summary": "Explanation generation failed.",
+                    "recommended": None,
+                    "positive_reasons": [],
+                    "not_recommended_reasons": [],
+                    "neutral_notes": [],
+                    "next_actions": [],
+                }
             print(f"\nstructured_risk_score（0-10）：{result.get('structured_risk_score')}")
             if result.get("matched_rules"):
                 print("matched_rules:", ", ".join(result["matched_rules"]))
@@ -1050,6 +1090,13 @@ def main():
                 print("risk_reasons:")
                 for line in result["risk_reasons"]:
                     print(" -", line)
+            # Module7: Risk Explanation Summary
+            expl = result.get("explanation")
+            if expl:
+                txt = format_explanation_for_cli(expl, max_items=3)
+                if txt:
+                    print("\n--- Risk Explanation Summary ---")
+                    print(txt)
 
         elif choice == "0":
             print("已退出。")
