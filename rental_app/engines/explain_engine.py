@@ -8,6 +8,8 @@
 # Phase3-A1：结果摘要输出到 State / Result Layer
 # Phase3-A2：多房源 / 多结果对比解释层
 # Phase3-A3：TopN 推荐理由汇总层
+# Phase3-A4：房源推荐结论层 Final Recommendation Layer
+# Phase4-A1：Risk Final Recommendation Layer
 
 
 def _empty_explanation():
@@ -1681,6 +1683,545 @@ def attach_top_house_summary_to_results(results: list, summary_data: dict) -> li
     return out
 
 
+# ---------- Phase3-A4: 房源推荐结论层 Final Recommendation Layer ----------
+
+def _empty_final_recommendation() -> dict:
+    """返回最终推荐结论结构的空模板。Phase3-A4。"""
+    return {
+        "final_summary": "",
+        "primary_recommendation": {},
+        "backup_recommendation": {},
+        "lower_priority_options": [],
+        "decision_confidence": "medium",
+        "final_decision_focus": "",
+        "final_action": "",
+        "supporting_reasons": [],
+        "watchouts": [],
+    }
+
+
+def _build_primary_reason(r: dict, label: str) -> str:
+    """为首选生成 reason 文案。"""
+    sum_data = r.get("explanation_summary") or r.get("explanation") or {}
+    sum_data = sum_data if isinstance(sum_data, dict) else {}
+    summary = (sum_data.get("summary") or "").strip()
+    pos = _safe_list(sum_data.get("key_positives") or sum_data.get("why_recommend"))
+    rank_expl = (r.get("ranking_explanation") or "").strip()
+    rec = (sum_data.get("recommendation") or "neutral").strip().lower()
+
+    if rec == "yes" and pos:
+        return "This option is the strongest current choice because it offers the best overall balance with fewer major trade-offs."
+    if summary and len(summary) > 20:
+        # 取 summary 首句或前 100 字作为参考，但生成结论性文案
+        return "This option is the strongest current choice because it offers the best overall balance with fewer major trade-offs."
+    if rank_expl:
+        return rank_expl
+    return "This option is the strongest current choice based on score, overall fit, and fewer trade-offs."
+
+
+def _build_backup_reason(r: dict, label: str, primary_score: float | None) -> str:
+    """为备选生成 reason 文案。"""
+    sum_data = r.get("explanation_summary") or r.get("explanation") or {}
+    sum_data = sum_data if isinstance(sum_data, dict) else {}
+    pos = _safe_list(sum_data.get("key_positives") or sum_data.get("why_recommend"))
+    neg = _safe_list(sum_data.get("key_risks") or sum_data.get("why_not_recommend"))
+
+    if pos and neg:
+        return "This option remains a reasonable backup, but it is weaker than the leading choice in overall balance or fit."
+    if neg:
+        return "This option remains viable as a backup, though it has more trade-offs than the top choice."
+    return "This option remains a reasonable backup, but it trails the leading choice in overall balance or practical fit."
+
+
+def _build_lower_priority_reason(r: dict, label: str, rank: int) -> str:
+    """为 lower_priority 生成 reason 文案。"""
+    rank_expl = (r.get("ranking_explanation") or "").strip()
+    if rank_expl:
+        return rank_expl[:120] + ("..." if len(rank_expl) > 120 else "")
+    sum_data = r.get("explanation_summary") or r.get("explanation") or {}
+    sum_data = sum_data if isinstance(sum_data, dict) else {}
+    neg = _safe_list(sum_data.get("key_risks") or sum_data.get("why_not_recommend"))
+    if neg:
+        return "This option currently ranks lower because its overall profile involves more trade-offs than the stronger alternatives."
+    return "This property may still suit a specific personal need, but it is not the strongest option under the current evaluation."
+
+
+def _compute_decision_confidence(
+    top_items: list,
+    score_gap: float,
+    sum1: dict,
+    sum2: dict | None,
+) -> str:
+    """计算 decision_confidence: high / medium / low。"""
+    rec1 = (sum1.get("recommendation") or "neutral").strip().lower()
+    mode1 = (sum1.get("mode") or "").strip().lower()
+    neg1 = _safe_list(sum1.get("key_risks") or sum1.get("why_not_recommend"))
+
+    # low: 整体都不强
+    if rec1 == "no" or "caution" in mode1 or "mixed" in mode1 or "tradeoff" in mode1:
+        if len(neg1) >= 2:
+            return "low"
+    if score_gap is not None and score_gap < 3 and len(top_items) >= 2:
+        if sum2:
+            neg2 = _safe_list(sum2.get("key_risks") or sum2.get("why_not_recommend"))
+            if len(neg1) >= 1 and len(neg2) >= 1:
+                return "low"
+
+    # high: 第1名明显领先
+    if score_gap is not None and score_gap >= 10:
+        if rec1 == "yes" and len(neg1) <= 1:
+            return "high"
+    if rec1 == "yes" and not neg1 and score_gap is not None and score_gap >= 5:
+        return "high"
+
+    # medium: 默认
+    return "medium"
+
+
+def build_final_house_recommendation(
+    results: list,
+    labels: list | None = None,
+    top_n: int = 3,
+) -> dict:
+    """输入一组房源结果，输出最终推荐结论。Phase3-A4。"""
+    out = _empty_final_recommendation()
+    if not results or not isinstance(results, list):
+        return out
+
+    # 复用 top_house_summary 的排序逻辑
+    sorted_results = sorted(
+        [r for r in results if isinstance(r, dict)],
+        key=_house_score_for_sort,
+        reverse=True,
+    )
+    top_items = sorted_results[:top_n]
+    n = len(top_items)
+    if n == 0:
+        return out
+
+    # labels
+    if labels and len(labels) >= n:
+        item_labels = [str(labels[i]).strip() or f"Option {i + 1}" for i in range(n)]
+    else:
+        item_labels = [r.get("house_label") or r.get("label") or f"Option {i + 1}" for i, r in enumerate(top_items)]
+
+    s1 = _get_score_value(top_items[0], ["final_score", "score", "total_score"])
+    s2 = _get_score_value(top_items[1], ["final_score", "score", "total_score"]) if n >= 2 else None
+    score_gap = (s1 - s2) if (s1 is not None and s2 is not None) else None
+
+    sum1 = top_items[0].get("explanation_summary") or top_items[0].get("explanation") or {}
+    sum1 = sum1 if isinstance(sum1, dict) else {}
+    sum2 = (top_items[1].get("explanation_summary") or top_items[1].get("explanation") or {}) if n >= 2 else None
+    sum2 = sum2 if isinstance(sum2, dict) else {} if sum2 else {}
+
+    # primary_recommendation
+    out["primary_recommendation"] = {
+        "label": item_labels[0],
+        "reason": _build_primary_reason(top_items[0], item_labels[0]),
+        "score": s1,
+    }
+
+    # backup_recommendation
+    if n >= 2:
+        out["backup_recommendation"] = {
+            "label": item_labels[1],
+            "reason": _build_backup_reason(top_items[1], item_labels[1], s1),
+            "score": s2,
+        }
+    else:
+        out["backup_recommendation"] = {}
+
+    # lower_priority_options
+    out["lower_priority_options"] = []
+    for i in range(2, n):
+        r = top_items[i]
+        label = item_labels[i] if i < len(item_labels) else f"Option {i + 1}"
+        out["lower_priority_options"].append({
+            "label": label,
+            "reason": _build_lower_priority_reason(r, label, i + 1),
+        })
+
+    # final_summary
+    if n == 1:
+        out["final_summary"] = f"{item_labels[0]} stands out as the clearest current recommendation."
+    elif score_gap is not None and score_gap >= 8:
+        out["final_summary"] = f"{item_labels[0]} stands out as the clearest current recommendation, with {item_labels[1]} serving as the main backup and the remaining options falling behind on overall fit."
+    elif score_gap is not None and score_gap < 5 and n >= 2:
+        out["final_summary"] = f"The top two options are relatively close, but {item_labels[0]} still holds a slight edge as the stronger overall recommendation."
+    else:
+        rec1 = (sum1.get("recommendation") or "neutral").strip().lower()
+        if rec1 == "no" or len(_safe_list(sum1.get("key_risks") or [])) >= 2:
+            out["final_summary"] = f"None of the current options looks particularly strong, but {item_labels[0]} is the least compromised choice among the available results."
+        else:
+            out["final_summary"] = f"{item_labels[0]} stands out as the clearest current recommendation, with {item_labels[1]} serving as the main backup." if n >= 2 else f"{item_labels[0]} stands out as the clearest current recommendation."
+
+    # decision_confidence
+    out["decision_confidence"] = _compute_decision_confidence(top_items, score_gap, sum1, sum2 if n >= 2 else None)
+
+    # final_decision_focus
+    if out["decision_confidence"] == "high":
+        out["final_decision_focus"] = "The key decision now is whether the top-ranked option also matches your real non-negotiables in practice."
+    elif out["decision_confidence"] == "low":
+        out["final_decision_focus"] = "The main focus should be whether any of these options can realistically meet your must-haves before you proceed."
+    else:
+        out["final_decision_focus"] = "The main focus should be whether the stronger option's advantages are enough to justify moving quickly."
+
+    # final_action
+    if n >= 3:
+        out["final_action"] = "View the primary option first, keep the backup ready, and only revisit lower-ranked options if new information changes the picture."
+    elif n >= 2:
+        out["final_action"] = "Compare the top two options against your personal must-haves before making a final commitment."
+    else:
+        out["final_action"] = "Proceed with the primary option and verify it matches your personal priorities in person."
+
+    # supporting_reasons
+    pos1 = _safe_list(sum1.get("key_positives") or sum1.get("why_recommend") or sum1.get("top_positive_reasons"))
+    out["supporting_reasons"] = _limit_items([x for x in pos1 if isinstance(x, str) and x.strip()], 3)
+
+    # watchouts
+    watchouts = []
+    neg1 = _safe_list(sum1.get("key_risks") or sum1.get("why_not_recommend") or sum1.get("top_risk_reasons"))
+    for x in neg1[:2]:
+        if isinstance(x, str) and x.strip():
+            watchouts.append(x)
+    caution = _safe_list(sum1.get("proceed_with_caution") or sum1.get("next_actions"))
+    for x in caution[:1]:
+        if isinstance(x, str) and x.strip() and x not in watchouts:
+            watchouts.append(x)
+    if n >= 2 and not watchouts:
+        watchouts.append("The backup option has more trade-offs than the primary choice.")
+    out["watchouts"] = _limit_items(watchouts, 3)
+
+    return out
+
+
+def format_final_recommendation_for_cli(data: dict, max_items: int = 2) -> str:
+    """将最终推荐结论转为 CLI 文本。Phase3-A4。"""
+    if not data or not isinstance(data, dict):
+        return ""
+    parts = []
+    summary = (data.get("final_summary") or "").strip()
+    if summary:
+        parts.append("Final Summary: %s" % summary)
+
+    primary = data.get("primary_recommendation") or {}
+    if primary and primary.get("label"):
+        line = "Primary Recommendation: %s" % primary.get("label")
+        if primary.get("score") is not None:
+            line += " (score: %s)" % primary.get("score")
+        parts.append(line)
+        if primary.get("reason"):
+            parts.append("  Reason: %s" % primary.get("reason"))
+
+    backup = data.get("backup_recommendation") or {}
+    if backup and backup.get("label"):
+        line = "Backup Recommendation: %s" % backup.get("label")
+        if backup.get("score") is not None:
+            line += " (score: %s)" % backup.get("score")
+        parts.append(line)
+        if backup.get("reason"):
+            parts.append("  Reason: %s" % backup.get("reason"))
+
+    conf = (data.get("decision_confidence") or "medium").strip()
+    parts.append("Confidence: %s" % conf)
+
+    focus = (data.get("final_decision_focus") or "").strip()
+    if focus:
+        parts.append("Decision Focus: %s" % focus)
+
+    supporting = _limit_items(data.get("supporting_reasons") or [], max_items)
+    if supporting:
+        parts.append(_join_cli_section("Supporting Reasons", supporting))
+
+    watchouts = _limit_items(data.get("watchouts") or [], max_items)
+    if watchouts:
+        parts.append(_join_cli_section("Watchouts", watchouts))
+
+    action = (data.get("final_action") or "").strip()
+    if action:
+        parts.append("Final Action: %s" % action)
+
+    return "\n\n".join(parts) if parts else ""
+
+
+# ---------- Phase4-A1: Risk Final Recommendation Layer ----------
+
+def _empty_risk_final_recommendation() -> dict:
+    """返回 Risk Final Recommendation 结构的空模板。Phase4-A1。"""
+    return {
+        "final_summary": "",
+        "safer_option": {},
+        "higher_risk_option": {},
+        "manageable_path": "",
+        "decision_confidence": "medium",
+        "final_decision_focus": "",
+        "final_action": "",
+        "supporting_reasons": [],
+        "watchouts": [],
+    }
+
+
+def _risk_level_str(data: dict) -> str:
+    """从 risk result 取 risk_level 字符串。"""
+    if not data or not isinstance(data, dict):
+        return ""
+    level = _normalize_text(
+        _get_first_value(data, ["overall_risk_level", "severity", "risk_level", "overall_risk"])
+    )
+    if level in ("high", "critical"):
+        return "high"
+    if level in ("medium", "moderate"):
+        return "medium"
+    if level in ("low", "none", ""):
+        return "low"
+    score = _get_first_value(data, ["risk_score", "structured_risk_score"])
+    v = _to_float(score)
+    if v is not None:
+        if v >= 7:
+            return "high"
+        if v >= 4:
+            return "medium"
+        return "low"
+    return "medium"
+
+
+def _risk_blocker_count(data: dict) -> int:
+    """统计 risk result 中的 blockers / issues 数量。"""
+    if not data or not isinstance(data, dict):
+        return 0
+    expl = data.get("explanation_summary") or data.get("explanation") or {}
+    expl = expl if isinstance(expl, dict) else {}
+    blockers = _safe_list(expl.get("blockers") or expl.get("decision_blockers"))
+    issues = _safe_list(data.get("risk_flags") or data.get("issues"))
+    missing = _safe_list(data.get("missing_clauses"))
+    weak = _safe_list(data.get("weak_clauses"))
+    return len(blockers) + len(issues) + len(missing) + len(weak)
+
+
+def build_final_risk_recommendation(result: dict, label: str = "Current Case") -> dict:
+    """对单个 risk result 输出最终处理结论。Phase4-A1。"""
+    out = _empty_risk_final_recommendation()
+    if not result or not isinstance(result, dict):
+        return out
+
+    level = _risk_level_str(result)
+    sum_data = result.get("explanation_summary") or result.get("explanation") or {}
+    sum_data = sum_data if isinstance(sum_data, dict) else {}
+
+    # 单风险时 safer_option 表示当前 case 的可控程度
+    if level == "high":
+        out["final_summary"] = "This case currently looks too risky to proceed without clarification."
+        out["manageable_path"] = "Pause and clarify the highest-risk points before relying on the current contract or position."
+        out["final_action"] = "Collect evidence, identify the highest-risk clauses, and seek written clarification before proceeding."
+        out["safer_option"] = {
+            "label": label,
+            "reason": "This case requires clarification before it can be considered manageable.",
+            "risk_level": level,
+        }
+        out["higher_risk_option"] = {}
+    elif level == "medium":
+        out["final_summary"] = "This case may still be manageable, but it should not be treated as safe without further checking."
+        out["manageable_path"] = "Work through the unclear clauses and supporting evidence in an organized way."
+        out["final_action"] = "Review the key clauses, prepare evidence, and clarify any vague wording before moving forward."
+        out["safer_option"] = {
+            "label": label,
+            "reason": "This case can be managed with careful review and clarification of the unclear points.",
+            "risk_level": level,
+        }
+        out["higher_risk_option"] = {}
+    else:
+        out["final_summary"] = "No severe red flag is obvious at the moment, but the remaining details should still be verified."
+        out["manageable_path"] = "Proceed carefully while confirming the remaining contractual details."
+        out["final_action"] = "Confirm the remaining details in writing and keep basic records in case the situation changes."
+        out["safer_option"] = {
+            "label": label,
+            "reason": "This case appears relatively manageable, but verification of details is still recommended.",
+            "risk_level": level,
+        }
+        out["higher_risk_option"] = {}
+
+    # decision_confidence
+    blockers = _risk_blocker_count(result)
+    if level == "high" and blockers >= 3:
+        out["decision_confidence"] = "high"
+    elif level == "low" and blockers <= 1:
+        out["decision_confidence"] = "high"
+    elif level == "medium" or blockers >= 2:
+        out["decision_confidence"] = "medium"
+    else:
+        out["decision_confidence"] = "medium"
+
+    out["final_decision_focus"] = "The key focus is whether the unresolved clauses can be clarified before you rely on this position."
+    out["supporting_reasons"] = _limit_items(
+        _safe_list(sum_data.get("key_positives") or sum_data.get("why_recommend")),
+        3
+    )
+    out["watchouts"] = _limit_items(
+        _safe_list(sum_data.get("key_risks") or sum_data.get("why_not_recommend") or sum_data.get("blockers") or sum_data.get("decision_blockers")),
+        3
+    )
+    if not out["watchouts"] and level != "low":
+        out["watchouts"] = ["Verify unclear clauses before relying on the current position."]
+
+    return out
+
+
+def _compute_risk_decision_confidence(
+    safer_rank: float,
+    higher_rank: float,
+    n: int,
+) -> str:
+    """计算 risk comparison 的 decision_confidence。"""
+    if n <= 1:
+        return "medium"
+    gap = higher_rank - safer_rank
+    if gap >= 4:
+        return "high"
+    if gap < 2:
+        return "low"
+    return "medium"
+
+
+def build_final_risk_comparison_recommendation(
+    results: list,
+    labels: list | None = None,
+) -> dict:
+    """对多个风险结果输出最终结论，判断哪个更可控。Phase4-A1。"""
+    out = _empty_risk_final_recommendation()
+    if not results or not isinstance(results, list):
+        return out
+
+    valid = [r for r in results if isinstance(r, dict)]
+    if not valid:
+        return out
+
+    # 构建 (result, label) 对，按风险从低到高排序
+    if labels and len(labels) >= len(valid):
+        pairs = [(valid[i], str(labels[i]).strip() or f"Risk Option {i + 1}") for i in range(len(valid))]
+    else:
+        pairs = [(r, r.get("label") or f"Risk Option {i + 1}") for i, r in enumerate(valid)]
+    pairs.sort(key=lambda p: _risk_rank_value(p[0]))
+    sorted_results = [p[0] for p in pairs]
+    item_labels = [p[1] for p in pairs]
+    n = len(sorted_results)
+
+    safer = sorted_results[0]
+    safer_label = item_labels[0]
+    safer_level = _risk_level_str(safer)
+    safer_rank = _risk_rank_value(safer)
+
+    out["safer_option"] = {
+        "label": safer_label,
+        "reason": "This option appears more manageable because it contains fewer severe red flags and a clearer action path.",
+        "risk_level": safer_level,
+    }
+    sum_safer = safer.get("explanation_summary") or safer.get("explanation") or {}
+    sum_safer = sum_safer if isinstance(sum_safer, dict) else {}
+    pos = _safe_list(sum_safer.get("key_positives") or sum_safer.get("why_recommend"))
+    if pos:
+        out["safer_option"]["reason"] = pos[0][:100] + ("..." if len(pos[0]) > 100 else "") if isinstance(pos[0], str) else out["safer_option"]["reason"]
+
+    if n >= 2:
+        higher = sorted_results[-1]
+        higher_label = item_labels[-1]
+        higher_level = _risk_level_str(higher)
+        higher_rank = _risk_rank_value(higher)
+
+        out["higher_risk_option"] = {
+            "label": higher_label,
+            "reason": "This option remains weaker because it carries more unresolved contractual uncertainty and a less secure path forward.",
+            "risk_level": higher_level,
+        }
+        sum_higher = higher.get("explanation_summary") or higher.get("explanation") or {}
+        sum_higher = sum_higher if isinstance(sum_higher, dict) else {}
+        neg = _safe_list(sum_higher.get("key_risks") or sum_higher.get("why_not_recommend"))
+        if neg:
+            out["higher_risk_option"]["reason"] = neg[0][:100] + ("..." if len(neg[0]) > 100 else "") if isinstance(neg[0], str) else out["higher_risk_option"]["reason"]
+
+        gap = higher_rank - safer_rank
+        if gap >= 4:
+            out["final_summary"] = f"{safer_label} is the safer current path, while {higher_label} contains more significant unresolved concerns."
+        elif higher_level == "high" and safer_level != "high":
+            out["final_summary"] = f"None of the current risk scenarios looks especially comfortable, but {safer_label} is still the less risky path."
+        elif safer_level in ("low", "medium") and higher_level in ("low", "medium"):
+            out["final_summary"] = f"Both scenarios appear relatively manageable, though {safer_label} still offers the cleaner path overall."
+        else:
+            out["final_summary"] = f"{safer_label} is the safer current path, while {higher_label} carries more risk."
+
+        out["decision_confidence"] = _compute_risk_decision_confidence(safer_rank, higher_rank, n)
+        out["manageable_path"] = "Take the safer path first, preserve all evidence, and do not rely on unclear wording without written confirmation."
+        out["final_decision_focus"] = "The main decision issue is which option leaves you with fewer unresolved legal and practical risks."
+        out["final_action"] = "Take the safer path first, preserve all evidence, and do not rely on unclear wording without written confirmation."
+        out["supporting_reasons"] = _limit_items(
+            _safe_list(sum_safer.get("key_positives") or sum_safer.get("why_recommend")),
+            3
+        )
+        out["watchouts"] = _limit_items(
+            _safe_list(sum_higher.get("key_risks") or sum_higher.get("why_not_recommend") or sum_higher.get("blockers") or sum_higher.get("decision_blockers")),
+            3
+        )
+        if not out["watchouts"]:
+            out["watchouts"] = ["The higher-risk option should not be relied upon without clarification."]
+    else:
+        # 单结果回退到 build_final_risk_recommendation
+        return build_final_risk_recommendation(safer, safer_label)
+
+    return out
+
+
+def format_final_risk_recommendation_for_cli(data: dict, max_items: int = 2) -> str:
+    """将 Risk Final Recommendation 转为 CLI 文本。Phase4-A1。"""
+    if not data or not isinstance(data, dict):
+        return ""
+    parts = []
+    summary = (data.get("final_summary") or "").strip()
+    if summary:
+        parts.append("Final Summary: %s" % summary)
+
+    safer = data.get("safer_option") or {}
+    if safer and safer.get("label"):
+        line = "Safer Option: %s" % safer.get("label")
+        if safer.get("risk_level"):
+            line += " (risk_level: %s)" % safer.get("risk_level")
+        parts.append(line)
+        if safer.get("reason"):
+            parts.append("  Reason: %s" % safer.get("reason"))
+
+    higher = data.get("higher_risk_option") or {}
+    if higher and higher.get("label"):
+        line = "Higher Risk Option: %s" % higher.get("label")
+        if higher.get("risk_level"):
+            line += " (risk_level: %s)" % higher.get("risk_level")
+        parts.append(line)
+        if higher.get("reason"):
+            parts.append("  Reason: %s" % higher.get("reason"))
+
+    path = (data.get("manageable_path") or "").strip()
+    if path:
+        parts.append("Manageable Path: %s" % path)
+
+    conf = (data.get("decision_confidence") or "medium").strip()
+    parts.append("Confidence: %s" % conf)
+
+    focus = (data.get("final_decision_focus") or "").strip()
+    if focus:
+        parts.append("Decision Focus: %s" % focus)
+
+    supporting = _limit_items(data.get("supporting_reasons") or [], max_items)
+    if supporting:
+        parts.append(_join_cli_section("Supporting Reasons", supporting))
+
+    watchouts = _limit_items(data.get("watchouts") or [], max_items)
+    if watchouts:
+        parts.append(_join_cli_section("Watchouts", watchouts))
+
+    action = (data.get("final_action") or "").strip()
+    if action:
+        parts.append("Final Action: %s" % action)
+
+    return "\n\n".join(parts) if parts else ""
+
+
 if __name__ == "__main__":
     # 房源解释示例
     sample_house = {
@@ -1781,3 +2322,35 @@ if __name__ == "__main__":
     print("items:", [(it.get("label"), it.get("role"), expl_preview(it)) for it in top_summary.get("items", [])])
     print("\n--- format_top_house_summary_for_cli ---")
     print(format_top_house_summary_for_cli(top_summary))
+
+    # Phase3-A4: 最终推荐结论示例
+    print("\n=== Phase3-A4: build_final_house_recommendation ===")
+    final_rec = build_final_house_recommendation(top3, labels=["Rank 1", "Rank 2", "Rank 3"], top_n=3)
+    print("final_summary:", final_rec.get("final_summary"))
+    print("primary:", final_rec.get("primary_recommendation"))
+    print("backup:", final_rec.get("backup_recommendation"))
+    print("confidence:", final_rec.get("decision_confidence"))
+    print("\n--- format_final_recommendation_for_cli ---")
+    print(format_final_recommendation_for_cli(final_rec))
+
+    # Phase4-A1: Risk Final Recommendation 示例
+    print("\n=== Phase4-A1: build_final_risk_recommendation (single) ===")
+    single_risk = {"overall_risk_level": "high", "risk_score": 8}
+    single_risk["explanation_summary"] = build_explanation_snapshot(build_risk_explanation(single_risk))
+    final_single = build_final_risk_recommendation(single_risk, label="Current Case")
+    print("final_summary:", final_single.get("final_summary"))
+    print("safer_option:", final_single.get("safer_option"))
+    print("\n--- format_final_risk_recommendation_for_cli (single) ---")
+    print(format_final_risk_recommendation_for_cli(final_single))
+
+    print("\n=== Phase4-A1: build_final_risk_comparison_recommendation (two risks) ===")
+    risk_a = {"overall_risk_level": "high", "risk_score": 8}
+    risk_b = {"overall_risk_level": "medium", "structured_risk_score": 4}
+    risk_a["explanation_summary"] = build_explanation_snapshot(build_risk_explanation(risk_a))
+    risk_b["explanation_summary"] = build_explanation_snapshot(build_risk_explanation(risk_b))
+    final_comp = build_final_risk_comparison_recommendation([risk_a, risk_b], labels=["Contract A", "Contract B"])
+    print("final_summary:", final_comp.get("final_summary"))
+    print("safer_option:", final_comp.get("safer_option"))
+    print("higher_risk_option:", final_comp.get("higher_risk_option"))
+    print("\n--- format_final_risk_recommendation_for_cli (comparison) ---")
+    print(format_final_risk_recommendation_for_cli(final_comp))

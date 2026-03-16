@@ -1,6 +1,6 @@
 from datetime import datetime
 from module2_scoring import rank_houses as rank_houses_m2, build_compare_explain, build_decision_hints
-from engines.explain_engine import build_explanation, attach_explanation_snapshot, compare_house_results, build_top_house_summary, attach_top_house_summary_to_results
+from engines.explain_engine import build_explanation, attach_explanation_snapshot, compare_house_results, build_top_house_summary, attach_top_house_summary_to_results, build_final_house_recommendation
 
 # ---------- A2-B2-B2-B2-A: 输出契约冻结（Module5 API-ready 最终冻结） ----------
 # Module5 作为 API-ready baseline 保持冻结；后续如无必要不再修改其输出契约；新开发重点转向 Module3（合同与纠纷风险）。
@@ -26,6 +26,7 @@ RANKING_RESULT_CONTRACT_EXAMPLE = {
     "compare_explain": {},
     "comparison_explanation": {},
     "top_house_summary": {},
+    "final_recommendation": {},
     "decision_hints": {},
     "preference_switch_hints": [],
     "preference_simulation": [],
@@ -227,6 +228,7 @@ def _empty_ranking_result(state):
         "compare_explain": {},
         "comparison_explanation": {},
         "top_house_summary": {},
+        "final_recommendation": {},
         "decision_hints": {},
         "preference_switch_hints": [],
         "preference_simulation": [],
@@ -324,6 +326,15 @@ def build_ranking_result(state):
         except Exception:
             top_house_summary = {}
 
+    # Phase3-A4: 最终推荐结论层
+    final_recommendation = {}
+    if houses:
+        try:
+            labels = [h.get("house_label") or f"Rank {i+1}" for i, h in enumerate(houses)]
+            final_recommendation = build_final_house_recommendation(houses, labels=labels, top_n=min(3, len(houses)))
+        except Exception:
+            final_recommendation = {}
+
     return {
         "status": "ok",
         "message": "Ranking generated successfully.",
@@ -335,6 +346,7 @@ def build_ranking_result(state):
         "compare_explain": compare_explain,
         "comparison_explanation": comparison_explanation,
         "top_house_summary": top_house_summary,
+        "final_recommendation": final_recommendation,
         "decision_hints": decision_hints,
         "preference_switch_hints": decision_hints.get("preference_switch_hints") or [],
         "preference_simulation": decision_hints.get("preference_simulation") or [],

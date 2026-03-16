@@ -34,7 +34,7 @@ from explain_engine import (
     generate_confidence_level,
 )
 # Module7 Explain Engine: 统一解释结构
-from engines.explain_engine import build_explanation, format_explanation_for_cli, format_explanation_summary_for_cli, attach_explanation_snapshot, format_comparison_for_cli, format_top_house_summary_for_cli
+from engines.explain_engine import build_explanation, format_explanation_for_cli, format_explanation_summary_for_cli, attach_explanation_snapshot, format_comparison_for_cli, format_top_house_summary_for_cli, format_final_recommendation_for_cli, build_final_risk_recommendation, format_final_risk_recommendation_for_cli
 
 # Module3: Contract risk (demo only, not in final_score)
 from contract_risk import calculate_contract_risk_score, calculate_structured_risk_score
@@ -814,6 +814,14 @@ def print_ranking_report(state, n_show_top=3):
                 print("=== TopN Ranking Summary (Phase3-A3) ===")
                 print(txt)
                 print()
+        # Phase3-A4: 最终推荐结论
+        final_rec = rr.get("final_recommendation") or {}
+        if final_rec and final_rec.get("final_summary"):
+            txt = format_final_recommendation_for_cli(final_rec, max_items=2)
+            if txt:
+                print("=== Final Recommendation (Phase3-A4) ===")
+                print(txt)
+                print()
         if decision_hints and (decision_hints.get("primary_recommendation") or decision_hints.get("backup_option") or decision_hints.get("caution_option")):
             print_decision_hints_block(decision_hints)
         if preference_switch_hints:
@@ -1038,6 +1046,12 @@ def main():
                     "next_actions": [],
                 }
             attach_explanation_snapshot(result)
+            # Phase4-A1: 最终风险处理结论
+            try:
+                final_risk = build_final_risk_recommendation(result, label="Current Case")
+                result["final_risk_recommendation"] = final_risk
+            except Exception:
+                result["final_risk_recommendation"] = {}
             print(f"\n风险分（0-10）：{result.get('risk_score')}")
             if result.get("matched_categories"):
                 print("命中类别:", ", ".join(result["matched_categories"]))
@@ -1059,6 +1073,11 @@ def main():
             if txt:
                 print("\n--- Risk Explanation Summary ---")
                 print(txt)
+            # Phase4-A1: Final Risk Recommendation
+            fr = result.get("final_risk_recommendation") or {}
+            if fr and fr.get("final_summary"):
+                print("\n--- Final Risk Recommendation (Phase4-A1) ---")
+                print(format_final_risk_recommendation_for_cli(fr))
 
         elif choice.upper() == "L":
             print("\n--- 结构化风险识别（最小可运行版）---")
@@ -1114,6 +1133,12 @@ def main():
                     "next_actions": [],
                 }
             attach_explanation_snapshot(result)
+            # Phase4-A1: 最终风险处理结论
+            try:
+                final_risk = build_final_risk_recommendation(result, label="Current Case")
+                result["final_risk_recommendation"] = final_risk
+            except Exception:
+                result["final_risk_recommendation"] = {}
             print(f"\nstructured_risk_score（0-10）：{result.get('structured_risk_score')}")
             if result.get("matched_rules"):
                 print("matched_rules:", ", ".join(result["matched_rules"]))
@@ -1133,6 +1158,11 @@ def main():
             if txt:
                 print("\n--- Risk Explanation Summary ---")
                 print(txt)
+            # Phase4-A1: Final Risk Recommendation
+            fr = result.get("final_risk_recommendation") or {}
+            if fr and fr.get("final_summary"):
+                print("\n--- Final Risk Recommendation (Phase4-A1) ---")
+                print(format_final_risk_recommendation_for_cli(fr))
 
         elif choice == "0":
             print("已退出。")
