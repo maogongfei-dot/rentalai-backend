@@ -34,7 +34,7 @@ from explain_engine import (
     generate_confidence_level,
 )
 # Module7 Explain Engine: 统一解释结构
-from engines.explain_engine import build_explanation, format_explanation_for_cli, format_explanation_summary_for_cli, attach_explanation_snapshot, format_comparison_for_cli, format_top_house_summary_for_cli, format_final_recommendation_for_cli, build_final_risk_recommendation, format_final_risk_recommendation_for_cli
+from engines.explain_engine import build_explanation, format_explanation_for_cli, format_explanation_summary_for_cli, attach_explanation_snapshot, format_comparison_for_cli, format_top_house_summary_for_cli, format_final_recommendation_for_cli, build_final_risk_recommendation, format_final_risk_recommendation_for_cli, attach_unified_decision, format_unified_decision_for_cli
 
 # Module3: Contract risk (demo only, not in final_score)
 from contract_risk import calculate_contract_risk_score, calculate_structured_risk_score
@@ -822,6 +822,14 @@ def print_ranking_report(state, n_show_top=3):
                 print("=== Final Recommendation (Phase3-A4) ===")
                 print(txt)
                 print()
+        # Phase4-A3: Unified Decision（仅 house 或 house+risk）
+        ud = rr.get("unified_decision") or {}
+        if ud and ud.get("overall_recommendation"):
+            txt = format_unified_decision_for_cli(ud, max_items=2)
+            if txt:
+                print("=== Unified Decision (Phase4-A3) ===")
+                print(txt)
+                print()
         if decision_hints and (decision_hints.get("primary_recommendation") or decision_hints.get("backup_option") or decision_hints.get("caution_option")):
             print_decision_hints_block(decision_hints)
         if preference_switch_hints:
@@ -1052,6 +1060,8 @@ def main():
                 result["final_risk_recommendation"] = final_risk
             except Exception:
                 result["final_risk_recommendation"] = {}
+            # Phase4-A3: 挂载 unified_decision（仅 risk，无 house）
+            attach_unified_decision(result, house_key="final_recommendation", risk_key="final_risk_recommendation", unified_key="unified_decision")
             print(f"\n风险分（0-10）：{result.get('risk_score')}")
             if result.get("matched_categories"):
                 print("命中类别:", ", ".join(result["matched_categories"]))
@@ -1078,6 +1088,11 @@ def main():
             if fr and fr.get("final_summary"):
                 print("\n--- Final Risk Recommendation (Phase4-A1) ---")
                 print(format_final_risk_recommendation_for_cli(fr))
+            # Phase4-A3: Unified Decision（仅 risk）
+            ud = result.get("unified_decision") or {}
+            if ud and ud.get("overall_recommendation"):
+                print("\n=== Unified Decision (Phase4-A3) ===")
+                print(format_unified_decision_for_cli(ud))
 
         elif choice.upper() == "L":
             print("\n--- 结构化风险识别（最小可运行版）---")
@@ -1139,6 +1154,8 @@ def main():
                 result["final_risk_recommendation"] = final_risk
             except Exception:
                 result["final_risk_recommendation"] = {}
+            # Phase4-A3: 挂载 unified_decision（仅 risk，无 house）
+            attach_unified_decision(result, house_key="final_recommendation", risk_key="final_risk_recommendation", unified_key="unified_decision")
             print(f"\nstructured_risk_score（0-10）：{result.get('structured_risk_score')}")
             if result.get("matched_rules"):
                 print("matched_rules:", ", ".join(result["matched_rules"]))
@@ -1163,6 +1180,11 @@ def main():
             if fr and fr.get("final_summary"):
                 print("\n--- Final Risk Recommendation (Phase4-A1) ---")
                 print(format_final_risk_recommendation_for_cli(fr))
+            # Phase4-A3: Unified Decision（仅 risk）
+            ud = result.get("unified_decision") or {}
+            if ud and ud.get("overall_recommendation"):
+                print("\n=== Unified Decision (Phase4-A3) ===")
+                print(format_unified_decision_for_cli(ud))
 
         elif choice == "0":
             print("已退出。")

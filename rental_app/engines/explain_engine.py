@@ -1,15 +1,18 @@
 # 房源推荐解释引擎：根据评分生成用户可读的推荐说明
-# Module7 Phase1-A1：Explain Engine 基础解释框架
-# Phase1-A4：字段兼容 + 文案细化
-# Phase2-A1：原因排序与重点提炼
-# Phase2-A2：场景化解释模板
-# Phase2-A3：Why / Why Not 双向解释
-# Phase2-A4：可复用展示层格式化
-# Phase3-A1：结果摘要输出到 State / Result Layer
-# Phase3-A2：多房源 / 多结果对比解释层
-# Phase3-A3：TopN 推荐理由汇总层
-# Phase3-A4：房源推荐结论层 Final Recommendation Layer
-# Phase4-A1：Risk Final Recommendation Layer
+# Module7 Explain Engine - 完整收口 (Phase5-A4)
+#
+# 模块结构索引：
+# 1. Base helpers        - _empty_explanation, _empty_unified_decision, _get_first_value, _safe_list, _limit_items, ...
+# 2. Single explanation  - explain_house, build_risk_explanation, build_explanation
+# 3. Explanation format  - format_explanation_for_cli, format_explanation_for_api, format_explanation_for_agent
+# 4. Snapshot / result   - build_explanation_snapshot, attach_explanation_snapshot
+# 5. Comparison / rank   - compare_house_results, compare_risk_results, build_top_house_summary, format_top_house_summary_for_cli
+# 6. Final recommendation - build_final_house_recommendation, build_final_risk_recommendation, format_final_*_for_cli
+# 7. Unified decision    - build_unified_decision, attach_unified_decision, format_unified_decision_for_cli/api/agent
+# 8. Payload / protocol  - normalize_unified_decision, export_unified_decision_payload
+# 9. Self-check          - run_explain_engine_self_check
+#
+# ---------- 1. Base helpers ----------
 
 
 def _empty_explanation():
@@ -574,6 +577,8 @@ def _build_decision_blockers(explanation: dict, data: dict, explanation_type: st
     return out[:4]
 
 
+# ---------- 2. Single explanation builders ----------
+
 def explain_house(house):
     """房源推荐解释：根据评分生成统一解释结构。Phase1-A4: 字段兼容 + 文案细化。"""
     if house is None or not isinstance(house, dict):
@@ -972,6 +977,8 @@ def build_explanation(data, explanation_type):
     exp["summary"] = "Unsupported explanation type."
     return exp
 
+
+# ---------- 3. Explanation formatting ----------
 
 def format_explanation_for_cli(explanation: dict, max_items: int = 2) -> str:
     """可复用 CLI 展示：将 explanation dict 转为适合命令行的简洁文本。Phase2-A4。"""
@@ -2222,6 +2229,1129 @@ def format_final_risk_recommendation_for_cli(data: dict, max_items: int = 2) -> 
     return "\n\n".join(parts) if parts else ""
 
 
+# ---------- Phase4-A2: House + Risk 双结论合并层 Unified Decision Layer ----------
+
+def _empty_unified_decision() -> dict:
+    """返回 Unified Decision 结构的空模板。Phase4-A2 / Phase4-A4 / Phase5-A1 / Phase5-A2。"""
+    return {
+        "overall_recommendation": "unknown",
+        "final_summary": "",
+        "decision_confidence": "medium",
+        "confidence_reason": "",
+        "house_signal": "unknown",
+        "risk_signal": "unknown",
+        "decision_focus": "",
+        "primary_blockers": [],
+        "supporting_reasons": [],
+        "required_actions_before_proceeding": [],
+        "final_action": "",
+        "missing_information": [],
+        "assessment_limitations": [],
+        "recommended_inputs_to_improve_decision": [],
+        "trace_summary": "",
+        "decision_trace": [],
+        "house_trace_reasons": [],
+        "risk_trace_reasons": [],
+        "blocker_trace": [],
+        "support_trace": [],
+        "user_facing_summary": "",
+        "user_facing_reason": [],
+        "user_facing_risk_note": [],
+        "user_facing_next_step": [],
+        "user_facing_explanation": [],
+        "house_reference": {},
+        "risk_reference": {},
+    }
+
+
+def _detect_missing_house_information(house_final: dict | None) -> list:
+    """识别 house 侧缺失信息。Phase4-A4。unknown != bad。"""
+    out = []
+    if not house_final or not isinstance(house_final, dict):
+        out.append("House-side final recommendation is missing.")
+        return out
+    primary = house_final.get("primary_recommendation") or {}
+    score = primary.get("score")
+    if score is None:
+        s = _get_score_value(house_final, ["final_score", "score", "total_score"])
+        if s is None:
+            out.append("The overall property score is not available.")
+    expl = house_final.get("explanation_summary") or house_final.get("explanation") or {}
+    expl = expl if isinstance(expl, dict) else {}
+    summary = (expl.get("summary") or "").strip()
+    if not summary and not primary:
+        out.append("House-side explanation is very limited.")
+    return out
+
+
+def _detect_missing_risk_information(risk_final: dict | None) -> list:
+    """识别 risk 侧缺失信息。Phase4-A4。missing != high risk。"""
+    out = []
+    if not risk_final or not isinstance(risk_final, dict):
+        out.append("Risk-side final recommendation is missing.")
+        return out
+    safer = risk_final.get("safer_option") or {}
+    level = (safer.get("risk_level") or "").strip()
+    if not level:
+        score = _get_first_value(risk_final, ["risk_score", "structured_risk_score"])
+        if score is None:
+            out.append("No clear contract risk level is available.")
+    expl = risk_final.get("explanation_summary") or risk_final.get("explanation") or {}
+    expl = expl if isinstance(expl, dict) else {}
+    summary = (expl.get("summary") or "").strip()
+    if not summary and not safer.get("reason"):
+        out.append("Risk-side explanation is very limited.")
+    return out
+
+
+def _build_assessment_limitations(house_final: dict | None, risk_final: dict | None) -> list:
+    """构建 assessment_limitations。Phase4-A4。"""
+    out = []
+    if not house_final:
+        out.append("Property value and fit have not been fully evaluated.")
+    elif not (house_final.get("primary_recommendation") or {}).get("score") and _get_score_value(house_final, ["final_score", "score"]) is None:
+        out.append("Property scoring may be incomplete.")
+    if not risk_final:
+        out.append("Contract or dispute risk has not been fully assessed.")
+    else:
+        safer = risk_final.get("safer_option") or {}
+        if not safer.get("risk_level"):
+            out.append("Clause-level review may be incomplete.")
+    return _limit_items(out, 3)
+
+
+def _build_confidence_reason(
+    unified: dict,
+    house_final: dict | None,
+    risk_final: dict | None,
+) -> str:
+    """生成 confidence_reason。Phase4-A4。"""
+    conf = (unified.get("decision_confidence") or "medium").strip().lower()
+    h_sig = (unified.get("house_signal") or "unknown").strip()
+    r_sig = (unified.get("risk_signal") or "unknown").strip()
+    missing = _safe_list(unified.get("missing_information") or [])
+
+    if conf == "high":
+        return "Confidence is high because both property-side and risk-side signals are available and point in a consistent direction."
+    if conf == "low":
+        if not house_final or not risk_final:
+            return "Confidence is low because important parts of the property or risk assessment are still missing."
+        if h_sig == "unknown" or r_sig == "unknown":
+            return "Confidence is low because one or both sides have not been fully assessed."
+        if len(missing) >= 2:
+            return "Confidence is low because several key inputs are still missing."
+        return "Confidence is low because the system is making a conservative judgment rather than a definitive one."
+    # medium
+    if h_sig == "unknown" or r_sig == "unknown":
+        return "Confidence is medium because the overall direction is visible, but some practical or contractual details still need confirmation."
+    return "Confidence is medium because the conclusion is broadly formed, but some details remain to be confirmed."
+
+
+def _build_recommended_inputs_to_improve_decision(
+    house_final: dict | None,
+    risk_final: dict | None,
+) -> list:
+    """生成 recommended_inputs_to_improve_decision。Phase4-A4。"""
+    out = []
+    if not house_final:
+        out.extend([
+            "Rent details and total monthly cost",
+            "Commute route and travel time",
+            "Target area fit and bills structure",
+            "Bedroom/layout suitability",
+        ])
+    if not risk_final:
+        out.extend([
+            "Deposit clause review",
+            "Repair responsibility clarification",
+            "Termination and rent increase clause check",
+            "Evidence list and written confirmation",
+            "Full contract wording review",
+        ])
+    if house_final and risk_final:
+        missing_h = _detect_missing_house_information(house_final)
+        missing_r = _detect_missing_risk_information(risk_final)
+        if missing_h:
+            out.append("Complete property evaluation inputs (score, commute, area fit).")
+        if missing_r:
+            out.append("Complete contract-risk review (clause-level, evidence).")
+    return _limit_items(out, 6)
+
+
+# ---------- Phase5-A1: Trace Layer 辅助函数 ----------
+
+def _truncate_trace(text: str, max_len: int = 100) -> str:
+    """将 trace 文本截断为短句。"""
+    if not text or not isinstance(text, str):
+        return ""
+    s = text.strip()
+    if len(s) <= max_len:
+        return s
+    return s[: max_len - 3].rsplit(".", 1)[0].strip() + "..." if "." in s[: max_len - 3] else s[: max_len - 3] + "..."
+
+
+def _extract_house_trace_reasons(house_final: dict | None) -> list:
+    """从 house_final 提取影响最终结论的房源侧原因。Phase5-A1。"""
+    out = []
+    seen = set()
+    if not house_final or not isinstance(house_final, dict):
+        return out
+
+    def _add(s):
+        if s and isinstance(s, str) and s.strip():
+            t = _truncate_trace(s.strip(), 100)
+            if t and t not in seen:
+                seen.add(t)
+                out.append(t)
+
+    for x in _safe_list(house_final.get("supporting_reasons") or [])[:2]:
+        _add(x)
+    for x in _safe_list(house_final.get("watchouts") or [])[:2]:
+        _add(x)
+    primary = house_final.get("primary_recommendation") or {}
+    _add(primary.get("reason"))
+    summary = (house_final.get("final_summary") or "").strip()
+    if summary and len(summary) <= 120:
+        _add(summary)
+    elif summary:
+        _add(summary[:80] + "...")
+    expl = house_final.get("explanation_summary") or house_final.get("explanation") or {}
+    expl = expl if isinstance(expl, dict) else {}
+    for x in _safe_list(expl.get("key_positives") or expl.get("why_recommend"))[:1]:
+        _add(x)
+    for x in _safe_list(expl.get("key_risks") or expl.get("why_not_recommend"))[:1]:
+        _add(x)
+    return _limit_items(out, 4)
+
+
+def _extract_risk_trace_reasons(risk_final: dict | None) -> list:
+    """从 risk_final 提取影响最终结论的风险侧原因。Phase5-A1。"""
+    out = []
+    seen = set()
+    if not risk_final or not isinstance(risk_final, dict):
+        return out
+
+    def _add(s):
+        if s and isinstance(s, str) and s.strip():
+            t = _truncate_trace(s.strip(), 100)
+            if t and t not in seen:
+                seen.add(t)
+                out.append(t)
+
+    for x in _safe_list(risk_final.get("supporting_reasons") or [])[:2]:
+        _add(x)
+    for x in _safe_list(risk_final.get("watchouts") or [])[:2]:
+        _add(x)
+    summary = (risk_final.get("final_summary") or "").strip()
+    if summary:
+        _add(summary[:100] + ("..." if len(summary) > 100 else ""))
+    path = (risk_final.get("manageable_path") or "").strip()
+    if path:
+        _add(path[:100] + ("..." if len(path) > 100 else ""))
+    safer = risk_final.get("safer_option") or {}
+    _add(safer.get("reason"))
+    higher = risk_final.get("higher_risk_option") or {}
+    _add(higher.get("reason"))
+    return _limit_items(out, 4)
+
+
+def _build_blocker_trace(
+    unified: dict,
+    house_final: dict | None,
+    risk_final: dict | None,
+) -> list:
+    """构建 blocker_trace：真正阻塞最终决策的原因。Phase5-A1。"""
+    out = []
+    seen = set()
+    blockers = _safe_list(unified.get("primary_blockers") or [])
+    for x in blockers[:2]:
+        if x and isinstance(x, str) and x.strip():
+            t = _truncate_trace(x, 80)
+            if t and t not in seen:
+                seen.add(t)
+                out.append(t)
+    if risk_final:
+        for x in _safe_list(risk_final.get("watchouts") or [])[:1]:
+            if x and isinstance(x, str) and x.strip():
+                t = _truncate_trace(x, 80)
+                if t and t not in seen:
+                    seen.add(t)
+                    out.append(t)
+    if house_final:
+        for x in _safe_list(house_final.get("watchouts") or [])[:1]:
+            if x and isinstance(x, str) and x.strip():
+                t = _truncate_trace(x, 80)
+                if t and t not in seen:
+                    seen.add(t)
+                    out.append(t)
+    missing = _safe_list(unified.get("missing_information") or [])
+    if not house_final and not risk_final and missing:
+        out.append("Risk-side review is incomplete, so a safe proceed decision is not yet justified.")
+    elif not risk_final and house_final and missing:
+        out.append("Risk-side review is incomplete, so a safe proceed decision is not yet justified.")
+    elif not house_final and risk_final and missing:
+        out.append("Property value and fit have not been fully evaluated.")
+    return _limit_items(out, 4)
+
+
+def _build_support_trace(
+    unified: dict,
+    house_final: dict | None,
+    risk_final: dict | None,
+) -> list:
+    """构建 support_trace：支撑继续推进的原因。Phase5-A1。"""
+    out = []
+    seen = set()
+    supporting = _safe_list(unified.get("supporting_reasons") or [])
+    for x in supporting[:2]:
+        if x and isinstance(x, str) and x.strip() and x not in seen:
+            t = _truncate_trace(x, 80)
+            if t:
+                seen.add(t)
+                out.append(t)
+    if house_final:
+        for x in _safe_list(house_final.get("supporting_reasons") or [])[:1]:
+            if x and x not in seen:
+                t = _truncate_trace(x, 80)
+                if t:
+                    seen.add(t)
+                    out.append(t)
+    if risk_final:
+        for x in _safe_list(risk_final.get("supporting_reasons") or [])[:1]:
+            if x and x not in seen:
+                t = _truncate_trace(x, 80)
+                if t:
+                    seen.add(t)
+                    out.append(t)
+        path = (risk_final.get("manageable_path") or "").strip()
+        if path and "path" not in seen:
+            t = _truncate_trace(path, 80)
+            if t:
+                out.append(t)
+    return _limit_items(out, 4)
+
+
+def _build_decision_trace(
+    unified: dict,
+    house_final: dict | None,
+    risk_final: dict | None,
+) -> list:
+    """构建 decision_trace：顺序化原因链。Phase5-A1。"""
+    out = []
+    seen = set()
+    rec = (unified.get("overall_recommendation") or "unknown").strip()
+    h_sig = (unified.get("house_signal") or "unknown").strip()
+    r_sig = (unified.get("risk_signal") or "unknown").strip()
+    house_reasons = _safe_list(unified.get("house_trace_reasons") or [])
+    risk_reasons = _safe_list(unified.get("risk_trace_reasons") or [])
+    blockers = _safe_list(unified.get("blocker_trace") or [])
+    support = _safe_list(unified.get("support_trace") or [])
+
+    def _add(s):
+        if s and isinstance(s, str) and s.strip():
+            t = s.strip()[:95]
+            if t not in seen:
+                seen.add(t)
+                out.append(s.strip()[:90] + ("..." if len(s.strip()) > 90 else ""))
+
+    if house_final or house_reasons:
+        if h_sig == "positive":
+            _add("The property-side signal is positive enough to keep this option under consideration.")
+        elif h_sig == "unknown":
+            _add("The property-side signal is not yet available.")
+        elif house_reasons:
+            _add(house_reasons[0])
+        else:
+            _add("The property-side signal is mixed or weak.")
+
+    if risk_final or risk_reasons:
+        if r_sig == "manageable":
+            _add("The risk-side signal is manageable with normal checks.")
+        elif r_sig == "unknown":
+            _add("The risk-side signal is not yet available.")
+        elif r_sig in ("caution", "high_risk") and risk_reasons:
+            _add(risk_reasons[0])
+        else:
+            _add("The risk-side signal suggests caution.")
+
+    if blockers:
+        _add(blockers[0])
+    elif support:
+        _add(support[0])
+
+    if rec == "proceed":
+        _add("As a result, the current recommendation is to proceed with normal checks.")
+    elif rec == "proceed_with_caution":
+        _add("As a result, the current recommendation is to proceed with caution.")
+    elif rec == "hold_and_clarify":
+        _add("As a result, the current recommendation is to hold and clarify before moving forward.")
+    elif rec == "not_recommended":
+        _add("As a result, the current recommendation is not to proceed with this option.")
+    else:
+        _add("The overall recommendation is driven by the combined property and risk signals above.")
+
+    return _limit_items(out, 5)
+
+
+def _build_trace_summary(unified: dict) -> str:
+    """生成 trace_summary：一句话概括结论驱动力。Phase5-A1。"""
+    rec = (unified.get("overall_recommendation") or "unknown").strip()
+    h_sig = (unified.get("house_signal") or "unknown").strip()
+    r_sig = (unified.get("risk_signal") or "unknown").strip()
+    blockers = _safe_list(unified.get("blocker_trace") or [])
+    support = _safe_list(unified.get("support_trace") or [])
+
+    if rec == "proceed":
+        return "The final recommendation is mainly driven by a strong property profile and a manageable risk position."
+    if rec == "proceed_with_caution":
+        return "The property remains viable, but unresolved contract-side concerns are the main reason for a cautious recommendation."
+    if rec == "hold_and_clarify":
+        if h_sig == "unknown" or r_sig == "unknown":
+            return "The current decision is driven by missing information that still needs clarification."
+        return "The current decision is driven less by a bad property signal and more by unresolved risks or missing information that still need clarification."
+    if rec == "not_recommended":
+        return "The overall decision is driven by a weak combined profile, where neither the property case nor the risk position is strong enough."
+    return "The final recommendation is driven by the combined property and risk signals above."
+
+
+# ---------- Phase5-A2: Explain-to-User Layer 辅助函数 ----------
+
+def _build_user_facing_summary(unified: dict) -> str:
+    """生成 user_facing_summary：一句最适合直接给用户看的总结。Phase5-A2。"""
+    rec = (unified.get("overall_recommendation") or "unknown").strip()
+    if rec == "proceed":
+        return "This property currently looks reasonable to move forward with, and the main risks appear manageable."
+    if rec == "proceed_with_caution":
+        return "This property may still be worth pursuing, but you should be careful and confirm a few important points before committing."
+    if rec == "hold_and_clarify":
+        return "This option is not ready for a confident go-ahead yet. It would be better to clarify the key missing or risky points first."
+    if rec == "not_recommended":
+        return "This option does not currently look strong enough to justify moving forward, given the trade-offs and unresolved risks."
+    return "The current recommendation is still forming; more information would help make a clearer decision."
+
+
+def _build_user_facing_reason(unified: dict) -> list:
+    """生成 user_facing_reason：告诉用户「为什么会这样建议」。Phase5-A2。"""
+    out = []
+    seen = set()
+    rec = (unified.get("overall_recommendation") or "unknown").strip()
+    h_sig = (unified.get("house_signal") or "unknown").strip()
+    r_sig = (unified.get("risk_signal") or "unknown").strip()
+    support = _safe_list(unified.get("supporting_reasons") or [])
+    support_trace = _safe_list(unified.get("support_trace") or [])
+
+    def _add(s):
+        if s and isinstance(s, str) and s.strip():
+            t = s.strip()[:80]
+            if t not in seen:
+                seen.add(t)
+                out.append(s.strip())
+
+    if rec in ("proceed", "proceed_with_caution"):
+        if h_sig == "positive":
+            _add("The property itself still has some practical strengths.")
+        if r_sig in ("manageable", "caution"):
+            _add("At the moment, the main concerns seem manageable rather than completely blocking.")
+        if support or support_trace:
+            _add("The overall value may still make sense if the remaining issues are checked properly.")
+    if rec in ("hold_and_clarify", "not_recommended"):
+        if h_sig != "weak":
+            _add("The current recommendation is not purely negative; it is mainly limited by unresolved details.")
+        if support or support_trace:
+            _add("Some positive factors remain, but they are outweighed by the unresolved risks or gaps.")
+    return _limit_items(out, 4)
+
+
+def _build_user_facing_risk_note(unified: dict) -> list:
+    """生成 user_facing_risk_note：告诉用户「有哪些要注意的风险/不确定点」。Phase5-A2。"""
+    out = []
+    seen = set()
+    blockers = _safe_list(unified.get("blocker_trace") or unified.get("primary_blockers") or [])
+    missing = _safe_list(unified.get("missing_information") or [])
+    limitations = _safe_list(unified.get("assessment_limitations") or [])
+
+    def _add(s):
+        if s and isinstance(s, str) and s.strip():
+            t = s.strip()[:70]
+            if t not in seen:
+                seen.add(t)
+                out.append(s.strip())
+
+    for x in blockers[:2]:
+        _add(x)
+    if missing:
+        _add("There may be missing information affecting how reliable the current recommendation is.")
+    for x in limitations[:1]:
+        _add(x)
+    if blockers or missing:
+        _add("A few unresolved points still need checking before you rely on this result.")
+    if missing and not out:
+        _add("The current result should be treated cautiously if the missing inputs are not filled.")
+    return _limit_items(out, 4)
+
+
+def _build_user_facing_next_step(unified: dict) -> list:
+    """生成 user_facing_next_step：告诉用户「接下来先做什么」。Phase5-A2。"""
+    out = []
+    seen = set()
+    fa = (unified.get("final_action") or "").strip()
+    actions = _safe_list(unified.get("required_actions_before_proceeding") or [])
+    rec = (unified.get("overall_recommendation") or "unknown").strip()
+    missing = _safe_list(unified.get("missing_information") or [])
+
+    def _add(s):
+        if s and isinstance(s, str) and s.strip():
+            t = s.strip()[:70]
+            if t not in seen:
+                seen.add(t)
+                out.append(s.strip())
+
+    if fa:
+        _add(fa)
+    for x in actions[:2]:
+        _add(x)
+    if rec == "hold_and_clarify" and not out:
+        _add("Keep the option open, but do not commit until the main blockers are clarified.")
+    if missing and not any("rerun" in (x or "").lower() for x in out):
+        _add("Once the missing information is filled, rerun the final decision.")
+    if not out and rec == "not_recommended":
+        _add("Do not prioritize this option unless new information materially improves the picture.")
+    return _limit_items(out, 4)
+
+
+def _build_user_facing_explanation(unified: dict) -> list:
+    """生成 user_facing_explanation：面向用户的简短解释链。Phase5-A2。"""
+    out = []
+    rec = (unified.get("overall_recommendation") or "unknown").strip()
+    h_sig = (unified.get("house_signal") or "unknown").strip()
+    r_sig = (unified.get("risk_signal") or "unknown").strip()
+    support = _safe_list(unified.get("support_trace") or unified.get("supporting_reasons") or [])
+    blockers = _safe_list(unified.get("blocker_trace") or [])
+
+    if rec == "proceed":
+        out.append("The property still has enough strengths to remain under consideration.")
+        out.append("The main risks appear manageable with normal checks.")
+        out.append("That is why the current recommendation is to proceed.")
+    elif rec == "proceed_with_caution":
+        out.append("The property still has enough strengths to remain under consideration.")
+        if blockers:
+            out.append("However, a few important contract or information gaps make it wise to confirm details before committing.")
+        else:
+            out.append("However, a few points still need confirmation before you can move forward with confidence.")
+        out.append("That is why the current recommendation is to proceed with caution.")
+    elif rec == "hold_and_clarify":
+        out.append("The property still has enough strengths to remain under consideration.")
+        if h_sig == "unknown" or r_sig == "unknown":
+            out.append("However, important information is still missing, so a full green light is not yet justified.")
+        else:
+            out.append("However, a few important contract or information gaps make it unsafe to give a full green light yet.")
+        out.append("That is why the current recommendation is to hold and clarify rather than reject it outright.")
+    elif rec == "not_recommended":
+        out.append("The combined property and risk profile does not currently look strong enough.")
+        out.append("The trade-offs and unresolved risks outweigh the positive factors.")
+        out.append("That is why the current recommendation is not to proceed with this option.")
+    else:
+        out.append("The property and risk signals are still being assessed.")
+        out.append("More information would help form a clearer recommendation.")
+    return _limit_items(out, 4)
+
+
+def _house_signal_from_final(house_final: dict) -> str:
+    """从 house_final 提炼 house_signal。"""
+    if not house_final or not isinstance(house_final, dict):
+        return "unknown"
+    conf = (house_final.get("decision_confidence") or "medium").strip().lower()
+    primary = house_final.get("primary_recommendation") or {}
+    watchouts = _safe_list(house_final.get("watchouts") or [])
+    supporting = _safe_list(house_final.get("supporting_reasons") or [])
+    summary = (house_final.get("final_summary") or "").strip().lower()
+
+    if "not" in summary and "strong" in summary:
+        return "weak"
+    if "least compromised" in summary or "none of" in summary:
+        return "weak"
+    if conf == "low" and len(watchouts) >= 2:
+        return "weak"
+    if conf == "high" and len(supporting) >= 1 and len(watchouts) <= 1:
+        return "positive"
+    if len(watchouts) >= 2:
+        return "mixed"
+    if primary and (supporting or conf in ("high", "medium")):
+        return "positive"
+    return "mixed"
+
+
+def _risk_signal_from_final(risk_final: dict) -> str:
+    """从 risk_final 提炼 risk_signal。"""
+    if not risk_final or not isinstance(risk_final, dict):
+        return "unknown"
+    safer = risk_final.get("safer_option") or {}
+    higher = risk_final.get("higher_risk_option") or {}
+    level = (safer.get("risk_level") or "").strip().lower()
+    summary = (risk_final.get("final_summary") or "").strip().lower()
+    watchouts = _safe_list(risk_final.get("watchouts") or [])
+
+    if level == "high":
+        if higher and higher.get("label"):
+            return "high_risk"
+        return "high_risk"
+    if level == "low":
+        return "manageable"
+    if "too risky" in summary or "clarification" in summary and "before" in summary:
+        return "high_risk"
+    if "manageable" in summary or "still be manageable" in summary:
+        return "caution"
+    if len(watchouts) >= 2:
+        return "caution"
+    return "manageable"
+
+
+def _overall_recommendation_from_signals(house_signal: str, risk_signal: str, house_final: dict, risk_final: dict) -> str:
+    """根据 house_signal 和 risk_signal 判断 overall_recommendation。Phase4-A4: unknown != bad, missing != weak。"""
+    has_house = bool(house_final and isinstance(house_final, dict))
+    has_risk = bool(risk_final and isinstance(risk_final, dict))
+
+    # 两侧都缺大量信息：不要武断 not_recommended，改为 hold_and_clarify
+    if not has_house and not has_risk:
+        return "hold_and_clarify"
+
+    # house 强，但 risk 缺失：不要直接 proceed，改为 proceed_with_caution 或 hold_and_clarify
+    if has_house and not has_risk:
+        if house_signal == "weak":
+            return "hold_and_clarify"
+        return "hold_and_clarify"  # 风险未评估，保守处理
+
+    # risk 有，但 house 缺失：不要直接 proceed
+    if has_risk and not has_house:
+        if risk_signal == "high_risk":
+            return "hold_and_clarify"
+        return "hold_and_clarify"  # 房源价值未评估
+
+    # 两侧都有
+    # not_recommended：只有信息足够且结论明确负面时
+    if house_signal == "weak":
+        return "not_recommended"
+    if risk_signal == "high_risk":
+        if house_signal in ("weak", "mixed"):
+            return "not_recommended"
+        return "hold_and_clarify"
+    if house_signal == "weak" and risk_signal in ("caution", "high_risk"):
+        return "not_recommended"
+
+    if risk_signal == "high_risk":
+        return "hold_and_clarify"
+    if risk_signal == "caution" and house_signal in ("positive", "mixed"):
+        return "hold_and_clarify"
+
+    if risk_signal == "caution":
+        return "proceed_with_caution"
+    if house_signal == "mixed" and risk_signal == "manageable":
+        return "proceed_with_caution"
+    if house_signal == "positive" and risk_signal == "caution":
+        return "proceed_with_caution"
+
+    # proceed：只有两侧都有且信号一致时
+    if house_signal == "positive" and risk_signal == "manageable":
+        return "proceed"
+    if house_signal == "mixed" and risk_signal == "manageable":
+        return "proceed_with_caution"
+
+    if house_signal == "unknown" or risk_signal == "unknown":
+        return "hold_and_clarify"
+
+    return "proceed_with_caution"
+
+
+def build_unified_decision(
+    house_final: dict | None = None,
+    risk_final: dict | None = None,
+) -> dict:
+    """接收房源和风险最终结论，输出统一综合判断。Phase4-A2 / Phase4-A4。"""
+    out = _empty_unified_decision()
+    house_final = house_final if isinstance(house_final, dict) else None
+    risk_final = risk_final if isinstance(risk_final, dict) else None
+
+    # Phase4-A4: 缺失信息识别
+    out["missing_information"] = []
+    out["missing_information"].extend(_detect_missing_house_information(house_final))
+    out["missing_information"].extend(_detect_missing_risk_information(risk_final))
+    out["missing_information"] = _limit_items(out["missing_information"], 6)
+    out["assessment_limitations"] = _build_assessment_limitations(house_final, risk_final)
+    out["recommended_inputs_to_improve_decision"] = _build_recommended_inputs_to_improve_decision(house_final, risk_final)
+
+    if not house_final and not risk_final:
+        out["final_summary"] = "A reliable final decision is not yet available because important property-side and risk-side information is still missing."
+        out["overall_recommendation"] = "hold_and_clarify"
+        out["decision_confidence"] = "low"
+        out["confidence_reason"] = "Confidence is low because both property and risk assessments are missing."
+        out["final_action"] = "Clarify the missing data points first, then rerun the final decision."
+        out["trace_summary"] = "The current decision is driven by missing information that still needs clarification."
+        out["decision_trace"] = [
+            "A reliable final decision is not yet available because important property-side and risk-side information is still missing.",
+            "As a result, the current recommendation is to hold and clarify before moving forward.",
+        ]
+        out["user_facing_summary"] = "This option is not ready for a confident go-ahead yet. It would be better to clarify the key missing or risky points first."
+        out["user_facing_reason"] = ["The current recommendation is not purely negative; it is mainly limited by unresolved details."]
+        out["user_facing_risk_note"] = ["There may be missing information affecting how reliable the current recommendation is.", "The current result should be treated cautiously if the missing inputs are not filled."]
+        out["user_facing_next_step"] = ["Clarify the missing data points first, then rerun the final decision."]
+        out["user_facing_explanation"] = [
+            "The property and risk signals are still being assessed.",
+            "More information would help form a clearer recommendation.",
+        ]
+        return out
+
+    house_signal = _house_signal_from_final(house_final) if house_final else "unknown"
+    risk_signal = _risk_signal_from_final(risk_final) if risk_final else "unknown"
+    out["house_signal"] = house_signal
+    out["risk_signal"] = risk_signal
+
+    out["overall_recommendation"] = _overall_recommendation_from_signals(
+        house_signal, risk_signal, house_final or {}, risk_final or {}
+    )
+
+    # final_summary（Phase4-A4: 信息不完整时更诚实）
+    if house_final and risk_final:
+        if out["overall_recommendation"] == "proceed":
+            out["final_summary"] = "The property still looks worth pursuing overall, and the current risk profile appears manageable with normal checks."
+        elif out["overall_recommendation"] == "proceed_with_caution":
+            out["final_summary"] = "This option remains possible, but both the property trade-offs and the unresolved risks suggest a cautious approach."
+        elif out["overall_recommendation"] == "hold_and_clarify":
+            out["final_summary"] = "The property itself looks promising, but the current contract or dispute risks should be clarified before moving forward."
+        else:
+            out["final_summary"] = "This option does not currently look strong enough to justify the level of risk and uncertainty involved."
+    elif house_final:
+        out["final_summary"] = "This property may still be worth considering, but the current contract or risk position has not been fully assessed yet."
+    elif risk_final:
+        out["final_summary"] = "The risk position may be manageable, but the overall property value and fit have not been fully evaluated yet."
+
+    # decision_confidence（Phase4-A4: 考虑信息完整度）
+    h_conf = (house_final.get("decision_confidence") or "medium").strip().lower() if house_final else "medium"
+    r_conf = (risk_final.get("decision_confidence") or "medium").strip().lower() if risk_final else "medium"
+    missing_count = len(out.get("missing_information") or [])
+    if not house_final or not risk_final:
+        out["decision_confidence"] = "low"
+    elif house_signal == "unknown" or risk_signal == "unknown":
+        out["decision_confidence"] = "low"
+    elif missing_count >= 2:
+        out["decision_confidence"] = "low"
+    elif h_conf == "high" and r_conf == "high" and missing_count == 0:
+        out["decision_confidence"] = "high"
+    elif h_conf == "low" or r_conf == "low":
+        out["decision_confidence"] = "low"
+    else:
+        out["decision_confidence"] = "medium"
+
+    out["confidence_reason"] = _build_confidence_reason(out, house_final, risk_final)
+
+    # decision_focus
+    if out["overall_recommendation"] == "hold_and_clarify":
+        out["decision_focus"] = "The main focus should be on clarifying the risk blockers before treating this as a viable option."
+    elif out["overall_recommendation"] == "not_recommended":
+        out["decision_focus"] = "The key decision is whether any new information could materially improve either the property case or the risk position."
+    elif out["overall_recommendation"] == "proceed_with_caution":
+        out["decision_focus"] = "The key decision is whether the property's strengths still justify moving forward once the unresolved contract risks are considered."
+    else:
+        out["decision_focus"] = "The key decision is whether the top-ranked option also matches your real non-negotiables in practice."
+
+    # primary_blockers
+    blockers = []
+    if risk_final:
+        blockers.extend(_safe_list(risk_final.get("watchouts") or [])[:2])
+    if house_final:
+        blockers.extend(_safe_list(house_final.get("watchouts") or [])[:2])
+    out["primary_blockers"] = _limit_items(blockers, 4)
+
+    # supporting_reasons
+    supporting = []
+    if house_final:
+        supporting.extend(_safe_list(house_final.get("supporting_reasons") or [])[:2])
+    if risk_final:
+        supporting.extend(_safe_list(risk_final.get("supporting_reasons") or [])[:1])
+    out["supporting_reasons"] = _limit_items(supporting, 3)
+
+    # required_actions_before_proceeding
+    actions = []
+    if risk_final:
+        fa = (risk_final.get("final_action") or "").strip()
+        if fa:
+            actions.append(fa)
+        actions.extend(_safe_list(risk_final.get("watchouts") or [])[:2])
+    if house_final and not actions:
+        fa = (house_final.get("final_action") or "").strip()
+        if fa:
+            actions.append(fa)
+    out["required_actions_before_proceeding"] = _limit_items(actions, 4)
+
+    # final_action（Phase4-A4: 信息不完整时针对性动作）
+    if not house_final and not risk_final:
+        out["final_action"] = "Clarify the missing data points first, then rerun the final decision."
+    elif not risk_final:
+        out["final_action"] = "Complete the missing contract-risk review before treating this as a proceed decision."
+    elif not house_final:
+        out["final_action"] = "Fill the missing property evaluation inputs before making a final go/no-go call."
+    elif out["overall_recommendation"] == "proceed":
+        out["final_action"] = "Proceed with the viewing, but clarify the key contract terms in writing before committing."
+    elif out["overall_recommendation"] == "proceed_with_caution":
+        out["final_action"] = "Proceed with the viewing, but clarify the key contract terms in writing before committing."
+    elif out["overall_recommendation"] == "hold_and_clarify":
+        out["final_action"] = "Pause the process until the main risk blockers are clarified, then reassess whether the property still makes sense."
+    else:
+        out["final_action"] = "Do not prioritize this option further unless new information materially improves either the property case or the risk position."
+
+    # house_reference
+    if house_final:
+        primary = house_final.get("primary_recommendation") or {}
+        out["house_reference"] = {
+            "primary_label": primary.get("label") or "",
+            "confidence": house_final.get("decision_confidence") or "medium",
+            "summary": (house_final.get("final_summary") or "")[:120] + ("..." if len(house_final.get("final_summary") or "") > 120 else ""),
+        }
+    else:
+        out["house_reference"] = {}
+
+    # risk_reference
+    if risk_final:
+        safer = risk_final.get("safer_option") or {}
+        out["risk_reference"] = {
+            "safer_label": safer.get("label") or "current_case",
+            "confidence": risk_final.get("decision_confidence") or "medium",
+            "summary": (risk_final.get("final_summary") or "")[:120] + ("..." if len(risk_final.get("final_summary") or "") > 120 else ""),
+        }
+    else:
+        out["risk_reference"] = {}
+
+    # Phase5-A1: Trace Layer
+    out["house_trace_reasons"] = _extract_house_trace_reasons(house_final)
+    out["risk_trace_reasons"] = _extract_risk_trace_reasons(risk_final)
+    out["blocker_trace"] = _build_blocker_trace(out, house_final, risk_final)
+    out["support_trace"] = _build_support_trace(out, house_final, risk_final)
+    out["decision_trace"] = _build_decision_trace(out, house_final, risk_final)
+    out["trace_summary"] = _build_trace_summary(out)
+
+    # Phase5-A2: Explain-to-User Layer
+    out["user_facing_summary"] = _build_user_facing_summary(out)
+    out["user_facing_reason"] = _build_user_facing_reason(out)
+    out["user_facing_risk_note"] = _build_user_facing_risk_note(out)
+    out["user_facing_next_step"] = _build_user_facing_next_step(out)
+    out["user_facing_explanation"] = _build_user_facing_explanation(out)
+
+    return out
+
+
+def format_unified_decision_for_cli(data: dict | None, max_items: int = 2) -> str:
+    """将 Unified Decision 转为 CLI 文本。Phase4-A2 / Phase4-A4 / Phase5-A1 / Phase5-A2 / Phase5-A3。"""
+    payload = export_unified_decision_payload(data)
+    if not payload:
+        return ""
+    status = payload.get("status") or {}
+    decision = payload.get("decision") or {}
+    analysis = payload.get("analysis") or {}
+    trace = payload.get("trace") or {}
+    user_facing = payload.get("user_facing") or {}
+    parts = []
+
+    rec = (status.get("overall_recommendation") or "unknown").strip()
+    parts.append("Overall Recommendation: %s" % rec)
+
+    user_sum = (user_facing.get("summary") or "").strip()
+    if user_sum:
+        parts.append("User Summary: %s" % user_sum)
+
+    why = _limit_items(user_facing.get("reason") or [], 2)
+    if why:
+        parts.append(_join_cli_section("Why This Recommendation", why))
+
+    watch = _limit_items(user_facing.get("risk_note") or [], 2)
+    if watch:
+        parts.append(_join_cli_section("What To Watch", watch))
+
+    next_steps = _limit_items(user_facing.get("next_step") or [], 2)
+    if next_steps:
+        parts.append(_join_cli_section("Next Step", next_steps))
+
+    action = (decision.get("final_action") or "").strip()
+    if action:
+        parts.append("Final Action: %s" % action)
+
+    summary = (decision.get("final_summary") or "").strip()
+    if summary:
+        parts.append("Final Summary: %s" % summary)
+
+    trace_sum = (trace.get("trace_summary") or "").strip()
+    if trace_sum:
+        parts.append("Trace Summary: %s" % trace_sum)
+
+    conf = (status.get("decision_confidence") or "medium").strip()
+    parts.append("Confidence: %s" % conf)
+
+    conf_reason = (status.get("confidence_reason") or "").strip()
+    if conf_reason:
+        parts.append("Confidence Reason: %s" % conf_reason)
+
+    h_sig = (decision.get("house_signal") or "unknown").strip()
+    r_sig = (decision.get("risk_signal") or "unknown").strip()
+    parts.append("House Signal: %s | Risk Signal: %s" % (h_sig, r_sig))
+
+    focus = (decision.get("decision_focus") or "").strip()
+    if focus:
+        parts.append("Decision Focus: %s" % focus)
+
+    decision_trace = _limit_items(trace.get("decision_trace") or [], 3)
+    if decision_trace:
+        parts.append(_join_cli_section("Decision Trace", decision_trace))
+
+    blocker_trace = _limit_items(trace.get("blocker_trace") or [], 2)
+    if blocker_trace:
+        parts.append(_join_cli_section("Blocker Trace", blocker_trace))
+
+    support_trace = _limit_items(trace.get("support_trace") or [], 2)
+    if support_trace:
+        parts.append(_join_cli_section("Support Trace", support_trace))
+
+    missing = _limit_items(analysis.get("missing_information") or [], 3)
+    if missing:
+        parts.append(_join_cli_section("Missing Information", missing))
+
+    limitations = _limit_items(analysis.get("assessment_limitations") or [], 2)
+    if limitations:
+        parts.append(_join_cli_section("Assessment Limitations", limitations))
+
+    supporting = _limit_items(analysis.get("supporting_reasons") or [], max_items)
+    if supporting:
+        parts.append(_join_cli_section("Supporting Reasons", supporting))
+
+    blockers = _limit_items(analysis.get("primary_blockers") or [], max_items)
+    if blockers:
+        parts.append(_join_cli_section("Primary Blockers", blockers))
+
+    actions = _limit_items(analysis.get("required_actions_before_proceeding") or [], max_items)
+    if actions:
+        parts.append(_join_cli_section("Required Actions Before Proceeding", actions))
+
+    recommended = _limit_items(analysis.get("recommended_inputs_to_improve_decision") or [], 3)
+    if recommended:
+        parts.append(_join_cli_section("Recommended Inputs To Improve Decision", recommended))
+
+    if action and not any("Final Action:" in p for p in parts):
+        parts.append("Final Action: %s" % action)
+
+    return "\n\n".join(parts) if parts else ""
+
+
+# ---------- Phase5-A3: 输出协议层 Output Contract ----------
+
+def normalize_unified_decision(unified: dict | None) -> dict:
+    """把 unified_decision 补齐缺失字段，安全标准化。Phase5-A3。"""
+    if unified is None or not isinstance(unified, dict):
+        return _empty_unified_decision()
+    out = _empty_unified_decision()
+    for k in out:
+        v = unified.get(k)
+        if v is None:
+            continue
+        if isinstance(out[k], list):
+            out[k] = _safe_list(v)
+        elif isinstance(out[k], str):
+            out[k] = str(v).strip() if v else ""
+        elif isinstance(out[k], dict):
+            out[k] = v if isinstance(v, dict) else {}
+    return out
+
+
+def export_unified_decision_payload(unified: dict | None) -> dict:
+    """输出完整协议层 payload。Phase5-A3。"""
+    n = normalize_unified_decision(unified)
+    rec = (n.get("overall_recommendation") or "").strip()
+    if rec in ("", "unknown"):
+        rec = "hold_and_clarify"
+    conf = (n.get("decision_confidence") or "low").strip()
+    return {
+        "status": {
+            "overall_recommendation": rec,
+            "decision_confidence": conf,
+            "confidence_reason": (n.get("confidence_reason") or "").strip(),
+        },
+        "decision": {
+            "final_summary": (n.get("final_summary") or "").strip(),
+            "decision_focus": (n.get("decision_focus") or "").strip(),
+            "final_action": (n.get("final_action") or "").strip(),
+            "house_signal": (n.get("house_signal") or "unknown").strip(),
+            "risk_signal": (n.get("risk_signal") or "unknown").strip(),
+        },
+        "analysis": {
+            "supporting_reasons": _safe_list(n.get("supporting_reasons") or []),
+            "primary_blockers": _safe_list(n.get("primary_blockers") or []),
+            "required_actions_before_proceeding": _safe_list(n.get("required_actions_before_proceeding") or []),
+            "missing_information": _safe_list(n.get("missing_information") or []),
+            "assessment_limitations": _safe_list(n.get("assessment_limitations") or []),
+            "recommended_inputs_to_improve_decision": _safe_list(n.get("recommended_inputs_to_improve_decision") or []),
+        },
+        "trace": {
+            "trace_summary": (n.get("trace_summary") or "").strip(),
+            "decision_trace": _safe_list(n.get("decision_trace") or []),
+            "house_trace_reasons": _safe_list(n.get("house_trace_reasons") or []),
+            "risk_trace_reasons": _safe_list(n.get("risk_trace_reasons") or []),
+            "blocker_trace": _safe_list(n.get("blocker_trace") or []),
+            "support_trace": _safe_list(n.get("support_trace") or []),
+        },
+        "user_facing": {
+            "summary": (n.get("user_facing_summary") or "").strip(),
+            "reason": _safe_list(n.get("user_facing_reason") or []),
+            "risk_note": _safe_list(n.get("user_facing_risk_note") or []),
+            "next_step": _safe_list(n.get("user_facing_next_step") or []),
+            "explanation": _safe_list(n.get("user_facing_explanation") or []),
+        },
+        "references": {
+            "house_reference": n.get("house_reference") if isinstance(n.get("house_reference"), dict) else {},
+            "risk_reference": n.get("risk_reference") if isinstance(n.get("risk_reference"), dict) else {},
+        },
+    }
+
+
+def format_unified_decision_for_api(unified: dict | None) -> dict:
+    """返回适合 API/前端直接读取的 payload。Phase5-A3。"""
+    return export_unified_decision_payload(unified)
+
+
+def format_unified_decision_for_agent(unified: dict | None) -> dict:
+    """返回适合 Agent / Planner 使用的精简结构。Phase5-A3。"""
+    payload = export_unified_decision_payload(unified)
+    status = payload.get("status") or {}
+    decision = payload.get("decision") or {}
+    analysis = payload.get("analysis") or {}
+    trace = payload.get("trace") or {}
+    user_facing = payload.get("user_facing") or {}
+    refs = payload.get("references") or {}
+
+    blockers = list(analysis.get("primary_blockers") or [])
+    for x in (trace.get("blocker_trace") or []):
+        if x and x not in blockers:
+            blockers.append(x)
+
+    supports = list(analysis.get("supporting_reasons") or [])
+    for x in (trace.get("support_trace") or []):
+        if x and x not in supports:
+            supports.append(x)
+
+    return {
+        "decision_signal": (status.get("overall_recommendation") or "hold_and_clarify").strip(),
+        "confidence": (status.get("decision_confidence") or "low").strip(),
+        "focus": (decision.get("decision_focus") or "").strip(),
+        "summary": (decision.get("final_summary") or "").strip(),
+        "blockers": blockers[:4],
+        "supports": supports[:4],
+        "required_actions": _safe_list(analysis.get("required_actions_before_proceeding") or [])[:4],
+        "missing_information": _safe_list(analysis.get("missing_information") or [])[:4],
+        "user_message": (user_facing.get("summary") or "").strip(),
+        "references": {
+            "house": refs.get("house_reference") or {},
+            "risk": refs.get("risk_reference") or {},
+        },
+    }
+
+
+# ---------- Phase5-A4: 模块自检 ----------
+
+def run_explain_engine_self_check() -> dict:
+    """快速检查 Module7 关键能力是否都存在。Phase5-A4。"""
+    out = {
+        "house_explanation": False,
+        "risk_explanation": False,
+        "snapshot": False,
+        "house_final": False,
+        "risk_final": False,
+        "unified_decision": False,
+        "payload_export": False,
+        "cli_format": False,
+        "api_format": False,
+        "agent_format": False,
+        "all_passed": False,
+    }
+    h = r = s = house_final = risk_final = ud = None
+    try:
+        h = explain_house({"price_score": 80, "commute_score": 70, "area_score": 60})
+        out["house_explanation"] = bool(h and isinstance(h, dict) and "summary" in h)
+    except Exception:
+        pass
+    try:
+        r = build_risk_explanation({"overall_risk_level": "low", "risk_score": 2})
+        out["risk_explanation"] = bool(r and isinstance(r, dict) and "summary" in r)
+    except Exception:
+        pass
+    try:
+        s = build_explanation_snapshot(h or explain_house({"price_score": 80}))
+        out["snapshot"] = bool(s and isinstance(s, dict))
+    except Exception:
+        pass
+    try:
+        house_final = build_final_house_recommendation(
+            [{"final_score": 82, "explanation_summary": {}}], labels=["R1"], top_n=1
+        )
+        out["house_final"] = bool(house_final and house_final.get("primary_recommendation"))
+    except Exception:
+        pass
+    try:
+        risk_final = build_final_risk_recommendation({"overall_risk_level": "low", "risk_score": 2}, label="C")
+        out["risk_final"] = bool(risk_final and risk_final.get("safer_option"))
+    except Exception:
+        pass
+    try:
+        ud = build_unified_decision(house_final, risk_final)
+        out["unified_decision"] = bool(ud and isinstance(ud, dict) and "overall_recommendation" in ud)
+    except Exception:
+        pass
+    try:
+        payload = export_unified_decision_payload(ud or {})
+        out["payload_export"] = bool(payload and "status" in payload and "user_facing" in payload)
+    except Exception:
+        pass
+    try:
+        cli = format_unified_decision_for_cli(ud or {})
+        out["cli_format"] = isinstance(cli, str) and len(cli) >= 10
+    except Exception:
+        pass
+    try:
+        api = format_unified_decision_for_api(ud or {})
+        out["api_format"] = bool(api and isinstance(api, dict) and "status" in api)
+    except Exception:
+        pass
+    try:
+        agent = format_unified_decision_for_agent(ud or {})
+        out["agent_format"] = bool(agent and isinstance(agent, dict) and "decision_signal" in agent)
+    except Exception:
+        pass
+    out["all_passed"] = all(
+        out[k] for k in [
+            "house_explanation", "risk_explanation", "snapshot", "house_final", "risk_final",
+            "unified_decision", "payload_export", "cli_format", "api_format", "agent_format"
+        ]
+    )
+    return out
+
+
+def attach_unified_decision(
+    result: dict,
+    house_key: str = "final_recommendation",
+    risk_key: str = "final_risk_recommendation",
+    unified_key: str = "unified_decision",
+    payload_key: str = "unified_decision_payload",
+) -> dict:
+    """从 result 中读取 house/risk final recommendation，生成 unified_decision 并挂载。Phase4-A3 / Phase5-A3。"""
+    if not result or not isinstance(result, dict):
+        return result
+    house_final = result.get(house_key) if house_key else None
+    risk_final = result.get(risk_key) if risk_key else None
+    if not house_final and not risk_final:
+        result[unified_key] = build_unified_decision(None, None)
+    else:
+        try:
+            result[unified_key] = build_unified_decision(house_final, risk_final)
+        except Exception:
+            result[unified_key] = _empty_unified_decision()
+    result[payload_key] = export_unified_decision_payload(result.get(unified_key))
+    return result
+
+
 if __name__ == "__main__":
     # 房源解释示例
     sample_house = {
@@ -2354,3 +3484,154 @@ if __name__ == "__main__":
     print("higher_risk_option:", final_comp.get("higher_risk_option"))
     print("\n--- format_final_risk_recommendation_for_cli (comparison) ---")
     print(format_final_risk_recommendation_for_cli(final_comp))
+
+    # Phase4-A2: Unified Decision 示例
+    print("\n=== Phase4-A2: build_unified_decision ===")
+    # 场景1: proceed (house 强 + risk 低)
+    house_strong = build_final_house_recommendation(top3, labels=["Rank 1", "Rank 2", "Rank 3"], top_n=3)
+    risk_low = build_final_risk_recommendation({"overall_risk_level": "low", "risk_score": 2}, label="Current Case")
+    ud1 = build_unified_decision(house_strong, risk_low)
+    print("--- Scenario: proceed (house strong + risk low) ---")
+    print("overall_recommendation:", ud1.get("overall_recommendation"))
+    print(format_unified_decision_for_cli(ud1))
+
+    # 场景2: hold_and_clarify (house 强 + risk 高)
+    risk_high = build_final_risk_recommendation(single_risk, label="Current Case")
+    ud2 = build_unified_decision(house_strong, risk_high)
+    print("\n--- Scenario: hold_and_clarify (house strong + risk high) ---")
+    print("overall_recommendation:", ud2.get("overall_recommendation"))
+
+    # 场景3: proceed_with_caution (house mixed + risk caution)
+    house_mixed = build_final_house_recommendation([house_b], labels=["Option 1"], top_n=1)
+    risk_caution = build_final_risk_recommendation({"overall_risk_level": "medium", "risk_score": 5}, label="Current Case")
+    ud2b = build_unified_decision(house_mixed, risk_caution)
+    print("\n--- Scenario: proceed_with_caution (house mixed + risk caution) ---")
+    print("overall_recommendation:", ud2b.get("overall_recommendation"))
+
+    # 场景4: not_recommended (house 弱 + risk 高)
+    house_very_weak = {"final_score": 42, "price_score": 40, "commute_score": 45, "area_score": 35}
+    house_very_weak["explanation_summary"] = {"recommendation": "no", "key_risks": ["Weak overall fit.", "High trade-offs."], "key_positives": []}
+    house_weak = build_final_house_recommendation([house_very_weak], labels=["Option 1"], top_n=1)
+    ud3 = build_unified_decision(house_weak, risk_high)
+    print("\n--- Scenario: not_recommended (house weak + risk high) ---")
+    print("overall_recommendation:", ud3.get("overall_recommendation"))
+
+    # Phase4-A3: attach_unified_decision 主流程演示
+    print("\n=== Phase4-A3: attach_unified_decision (主流程演示) ===")
+    result = {"final_recommendation": house_strong, "final_risk_recommendation": risk_low}
+    attach_unified_decision(result)
+    print("unified_decision keys:", list(result.get("unified_decision", {}).keys()))
+    print("overall_recommendation:", result.get("unified_decision", {}).get("overall_recommendation"))
+    print("\n--- format_unified_decision_for_cli (house+risk) ---")
+    print(format_unified_decision_for_cli(result.get("unified_decision", {})))
+
+    # Phase4-A4: 缺失信息场景演示（unknown != bad）
+    print("\n=== Phase4-A4: 缺失信息场景 (unknown != bad) ===")
+    # 场景1: house 有，risk 缺失
+    ud_house_only = build_unified_decision(house_strong, None)
+    print("--- 1) House only, risk missing ---")
+    print("overall_recommendation:", ud_house_only.get("overall_recommendation"))
+    print("missing_information:", ud_house_only.get("missing_information"))
+    print("final_summary:", (ud_house_only.get("final_summary") or "")[:80] + "...")
+
+    # 场景2: risk 有，house 缺失
+    ud_risk_only = build_unified_decision(None, risk_low)
+    print("\n--- 2) Risk only, house missing ---")
+    print("overall_recommendation:", ud_risk_only.get("overall_recommendation"))
+    print("missing_information:", ud_risk_only.get("missing_information"))
+
+    # 场景3: 两边都不完整
+    ud_both_missing = build_unified_decision(None, None)
+    print("\n--- 3) Both missing ---")
+    print("overall_recommendation:", ud_both_missing.get("overall_recommendation"))
+    print("final_summary:", ud_both_missing.get("final_summary"))
+    print("\n--- format_unified_decision_for_cli (both missing) ---")
+    print(format_unified_decision_for_cli(ud_both_missing))
+
+    # Phase5-A1: Trace Layer 演示
+    print("\n=== Phase5-A1: Trace Layer (可追溯原因链) ===")
+    # 场景1: proceed_with_caution
+    ud_trace1 = build_unified_decision(house_mixed, risk_caution)
+    print("--- Scenario: proceed_with_caution ---")
+    print("overall_recommendation:", ud_trace1.get("overall_recommendation"))
+    print("trace_summary:", ud_trace1.get("trace_summary"))
+    print("house_trace_reasons:", ud_trace1.get("house_trace_reasons"))
+    print("risk_trace_reasons:", ud_trace1.get("risk_trace_reasons"))
+    print("blocker_trace:", ud_trace1.get("blocker_trace"))
+    print("support_trace:", ud_trace1.get("support_trace"))
+    print("decision_trace:", ud_trace1.get("decision_trace"))
+    print("\n--- format_unified_decision_for_cli (proceed_with_caution) ---")
+    print(format_unified_decision_for_cli(ud_trace1))
+
+    # 场景2: hold_and_clarify
+    ud_trace2 = build_unified_decision(house_strong, risk_high)
+    print("\n--- Scenario: hold_and_clarify ---")
+    print("overall_recommendation:", ud_trace2.get("overall_recommendation"))
+    print("trace_summary:", ud_trace2.get("trace_summary"))
+    print("decision_trace:", ud_trace2.get("decision_trace"))
+    print("\n--- format_unified_decision_for_cli (hold_and_clarify) ---")
+    print(format_unified_decision_for_cli(ud_trace2))
+
+    # Phase5-A2: Explain-to-User Layer 演示
+    print("\n=== Phase5-A2: Explain-to-User Layer (用户可解释输出) ===")
+    # 场景1: proceed
+    print("--- 1) proceed ---")
+    print("user_facing_summary:", ud1.get("user_facing_summary"))
+    print("user_facing_reason:", ud1.get("user_facing_reason"))
+    print("user_facing_next_step:", ud1.get("user_facing_next_step"))
+    print("\n--- format (proceed) ---")
+    print(format_unified_decision_for_cli(ud1))
+
+    # 场景2: proceed_with_caution (house mixed + risk medium)
+    ud_caution = build_unified_decision(house_mixed, risk_caution)
+    print("\n--- 2) proceed_with_caution / hold_and_clarify ---")
+    print("overall_recommendation:", ud_caution.get("overall_recommendation"))
+    print("user_facing_summary:", ud_caution.get("user_facing_summary"))
+    print("user_facing_reason:", ud_caution.get("user_facing_reason"))
+    print("user_facing_risk_note:", ud_caution.get("user_facing_risk_note"))
+
+    # 场景3: hold_and_clarify / not_recommended
+    print("\n--- 3) hold_and_clarify ---")
+    print("user_facing_summary:", ud_trace2.get("user_facing_summary"))
+    print("user_facing_explanation:", ud_trace2.get("user_facing_explanation"))
+    print("\n--- 4) not_recommended ---")
+    print("user_facing_summary:", ud3.get("user_facing_summary"))
+    print("user_facing_next_step:", ud3.get("user_facing_next_step"))
+
+    # Phase5-A3: 输出协议层演示
+    print("\n=== Phase5-A3: 输出协议层 (Output Contract) ===")
+    # 场景1: proceed_with_caution / hold_and_clarify
+    ud_caution = build_unified_decision(house_mixed, risk_caution)
+    payload = export_unified_decision_payload(ud_caution)
+    print("--- 1) export_unified_decision_payload (hold_and_clarify) ---")
+    print("payload keys:", list(payload.keys()))
+    print("status:", payload.get("status"))
+    print("user_facing.summary:", payload.get("user_facing", {}).get("summary"))
+
+    api_out = format_unified_decision_for_api(ud_caution)
+    print("\n--- format_unified_decision_for_api ---")
+    print("api keys:", list(api_out.keys()))
+
+    agent_out = format_unified_decision_for_agent(ud_caution)
+    print("\n--- format_unified_decision_for_agent ---")
+    print("decision_signal:", agent_out.get("decision_signal"))
+    print("confidence:", agent_out.get("confidence"))
+    print("blockers:", agent_out.get("blockers"))
+    print("user_message:", (agent_out.get("user_message") or "")[:60] + "...")
+
+    # 场景2: hold_and_clarify
+    payload2 = export_unified_decision_payload(ud_trace2)
+    print("\n--- 2) hold_and_clarify payload ---")
+    print("status.overall_recommendation:", payload2.get("status", {}).get("overall_recommendation"))
+    print("trace.decision_trace (first):", (payload2.get("trace", {}).get("decision_trace") or [])[:1])
+
+    # attach 后 result 含 unified_decision_payload
+    print("\n--- attach_unified_decision 含 payload ---")
+    print("unified_decision_payload keys:", list(result.get("unified_decision_payload", {}).keys()))
+
+    # Phase5-A4: Module7 收口验收演示
+    print("\n=== Phase5-A4: Module7 收口验收 (Explain Engine Self-Check) ===")
+    check = run_explain_engine_self_check()
+    for k, v in check.items():
+        print("  %s: %s" % (k, v))
+    print("Module7 验收结果: %s" % ("PASS" if check.get("all_passed") else "FAIL"))

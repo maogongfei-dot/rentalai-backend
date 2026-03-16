@@ -1,6 +1,6 @@
 from datetime import datetime
 from module2_scoring import rank_houses as rank_houses_m2, build_compare_explain, build_decision_hints
-from engines.explain_engine import build_explanation, attach_explanation_snapshot, compare_house_results, build_top_house_summary, attach_top_house_summary_to_results, build_final_house_recommendation
+from engines.explain_engine import build_explanation, attach_explanation_snapshot, compare_house_results, build_top_house_summary, attach_top_house_summary_to_results, build_final_house_recommendation, attach_unified_decision
 
 # ---------- A2-B2-B2-B2-A: 输出契约冻结（Module5 API-ready 最终冻结） ----------
 # Module5 作为 API-ready baseline 保持冻结；后续如无必要不再修改其输出契约；新开发重点转向 Module3（合同与纠纷风险）。
@@ -27,6 +27,8 @@ RANKING_RESULT_CONTRACT_EXAMPLE = {
     "comparison_explanation": {},
     "top_house_summary": {},
     "final_recommendation": {},
+    "unified_decision": {},
+    "unified_decision_payload": {},  # Phase5-A3: 协议化导出，供 API/Agent 直接消费
     "decision_hints": {},
     "preference_switch_hints": [],
     "preference_simulation": [],
@@ -229,6 +231,7 @@ def _empty_ranking_result(state):
         "comparison_explanation": {},
         "top_house_summary": {},
         "final_recommendation": {},
+        "unified_decision": {},
         "decision_hints": {},
         "preference_switch_hints": [],
         "preference_simulation": [],
@@ -335,7 +338,7 @@ def build_ranking_result(state):
         except Exception:
             final_recommendation = {}
 
-    return {
+    out = {
         "status": "ok",
         "message": "Ranking generated successfully.",
         "metadata": metadata,
@@ -354,6 +357,9 @@ def build_ranking_result(state):
         "viewing_checklist": decision_hints.get("viewing_checklist") or [],
         "action_plan": decision_hints.get("action_plan") or {},
     }
+    # Phase4-A3: 挂载 unified_decision（仅 house，无 risk）
+    attach_unified_decision(out, house_key="final_recommendation", risk_key="final_risk_recommendation", unified_key="unified_decision")
+    return out
 
 
 def rank_listings(state):
