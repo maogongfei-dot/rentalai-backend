@@ -1,4 +1,4 @@
-# P1 Phase1–6 + P2 Phase1: RentalAI Web UI（默认经 HTTP 调 /analyze，可切换本地引擎）
+# P1 Phase1–6 + P2 Phase1–4: Web UI（HTTP 封套 + 可选 /analyze-batch 烟测）
 # Phase4: 结果解释增强 — 推荐 / 顾虑 / 风险 / 下一步 分开展示
 # Phase5: 输入校验、示例预填、错误提示、Reset form
 # Phase6: 页面收口、统一文案、演示顺序、弱化调试区
@@ -165,31 +165,40 @@ def normalize_form_values(raw: dict) -> dict:
 
 
 def run_analysis_for_ui(
-    raw_form: dict, *, use_local: bool, api_base_url: str
+    raw_form: dict,
+    *,
+    use_local: bool,
+    api_base_url: str,
+    api_endpoint: str = "/analyze",
 ) -> tuple[dict | None, str | None]:
     """
-    P2 Phase1：默认 HTTP POST /analyze；勾选本地时直接 run_web_demo_analysis。
-    返回 (result_dict, transport_error)；后者为网络/HTTP 层错误，前者可与现 UI 字段兼容。
+    P2 Phase3：HTTP 可调 /analyze、/score-breakdown、/risk-check、/explain-only；
+    本地模式等价全量 /analyze。
     """
+    from api_analysis import envelope_from_engine_result, legacy_ui_result_from_standard_envelope
+
     if use_local:
         try:
             from web_bridge import run_web_demo_analysis
 
             input_data = normalize_form_values(raw_form)
-            return run_web_demo_analysis(input_data), None
+            engine = run_web_demo_analysis(input_data)
+            envelope = envelope_from_engine_result(engine)
+            return legacy_ui_result_from_standard_envelope(envelope), None
         except Exception as e:
             return None, str(e)
 
     import requests
 
-    url = "%s/analyze" % (api_base_url or "").rstrip("/")
+    path = api_endpoint if str(api_endpoint).startswith("/") else "/%s" % api_endpoint
+    url = "%s%s" % ((api_base_url or "").rstrip("/"), path)
     try:
         resp = requests.post(url, json=raw_form, timeout=120)
         resp.raise_for_status()
         data = resp.json()
         if not isinstance(data, dict):
             return None, "API returned non-JSON object"
-        return data, None
+        return legacy_ui_result_from_standard_envelope(data), None
     except requests.RequestException as e:
         return None, "API request failed: %s" % (e,)
     except ValueError as e:
@@ -566,12 +575,12 @@ init_form_session_state()
 lab = normalize_display_labels()
 build_page_header(show_demo_hint=True)
 
-# --- P2 Phase1：侧栏选择 API / 本地（默认 API）---
+# --- P2：侧栏 API / 本地 + 可选子接口路径 ---
 st.sidebar.markdown("### Backend (P2)")
 _use_local = st.sidebar.checkbox(
     "Use local engine (bypass API)",
     value=os.environ.get("RENTALAI_USE_LOCAL", "").strip().lower() in ("1", "true", "yes"),
-    help="Off = POST to FastAPI /analyze. On = call web_bridge in-process (no HTTP).",
+    help="On = in-process full analysis (same as /analyze). Modular paths require API.",
 )
 _api_default = os.environ.get("RENTALAI_API_URL", "http://127.0.0.1:8000").strip()
 _api_base = st.sidebar.text_input(
@@ -580,7 +589,16 @@ _api_base = st.sidebar.text_input(
     disabled=_use_local,
     help="Example: http://127.0.0.1:8000 — start with: uvicorn api_server:app --port 8000",
 )
-st.sidebar.caption("Start API from `rental_app`: `uvicorn api_server:app --host 127.0.0.1 --port 8000`")
+_api_endpoint = st.sidebar.selectbox(
+    "API endpoint",
+    options=["/analyze", "/score-breakdown", "/risk-check", "/explain-only"],
+    index=0,
+    disabled=_use_local,
+    help="P2 Phase3 modular APIs; default /analyze keeps full dashboard data.",
+)
+if _use_local:
+    st.sidebar.caption("Local mode always uses full engine output (≈ POST /analyze).")
+st.sidebar.caption("Start API: `uvicorn api_server:app --host 127.0.0.1 --port 8000`")
 
 # --- Phase6: 输入区（表单 → 再操作按钮，顺序与验收一致）---
 st.subheader(lab["input_section"])
@@ -643,7 +661,10 @@ else:
     try:
         with st.spinner("Running analysis..."):
             result, transport_err = run_analysis_for_ui(
-                raw_form, use_local=_use_local, api_base_url=_api_base
+                raw_form,
+                use_local=_use_local,
+                api_base_url=_api_base,
+                api_endpoint=_api_endpoint,
             )
         if transport_err:
             err_msg = transport_err
@@ -664,6 +685,10 @@ else:
     if not result:
         st.error("No result returned.")
         st.stop()
+
+    # P2 Phase2：API 业务失败时优先展示 error.message（已映射到 result["message"]）
+    if not err_msg and not result.get("success") and result.get("message"):
+        st.error(result["message"])
 
     payload = result.get("unified_decision_payload") or {}
     status = payload.get("status") if isinstance(payload.get("status"), dict) else {}
@@ -738,7 +763,7 @@ else:
     st.divider()
 
     st.markdown(f"## {lab['score']}")
-    st.caption("Single scalar from the engine (`property_score` / final score).")
+    st.caption("Standard field `data.score` (mapped from engine final / property score).")
     with st.container():
         score = result.get("property_score")
         if score is not None:
@@ -825,5 +850,96 @@ else:
             st.caption("Empty")
         st.markdown("**Bridge payload (debug)**")
         st.json({k: v for k, v in result.items() if k != "explanation"})
+
+# --- P2 Phase4–5：批量接口 + 轻量结果展示区 ---
+_DEFAULT_BATCH_JSON = """{
+  "properties": [
+    {"rent": 1200, "budget": 1500, "commute_minutes": 25, "bedrooms": 2, "bills_included": true},
+    {"rent": 950, "budget": 1500, "commute_minutes": 40, "bedrooms": 1, "bills_included": false},
+    {"rent": 1400, "budget": 1500, "commute_minutes": 15, "bedrooms": 2, "bills_included": true}
+  ]
+}"""
+with st.expander("P2 Phase5 — Batch API (`POST /analyze-batch`)", expanded=False):
+    st.caption("Uses **API base URL** above. Disabled when **Use local engine** is on (batch is HTTP-only here).")
+    _batch_ta = st.text_area("Request JSON", value=_DEFAULT_BATCH_JSON, height=220, key="p2_batch_json")
+    if st.button("Run batch request", key="p2_batch_run"):
+        if _use_local:
+            st.warning("Turn off **Use local engine** and ensure the API is running to test `/analyze-batch`.")
+        else:
+            import json
+
+            import requests
+
+            try:
+                _payload = json.loads(_batch_ta)
+            except json.JSONDecodeError as ex:
+                st.error("Invalid JSON: %s" % ex)
+            else:
+                try:
+                    _bu = _api_base.rstrip("/")
+                    _br = requests.post("%s/analyze-batch" % _bu, json=_payload, timeout=180)
+                    _br.raise_for_status()
+                    _bj = _br.json()
+                    st.session_state["p2_batch_last"] = _bj
+                    with st.expander("Raw JSON response", expanded=False):
+                        st.json(_bj)
+                except Exception as ex:
+                    st.error(_display_text(str(ex), "Request failed"))
+
+    _last_batch = st.session_state.get("p2_batch_last")
+    if isinstance(_last_batch, dict) and _last_batch.get("success"):
+        _bd = _last_batch.get("data")
+        if isinstance(_bd, dict):
+            st.divider()
+            st.markdown("##### Batch results (Phase5)")
+            st.markdown("**Comparison summary**")
+            st.text(_bd.get("comparison_summary") or "N/A")
+            _rs = _bd.get("risk_summary")
+            if isinstance(_rs, dict):
+                st.markdown("**Risk summary**")
+                st.caption(_rs.get("summary_text") or "N/A")
+            st.markdown("**Ranking**")
+            st.dataframe(_bd.get("ranking") or [], use_container_width=True, hide_index=True)
+            _t1 = _bd.get("top_1_recommendation")
+            if isinstance(_t1, dict) and _t1.get("success"):
+                st.markdown(
+                    "**Top 1** — index `%s` · score `%s` · `%s`"
+                    % (
+                        _t1.get("index"),
+                        _t1.get("score"),
+                        _t1.get("decision_code") or _t1.get("decision_summary") or "N/A",
+                    )
+                )
+                st.caption("Recommended reasons (sample)")
+                for _ln in (_t1.get("recommended_reasons") or [])[:6]:
+                    st.markdown("- %s" % _display_text(_ln, ""))
+                st.caption("Concerns (sample)")
+                for _ln in (_t1.get("concerns") or [])[:4]:
+                    st.markdown("- %s" % _display_text(_ln, ""))
+            _t3 = _bd.get("top_3_recommendations") or []
+            if _t3:
+                st.markdown("**Top 3 indices**")
+                st.write(
+                    [
+                        {
+                            "index": x.get("index"),
+                            "score": x.get("score"),
+                            "code": x.get("decision_code"),
+                        }
+                        for x in _t3
+                        if isinstance(x, dict)
+                    ]
+                )
+            for _r in _bd.get("results") or []:
+                if not isinstance(_r, dict) or not _r.get("success"):
+                    continue
+                with st.expander("Listing index %s — score %s" % (_r.get("index"), _r.get("score")), expanded=False):
+                    st.markdown("**decision_code:** `%s`" % (_r.get("decision_code") or "N/A"))
+                    st.markdown("**Recommended**")
+                    for _ln in (_r.get("recommended_reasons") or [])[:8]:
+                        st.markdown("- %s" % _display_text(_ln, ""))
+                    st.markdown("**Concerns**")
+                    for _ln in (_r.get("concerns") or [])[:6]:
+                        st.markdown("- %s" % _display_text(_ln, ""))
 
 render_demo_footer()

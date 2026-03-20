@@ -106,6 +106,7 @@ def run_web_demo_analysis(input_data: dict) -> dict:
         "unified_decision": {},
         "unified_decision_payload": {},
         "risk_result": {"status": "placeholder", "message": "暂未输入合同风险信息"},
+        "top_house_export": {},
     }
     try:
         house = _input_to_house(input_data)
@@ -135,6 +136,15 @@ def run_web_demo_analysis(input_data: dict) -> dict:
             out["property_score"] = h0.get("final_score")
             out["explanation_summary"] = h0.get("explanation_summary") or {}
             out["explanation"] = h0.get("explanation") or {}
+            # P2 Phase3: 供 /score-breakdown 等子接口复用（标准 houses[0] 契约子集）
+            out["top_house_export"] = {
+                "rank": h0.get("rank"),
+                "house_label": h0.get("house_label"),
+                "final_score": h0.get("final_score"),
+                "scores": h0.get("scores") if isinstance(h0.get("scores"), dict) else {},
+                "reasons": h0.get("reasons") if isinstance(h0.get("reasons"), dict) else {},
+                "explain": h0.get("explain") if isinstance(h0.get("explain"), dict) else {},
+            }
 
         out["final_recommendation"] = data.get("final_recommendation") or {}
         out["unified_decision"] = data.get("unified_decision") or {}
