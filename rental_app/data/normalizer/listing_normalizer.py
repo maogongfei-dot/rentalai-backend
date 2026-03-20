@@ -120,7 +120,7 @@ def _resolve_source(explicit: str | None, data: dict) -> str:
     s = explicit if explicit is not None else data.get("source")
     if isinstance(s, str):
         s = s.strip().lower()
-        if s in ("manual", "api", "rightmove", "zoopla", "unknown"):
+        if s in ("manual", "api", "rightmove", "zoopla", "unknown", "manual_mock"):
             return s
     return "unknown"
 
@@ -278,6 +278,7 @@ def _normalize_unknown_payload(data: dict) -> dict[str, Any]:
 
 _DISPATCH: dict[str, Callable[[dict], dict[str, Any]]] = {
     "manual": _normalize_manual_payload,
+    "manual_mock": _normalize_manual_payload,
     "api": _normalize_api_payload,
     "rightmove": _normalize_rightmove_payload,
     "zoopla": _normalize_zoopla_payload,

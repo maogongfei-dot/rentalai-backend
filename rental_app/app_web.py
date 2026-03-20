@@ -1,4 +1,4 @@
-# P1 Phase1–6 + P2 Phase1–4: Web UI（HTTP 封套 + 可选 /analyze-batch 烟测）
+# P1 Phase1–6 + P2 Phase1–4 + P4 Phase1: Web UI（结果卡片 + HTTP 封套 + /analyze-batch）
 # Phase4: 结果解释增强 — 推荐 / 顾虑 / 风险 / 下一步 分开展示
 # Phase5: 输入校验、示例预填、错误提示、Reset form
 # Phase6: 页面收口、统一文案、演示顺序、弱化调试区
@@ -12,6 +12,12 @@
 import os
 
 import streamlit as st
+
+from web_ui.listing_result_card import (
+    build_analyze_card_model,
+    build_batch_row_card_model,
+    render_listing_result_card,
+)
 
 # ---------- P1 Phase5: 输入校验 / 示例数据 / 错误提示 ----------
 
@@ -228,6 +234,10 @@ def normalize_display_labels() -> dict:
         "references": "References",
         "contract_risk": "Contract risk",
         "debug_expander": "Technical trace & debug",
+        "listing_snapshot": "Listing snapshot",
+        "listing_snapshot_caption": "Key facts, model score, and summary — same card style as batch results.",
+        "batch_listing_cards": "All listings (cards)",
+        "batch_no_rows": "No listing rows in the last batch response.",
     }
 
 
@@ -761,6 +771,12 @@ else:
             st.write(one_line)
 
     st.divider()
+    st.markdown("## %s" % lab["listing_snapshot"])
+    st.caption(lab["listing_snapshot_caption"])
+    _ctx = normalize_form_values(raw_form)
+    render_listing_result_card(build_analyze_card_model(result, listing_context=_ctx))
+
+    st.divider()
 
     st.markdown(f"## {lab['score']}")
     st.caption("Standard field `data.score` (mapped from engine final / property score).")
@@ -877,9 +893,10 @@ with st.expander("P2 Phase5 — Batch API (`POST /analyze-batch`)", expanded=Fal
             else:
                 try:
                     _bu = _api_base.rstrip("/")
-                    _br = requests.post("%s/analyze-batch" % _bu, json=_payload, timeout=180)
-                    _br.raise_for_status()
-                    _bj = _br.json()
+                    with st.spinner("Calling analyze-batch…"):
+                        _br = requests.post("%s/analyze-batch" % _bu, json=_payload, timeout=180)
+                        _br.raise_for_status()
+                        _bj = _br.json()
                     st.session_state["p2_batch_last"] = _bj
                     with st.expander("Raw JSON response", expanded=False):
                         st.json(_bj)
@@ -887,9 +904,16 @@ with st.expander("P2 Phase5 — Batch API (`POST /analyze-batch`)", expanded=Fal
                     st.error(_display_text(str(ex), "Request failed"))
 
     _last_batch = st.session_state.get("p2_batch_last")
-    if isinstance(_last_batch, dict) and _last_batch.get("success"):
-        _bd = _last_batch.get("data")
-        if isinstance(_bd, dict):
+    if isinstance(_last_batch, dict):
+        if not _last_batch.get("success"):
+            _berr = _last_batch.get("error")
+            _bmsg = ""
+            if isinstance(_berr, dict):
+                _bmsg = _display_text(_berr.get("message"), "")
+            if _bmsg:
+                st.warning("Last batch request was not successful: %s" % _bmsg)
+        elif isinstance(_last_batch.get("data"), dict):
+            _bd = _last_batch["data"]
             st.divider()
             st.markdown("##### Batch results (Phase5)")
             st.markdown("**Comparison summary**")
@@ -900,22 +924,22 @@ with st.expander("P2 Phase5 — Batch API (`POST /analyze-batch`)", expanded=Fal
                 st.caption(_rs.get("summary_text") or "N/A")
             st.markdown("**Ranking**")
             st.dataframe(_bd.get("ranking") or [], use_container_width=True, hide_index=True)
+
             _t1 = _bd.get("top_1_recommendation")
-            if isinstance(_t1, dict) and _t1.get("success"):
-                st.markdown(
-                    "**Top 1** — index `%s` · score `%s` · `%s`"
-                    % (
-                        _t1.get("index"),
-                        _t1.get("score"),
-                        _t1.get("decision_code") or _t1.get("decision_summary") or "N/A",
-                    )
+            if isinstance(_t1, dict):
+                st.markdown("##### Top recommendation")
+                render_listing_result_card(
+                    build_batch_row_card_model(_t1, highlight_top=bool(_t1.get("success")))
                 )
-                st.caption("Recommended reasons (sample)")
-                for _ln in (_t1.get("recommended_reasons") or [])[:6]:
-                    st.markdown("- %s" % _display_text(_ln, ""))
-                st.caption("Concerns (sample)")
-                for _ln in (_t1.get("concerns") or [])[:4]:
-                    st.markdown("- %s" % _display_text(_ln, ""))
+                if _t1.get("success"):
+                    with st.expander("Top pick — extra reasons & concerns", expanded=False):
+                        st.caption("Recommended (sample)")
+                        for _ln in (_t1.get("recommended_reasons") or [])[:8]:
+                            st.markdown("- %s" % _display_text(_ln, ""))
+                        st.caption("Concerns (sample)")
+                        for _ln in (_t1.get("concerns") or [])[:6]:
+                            st.markdown("- %s" % _display_text(_ln, ""))
+
             _t3 = _bd.get("top_3_recommendations") or []
             if _t3:
                 st.markdown("**Top 3 indices**")
@@ -930,16 +954,26 @@ with st.expander("P2 Phase5 — Batch API (`POST /analyze-batch`)", expanded=Fal
                         if isinstance(x, dict)
                     ]
                 )
-            for _r in _bd.get("results") or []:
-                if not isinstance(_r, dict) or not _r.get("success"):
-                    continue
-                with st.expander("Listing index %s — score %s" % (_r.get("index"), _r.get("score")), expanded=False):
-                    st.markdown("**decision_code:** `%s`" % (_r.get("decision_code") or "N/A"))
-                    st.markdown("**Recommended**")
-                    for _ln in (_r.get("recommended_reasons") or [])[:8]:
-                        st.markdown("- %s" % _display_text(_ln, ""))
-                    st.markdown("**Concerns**")
-                    for _ln in (_r.get("concerns") or [])[:6]:
-                        st.markdown("- %s" % _display_text(_ln, ""))
+
+            _rows = _bd.get("results")
+            st.markdown("##### %s" % lab["batch_listing_cards"])
+            if not isinstance(_rows, list) or len(_rows) == 0:
+                st.info(lab["batch_no_rows"])
+            else:
+                for _r in _rows:
+                    if isinstance(_r, dict):
+                        render_listing_result_card(build_batch_row_card_model(_r, highlight_top=False))
+                        if _r.get("success"):
+                            with st.expander(
+                                "Listing #%s — bullets (debug)" % (_r.get("index", "?")),
+                                expanded=False,
+                            ):
+                                st.markdown("**decision_code:** `%s`" % (_r.get("decision_code") or "N/A"))
+                                st.markdown("**Recommended**")
+                                for _ln in (_r.get("recommended_reasons") or [])[:8]:
+                                    st.markdown("- %s" % _display_text(_ln, ""))
+                                st.markdown("**Concerns**")
+                                for _ln in (_r.get("concerns") or [])[:6]:
+                                    st.markdown("- %s" % _display_text(_ln, ""))
 
 render_demo_footer()
