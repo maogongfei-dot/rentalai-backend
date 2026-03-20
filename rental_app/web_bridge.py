@@ -19,6 +19,7 @@ _WEB_FORM_DEFAULTS = {
 def normalize_web_form_inputs(raw: dict) -> dict:
     """
     P1 Phase2: 将页面表单原始值规范为 run_web_demo_analysis 所需格式。
+    P1 Phase5: Web 端已在提交前做必填与数值校验；此处仍保留空值默认与容错，供脚本或其它入口复用。
     - 空字符串 / None → 使用默认值（rent/budget/commute/bedrooms）
     - bills_included: 支持 bool 或 str
     - distance: 可空，无效则 None

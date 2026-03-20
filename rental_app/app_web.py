@@ -1,5 +1,7 @@
-# P1 Phase1–3: RentalAI Web UI
-# Phase3: 结果卡片结构化展示 + 页面字段分区
+# P1 Phase1–6 + P2 Phase1: RentalAI Web UI（默认经 HTTP 调 /analyze，可切换本地引擎）
+# Phase4: 结果解释增强 — 推荐 / 顾虑 / 风险 / 下一步 分开展示
+# Phase5: 输入校验、示例预填、错误提示、Reset form
+# Phase6: 页面收口、统一文案、演示顺序、弱化调试区
 #
 # 启动（在 rental_app 目录下）:
 #   streamlit run app_web.py
@@ -7,7 +9,241 @@
 #
 # 依赖: pip install -r requirements.txt  (含 streamlit)
 
+import os
+
 import streamlit as st
+
+# ---------- P1 Phase5: 输入校验 / 示例数据 / 错误提示 ----------
+
+# Session keys for form widgets（与 st.text_input(..., key=) 一致）
+_FORM_KEYS = {
+    "rent": "form_rent",
+    "budget": "form_budget",
+    "commute_minutes": "form_commute_minutes",
+    "bedrooms": "form_bedrooms",
+    "distance": "form_distance",
+    "bills_included": "form_bills_included",
+    "area": "form_area",
+    "postcode": "form_postcode",
+    "target_postcode": "form_target_postcode",
+}
+
+# 推荐示例（与需求一致）；首次进入页面会预填
+_DEMO_FORM_STATE = {
+    _FORM_KEYS["rent"]: "1200",
+    _FORM_KEYS["budget"]: "1500",
+    _FORM_KEYS["commute_minutes"]: "25",
+    _FORM_KEYS["bedrooms"]: "2",
+    _FORM_KEYS["distance"]: "",
+    _FORM_KEYS["bills_included"]: True,
+    _FORM_KEYS["area"]: "",
+    _FORM_KEYS["postcode"]: "",
+    _FORM_KEYS["target_postcode"]: "",
+}
+
+# Clear form：空字符串 + bills 关（用户需自行填写或再点 Load example）
+_CLEAR_FORM_STATE = {
+    _FORM_KEYS["rent"]: "",
+    _FORM_KEYS["budget"]: "",
+    _FORM_KEYS["commute_minutes"]: "",
+    _FORM_KEYS["bedrooms"]: "",
+    _FORM_KEYS["distance"]: "",
+    _FORM_KEYS["bills_included"]: False,
+    _FORM_KEYS["area"]: "",
+    _FORM_KEYS["postcode"]: "",
+    _FORM_KEYS["target_postcode"]: "",
+}
+
+
+def init_form_session_state() -> None:
+    """首次访问时预填示例数据（不覆盖用户已改过的 session）。"""
+    for k, v in _DEMO_FORM_STATE.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+
+def load_demo_values() -> dict:
+    """返回示例表单状态副本（供 Load example 批量写回）。"""
+    return dict(_DEMO_FORM_STATE)
+
+
+def _parse_non_negative_float(raw: str, field_label: str) -> tuple[float | None, str | None]:
+    """解析非负浮点；错误返回 (None, error_message)。"""
+    s = (raw or "").strip()
+    if not s:
+        return None, f"{field_label} is required"
+    try:
+        v = float(s)
+    except (TypeError, ValueError):
+        return None, f"{field_label} must be a numeric value"
+    if v < 0:
+        return None, f"{field_label} must be a non-negative number"
+    return v, None
+
+
+def _parse_non_negative_int(raw: str, field_label: str) -> tuple[int | None, str | None]:
+    """解析非负整数（允许 2.0 这类输入）。"""
+    s = (raw or "").strip()
+    if not s:
+        return None, f"{field_label} is required"
+    try:
+        v = float(s)
+    except (TypeError, ValueError):
+        return None, f"{field_label} must be a numeric value"
+    if v < 0:
+        return None, f"{field_label} must be a non-negative number"
+    return int(v), None
+
+
+def validate_inputs(raw: dict) -> tuple[bool, list[str]]:
+    """
+    Phase5 基础校验：rent/budget/commute/bedrooms 必填、数字、>=0；
+    bills_included 可布尔化；area/postcode/target_postcode/distance 可空，不报错。
+    """
+    errors: list[str] = []
+    rent = raw.get("rent")
+    budget = raw.get("budget")
+    commute = raw.get("commute_minutes")
+    bedrooms = raw.get("bedrooms")
+    bills = raw.get("bills_included")
+
+    _, e = _parse_non_negative_float(str(rent) if rent is not None else "", "Rent (£/month)")
+    if e:
+        errors.append(e)
+
+    _, e = _parse_non_negative_float(str(budget) if budget is not None else "", "Budget (£/month)")
+    if e:
+        errors.append(e)
+
+    _, e = _parse_non_negative_int(str(commute) if commute is not None else "", "Commute minutes")
+    if e:
+        errors.append(e)
+
+    _, e = _parse_non_negative_int(str(bedrooms) if bedrooms is not None else "", "Bedrooms")
+    if e:
+        errors.append(e)
+
+    # Checkbox 一般为 bool；若来自其它来源则尝试转换
+    if bills is None:
+        errors.append("Bills included must be yes/no or a checkbox value")
+    elif isinstance(bills, str):
+        sl = bills.strip().lower()
+        if sl not in ("", "yes", "y", "true", "1", "no", "n", "false", "0", "包", "包含"):
+            if sl:  # 非空且无法识别
+                errors.append("Bills included must be a clear yes/no value")
+
+    return (len(errors) == 0, errors)
+
+
+def build_error_message(errors: list[str]) -> str:
+    """合并为一段可读错误文案（单行换行展示）。"""
+    if not errors:
+        return ""
+    return "\n".join(f"• {e}" for e in errors)
+
+
+def collect_raw_form_from_session() -> dict:
+    """从 session_state 组装与原先 raw_form 相同结构的 dict。"""
+    return {
+        "rent": st.session_state.get(_FORM_KEYS["rent"], ""),
+        "budget": st.session_state.get(_FORM_KEYS["budget"], ""),
+        "commute_minutes": st.session_state.get(_FORM_KEYS["commute_minutes"], ""),
+        "bedrooms": st.session_state.get(_FORM_KEYS["bedrooms"], ""),
+        "distance": st.session_state.get(_FORM_KEYS["distance"], ""),
+        "bills_included": st.session_state.get(_FORM_KEYS["bills_included"], False),
+        "area": st.session_state.get(_FORM_KEYS["area"], ""),
+        "postcode": st.session_state.get(_FORM_KEYS["postcode"], ""),
+        "target_postcode": st.session_state.get(_FORM_KEYS["target_postcode"], ""),
+    }
+
+
+def normalize_form_values(raw: dict) -> dict:
+    """校验通过后交给 web_bridge 做类型与空字段规范化（与引擎入参对齐）。"""
+    from web_bridge import normalize_web_form_inputs
+
+    return normalize_web_form_inputs(raw)
+
+
+def run_analysis_for_ui(
+    raw_form: dict, *, use_local: bool, api_base_url: str
+) -> tuple[dict | None, str | None]:
+    """
+    P2 Phase1：默认 HTTP POST /analyze；勾选本地时直接 run_web_demo_analysis。
+    返回 (result_dict, transport_error)；后者为网络/HTTP 层错误，前者可与现 UI 字段兼容。
+    """
+    if use_local:
+        try:
+            from web_bridge import run_web_demo_analysis
+
+            input_data = normalize_form_values(raw_form)
+            return run_web_demo_analysis(input_data), None
+        except Exception as e:
+            return None, str(e)
+
+    import requests
+
+    url = "%s/analyze" % (api_base_url or "").rstrip("/")
+    try:
+        resp = requests.post(url, json=raw_form, timeout=120)
+        resp.raise_for_status()
+        data = resp.json()
+        if not isinstance(data, dict):
+            return None, "API returned non-JSON object"
+        return data, None
+    except requests.RequestException as e:
+        return None, "API request failed: %s" % (e,)
+    except ValueError as e:
+        return None, "Invalid JSON from API: %s" % (e,)
+
+
+# ---------- P1 Phase6: Demo 收口 / 统一展示文案 ----------
+
+
+def normalize_display_labels() -> dict:
+    """区块与指标英文标签（单一来源，避免 Overview / Decision / Score 前后不一致）。"""
+    return {
+        "input_section": "Property details",
+        "actions_section": "Actions",
+        "validation_section": "Validation",
+        "errors_section": "Errors",
+        "overview": "Overview",
+        "score": "Property score",
+        "decision": "Decision",
+        "decision_caption": "High-level recommendation and confidence from the scoring engine.",
+        "recommended": "Recommended reasons",
+        "concerns": "Concerns",
+        "risks": "Risks",
+        "next_steps": "Next steps",
+        "analysis_detail": "Analysis (structured detail)",
+        "user_facing": "Narrative summary",
+        "references": "References",
+        "contract_risk": "Contract risk",
+        "debug_expander": "Technical trace & debug",
+    }
+
+
+def build_page_header(*, show_demo_hint: bool = True) -> None:
+    """主标题 + 一句话产品说明；可选 Demo 引导（不抢主视觉）。"""
+    st.title("RentalAI · Rental decision demo")
+    st.markdown(
+        "Compare a listing to your **budget** and **commute**, then review **overview**, "
+        "**property score**, **decision**, and **recommended reasons**, **concerns**, **risks**, and **next steps**."
+    )
+    if show_demo_hint:
+        st.caption(
+            "Demo: sample values are pre-filled — click **Analyze Property** for a one-click run."
+        )
+
+
+def render_demo_footer() -> None:
+    """页脚 prototype 声明（Phase6 验收用）。"""
+    st.markdown("---")
+    st.caption(
+        "_This is a prototype demo for rental property analysis. "
+        "Results are illustrative and not legal, financial, or investment advice._"
+    )
+    st.caption("RentalAI P1 · Module2 + Module7 · Web UI")
+
 
 # ---------- P1 Phase3: 安全展示辅助函数 ----------
 
@@ -145,61 +381,285 @@ def format_trace_block(trace: dict, *, compact: bool = True) -> None:
                 st.markdown(f"- {_display_text(line, 'N/A')}")
 
 
+# ---------- P1 Phase4: 解释层提取与格式化 ----------
+
+
+def _list_str(v):
+    """任意值 → 非空字符串列表。"""
+    if v is None:
+        return []
+    if isinstance(v, str):
+        s = v.strip()
+        return [s] if s else []
+    if isinstance(v, list):
+        out = []
+        for x in v:
+            if x is None:
+                continue
+            s = str(x).strip()
+            if s:
+                out.append(s)
+        return out
+    return []
+
+
+def _dedupe_preserve(items: list) -> list:
+    """去重保序，忽略大小写键。"""
+    seen = set()
+    out = []
+    for x in items:
+        if not isinstance(x, str):
+            continue
+        k = x.strip().lower()
+        if not k or k in ("n/a", "none", "empty"):
+            continue
+        if k not in seen:
+            seen.add(k)
+            out.append(x.strip())
+    return out
+
+
+def extract_recommended_reasons(
+    decision: dict,
+    analysis: dict,
+    user_facing: dict,
+    trace: dict,
+    result: dict,
+) -> list:
+    """合并 user_facing / analysis / trace / explanation_snapshot 中的正向理由。"""
+    out = []
+    if isinstance(analysis, dict):
+        out.extend(_list_str(analysis.get("supporting_reasons")))
+    if isinstance(user_facing, dict):
+        out.extend(_list_str(user_facing.get("reason")))
+    if isinstance(trace, dict):
+        out.extend(_list_str(trace.get("support_trace")))
+        out.extend(_list_str(trace.get("house_trace_reasons")))
+    expl = (result or {}).get("explanation_summary") or {}
+    if isinstance(expl, dict):
+        out.extend(_list_str(expl.get("key_positives")))
+        out.extend(_list_str(expl.get("top_positive_reasons")))
+        out.extend(_list_str(expl.get("why_recommend")))
+    # final_recommendation 主理由一句
+    frec = (result or {}).get("final_recommendation") or {}
+    if isinstance(frec, dict):
+        pr = frec.get("primary_recommendation") or {}
+        if isinstance(pr, dict) and pr.get("reason"):
+            out.extend(_list_str(pr.get("reason")))
+    return _dedupe_preserve(out)
+
+
+def extract_concerns(decision: dict, analysis: dict, user_facing: dict, trace: dict) -> list:
+    """顾虑 / 为何不直接推进：blockers、缺失信息、局限、风险侧 trace。"""
+    out = []
+    if isinstance(analysis, dict):
+        out.extend(_list_str(analysis.get("primary_blockers")))
+        out.extend(_list_str(analysis.get("missing_information")))
+        out.extend(_list_str(analysis.get("assessment_limitations")))
+    if isinstance(trace, dict):
+        out.extend(_list_str(trace.get("blocker_trace")))
+        out.extend(_list_str(trace.get("risk_trace_reasons")))
+    expl = (user_facing or {}).get("explanation") if isinstance(user_facing, dict) else []
+    # explanation 链里常含 “However …” — 整段作为一条补充顾虑（避免拆句复杂逻辑）
+    for line in _list_str(expl):
+        if any(w in line.lower() for w in ("however", "unsafe", "not yet", "clarify", "missing", "gap", "unresolved")):
+            out.append(line)
+    return _dedupe_preserve(out)
+
+
+def extract_risks(analysis: dict, user_facing: dict, trace: dict, references: dict) -> list:
+    """风险提示：用户 risk_note + 参考摘要中的警示。"""
+    out = []
+    if isinstance(user_facing, dict):
+        out.extend(_list_str(user_facing.get("risk_note")))
+    if isinstance(trace, dict):
+        out.extend(_list_str(trace.get("blocker_trace")))
+    if isinstance(references, dict):
+        for key in ("house_reference", "risk_reference"):
+            sub = references.get(key) or {}
+            if isinstance(sub, dict):
+                summ = sub.get("summary") or sub.get("risk_level")
+                out.extend(_list_str(summ) if isinstance(summ, str) else _list_str(summ))
+    return _dedupe_preserve(out)
+
+
+def extract_next_steps(decision: dict, user_facing: dict, analysis: dict) -> list:
+    """下一步用户指引：final_action + next_step + 必做动作 + 建议补充信息。"""
+    out = []
+    if isinstance(decision, dict):
+        out.extend(_list_str(decision.get("final_action")))
+        out.extend(_list_str(decision.get("decision_focus")))
+    if isinstance(user_facing, dict):
+        out.extend(_list_str(user_facing.get("next_step")))
+        out.extend(_list_str(user_facing.get("explanation")))
+    if isinstance(analysis, dict):
+        out.extend(_list_str(analysis.get("required_actions_before_proceeding")))
+        out.extend(_list_str(analysis.get("recommended_inputs_to_improve_decision")))
+    return _dedupe_preserve(out)
+
+
+def format_reason_list(title: str, reasons: list, *, empty_label: str = "No clear reason provided") -> None:
+    """统一 bullet 展示理由列表。"""
+    if title and str(title).strip():
+        st.markdown(f"**{title}**")
+    if not reasons:
+        st.caption(empty_label)
+        return
+    for r in reasons:
+        st.markdown(f"- {_display_text(r, 'N/A')}")
+
+
+def render_explanation_highlights(
+    decision: dict,
+    analysis: dict,
+    user_facing: dict,
+    trace: dict,
+    references: dict,
+    result: dict,
+) -> None:
+    """Phase4/6 解释区：纵向顺序 — Recommended → Concerns → Risks → Next steps（与验收顺序一致）。"""
+    lab = normalize_display_labels()
+    rec = extract_recommended_reasons(decision, analysis, user_facing, trace, result)
+    con = extract_concerns(decision, analysis, user_facing, trace)
+    risks = extract_risks(analysis, user_facing, trace, references)
+    steps = extract_next_steps(decision, user_facing, analysis)
+
+    st.markdown(f"## {lab['recommended']}")
+    st.caption("Why the engine leans positive (when data supports it).")
+    format_reason_list("", rec)
+    if rec:
+        st.success("These factors support moving forward (subject to your own checks).")
+    elif not (con or risks or steps):
+        st.caption("No structured positive reasons extracted for this run.")
+
+    st.divider()
+    st.markdown(f"## {lab['concerns']}")
+    st.caption("Gaps, blockers, or reasons to pause before committing.")
+    format_reason_list("", con)
+    if con:
+        st.warning("Review these before you proceed.")
+
+    st.divider()
+    st.markdown(f"## {lab['risks']}")
+    st.caption("Uncertainty and downside signals.")
+    format_reason_list("", risks)
+    if risks:
+        st.error("Treat these as signals to verify or mitigate.")
+
+    st.divider()
+    st.markdown(f"## {lab['next_steps']}")
+    st.caption("Concrete follow-ups from the decision and user-facing guidance.")
+    format_reason_list("", steps)
+    if steps:
+        st.info("Work through these in order where relevant.")
+
+    if not rec and not con and not risks and not steps:
+        st.caption("No structured explanation blocks were extracted from this run.")
+
+
 # ---------- 页面配置 ----------
 
-st.set_page_config(page_title="RentalAI", page_icon="🏠", layout="wide")
+st.set_page_config(page_title="RentalAI Demo", page_icon="🏠", layout="wide")
 
-st.title("RentalAI Decision Dashboard")
-st.caption("P1 Phase3: 结构化结果展示 · 输入 → 分析 → 分区卡片")
+init_form_session_state()
 
-# --- 输入表单（Phase2 逻辑保留）---
-st.subheader("Property input")
-st.caption("数字留空将使用默认：rent 1200 / budget 1500 / commute 30 / bedrooms 2")
+lab = normalize_display_labels()
+build_page_header(show_demo_hint=True)
+
+# --- P2 Phase1：侧栏选择 API / 本地（默认 API）---
+st.sidebar.markdown("### Backend (P2)")
+_use_local = st.sidebar.checkbox(
+    "Use local engine (bypass API)",
+    value=os.environ.get("RENTALAI_USE_LOCAL", "").strip().lower() in ("1", "true", "yes"),
+    help="Off = POST to FastAPI /analyze. On = call web_bridge in-process (no HTTP).",
+)
+_api_default = os.environ.get("RENTALAI_API_URL", "http://127.0.0.1:8000").strip()
+_api_base = st.sidebar.text_input(
+    "API base URL",
+    value=_api_default or "http://127.0.0.1:8000",
+    disabled=_use_local,
+    help="Example: http://127.0.0.1:8000 — start with: uvicorn api_server:app --port 8000",
+)
+st.sidebar.caption("Start API from `rental_app`: `uvicorn api_server:app --host 127.0.0.1 --port 8000`")
+
+# --- Phase6: 输入区（表单 → 再操作按钮，顺序与验收一致）---
+st.subheader(lab["input_section"])
+st.caption(
+    "Required: rent, budget, commute, and bedrooms (non-negative numbers). "
+    "Optional: area, postcode, target postcode, distance (invalid distance is ignored server-side)."
+)
 
 c1, c2, c3 = st.columns(3)
 with c1:
-    rent_in = st.text_input("Rent (£/month)", value="1200", help="月租，可留空用默认")
-    budget_in = st.text_input("Budget (£/month)", value="1500", help="预算")
-    commute_in = st.text_input("Commute (minutes)", value="30", help="通勤分钟")
+    st.text_input("Rent (£/month)", key=_FORM_KEYS["rent"], help="Required, non-negative number")
+    st.text_input("Budget (£/month)", key=_FORM_KEYS["budget"], help="Required, non-negative number")
+    st.text_input("Commute (minutes)", key=_FORM_KEYS["commute_minutes"], help="Required, non-negative integer")
 with c2:
-    bedrooms_in = st.text_input("Bedrooms", value="2", help="卧室数")
-    distance_in = st.text_input("Distance (optional)", value="", help="到目标点距离（与引擎一致，可空）")
-    bills_included = st.checkbox("Bills included", value=False)
+    st.text_input("Bedrooms", key=_FORM_KEYS["bedrooms"], help="Required, non-negative integer")
+    st.text_input(
+        "Distance (optional)",
+        key=_FORM_KEYS["distance"],
+        help="Optional; non-numeric values are ignored and do not block submit",
+    )
+    st.checkbox("Bills included", key=_FORM_KEYS["bills_included"])
 with c3:
-    area_in = st.text_input("Area", value="", placeholder="e.g. E1")
-    postcode_in = st.text_input("Postcode", value="", placeholder="e.g. E1 6AN")
-    target_postcode_in = st.text_input("Target postcode (optional)", value="")
+    st.text_input("Area", key=_FORM_KEYS["area"], placeholder="e.g. E1")
+    st.text_input("Postcode", key=_FORM_KEYS["postcode"], placeholder="e.g. E1 6AN")
+    st.text_input("Target postcode (optional)", key=_FORM_KEYS["target_postcode"])
 
 st.markdown("---")
-
-analyze = st.button("Analyze Property", type="primary")
+st.subheader(lab["actions_section"])
+ba, bb, bc = st.columns([1, 1, 2])
+with ba:
+    if st.button("Load Demo Data", type="secondary", help="Restore recommended sample values"):
+        for k, v in load_demo_values().items():
+            st.session_state[k] = v
+        st.rerun()
+with bb:
+    if st.button("Reset Form", type="secondary", help="Clear fields; use Load Demo Data or enter values again"):
+        for k, v in _CLEAR_FORM_STATE.items():
+            st.session_state[k] = v
+        st.rerun()
+with bc:
+    analyze = st.button("Analyze Property", type="primary", use_container_width=True)
 
 if not analyze:
-    st.info("填写表单后点击 **Analyze Property** 开始分析。")
+    st.info(
+        "Use **Load Demo Data** to restore samples, **Reset Form** to clear, then **Analyze Property** to run. "
+        "Invalid inputs show under **Validation** without crashing the app."
+    )
 else:
-    raw_form = {
-        "rent": rent_in,
-        "budget": budget_in,
-        "commute_minutes": commute_in,
-        "bedrooms": bedrooms_in,
-        "distance": distance_in,
-        "bills_included": bills_included,
-        "area": area_in,
-        "postcode": postcode_in,
-        "target_postcode": target_postcode_in,
-    }
+    raw_form = collect_raw_form_from_session()
+
+    valid, validation_errors = validate_inputs(raw_form)
+    if not valid:
+        st.markdown(f"### {lab['validation_section']}")
+        st.error("Please fix the following before re-running analysis.")
+        st.warning(build_error_message(validation_errors))
+        st.stop()
 
     result = None
     err_msg = None
     try:
-        from web_bridge import normalize_web_form_inputs, run_web_demo_analysis
-
-        input_data = normalize_web_form_inputs(raw_form)
         with st.spinner("Running analysis..."):
-            result = run_web_demo_analysis(input_data)
+            result, transport_err = run_analysis_for_ui(
+                raw_form, use_local=_use_local, api_base_url=_api_base
+            )
+        if transport_err:
+            err_msg = transport_err
+            result = result or {
+                "success": False,
+                "message": transport_err,
+                "unified_decision_payload": {},
+            }
     except Exception as e:
         err_msg = str(e)
-        result = {"success": False, "message": err_msg}
+        result = {"success": False, "message": err_msg, "unified_decision_payload": {}}
+
+    if err_msg:
+        st.markdown(f"### {lab['errors_section']}")
+        st.error("Unexpected error while running analysis (shown below).")
+        st.warning(_display_text(err_msg, "Unknown error"))
 
     if not result:
         st.error("No result returned.")
@@ -252,116 +712,118 @@ else:
 
     ok = bool(result.get("success"))
 
-    # ========== Overview / Summary ==========
-    st.markdown("## Overview / Summary")
+    # ========== Phase6 结果顺序：Overview → Property score → Decision → 四块解释 → 补充区 → References → 占位风险 → Debug ==========
+    st.markdown(f"## {lab['overview']}")
     with st.container():
         col_o1, col_o2 = st.columns([1, 2])
         with col_o1:
-            st.markdown("**Analysis status**")
+            st.markdown("**Run status**")
             if err_msg:
                 st.error("Failed")
             elif ok:
-                st.success("Success")
+                st.success("Completed")
             else:
-                st.warning("Not successful")
-            st.markdown("**success**")
-            st.write(str(ok))
+                st.warning("Completed with issues")
+            st.caption(f"Engine success flag: `{ok}`")
         with col_o2:
             msg = result.get("message") or ""
-            st.markdown("**Message**")
+            st.markdown("**Engine message**")
             st.write(_display_text(msg, "N/A") if msg or err_msg else "N/A")
             one_line = safe_get(user_facing, "summary") if isinstance(user_facing, dict) else "N/A"
             if one_line == "N/A":
                 one_line = _display_text(decision.get("final_summary") if decision else None, "N/A")
-            st.markdown("**Quick read**")
+            st.markdown("**At a glance**")
             st.write(one_line)
 
     st.divider()
 
-    # ========== Score ==========
-    st.markdown("## Score")
+    st.markdown(f"## {lab['score']}")
+    st.caption("Single scalar from the engine (`property_score` / final score).")
     with st.container():
         score = result.get("property_score")
         if score is not None:
             try:
-                st.metric(label="Property score (final_score)", value="%.2f" % float(score))
+                st.metric(label=lab["score"], value="%.2f" % float(score))
             except (TypeError, ValueError):
-                st.metric(label="Property score", value=_display_text(score, "N/A"))
+                st.metric(label=lab["score"], value=_display_text(score, "N/A"))
         else:
-            st.info("No score — N/A")
+            st.info("No property score returned for this run (N/A).")
 
     st.divider()
 
-    # ========== Decision ==========
-    st.markdown("## Decision")
+    st.markdown(f"## {lab['decision']}")
+    st.caption(lab["decision_caption"])
     with st.container():
         st.markdown("**Overall recommendation**")
         rec_val = safe_get(status, "overall_recommendation") if status else "N/A"
         st.write(rec_val)
-        st.markdown("**Confidence**")
+        st.markdown("**Decision confidence**")
         st.write(_display_text(safe_get(status, "decision_confidence"), "N/A"))
-        st.markdown("**Confidence reason**")
+        st.markdown("**Why this confidence level**")
         st.write(_display_text(safe_get(status, "confidence_reason"), "N/A"))
         st.markdown("---")
+        st.markdown("**Decision detail**")
         format_decision_block(decision)
 
     st.divider()
 
-    # ========== Analysis ==========
-    st.markdown("## Analysis")
+    render_explanation_highlights(
+        decision, analysis, user_facing, trace, references, result
+    )
+
+    st.divider()
+
+    st.markdown(f"## {lab['analysis_detail']}")
     with st.container():
         format_analysis_block(analysis)
 
     st.divider()
 
-    # ========== User facing explanation ==========
-    st.markdown("## User-facing explanation")
+    st.markdown(f"## {lab['user_facing']}")
     with st.container():
         format_user_facing_block(user_facing)
 
     st.divider()
 
-    # ========== References ==========
-    st.markdown("## References")
+    st.markdown(f"## {lab['references']}")
     with st.container():
         format_references_block(references)
 
     st.divider()
 
-    # ========== Risk（占位，主流程可见）==========
-    st.markdown("## Risk analysis")
+    st.markdown(f"## {lab['contract_risk']}")
+    st.caption("Contract / clause risk module — placeholder in P1 Web UI.")
     with st.container():
         risk = result.get("risk_result") or {}
-        st.info(_display_text(risk.get("message"), "No contract risk input"))
+        st.info(_display_text(risk.get("message"), "No contract risk input for this demo."))
 
-    # ========== Trace / Debug（弱化，默认折叠）==========
-    with st.expander("Trace & debug info", expanded=False):
-        st.caption("Technical trace — collapsed by default")
+    # 调试区：默认折叠 + 弱 caption，避免抢主流程视觉
+    with st.expander(lab["debug_expander"], expanded=False):
+        st.caption("For developers only — not required for the demo walkthrough.")
         format_trace_block(trace, compact=True)
-        st.markdown("**Explanation summary (engine)**")
+        st.markdown("**Engine explanation snapshot**")
         expl = result.get("explanation_summary") or {}
         if expl:
             st.write(_display_text(expl.get("summary"), "N/A"))
             pos = expl.get("key_positives") or expl.get("top_positive_reasons") or []
             neg = expl.get("key_risks") or expl.get("top_risk_reasons") or []
             if pos:
-                st.markdown("**Positives**")
+                st.markdown("**Positives (engine)**")
                 for p in pos[:5]:
                     st.markdown(f"- {_display_text(p)}")
             if neg:
-                st.markdown("**Risks**")
+                st.markdown("**Risks (engine)**")
                 for n in neg[:5]:
                     st.markdown(f"- {_display_text(n)}")
         else:
             st.caption("No data")
-        st.markdown("**Final house recommendation (raw)**")
+        st.markdown("**Final recommendation (raw JSON)**")
         frec = result.get("final_recommendation") or {}
         if frec:
             st.json(frec)
         else:
             st.caption("Empty")
-        st.markdown("**Full bridge result (debug)**")
+        st.markdown("**Bridge payload (debug)**")
         st.json({k: v for k, v in result.items() if k != "explanation"})
 
-st.markdown("---")
-st.caption("RentalAI | Module2 + Module7 | P1 Phase3 Web UI")
+render_demo_footer()
