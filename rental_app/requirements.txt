@@ -1,0 +1,5 @@
+# RentalAI 基础依赖
+# 安装: pip install -r requirements.txt
+
+# P1 Phase1: Web UI
+streamlit>=1.28.0
