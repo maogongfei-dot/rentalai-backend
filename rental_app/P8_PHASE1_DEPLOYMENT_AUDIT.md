@@ -8,6 +8,8 @@
 
 **Step4（部署前联调清单）补充**：已新增 **`P8_PHASE1_PREDEPLOY_CHECKLIST.md`**；`.env.example` 补充 **`PORT`** 说明（平台注入、与 `render.yaml` 一致）。
 
+**Phase2 Step1（后端部署 Runbook）**：已新增 **`P8_PHASE2_BACKEND_DEPLOY_RUNBOOK.md`**、仓库根 **`render.backend.yaml`**（仅 API）；`api_server.py` 头注释补充生产启动方式。
+
 ---
 
 ## 1. Current Project Structure

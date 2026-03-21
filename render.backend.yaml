@@ -1,0 +1,15 @@
+# P8 Phase2 Step1 — 仅部署 FastAPI 后端（RentalAI）
+# 与 render.yaml 中 rentalai-api 服务等价；用于先上线 API、暂不部署 Streamlit。
+# 仓库根为 python_learning、应用代码在 rental_app/ 时使用。
+# 若 Git 根仅为 rental_app/，删除下方 rootDir 字段。
+
+services:
+  - type: web
+    name: rentalai-api
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: rental_app
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
