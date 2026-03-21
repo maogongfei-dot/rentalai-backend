@@ -1,4 +1,4 @@
-# P6 Phase5：Zoopla 闭环占位 — **不执行真实抓取**（下一阶段镜像 rightmove_pipeline）
+# P6 Phase5：Zoopla 闭环占位 — **不执行真实抓取**（P7 Phase2 镜像 rightmove_pipeline；P7 Phase1 已实现列表抓取见 zoopla_scraper）
 from __future__ import annotations
 
 from typing import Any

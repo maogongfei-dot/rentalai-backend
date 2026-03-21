@@ -33,8 +33,8 @@ def test_rightmove_empty_search_url():
     assert scrape_listings("rightmove", query={"search_url": ""}, normalized=False) == []
 
 
-def test_zoopla_placeholder_returns_empty():
-    assert scrape_listings("zoopla", normalized=False) == []
+def test_zoopla_empty_search_url():
+    assert scrape_listings("zoopla", query={"search_url": ""}, normalized=False) == []
 
 
 def test_unknown_source_empty():
@@ -46,6 +46,6 @@ if __name__ == "__main__":
     test_manual_mock_raw()
     test_manual_mock_normalized()
     test_rightmove_empty_search_url()
-    test_zoopla_placeholder_returns_empty()
+    test_zoopla_empty_search_url()
     test_unknown_source_empty()
     print("test_listing_scraper: all ok")

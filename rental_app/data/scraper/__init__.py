@@ -5,9 +5,11 @@ from .manual_mock_scraper import ManualMockScraper
 from .playwright_runner import (
     playwright_available,
     probe_rightmove_search,
+    probe_zoopla_search,
     run_playwright_page_probe,
     run_playwright_scrape,
     run_rightmove_probe,
+    run_zoopla_probe,
 )
 from .rightmove_scraper import RightmoveScraper
 from .scraper_config import ScraperRunConfig
@@ -22,8 +24,10 @@ __all__ = [
     "ZooplaScraper",
     "playwright_available",
     "probe_rightmove_search",
+    "probe_zoopla_search",
     "run_playwright_page_probe",
     "run_playwright_scrape",
     "run_rightmove_probe",
+    "run_zoopla_probe",
     "scrape_listings",
 ]

@@ -31,6 +31,27 @@ def _resolve_output_dir(config: ScraperRunConfig) -> Path:
     return _default_debug_output_dir()
 
 
+def _chromium_launch_args_for_config(config: ScraperRunConfig) -> list[str]:
+    """Zoopla 列表页经 Cloudflare 时，需弱化自动化指纹（仅影响对应 source）。"""
+    if (config.source or "").strip().lower() == "zoopla":
+        return ["--disable-blink-features=AutomationControlled"]
+    return []
+
+
+def _browser_new_context_kwargs_for_config(config: ScraperRunConfig) -> dict[str, Any]:
+    if (config.source or "").strip().lower() == "zoopla":
+        return {
+            "user_agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/121.0.0.0 Safari/537.36"
+            ),
+            "locale": "en-GB",
+            "viewport": {"width": 1366, "height": 768},
+        }
+    return {}
+
+
 def _optional_debug_artifacts(
     page: Any,
     html: str,
@@ -87,9 +108,13 @@ def run_playwright_page_probe(config: ScraperRunConfig) -> PageProbeResult:
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=config.headless)
+            browser = p.chromium.launch(
+                headless=config.headless,
+                args=_chromium_launch_args_for_config(config),
+            )
+            ctx = browser.new_context(**_browser_new_context_kwargs_for_config(config))
             try:
-                page = browser.new_page()
+                page = ctx.new_page()
                 page.goto(url, wait_until="domcontentloaded", timeout=60_000)
                 final = page.url
                 title = page.title()
@@ -101,6 +126,7 @@ def run_playwright_page_probe(config: ScraperRunConfig) -> PageProbeResult:
                 if config.save_raw_html or config.save_screenshots:
                     _optional_debug_artifacts(page, html, config)
             finally:
+                ctx.close()
                 browser.close()
     except Exception as e:  # noqa: BLE001 — 探针需吞掉异常并结构化返回
         base["error"] = f"{type(e).__name__}: {e}"
@@ -142,6 +168,40 @@ def run_rightmove_probe(
 probe_rightmove_search = run_rightmove_probe
 
 
+def run_zoopla_probe(
+    search_url: str | None = None,
+    *,
+    headless: bool = True,
+    save_raw_html: bool = False,
+    save_screenshots: bool = False,
+    output_dir: str | None = None,
+    query: dict[str, Any] | None = None,
+    max_pages: int = 1,
+    limit: int = 20,
+) -> PageProbeResult:
+    """
+    Zoopla 列表页连通性探针（与 Rightmove 探针对称）。
+    使用与抓取器相同的浏览器上下文策略（弱化自动化指纹）。
+    """
+    from data.scraper.zoopla_scraper import DEFAULT_ZOOPLA_SEARCH_URL
+
+    cfg = ScraperRunConfig(
+        source="zoopla",
+        search_url=(search_url or DEFAULT_ZOOPLA_SEARCH_URL).strip(),
+        query=dict(query or {}),
+        max_pages=max_pages,
+        limit=limit,
+        headless=headless,
+        save_raw_html=save_raw_html,
+        save_screenshots=save_screenshots,
+        output_dir=output_dir,
+    )
+    return run_playwright_page_probe(cfg)
+
+
+probe_zoopla_search = run_zoopla_probe
+
+
 @contextmanager
 def browser_page_for_scraper_config(
     config: ScraperRunConfig,
@@ -156,13 +216,18 @@ def browser_page_for_scraper_config(
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=config.headless)
+        browser = p.chromium.launch(
+            headless=config.headless,
+            args=_chromium_launch_args_for_config(config),
+        )
+        ctx = browser.new_context(**_browser_new_context_kwargs_for_config(config))
         try:
-            page = browser.new_page()
+            page = ctx.new_page()
             page.set_default_timeout(30_000)
             page.goto(url, wait_until="domcontentloaded", timeout=90_000)
             yield page
         finally:
+            ctx.close()
             browser.close()
 
 
@@ -170,14 +235,17 @@ def run_playwright_scrape(config: ScraperRunConfig) -> list[dict[str, Any]]:
     """
     按 `ScraperRunConfig.source` 分发到平台抓取器；返回原始 `list[dict]`。
 
-    **当前**：`source=rightmove` 时解析列表页；**zoopla** 等平台在 Phase6+ 在此分支接入
-    （或委托 `zoopla_raw_from_config` 类入口），本阶段仍返回 `[]`。
+    **当前**：`rightmove` / `zoopla` 解析列表页；其余 source 返回 `[]`。
     """
     key = (config.source or "").strip().lower()
     if key == "rightmove":
         from data.scraper.rightmove_scraper import rightmove_raw_from_config
 
         return rightmove_raw_from_config(config)
+    if key == "zoopla":
+        from data.scraper.zoopla_scraper import zoopla_raw_from_config
+
+        return zoopla_raw_from_config(config)
     return []
 
 
