@@ -1,0 +1,31 @@
+{
+  "count": 2,
+  "sample": [
+    {
+      "source": "rightmove",
+      "listing_id": "172667459",
+      "title": "Albion Place, London, W6",
+      "price": "£2,000 pcm",
+      "bedrooms": "1",
+      "address": "Albion Place, London, W6",
+      "url": "https://www.rightmove.co.uk/properties/172667459#/?channel=RES_LET",
+      "source_url": "https://www.rightmove.co.uk/properties/172667459#/?channel=RES_LET",
+      "property_type": "Apartment",
+      "summary": "This beautifully refurbished 1-bedroom flat in Albion Court is available in May, offering modern living in a secure gated development",
+      "scraped_at": "2026-03-21T13:43:08.099846+00:00"
+    },
+    {
+      "source": "rightmove",
+      "listing_id": "87718020",
+      "title": "Rostrevor Road, Fulham",
+      "price": "£2,250 pcm",
+      "bedrooms": "1",
+      "address": "Rostrevor Road, Fulham",
+      "url": "https://www.rightmove.co.uk/properties/87718020#/?channel=RES_LET",
+      "source_url": "https://www.rightmove.co.uk/properties/87718020#/?channel=RES_LET",
+      "property_type": "Flat",
+      "summary": "SHORT LET - An extraordinary one bedroom garden flat flat, available for 3/4 months only, forming the ground floor of this substantial converted house offering nice internal proportions with lovely high ceilings and an unusually large garden. Rostrevor Road is a sought after residential ...",
+      "scraped_at": "2026-03-21T13:43:08.099846+00:00"
+    }
+  ]
+}

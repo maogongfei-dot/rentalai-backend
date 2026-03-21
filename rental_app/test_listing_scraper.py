@@ -25,8 +25,8 @@ def test_manual_mock_normalized():
     assert out[0].rent_pcm is not None
 
 
-def test_rightmove_empty():
-    assert scrape_listings("rightmove", normalized=False) == []
+def test_rightmove_empty_search_url():
+    assert scrape_listings("rightmove", query={"search_url": ""}, normalized=False) == []
 
 
 def test_unknown_source_empty():
@@ -37,6 +37,6 @@ if __name__ == "__main__":
     test_registry_has_sources()
     test_manual_mock_raw()
     test_manual_mock_normalized()
-    test_rightmove_empty()
+    test_rightmove_empty_search_url()
     test_unknown_source_empty()
     print("test_listing_scraper: all ok")
