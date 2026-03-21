@@ -112,7 +112,8 @@ curl -s http://127.0.0.1:8000/health
 
 ## 7. 更多文档
 
-- 部署方案（本步）：**`P8_PHASE1_DEPLOYMENT_PLAN.md`**
+- 部署前联调与上线执行清单：**`P8_PHASE1_PREDEPLOY_CHECKLIST.md`**
+- 部署方案：**`P8_PHASE1_DEPLOYMENT_PLAN.md`**
 - 运行入口汇总：**`P8_PHASE1_RUNTIME_ENTRY_GUIDE.md`**
 - 部署审计：**`P8_PHASE1_DEPLOYMENT_AUDIT.md`**
 - Web 组件说明：**`web_ui/README.md`**

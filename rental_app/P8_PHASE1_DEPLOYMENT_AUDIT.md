@@ -6,6 +6,8 @@
 
 **Step3（部署方案）补充**：已新增 **`P8_PHASE1_DEPLOYMENT_PLAN.md`**、仓库根 **`render.yaml`**（双 Web 服务）、**`rental_app/Procfile`**（单进程 API 示例）。未改分析 / Agent / 抓取业务代码。
 
+**Step4（部署前联调清单）补充**：已新增 **`P8_PHASE1_PREDEPLOY_CHECKLIST.md`**；`.env.example` 补充 **`PORT`** 说明（平台注入、与 `render.yaml` 一致）。
+
 ---
 
 ## 1. Current Project Structure
