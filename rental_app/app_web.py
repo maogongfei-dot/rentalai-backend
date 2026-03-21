@@ -1,4 +1,4 @@
-# P1 Phase1–6 + P2 Phase1–4 + P4 Phase1–5 + P5 Phase1–2: Web UI（Agent 规则解析 + Product 层）
+# P1 Phase1–6 + P2 Phase1–4 + P4 Phase1–5 + P5 Phase1–4: Web UI（Agent insights + batch + Product 层）
 # Phase4: 结果解释增强 — 推荐 / 顾虑 / 风险 / 下一步 分开展示
 # Phase5: 输入校验、示例预填、错误提示、Reset form
 # Phase6: 页面收口、统一文案、演示顺序、弱化调试区
@@ -21,6 +21,8 @@ from web_ui.listing_result_card import (
     render_listing_result_card,
 )
 from web_ui.agent_entry import render_p5_agent_entry
+from web_ui.agent_insight_summary import build_agent_insight_bundle, resolve_intent_for_insights
+from web_ui.agent_summary_panel import render_agent_insight_panel
 from web_ui.batch_results_view import render_batch_partitioned_listings
 from web_ui.product_copy import DISPLAY_LABELS
 from web_ui.result_filters import collect_source_values, collect_top_indices, filter_batch_rows
@@ -605,7 +607,13 @@ if _use_local:
 st.sidebar.caption("Start API: `uvicorn api_server:app --host 127.0.0.1 --port 8000`")
 
 # --- P5 Phase1: AI Agent 入口（自然语言 → mock 预览 → 可选回填表单）---
-render_p5_agent_entry(st, lab=lab, form_keys=_FORM_KEYS)
+render_p5_agent_entry(
+    st,
+    lab=lab,
+    form_keys=_FORM_KEYS,
+    use_local=_use_local,
+    api_base_url=_api_base,
+)
 
 # --- Phase6: 输入区（表单 → 再操作按钮，顺序与验收一致）---
 st.subheader(lab["input_section"])
@@ -742,9 +750,27 @@ else:
     ok = bool(result.get("success"))
 
     st.markdown("## %s" % lab["criteria_section"])
+    _norm_single = normalize_form_values(raw_form)
     render_criteria_summary(
-        summarize_analyze_context(normalize_form_values(raw_form)),
+        summarize_analyze_context(_norm_single),
         empty_caption=lab["criteria_empty"],
+    )
+    st.divider()
+
+    # P5 Phase4：单条 analyze 结果顶部的 Agent 解释（规则型，无 LLM）
+    _intent_s = resolve_intent_for_insights(st.session_state, normalized_form=_norm_single)
+    _bundle_s = build_agent_insight_bundle(
+        _intent_s,
+        mode="single",
+        single_result=result,
+        batch_data=None,
+    )
+    render_agent_insight_panel(
+        st,
+        lab=lab,
+        bundle=_bundle_s,
+        intent=_intent_s,
+        key_prefix="p5_insight_single",
     )
     st.divider()
 
@@ -920,6 +946,25 @@ with st.expander(lab["batch_section_expander"], expanded=False):
                 st.warning(lab["batch_last_failed"] % _bmsg)
         elif isinstance(_last_batch.get("data"), dict):
             _bd = _last_batch["data"]
+            st.divider()
+            # P5 Phase4：batch 结果区顶部 Agent 解释（与 Top picks / 筛选共存）
+            _intent_b = resolve_intent_for_insights(
+                st.session_state,
+                batch_request=st.session_state.get("p2_batch_last_request"),
+            )
+            _bundle_b = build_agent_insight_bundle(
+                _intent_b,
+                mode="batch",
+                single_result=None,
+                batch_data=_bd,
+            )
+            render_agent_insight_panel(
+                st,
+                lab=lab,
+                bundle=_bundle_b,
+                intent=_intent_b,
+                key_prefix="p5_insight_batch",
+            )
             st.divider()
             section_header(st, lab["batch_results_header"], level=3)
             st.markdown("**%s**" % lab["batch_criteria_title"])

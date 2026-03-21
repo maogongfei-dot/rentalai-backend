@@ -1,8 +1,10 @@
-# P5 Phase1–2: Agent 入口 UI（Streamlit）— 规则解析预览 + 表单回填
+# P5 Phase1–3: Agent 入口 — 规则解析 + 表单同步 + analyze-batch 调度
 from __future__ import annotations
 
 from typing import Any
 
+from web_ui.agent_runner import agent_intent_sparse_warning, run_agent_intent_analysis
+from web_ui.intent_to_payload import build_analyze_raw_form_from_intent
 from web_ui.rental_intent import AgentRentalRequest
 from web_ui.rental_intent_parser import intent_has_key_signals, parse_rental_intent
 from web_ui.result_ui import section_header
@@ -13,11 +15,14 @@ P5_KEY_NL = "p5_agent_nl_input"
 P5_KEY_INTENT = "p5_agent_last_intent"
 P5_KEY_HINT = "p5_agent_form_hint"
 
-# 与产品文档一致的阶段名（便于 Phase2/3 扩展）
+# Phase1–2 流程 + Phase3 提交与结果
 PHASE_IDLE = "idle"
 PHASE_PARSING_PREVIEW = "parsing_preview"
 PHASE_PARSED_RESULT = "parsed_result"
-PHASE_READY_FOR_ANALYSIS = "ready_for_analysis"
+PHASE_READY_FOR_ANALYSIS = "ready_for_analysis"  # 保留名：可与「仅填表」扩展共用
+PHASE_SUBMITTING = "submitting"
+PHASE_ANALYSIS_SUCCESS = "analysis_success"
+PHASE_ANALYSIS_ERROR = "analysis_error"
 
 
 def init_p5_agent_session(st: Any) -> None:
@@ -37,58 +42,77 @@ def _consume_parsing_preview(st: Any) -> None:
     st.session_state[P5_KEY_PHASE] = PHASE_PARSED_RESULT
 
 
+def _process_agent_batch_submit(
+    st: Any,
+    *,
+    lab: dict[str, str],
+    use_local: bool,
+    api_base_url: str,
+) -> None:
+    """Continue → submitting 后在本轮渲染早期执行 batch。"""
+    if st.session_state.get(P5_KEY_PHASE) != PHASE_SUBMITTING:
+        return
+    it = AgentRentalRequest.from_dict(st.session_state.get(P5_KEY_INTENT) or {})
+    with st.spinner(lab.get("p5_agent_spinner_submit", "Running agent batch…")):
+        resp, err, payload = run_agent_intent_analysis(
+            it,
+            use_local=use_local,
+            api_base_url=api_base_url,
+        )
+    if err and not resp:
+        st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_ERROR
+        st.session_state["p5_agent_last_error"] = err
+        st.session_state["p2_batch_last"] = {
+            "success": False,
+            "error": {"message": err},
+        }
+        return
+    if resp is not None:
+        st.session_state["p2_batch_last"] = resp
+        st.session_state["p2_batch_last_request"] = payload
+        if resp.get("success"):
+            st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_SUCCESS
+            st.session_state["p5_agent_last_error"] = ""
+        else:
+            st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_ERROR
+            em = ""
+            er = resp.get("error")
+            if isinstance(er, dict):
+                em = str(er.get("message") or "")
+            st.session_state["p5_agent_last_error"] = em or "Batch returned success=false"
+    else:
+        st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_ERROR
+        st.session_state["p5_agent_last_error"] = err or "Unknown error"
+
+
 def apply_agent_intent_to_form_keys(
     intent: AgentRentalRequest,
     form_keys: dict[str, str],
     st_session: Any,
 ) -> list[str]:
     """
-    将结构化预览同步到现有 analyze 表单 session 键；返回未写入表单的提示（如无 commute）。
+    将 intent 转为与 **analyze-batch 单条 property** 一致的数值，并写入表单 session。
     """
     hints: list[str] = []
+    raw = build_analyze_raw_form_from_intent(intent)
     s = st_session
+    s[form_keys["rent"]] = raw["rent"]
+    s[form_keys["budget"]] = raw["budget"]
+    s[form_keys["commute_minutes"]] = raw["commute_minutes"]
+    s[form_keys["bedrooms"]] = raw["bedrooms"]
+    s[form_keys["distance"]] = raw["distance"]
+    s[form_keys["bills_included"]] = raw["bills_included"]
+    s[form_keys["area"]] = raw["area"]
+    s[form_keys["postcode"]] = raw["postcode"]
+    s[form_keys["target_postcode"]] = raw["target_postcode"]
 
-    if intent.max_rent is not None:
-        rv = intent.max_rent
-        s[form_keys["rent"]] = str(int(rv)) if rv == int(rv) else str(rv)
-        # 预算未识别时与租金对齐，减少必填阻塞（用户可再改）
-        if not (s.get(form_keys.get("budget") or "") or "").strip():
-            s[form_keys["budget"]] = s[form_keys["rent"]]
-
-    if intent.bedrooms is not None:
-        s[form_keys["bedrooms"]] = str(intent.bedrooms)
-
-    if intent.max_commute_minutes is not None:
-        s[form_keys["commute_minutes"]] = str(intent.max_commute_minutes)
-
-    if intent.preferred_area:
-        s[form_keys["area"]] = intent.preferred_area
-
-    if intent.target_postcode:
-        s[form_keys["target_postcode"]] = intent.target_postcode
-
-    if intent.bills_included is not None:
-        s[form_keys["bills_included"]] = bool(intent.bills_included)
-
-    extra: list[str] = []
-    if intent.property_type:
-        extra.append("Property type: %s" % intent.property_type)
-    if intent.furnished is not None:
-        extra.append("Furnished: %s" % ("yes" if intent.furnished else "no"))
+    w = agent_intent_sparse_warning(intent)
+    if w:
+        hints.append(w)
     if intent.source_preference:
-        extra.append("Source: %s" % intent.source_preference)
-    if intent.notes:
-        extra.append(intent.notes)
-
-    if not (s.get(form_keys["commute_minutes"]) or "").strip():
-        hints.append("Commute (minutes) is still required for **Analyze Property**.")
-
-    if not (s.get(form_keys["budget"]) or "").strip():
-        hints.append("Budget is still required — please fill or use **Load Demo Data**.")
-
-    if extra:
-        hints.append("Not mapped to form (saved as hint): " + "; ".join(extra))
-
+        hints.append(
+            "**Source preference** is copied into the **area** text only (API has no source field)."
+        )
     return hints
 
 
@@ -97,13 +121,29 @@ def render_p5_agent_entry(
     *,
     lab: dict[str, str],
     form_keys: dict[str, str],
+    use_local: bool,
+    api_base_url: str,
 ) -> None:
     """
-    主入口：自然语言框 + Parse + 预览 JSON + Continue to Analysis。
-    调用方需在首屏对 session 调用 init_p5_agent_session；本函数开头会消费 parsing_preview。
+    自然语言 → Parse → Continue：**同步表单并调用 analyze-batch**（单条场景），结果写入 `p2_batch_last`。
     """
     init_p5_agent_session(st)
+    if st.session_state.pop("p5_refinement_parse_reminder", False):
+        st.info(lab.get("p5_agent_refine_parse_reminder", "Scroll to **AI Agent** and click **Parse request**."))
+    if st.session_state.pop("p5_refinement_snippet_added", False):
+        st.success(
+            lab.get(
+                "p5_refinement_snippet_ok",
+                "Added a line to your request box — click **Parse request** when ready.",
+            )
+        )
     _consume_parsing_preview(st)
+    _process_agent_batch_submit(
+        st,
+        lab=lab,
+        use_local=use_local,
+        api_base_url=api_base_url,
+    )
 
     phase = st.session_state.get(P5_KEY_PHASE, PHASE_IDLE)
 
@@ -143,35 +183,44 @@ def render_p5_agent_entry(
             st.session_state[P5_KEY_INTENT] = None
             st.session_state[P5_KEY_HINT] = ""
             st.session_state[P5_KEY_NL] = ""
+            st.session_state["p5_agent_last_error"] = ""
 
         st.button(lab["p5_agent_clear_button"], on_click=_go_clear, type="secondary")
 
     with b3:
         st.caption(lab["p5_agent_single_turn_note"])
 
-    # 预览区：parsed_result 或 ready 时仍展示最后 intent
     intent_dict = st.session_state.get(P5_KEY_INTENT)
-    if phase in (PHASE_PARSED_RESULT, PHASE_READY_FOR_ANALYSIS) and isinstance(intent_dict, dict):
+    _show_preview = phase in (
+        PHASE_PARSED_RESULT,
+        PHASE_ANALYSIS_SUCCESS,
+        PHASE_ANALYSIS_ERROR,
+    )
+    if _show_preview and isinstance(intent_dict, dict):
         st.markdown("**%s**" % lab["p5_agent_raw_heading"])
         st.code((intent_dict.get("raw_query") or "").strip() or "(empty)", language=None)
 
         st.markdown("**%s**" % lab["p5_agent_structured_heading"])
         st.json(intent_dict)
 
-        ready = phase == PHASE_READY_FOR_ANALYSIS
         _it = AgentRentalRequest.from_dict(intent_dict)
         _rich = intent_has_key_signals(_it)
 
-        if ready:
-            st.success(lab["p5_agent_ready_banner"])
+        if phase == PHASE_ANALYSIS_SUCCESS:
+            st.success(lab["p5_agent_batch_success"])
+        elif phase == PHASE_ANALYSIS_ERROR:
+            _em = st.session_state.get("p5_agent_last_error") or lab["unknown_error"]
+            st.error(lab["p5_agent_batch_error"] % _em)
         elif _rich:
             st.success(lab["p5_agent_preview_rich"])
         else:
             st.info(lab["p5_agent_preview_note"])
 
         st.markdown("**%s**" % lab["p5_agent_readiness_heading"])
-        if ready:
-            st.write(lab["p5_agent_ready_yes"])
+        if phase == PHASE_ANALYSIS_SUCCESS:
+            st.write(lab["p5_agent_after_batch_success"])
+        elif phase == PHASE_ANALYSIS_ERROR:
+            st.write(lab["p5_agent_after_batch_error"])
         elif _rich:
             st.write(lab["p5_agent_ready_partial"])
         else:
@@ -186,7 +235,7 @@ def render_p5_agent_entry(
                 )
                 h = apply_agent_intent_to_form_keys(it, form_keys, st.session_state)
                 st.session_state[P5_KEY_HINT] = "\n".join(h) if h else ""
-                st.session_state[P5_KEY_PHASE] = PHASE_READY_FOR_ANALYSIS
+                st.session_state[P5_KEY_PHASE] = PHASE_SUBMITTING
 
             st.button(
                 lab["p5_agent_continue_button"],
@@ -198,7 +247,7 @@ def render_p5_agent_entry(
             st.caption(lab["p5_agent_continue_caption"])
 
     hint = st.session_state.get(P5_KEY_HINT) or ""
-    if hint and phase == PHASE_READY_FOR_ANALYSIS:
+    if hint and phase in (PHASE_ANALYSIS_SUCCESS, PHASE_ANALYSIS_ERROR):
         st.warning(hint)
 
     st.divider()

@@ -26,12 +26,16 @@
 - **`result_ui`** — `section_header`、`card_spacing`、轻量 `state_*` 辅助。
 - 验收清单：**`docs/P4_PRODUCT_ACCEPTANCE_CHECKLIST.md`**。
 
-## P5 Phase1–2：Agent 入口 + 规则解析
+## P5 Phase1–4：Agent 入口 + 解析 + batch + 解释/追问
 
-- **`rental_intent`** — `AgentRentalRequest`（`raw_query` + 可空结构化字段）。
-- **`rental_intent_parser`** — **`parse_rental_intent`**（规则型，中英混合）；**`intent_has_key_signals`**（预览 rich/sparse）。
-- **`agent_intent_mock_parser`** — `parse_rental_intent_mock` 为别名。
-- **`agent_entry`** — 主流程与 session 阶段：`idle` → `parsing_preview` → `parsed_result` → `ready_for_analysis`。
-- 说明：**`docs/P5_AGENT_ENTRY_FLOW.md`**、**`docs/P5_NL_TO_STRUCTURED_PARSER.md`**。
+- **`rental_intent`** — `AgentRentalRequest`。
+- **`rental_intent_parser`** — **`parse_rental_intent`**；**`intent_has_key_signals`**。
+- **`intent_to_payload`** — intent → **`analyze-batch`** 单条 `properties[]` + 与之一致的表单字典。
+- **`agent_runner`** — **`run_agent_intent_analysis`**（本地 `analyze_batch_request_body` 或 HTTP）。
+- **`agent_entry`** — **Continue to analysis** 写表单并跑 batch；阶段含 `submitting` / `analysis_success` / `analysis_error`。
+- **`agent_insight_summary`** — **`build_agent_insight_bundle`**、**`resolve_intent_for_insights`**（规则解释）。
+- **`agent_refinement`** — **`get_missing_intent_fields`**、**`get_refinement_suggestions`**。
+- **`agent_summary_panel`** — **`render_agent_insight_panel`**（结果区顶部 + Refine expander）。
+- 说明：**`docs/P5_AGENT_ENTRY_FLOW.md`**、**`docs/P5_NL_TO_STRUCTURED_PARSER.md`**、**`docs/P5_AGENT_ANALYSIS_FLOW.md`**、**`docs/P5_AGENT_EXPLANATION_AND_REFINEMENT.md`**。
 
 单页入口仍为根目录 **`app_web.py`**（`streamlit run app_web.py`）。

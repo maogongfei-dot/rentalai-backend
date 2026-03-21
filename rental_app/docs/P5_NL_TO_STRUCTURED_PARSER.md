@@ -39,6 +39,6 @@ Helpers live in the same module: `parse_max_rent`, `parse_bedrooms`, `parse_post
 
 - `python test_rental_intent_parser.py` — includes the four spec examples + edge cases.
 
-## Next: P5 Phase3
+## P5 Phase3 (done)
 
-Wire **`AgentRentalRequest`** into **Analyze** / **batch** flows (and optional search) without changing core engine contracts in this phase.
+**Continue to analysis** runs **analyze-batch** from intent (`intent_to_payload` + `agent_runner`). See **`docs/P5_AGENT_ANALYSIS_FLOW.md`**.

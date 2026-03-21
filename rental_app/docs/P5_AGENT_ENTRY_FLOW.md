@@ -6,14 +6,15 @@
 2. **Structured target type** `AgentRentalRequest` in `web_ui/rental_intent.py` (P5 natural-language → structured goal; aligns with existing analyze form fields where applicable).
 3. **Rule parser** `parse_rental_intent` in `web_ui/rental_intent_parser.py` (Phase2). `parse_rental_intent_mock` remains an alias in `agent_intent_mock_parser.py`.
 4. **UI flow** in `web_ui/agent_entry.py`: states `idle` → `parsing_preview` → `parsed_result` → `ready_for_analysis` (session keys `p5_agent_*`).
-5. **Continue to analysis** copies recognized fields into the existing property form; user still clicks **Analyze Property** (no auto-run).
+5. **Continue to analysis** (Phase3) syncs the form and runs **analyze-batch** (one property); results reuse **Batch results** below. **Analyze Property** remains available for single `/analyze`.
 
 ## Not in scope (later phases)
 
 | Phase | Planned work |
 |-------|----------------|
 | **Phase2** | **Done (rules):** `parse_rental_intent` + helpers — still no LLM. |
-| **Phase3** | Wire intent to **Analyze** / **analyze-batch**, search/scraper flows, optional planner. |
+| **Phase3** | **Done:** Agent **Continue** → **analyze-batch** (`intent_to_payload` + `agent_runner`). Optional **Analyze** still manual. |
+| **Phase4+** | Follow-ups, richer explanations, search/scraper, planner (out of scope). |
 
 ## Current limitations
 
