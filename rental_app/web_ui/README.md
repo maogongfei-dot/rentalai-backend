@@ -1,4 +1,4 @@
-# Web UI 组件（P4 Phase1–5）
+# Web UI 组件（P4 Phase1–5 + P5 Phase1）
 
 ## `listing_result_card`（Phase1）
 
@@ -25,5 +25,13 @@
 - **`product_copy`** — 全页展示文案单一来源（`DISPLAY_LABELS`、`VIEW_DETAILS` 等）。
 - **`result_ui`** — `section_header`、`card_spacing`、轻量 `state_*` 辅助。
 - 验收清单：**`docs/P4_PRODUCT_ACCEPTANCE_CHECKLIST.md`**。
+
+## P5 Phase1–2：Agent 入口 + 规则解析
+
+- **`rental_intent`** — `AgentRentalRequest`（`raw_query` + 可空结构化字段）。
+- **`rental_intent_parser`** — **`parse_rental_intent`**（规则型，中英混合）；**`intent_has_key_signals`**（预览 rich/sparse）。
+- **`agent_intent_mock_parser`** — `parse_rental_intent_mock` 为别名。
+- **`agent_entry`** — 主流程与 session 阶段：`idle` → `parsing_preview` → `parsed_result` → `ready_for_analysis`。
+- 说明：**`docs/P5_AGENT_ENTRY_FLOW.md`**、**`docs/P5_NL_TO_STRUCTURED_PARSER.md`**。
 
 单页入口仍为根目录 **`app_web.py`**（`streamlit run app_web.py`）。

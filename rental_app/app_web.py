@@ -1,4 +1,4 @@
-# P1 Phase1–6 + P2 Phase1–4 + P4 Phase1–5: Web UI（Product 层收口：统一文案/状态/布局）
+# P1 Phase1–6 + P2 Phase1–4 + P4 Phase1–5 + P5 Phase1–2: Web UI（Agent 规则解析 + Product 层）
 # Phase4: 结果解释增强 — 推荐 / 顾虑 / 风险 / 下一步 分开展示
 # Phase5: 输入校验、示例预填、错误提示、Reset form
 # Phase6: 页面收口、统一文案、演示顺序、弱化调试区
@@ -20,6 +20,7 @@ from web_ui.listing_result_card import (
     build_batch_row_card_model,
     render_listing_result_card,
 )
+from web_ui.agent_entry import render_p5_agent_entry
 from web_ui.batch_results_view import render_batch_partitioned_listings
 from web_ui.product_copy import DISPLAY_LABELS
 from web_ui.result_filters import collect_source_values, collect_top_indices, filter_batch_rows
@@ -602,6 +603,9 @@ _api_endpoint = st.sidebar.selectbox(
 if _use_local:
     st.sidebar.caption("Local mode always uses full engine output (≈ POST /analyze).")
 st.sidebar.caption("Start API: `uvicorn api_server:app --host 127.0.0.1 --port 8000`")
+
+# --- P5 Phase1: AI Agent 入口（自然语言 → mock 预览 → 可选回填表单）---
+render_p5_agent_entry(st, lab=lab, form_keys=_FORM_KEYS)
 
 # --- Phase6: 输入区（表单 → 再操作按钮，顺序与验收一致）---
 st.subheader(lab["input_section"])
