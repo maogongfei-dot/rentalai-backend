@@ -21,6 +21,8 @@ from web_ui.listing_result_card import (
     render_listing_result_card,
 )
 from web_ui.agent_entry import render_p5_agent_entry
+from web_ui.rental_intent import AgentRentalRequest
+from web_ui.real_analysis_service import run_real_listings_analysis
 from web_ui.agent_insight_summary import build_agent_insight_bundle, resolve_intent_for_insights
 from web_ui.agent_summary_panel import render_agent_insight_panel
 from web_ui.batch_results_view import render_batch_partitioned_listings
@@ -606,13 +608,42 @@ if _use_local:
     st.sidebar.caption("Local mode always uses full engine output (≈ POST /analyze).")
 st.sidebar.caption("Start API: `uvicorn api_server:app --host 127.0.0.1 --port 8000`")
 
-# --- P5 Phase1: AI Agent 入口（自然语言 → mock 预览 → 可选回填表单）---
+# --- P7 Phase5: 真实多平台抓取 + batch（侧栏控制 Agent 与 batch 区按钮）---
+st.sidebar.markdown("### %s" % lab.get("p7_sidebar_title", "Real listings (P7)"))
+st.sidebar.caption(lab.get("p7_sidebar_caption", ""))
+st.sidebar.number_input(
+    lab.get("p7_limit_label", "Listings per portal"),
+    min_value=1,
+    max_value=25,
+    value=int(st.session_state.get("p7_limit_per_source", 8)),
+    step=1,
+    key="p7_limit_per_source",
+)
+st.sidebar.checkbox(
+    lab.get("p7_headless_label", "Headless browser"),
+    value=bool(st.session_state.get("p7_headless", True)),
+    key="p7_headless",
+)
+st.sidebar.checkbox(
+    lab.get("p7_persist_label", "Persist listings"),
+    value=bool(st.session_state.get("p7_persist_listings", True)),
+    key="p7_persist_listings",
+)
+
+_p7_lim = int(st.session_state.get("p7_limit_per_source", 8))
+_p7_h = bool(st.session_state.get("p7_headless", True))
+_p7_persist = bool(st.session_state.get("p7_persist_listings", True))
+
+# --- P5 + P7：Agent 入口（自然语言 → 预览 → 真实多平台抓取 + batch）---
 render_p5_agent_entry(
     st,
     lab=lab,
     form_keys=_FORM_KEYS,
     use_local=_use_local,
     api_base_url=_api_base,
+    limit_per_source=_p7_lim,
+    headless=_p7_h,
+    persist_listings=_p7_persist,
 )
 
 # --- Phase6: 输入区（表单 → 再操作按钮，顺序与验收一致）---
@@ -907,7 +938,57 @@ _DEFAULT_BATCH_JSON = """{
   ]
 }"""
 with st.expander(lab["batch_section_expander"], expanded=False):
+    st.caption(lab.get("p7_real_batch_intro", ""))
+    if st.button(
+        lab.get("p7_real_batch_button", "Run real multi-source analysis"),
+        key="p7_real_batch",
+        help=lab.get("p7_real_batch_help", ""),
+    ):
+        _intent_d = st.session_state.get("p5_agent_last_intent")
+        _intent_o = (
+            AgentRentalRequest.from_dict(_intent_d) if isinstance(_intent_d, dict) else None
+        )
+        _raw_f = collect_raw_form_from_session()
+        try:
+            with st.spinner(lab.get("p7_real_spinner", "Running…")):
+                _env, _terr, _req = run_real_listings_analysis(
+                    intent=_intent_o,
+                    form_raw=_raw_f,
+                    limit_per_source=_p7_lim,
+                    headless=_p7_h,
+                    persist=_p7_persist,
+                )
+        except Exception as _ex:  # noqa: BLE001
+            st.session_state["p2_batch_last"] = {
+                "success": False,
+                "error": {"message": str(_ex)},
+            }
+            st.session_state["p2_batch_last_request"] = {"properties": []}
+        else:
+            st.session_state["p2_batch_last"] = _env
+            st.session_state["p2_batch_last_request"] = _req
+            if isinstance(_req, dict) and _req.get("_p7_debug"):
+                st.session_state["p7_last_debug"] = _req["_p7_debug"]
+            if _terr and isinstance(_req, dict):
+                _req.setdefault("_p7_transport_note", _terr)
+        st.rerun()
+
     st.caption(lab["batch_section_caption"])
+    _dbg = st.session_state.get("p7_last_debug")
+    if isinstance(_dbg, dict):
+        try:
+            st.caption(
+                lab.get("p7_debug_caption", "")
+                % (
+                    ", ".join(_dbg.get("sources_run") or []) or "—",
+                    str(_dbg.get("total_raw_count", "—")),
+                    str(_dbg.get("aggregated_unique_count", "—")),
+                    str(_dbg.get("total_analyzed_count", "—")),
+                    float(_dbg.get("seconds") or 0),
+                )
+            )
+        except (TypeError, ValueError):
+            pass
     _batch_ta = st.text_area("Request JSON", value=_DEFAULT_BATCH_JSON, height=220, key="p2_batch_json")
     if st.button("Run batch request", key="p2_batch_run"):
         if _use_local:

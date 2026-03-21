@@ -49,8 +49,11 @@ def _process_agent_batch_submit(
     lab: dict[str, str],
     use_local: bool,
     api_base_url: str,
+    limit_per_source: int,
+    headless: bool,
+    persist_listings: bool,
 ) -> None:
-    """Continue to Analysis → submitting → analysis_*。"""
+    """Continue to Analysis → submitting → analysis_*（P7：真实多平台 + batch）。"""
     if st.session_state.get(P5_KEY_PHASE) != PHASE_SUBMITTING:
         return
     it = AgentRentalRequest.from_dict(st.session_state.get(P5_KEY_INTENT) or {})
@@ -59,31 +62,34 @@ def _process_agent_batch_submit(
             it,
             use_local=use_local,
             api_base_url=api_base_url,
+            limit_per_source=limit_per_source,
+            headless=headless,
+            persist_listings=persist_listings,
         )
-    if err and not resp:
-        st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_ERROR
-        st.session_state["p5_agent_last_error"] = err
-        st.session_state["p2_batch_last"] = {
-            "success": False,
-            "error": {"message": err},
-        }
-        return
-    if resp is not None:
-        st.session_state["p2_batch_last"] = resp
-        st.session_state["p2_batch_last_request"] = payload
-        if resp.get("success"):
-            st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_SUCCESS
-            st.session_state["p5_agent_last_error"] = ""
-        else:
-            st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_ERROR
-            em = ""
-            er = resp.get("error")
-            if isinstance(er, dict):
-                em = str(er.get("message") or "")
-            st.session_state["p5_agent_last_error"] = em or "Batch returned success=false"
-    else:
+    if resp is None:
         st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_ERROR
         st.session_state["p5_agent_last_error"] = err or "Unknown error"
+        st.session_state["p2_batch_last"] = {
+            "success": False,
+            "error": {"message": err or "Unknown error"},
+        }
+        return
+    st.session_state["p2_batch_last"] = resp
+    st.session_state["p2_batch_last_request"] = payload
+    if isinstance(payload, dict) and payload.get("_p7_debug"):
+        st.session_state["p7_last_debug"] = payload["_p7_debug"]
+    if err:
+        st.session_state["p7_last_transport_note"] = err
+    if resp.get("success"):
+        st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_SUCCESS
+        st.session_state["p5_agent_last_error"] = ""
+    else:
+        st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_ERROR
+        em = ""
+        er = resp.get("error")
+        if isinstance(er, dict):
+            em = str(er.get("message") or "")
+        st.session_state["p5_agent_last_error"] = em or "Batch returned success=false"
 
 
 def apply_agent_intent_to_form_keys(
@@ -122,10 +128,13 @@ def render_p5_agent_entry(
     form_keys: dict[str, str],
     use_local: bool,
     api_base_url: str,
+    limit_per_source: int = 10,
+    headless: bool = True,
+    persist_listings: bool = True,
 ) -> None:
     """
     顺序：1) 输入 2) Parse 3) 预览 4) Continue to Analysis 5) 状态提示。
-    分析结果与 Agent Summary 在页面下方（app_web）。
+    **Continue** 触发 P7 真实多平台抓取 + analyze-batch；结果写入 `p2_batch_last`，与下方 Batch 区共用。
     """
     init_p5_agent_session(st)
     migrate_agent_phase(st.session_state)
@@ -147,6 +156,9 @@ def render_p5_agent_entry(
         lab=lab,
         use_local=use_local,
         api_base_url=api_base_url,
+        limit_per_source=limit_per_source,
+        headless=headless,
+        persist_listings=persist_listings,
     )
 
     migrate_agent_phase(st.session_state)

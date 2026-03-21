@@ -12,7 +12,9 @@ from data.pipeline.zoopla_pipeline import run_zoopla_pipeline
 _DEFAULT_SOURCES: tuple[str, ...] = ("rightmove", "zoopla")
 
 # 仅聚合层消费、不传给子 pipeline 的 query 键
-_MULTI_ONLY_QUERY_KEYS = frozenset({"save_aggregated_sample"})
+_MULTI_ONLY_QUERY_KEYS = frozenset(
+    {"save_aggregated_sample", "save_analysis_sample"},
+)
 
 _DEBUG_DIR = Path(__file__).resolve().parent.parent / "scraper" / "samples" / "debug"
 _AGG_SAMPLE_PATH = _DEBUG_DIR / "multi_source_aggregated_sample.json"
@@ -104,6 +106,7 @@ def run_multi_source_pipeline(
     persist: bool = True,
     storage_path: str | None = None,
     save_aggregated_sample: bool = False,
+    include_aggregated_listings: bool = False,
 ) -> dict[str, Any]:
     """
     按顺序调用各平台 `run_*_pipeline`（带 `include_normalized_listings=True`），汇总统计并轻量去重聚合。
@@ -185,7 +188,7 @@ def run_multi_source_pipeline(
         per_source_stats[s].get("success") is True for s in normalized_sources
     )
 
-    return {
+    out: dict[str, Any] = {
         "success": success,
         "sources_requested": list(want),
         "sources_run": normalized_sources,
@@ -200,6 +203,9 @@ def run_multi_source_pipeline(
         "aggregated_unique_count": len(deduped),
         "aggregated_listings_sample": deduped[:5],
     }
+    if include_aggregated_listings:
+        out["aggregated_listings"] = deduped
+    return out
 
 
 def run_multi_source_normalization_pipeline(**kwargs: Any) -> dict[str, Any]:
