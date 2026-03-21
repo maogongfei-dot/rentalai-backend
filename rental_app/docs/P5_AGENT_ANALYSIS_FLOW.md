@@ -18,7 +18,7 @@
 
 ## Agent session phases (UI)
 
-`idle` → `parsing_preview` → `parsed_result` → **`submitting`** → **`analysis_success`** | **`analysis_error`**.
+`idle` → **`parsing`** → **`parsed`** → **`submitting`** → **`analysis_success`** | **`analysis_error`** (old `parsing_preview` / `parsed_result` auto-upgrade).
 
 ## P5 Phase4 (related)
 

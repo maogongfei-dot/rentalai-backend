@@ -1,4 +1,4 @@
-# P3 Phase4: 本地调试用 mock 抓取器 — 非真实数据源
+# P3 Phase4 + P6: 本地调试用 mock — 无 Playwright；真实链路透 Rightmove→Zoopla 时仍保留本 source
 from __future__ import annotations
 
 from typing import Any

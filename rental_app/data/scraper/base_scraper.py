@@ -1,4 +1,4 @@
-# P3 Phase4: 抓取层统一协议（无联网、无 HTML）
+# P3 Phase4 + P6 Phase1: 抓取层统一协议（当前无联网；P6 规划见 docs/P6_*.md）
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

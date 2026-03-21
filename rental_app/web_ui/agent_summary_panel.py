@@ -30,7 +30,7 @@ def render_agent_insight_panel(
     intent: AgentRentalRequest,
     key_prefix: str,
 ) -> None:
-    """结果区顶部：助手式说明 + 轻量追问（追加 NL 片段）。"""
+    """分析结果之后：Agent summary + Refine Your Search（追加 NL 片段）。"""
     section_header(
         st,
         lab["p5_agent_insight_title"],
@@ -63,9 +63,7 @@ def render_agent_insight_panel(
         for s in sugg:
             st.markdown("- **%s** — %s" % (s.button_label, s.question))
 
-        st.markdown(
-            "**Quick actions** — append one line to **AI Agent → Your rental request**, then scroll up and **Parse request**."
-        )
+        st.markdown(lab.get("p5_agent_refine_quick_actions_blurb", ""))
         for s in sugg:
 
             def _make_append_cb(snippet: str):

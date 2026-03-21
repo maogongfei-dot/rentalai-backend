@@ -26,7 +26,7 @@
 - **`result_ui`** — `section_header`、`card_spacing`、轻量 `state_*` 辅助。
 - 验收清单：**`docs/P4_PRODUCT_ACCEPTANCE_CHECKLIST.md`**。
 
-## P5 Phase1–4：Agent 入口 + 解析 + batch + 解释/追问
+## P5 Phase1–5：Agent 层收口（入口 + 解析 + batch + 解释 + 状态/文案统一）
 
 - **`rental_intent`** — `AgentRentalRequest`。
 - **`rental_intent_parser`** — **`parse_rental_intent`**；**`intent_has_key_signals`**。
@@ -36,6 +36,7 @@
 - **`agent_insight_summary`** — **`build_agent_insight_bundle`**、**`resolve_intent_for_insights`**（规则解释）。
 - **`agent_refinement`** — **`get_missing_intent_fields`**、**`get_refinement_suggestions`**。
 - **`agent_summary_panel`** — **`render_agent_insight_panel`**（结果区顶部 + Refine expander）。
-- 说明：**`docs/P5_AGENT_ENTRY_FLOW.md`**、**`docs/P5_NL_TO_STRUCTURED_PARSER.md`**、**`docs/P5_AGENT_ANALYSIS_FLOW.md`**、**`docs/P5_AGENT_EXPLANATION_AND_REFINEMENT.md`**。
+- **`agent_flow`** — 标准 phase 常量、`migrate_agent_phase`、`format_agent_phase_caption`。
+- 说明：**`docs/P5_AGENT_ENTRY_FLOW.md`**、**`docs/P5_NL_TO_STRUCTURED_PARSER.md`**、**`docs/P5_AGENT_ANALYSIS_FLOW.md`**、**`docs/P5_AGENT_EXPLANATION_AND_REFINEMENT.md`**、**`docs/P5_AGENT_ACCEPTANCE_CHECKLIST.md`**、**`docs/P5_AGENT_LAYER_FINALIZED.md`**。
 
 单页入口仍为根目录 **`app_web.py`**（`streamlit run app_web.py`）。

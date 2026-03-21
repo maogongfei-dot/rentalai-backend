@@ -1,4 +1,4 @@
-# P1 Phase1–6 + P2 Phase1–4 + P4 Phase1–5 + P5 Phase1–4: Web UI（Agent insights + batch + Product 层）
+# P1 Phase1–6 + P2 Phase1–4 + P4 Phase1–5 + P5 Phase1–5: Web UI（Agent 收口 + Product 层）
 # Phase4: 结果解释增强 — 推荐 / 顾虑 / 风险 / 下一步 分开展示
 # Phase5: 输入校验、示例预填、错误提示、Reset form
 # Phase6: 页面收口、统一文案、演示顺序、弱化调试区
@@ -757,23 +757,6 @@ else:
     )
     st.divider()
 
-    # P5 Phase4：单条 analyze 结果顶部的 Agent 解释（规则型，无 LLM）
-    _intent_s = resolve_intent_for_insights(st.session_state, normalized_form=_norm_single)
-    _bundle_s = build_agent_insight_bundle(
-        _intent_s,
-        mode="single",
-        single_result=result,
-        batch_data=None,
-    )
-    render_agent_insight_panel(
-        st,
-        lab=lab,
-        bundle=_bundle_s,
-        intent=_intent_s,
-        key_prefix="p5_insight_single",
-    )
-    st.divider()
-
     # ========== Phase6 结果顺序：Overview → Property score → Decision → 四块解释 → 补充区 → References → 占位风险 → Debug ==========
     st.markdown(f"## {lab['overview']}")
     with st.container():
@@ -898,6 +881,23 @@ else:
         st.markdown("**Bridge payload (debug)**")
         st.json({k: v for k, v in result.items() if k != "explanation"})
 
+    # P5 Phase5：单条 analyze 之后 — Agent summary + Refine（在完整结果之后）
+    st.divider()
+    _intent_s = resolve_intent_for_insights(st.session_state, normalized_form=_norm_single)
+    _bundle_s = build_agent_insight_bundle(
+        _intent_s,
+        mode="single",
+        single_result=result,
+        batch_data=None,
+    )
+    render_agent_insight_panel(
+        st,
+        lab=lab,
+        bundle=_bundle_s,
+        intent=_intent_s,
+        key_prefix="p5_insight_single",
+    )
+
 # --- P2 Phase4–5：批量接口 + 轻量结果展示区 ---
 _DEFAULT_BATCH_JSON = """{
   "properties": [
@@ -946,25 +946,6 @@ with st.expander(lab["batch_section_expander"], expanded=False):
                 st.warning(lab["batch_last_failed"] % _bmsg)
         elif isinstance(_last_batch.get("data"), dict):
             _bd = _last_batch["data"]
-            st.divider()
-            # P5 Phase4：batch 结果区顶部 Agent 解释（与 Top picks / 筛选共存）
-            _intent_b = resolve_intent_for_insights(
-                st.session_state,
-                batch_request=st.session_state.get("p2_batch_last_request"),
-            )
-            _bundle_b = build_agent_insight_bundle(
-                _intent_b,
-                mode="batch",
-                single_result=None,
-                batch_data=_bd,
-            )
-            render_agent_insight_panel(
-                st,
-                lab=lab,
-                bundle=_bundle_b,
-                intent=_intent_b,
-                key_prefix="p5_insight_batch",
-            )
             st.divider()
             section_header(st, lab["batch_results_header"], level=3)
             st.markdown("**%s**" % lab["batch_criteria_title"])
@@ -1086,5 +1067,25 @@ with st.expander(lab["batch_section_expander"], expanded=False):
                     debug_display_text_fn=_display_text,
                     detail_key_prefix="p4_detail_batch",
                 )
+
+            # P5 Phase5：batch 列表与筛选之后 — Agent summary + Refine
+            st.divider()
+            _intent_b = resolve_intent_for_insights(
+                st.session_state,
+                batch_request=st.session_state.get("p2_batch_last_request"),
+            )
+            _bundle_b = build_agent_insight_bundle(
+                _intent_b,
+                mode="batch",
+                single_result=None,
+                batch_data=_bd,
+            )
+            render_agent_insight_panel(
+                st,
+                lab=lab,
+                bundle=_bundle_b,
+                intent=_intent_b,
+                key_prefix="p5_insight_batch",
+            )
 
 render_demo_footer()

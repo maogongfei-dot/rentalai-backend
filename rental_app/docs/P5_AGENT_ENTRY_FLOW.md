@@ -5,8 +5,8 @@
 1. **Agent entry** on the main Streamlit page (`app_web.py`), **above** **Property details**.
 2. **Structured target type** `AgentRentalRequest` in `web_ui/rental_intent.py` (P5 natural-language → structured goal; aligns with existing analyze form fields where applicable).
 3. **Rule parser** `parse_rental_intent` in `web_ui/rental_intent_parser.py` (Phase2). `parse_rental_intent_mock` remains an alias in `agent_intent_mock_parser.py`.
-4. **UI flow** in `web_ui/agent_entry.py`: states `idle` → `parsing_preview` → `parsed_result` → `ready_for_analysis` (session keys `p5_agent_*`).
-5. **Continue to analysis** (Phase3) syncs the form and runs **analyze-batch** (one property); results reuse **Batch results** below. **Analyze Property** remains available for single `/analyze`.
+4. **UI flow** in `web_ui/agent_entry.py` + `web_ui/agent_flow.py`: `idle` → `parsing` → `parsed` → `submitting` → `analysis_success` | `analysis_error` (legacy `parsing_preview` / `parsed_result` migrate on load).
+5. **Continue to Analysis** syncs the form and runs **analyze-batch** (one property); **Agent summary** + **Refine Your Search** render after results (Phase4–5). **Analyze Property** remains for single `/analyze`.
 
 ## Not in scope (later phases)
 
@@ -30,5 +30,8 @@
 | `web_ui/rental_intent_parser.py` | `parse_rental_intent`, `intent_has_key_signals` |
 | `web_ui/agent_intent_mock_parser.py` | Alias `parse_rental_intent_mock` → `parse_rental_intent` |
 | `web_ui/agent_entry.py` | Streamlit section + state + form sync |
-| `web_ui/product_copy.py` | English strings for the Agent block |
+| `web_ui/agent_flow.py` | Canonical phases + migration + caption formatter |
+| `web_ui/product_copy.py` | English strings (Phase5 unified) |
 | `docs/P5_AGENT_ENTRY_FLOW.md` | This note |
+| `docs/P5_AGENT_ACCEPTANCE_CHECKLIST.md` | Manual acceptance |
+| `docs/P5_AGENT_LAYER_FINALIZED.md` | P5 wrap-up |

@@ -1,28 +1,29 @@
-# P5 Phase1–3: Agent 入口 — 规则解析 + 表单同步 + analyze-batch 调度
+# P5 Phase1–5: Agent 入口 — 统一状态名 + 解析 + batch 调度
 from __future__ import annotations
 
 from typing import Any
 
+from web_ui.agent_flow import (
+    P5_KEY_PHASE,
+    PHASE_ANALYSIS_ERROR,
+    PHASE_ANALYSIS_SUCCESS,
+    PHASE_IDLE,
+    PHASE_PARSED,
+    PHASE_PARSING,
+    PHASE_SUBMITTING,
+    agent_refinement_available,
+    format_agent_phase_caption,
+    migrate_agent_phase,
+)
 from web_ui.agent_runner import agent_intent_sparse_warning, run_agent_intent_analysis
 from web_ui.intent_to_payload import build_analyze_raw_form_from_intent
 from web_ui.rental_intent import AgentRentalRequest
 from web_ui.rental_intent_parser import intent_has_key_signals, parse_rental_intent
 from web_ui.result_ui import section_header
 
-# Session keys（与 app_web 约定，避免与表单 key 冲突）
-P5_KEY_PHASE = "p5_agent_phase"
 P5_KEY_NL = "p5_agent_nl_input"
 P5_KEY_INTENT = "p5_agent_last_intent"
 P5_KEY_HINT = "p5_agent_form_hint"
-
-# Phase1–2 流程 + Phase3 提交与结果
-PHASE_IDLE = "idle"
-PHASE_PARSING_PREVIEW = "parsing_preview"
-PHASE_PARSED_RESULT = "parsed_result"
-PHASE_READY_FOR_ANALYSIS = "ready_for_analysis"  # 保留名：可与「仅填表」扩展共用
-PHASE_SUBMITTING = "submitting"
-PHASE_ANALYSIS_SUCCESS = "analysis_success"
-PHASE_ANALYSIS_ERROR = "analysis_error"
 
 
 def init_p5_agent_session(st: Any) -> None:
@@ -30,16 +31,16 @@ def init_p5_agent_session(st: Any) -> None:
         st.session_state[P5_KEY_PHASE] = PHASE_IDLE
 
 
-def _consume_parsing_preview(st: Any) -> None:
-    """由 parsing_preview 自动进入 parsed_result（P5 Phase2 规则解析，无 LLM）。"""
-    if st.session_state.get(P5_KEY_PHASE) != PHASE_PARSING_PREVIEW:
+def _consume_parsing(st: Any) -> None:
+    """parsing → parsed（规则解析，无 LLM）。"""
+    if st.session_state.get(P5_KEY_PHASE) != PHASE_PARSING:
         return
     raw = st.session_state.get(P5_KEY_NL, "")
     if not isinstance(raw, str):
         raw = str(raw) if raw is not None else ""
     intent = parse_rental_intent(raw)
     st.session_state[P5_KEY_INTENT] = intent.to_dict()
-    st.session_state[P5_KEY_PHASE] = PHASE_PARSED_RESULT
+    st.session_state[P5_KEY_PHASE] = PHASE_PARSED
 
 
 def _process_agent_batch_submit(
@@ -49,11 +50,11 @@ def _process_agent_batch_submit(
     use_local: bool,
     api_base_url: str,
 ) -> None:
-    """Continue → submitting 后在本轮渲染早期执行 batch。"""
+    """Continue to Analysis → submitting → analysis_*。"""
     if st.session_state.get(P5_KEY_PHASE) != PHASE_SUBMITTING:
         return
     it = AgentRentalRequest.from_dict(st.session_state.get(P5_KEY_INTENT) or {})
-    with st.spinner(lab.get("p5_agent_spinner_submit", "Running agent batch…")):
+    with st.spinner(lab.get("p5_agent_spinner_submit", "Running batch analysis…")):
         resp, err, payload = run_agent_intent_analysis(
             it,
             use_local=use_local,
@@ -90,9 +91,7 @@ def apply_agent_intent_to_form_keys(
     form_keys: dict[str, str],
     st_session: Any,
 ) -> list[str]:
-    """
-    将 intent 转为与 **analyze-batch 单条 property** 一致的数值，并写入表单 session。
-    """
+    """将 intent 转为与 analyze-batch 单条 property 一致的数值，并写入表单 session。"""
     hints: list[str] = []
     raw = build_analyze_raw_form_from_intent(intent)
     s = st_session
@@ -125,19 +124,24 @@ def render_p5_agent_entry(
     api_base_url: str,
 ) -> None:
     """
-    自然语言 → Parse → Continue：**同步表单并调用 analyze-batch**（单条场景），结果写入 `p2_batch_last`。
+    顺序：1) 输入 2) Parse 3) 预览 4) Continue to Analysis 5) 状态提示。
+    分析结果与 Agent Summary 在页面下方（app_web）。
     """
     init_p5_agent_session(st)
+    migrate_agent_phase(st.session_state)
+
     if st.session_state.pop("p5_refinement_parse_reminder", False):
-        st.info(lab.get("p5_agent_refine_parse_reminder", "Scroll to **AI Agent** and click **Parse request**."))
+        st.info(lab.get("p5_agent_refine_parse_reminder", ""))
     if st.session_state.pop("p5_refinement_snippet_added", False):
-        st.success(
-            lab.get(
-                "p5_refinement_snippet_ok",
-                "Added a line to your request box — click **Parse request** when ready.",
-            )
-        )
-    _consume_parsing_preview(st)
+        st.success(lab.get("p5_refinement_snippet_ok", ""))
+
+    _ph0 = st.session_state.get(P5_KEY_PHASE)
+    if _ph0 == PHASE_PARSING:
+        st.info(lab.get("p5_agent_status_parsing", ""))
+    if _ph0 == PHASE_SUBMITTING:
+        st.info(lab.get("p5_agent_status_submitting", ""))
+
+    _consume_parsing(st)
     _process_agent_batch_submit(
         st,
         lab=lab,
@@ -145,6 +149,7 @@ def render_p5_agent_entry(
         api_base_url=api_base_url,
     )
 
+    migrate_agent_phase(st.session_state)
     phase = st.session_state.get(P5_KEY_PHASE, PHASE_IDLE)
 
     section_header(
@@ -154,7 +159,16 @@ def render_p5_agent_entry(
         caption=lab["p5_agent_section_caption"],
     )
 
-    st.caption("%s **%s**" % (lab["p5_agent_phase_label"], phase.replace("_", " ")))
+    _intent_for_caption = AgentRentalRequest.from_dict(
+        st.session_state.get(P5_KEY_INTENT) or {}
+    )
+    st.caption(
+        "%s %s"
+        % (
+            lab.get("p5_agent_current_step_label", "Current step:"),
+            format_agent_phase_caption(phase, lab, intent=_intent_for_caption),
+        )
+    )
 
     st.text_area(
         lab["p5_agent_input_label"],
@@ -168,7 +182,7 @@ def render_p5_agent_entry(
     with b1:
 
         def _go_parse() -> None:
-            st.session_state[P5_KEY_PHASE] = PHASE_PARSING_PREVIEW
+            st.session_state[P5_KEY_PHASE] = PHASE_PARSING
 
         st.button(
             lab["p5_agent_parse_button"],
@@ -192,7 +206,7 @@ def render_p5_agent_entry(
 
     intent_dict = st.session_state.get(P5_KEY_INTENT)
     _show_preview = phase in (
-        PHASE_PARSED_RESULT,
+        PHASE_PARSED,
         PHASE_ANALYSIS_SUCCESS,
         PHASE_ANALYSIS_ERROR,
     )
@@ -205,6 +219,7 @@ def render_p5_agent_entry(
 
         _it = AgentRentalRequest.from_dict(intent_dict)
         _rich = intent_has_key_signals(_it)
+        _refine = agent_refinement_available(_it)
 
         if phase == PHASE_ANALYSIS_SUCCESS:
             st.success(lab["p5_agent_batch_success"])
@@ -225,6 +240,9 @@ def render_p5_agent_entry(
             st.write(lab["p5_agent_ready_partial"])
         else:
             st.write(lab["p5_agent_ready_sparse"])
+
+        if _refine and phase == PHASE_PARSED:
+            st.caption(lab.get("p5_agent_refinement_hint_before_run", ""))
 
         cta1, cta2 = st.columns(2)
         with cta1:

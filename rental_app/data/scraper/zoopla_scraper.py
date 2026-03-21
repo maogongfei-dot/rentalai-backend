@@ -1,4 +1,5 @@
-# P3 Phase4: Zoopla 占位骨架 — 非实际抓取器，后续在此接入真实逻辑
+# P3 Phase4 + P6: Zoopla 占位 — **第二优先**（Rightmove 单平台闭环后再扩）
+# P6 Phase1：仍无网络/Playwright
 from __future__ import annotations
 
 from typing import Any
@@ -7,7 +8,7 @@ from .base_scraper import BaseListingScraper
 
 
 class ZooplaScraper(BaseListingScraper):
-    """当前阶段不发起任何 HTTP / 浏览器请求；scrape 恒为空列表。"""
+    """当前不发起 HTTP/浏览器；`scrape` 返回 []。"""
 
     source = "zoopla"
 

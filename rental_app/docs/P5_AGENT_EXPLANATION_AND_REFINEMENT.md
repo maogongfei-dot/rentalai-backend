@@ -2,9 +2,9 @@
 
 ## What shipped
 
-1. **`Agent insights`** panel (`web_ui/agent_summary_panel.py`) above:
-   - **Single `/analyze` results** (after criteria summary, before Overview)
-   - **Batch results** (before **Batch results** header, above comparison / filters / Top picks)
+1. **`Agent summary`** panel (`web_ui/agent_summary_panel.py`) **after** main outcomes:
+   - **Single `/analyze`**: below the Debug expander (full dashboard first).
+   - **Batch**: after filters / Top picks / tier cards (P5 Phase5 order).
 2. **Rule-based copy** from `build_agent_insight_bundle` (`web_ui/agent_insight_summary.py`): headline, short summary, bullets (“what drove this view”), cautions (weak scores, sparse intent, few rows).
 3. **Missing-field hints** via `get_missing_intent_fields` + `get_refinement_suggestions` (`web_ui/agent_refinement.py`).
 4. **Refine your search** expander: suggested questions + **Quick actions** buttons that **append English lines** to **`p5_agent_nl_input`** (scroll up → **Parse request**). **Remind me to Parse** surfaces an info banner in the Agent block.
