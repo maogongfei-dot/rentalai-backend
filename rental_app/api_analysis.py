@@ -142,6 +142,7 @@ def normalize_engine_output(engine_result: dict) -> dict:
 
     status = p.get("status") if isinstance(p.get("status"), dict) else {}
 
+    thx = engine_result.get("top_house_export")
     return {
         "score": engine_result.get("property_score"),
         "decision": p.get("decision") if isinstance(p.get("decision"), dict) else {},
@@ -157,6 +158,8 @@ def normalize_engine_output(engine_result: dict) -> dict:
         "risk_result": engine_result.get("risk_result")
         if isinstance(engine_result.get("risk_result"), dict)
         else {"status": "placeholder", "message": "No contract risk input"},
+        # P4 Phase3: 前端详情页评分明细（引擎已有则透传，缺省为空 dict）
+        "top_house_export": thx if isinstance(thx, dict) else {},
     }
 
 
@@ -593,6 +596,7 @@ def batch_result_row(item_out: dict) -> dict:
         row["status"] = {}
         row["decision_label"] = "N/A"
         row["explanation_summary"] = {}
+        row["top_house_export"] = {}
         row["input_meta"] = {}
         return row
     d = item_out["data"]
@@ -610,6 +614,8 @@ def batch_result_row(item_out: dict) -> dict:
     row["explanation_summary"] = (
         d.get("explanation_summary") if isinstance(d.get("explanation_summary"), dict) else {}
     )
+    th = d.get("top_house_export")
+    row["top_house_export"] = th if isinstance(th, dict) else {}
     im = item_out.get("input_meta")
     row["input_meta"] = im if isinstance(im, dict) else {}
     return row
@@ -924,6 +930,7 @@ def legacy_ui_result_from_standard_envelope(envelope: dict) -> dict:
         "explanation_summary": {},
         "explanation": {},
         "risk_result": {},
+        "top_house_export": {},
         "_api_meta": build_meta(ep),
     }
 
@@ -984,6 +991,8 @@ def legacy_ui_result_from_standard_envelope(envelope: dict) -> dict:
         out["risk_result"] = (
             data.get("risk_result") if isinstance(data.get("risk_result"), dict) else {}
         )
+        th = data.get("top_house_export")
+        out["top_house_export"] = th if isinstance(th, dict) else {}
         return out
 
     # 子接口：尽量填充可映射字段，其余留空

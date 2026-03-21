@@ -69,7 +69,7 @@ def _recommendation_tier(status: dict, decision: dict) -> tuple[str, str]:
         return "Recommended", "recommended"
     if any(w in t for w in ("avoid", "not recommend", "reject", "unsafe", "high risk")):
         return "Not recommended", "not_recommended"
-    return "Review", "uncertain"
+    return "Review needed", "uncertain"
 
 
 def _badge_markdown(label: str, kind: str) -> str:
@@ -147,6 +147,7 @@ def build_analyze_card_model(
         score_v = _fmt_scalar(score)
 
     return {
+        "recommend_one_liner": None,
         "title": title,
         "rent_pcm": ctx.get("rent"),
         "bedrooms": ctx.get("bedrooms"),
@@ -180,6 +181,7 @@ def build_batch_row_card_model(row: dict, *, highlight_top: bool = False) -> dic
         elif err is not None:
             msg = _clean_str(err)
         return {
+            "recommend_one_liner": None,
             "title": "Listing #%s — analysis failed" % idx if idx is not None else "Listing — analysis failed",
             "rent_pcm": im.get("rent"),
             "bedrooms": im.get("bedrooms"),
@@ -207,10 +209,10 @@ def build_batch_row_card_model(row: dict, *, highlight_top: bool = False) -> dic
     label_map = {
         "recommended": "Recommended",
         "not_recommended": "Not recommended",
-        "uncertain": "Review",
-        "N/A": "Review",
+        "uncertain": "Review needed",
+        "N/A": "Review needed",
     }
-    label = label_map.get(code, "Review")
+    label = label_map.get(code, "Review needed")
     kind = code if code in ("recommended", "not_recommended") else "uncertain"
     if code == "N/A":
         kind = "uncertain"
@@ -234,7 +236,11 @@ def build_batch_row_card_model(row: dict, *, highlight_top: bool = False) -> dic
     if short:
         title = "%s · %s" % (title, short)
 
+    _rr = row.get("recommended_reasons") or []
+    _one = _clean_str(_rr[0]) if isinstance(_rr, list) and _rr else None
+
     return {
+        "recommend_one_liner": _one,
         "title": title,
         "rent_pcm": im.get("rent"),
         "bedrooms": im.get("bedrooms"),
@@ -254,9 +260,27 @@ def build_batch_row_card_model(row: dict, *, highlight_top: bool = False) -> dic
     }
 
 
-def render_listing_result_card(model: dict[str, Any]) -> None:
-    """根据卡片模型渲染一块结果卡片（缺失字段安全降级）。"""
+def render_listing_result_card(
+    model: dict[str, Any],
+    *,
+    detail_bundle: dict[str, Any] | None = None,
+    detail_expander_key: str | None = None,
+    detail_expander_title: str | None = None,
+    top_rank: int | None = None,
+    visual_tier: str = "default",
+) -> None:
+    """根据卡片模型渲染一块结果卡片（缺失字段安全降级）。可选详情 expander 与 P4 Phase4 Top 强化样式。"""
     import streamlit as st
+
+    from web_ui.listing_detail_panel import render_listing_detail_expander
+    from web_ui.product_copy import (
+        DETAIL_LINK_LISTING,
+        DETAIL_NO_EXPLAIN_SUMMARY,
+        FEATURED_IN_BATCH,
+        KEY_RECOMMENDATION_REASON,
+        TOP_PICK_BANNER,
+        VIEW_DETAILS,
+    )
 
     def _card_outer():
         """Streamlit ≥1.29 支持 border；旧版回退为普通 container。"""
@@ -270,9 +294,13 @@ def render_listing_result_card(model: dict[str, Any]) -> None:
     highlight = bool(m.get("highlight_top"))
     score_show = _fmt_scalar(m.get("final_score") or m.get("total_score"), "—")
 
+    tier = (visual_tier or "default").strip().lower()
+
     with _card_outer():
-        if highlight:
-            st.success("Top recommendation in this batch")
+        if tier == "top_pick" and top_rank:
+            st.success(TOP_PICK_BANNER % top_rank)
+        elif highlight:
+            st.success(FEATURED_IN_BATCH)
 
         top_l, top_r = st.columns([4, 1])
         with top_l:
@@ -280,7 +308,7 @@ def render_listing_result_card(model: dict[str, Any]) -> None:
         with top_r:
             st.markdown(
                 _badge_markdown(
-                    str(m.get("badge_label") or "Review"),
+                    str(m.get("badge_label") or "Review needed"),
                     str(m.get("badge_kind") or "uncertain"),
                 )
             )
@@ -306,14 +334,26 @@ def render_listing_result_card(model: dict[str, Any]) -> None:
         sc1, sc2 = st.columns([1, 2])
         with sc1:
             st.markdown("**Total score**")
-            st.markdown("### %s" % score_show)
+            if tier == "top_pick":
+                try:
+                    st.metric("Total score", score_show)
+                except Exception:
+                    st.markdown("### %s" % score_show)
+            else:
+                st.markdown("### %s" % score_show)
         with sc2:
             st.markdown("**Summary**")
             summ = _clean_str(m.get("explain_summary"))
             if summ:
                 st.markdown(summ)
             else:
-                st.caption("No explanation summary for this run.")
+                st.caption(DETAIL_NO_EXPLAIN_SUMMARY)
+
+        if tier == "top_pick":
+            rl = _clean_str(m.get("recommend_one_liner"))
+            if rl and rl != summ:
+                st.markdown("**%s**" % KEY_RECOMMENDATION_REASON)
+                st.info(rl)
 
         st.markdown("---")
         ft1, ft2, ft3 = st.columns(3)
@@ -329,4 +369,12 @@ def render_listing_result_card(model: dict[str, Any]) -> None:
 
         url = _clean_str(m.get("source_url"))
         if url:
-            st.markdown("[Open listing link](%s)" % url)
+            st.markdown("[%s](%s)" % (DETAIL_LINK_LISTING, url))
+
+        if detail_bundle is not None and detail_expander_key:
+            render_listing_detail_expander(
+                st,
+                detail_bundle,
+                expander_key=str(detail_expander_key),
+                title=detail_expander_title or VIEW_DETAILS,
+            )

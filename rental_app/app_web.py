@@ -1,4 +1,4 @@
-# P1 Phase1–6 + P2 Phase1–4 + P4 Phase1: Web UI（结果卡片 + HTTP 封套 + /analyze-batch）
+# P1 Phase1–6 + P2 Phase1–4 + P4 Phase1–5: Web UI（Product 层收口：统一文案/状态/布局）
 # Phase4: 结果解释增强 — 推荐 / 顾虑 / 风险 / 下一步 分开展示
 # Phase5: 输入校验、示例预填、错误提示、Reset form
 # Phase6: 页面收口、统一文案、演示顺序、弱化调试区
@@ -13,11 +13,18 @@ import os
 
 import streamlit as st
 
+from web_ui.condition_summary import summarize_analyze_context, summarize_batch_request
+from web_ui.listing_detail_panel import build_analyze_detail_bundle, build_batch_detail_bundle
 from web_ui.listing_result_card import (
     build_analyze_card_model,
     build_batch_row_card_model,
     render_listing_result_card,
 )
+from web_ui.batch_results_view import render_batch_partitioned_listings
+from web_ui.product_copy import DISPLAY_LABELS
+from web_ui.result_filters import collect_source_values, collect_top_indices, filter_batch_rows
+from web_ui.result_sorters import sort_batch_rows
+from web_ui.result_ui import section_header
 
 # ---------- P1 Phase5: 输入校验 / 示例数据 / 错误提示 ----------
 
@@ -215,30 +222,8 @@ def run_analysis_for_ui(
 
 
 def normalize_display_labels() -> dict:
-    """区块与指标英文标签（单一来源，避免 Overview / Decision / Score 前后不一致）。"""
-    return {
-        "input_section": "Property details",
-        "actions_section": "Actions",
-        "validation_section": "Validation",
-        "errors_section": "Errors",
-        "overview": "Overview",
-        "score": "Property score",
-        "decision": "Decision",
-        "decision_caption": "High-level recommendation and confidence from the scoring engine.",
-        "recommended": "Recommended reasons",
-        "concerns": "Concerns",
-        "risks": "Risks",
-        "next_steps": "Next steps",
-        "analysis_detail": "Analysis (structured detail)",
-        "user_facing": "Narrative summary",
-        "references": "References",
-        "contract_risk": "Contract risk",
-        "debug_expander": "Technical trace & debug",
-        "listing_snapshot": "Listing snapshot",
-        "listing_snapshot_caption": "Key facts, model score, and summary — same card style as batch results.",
-        "batch_listing_cards": "All listings (cards)",
-        "batch_no_rows": "No listing rows in the last batch response.",
-    }
+    """P4 Phase5：与 `web_ui.product_copy.DISPLAY_LABELS` 同步的展示文案。"""
+    return dict(DISPLAY_LABELS)
 
 
 def build_page_header(*, show_demo_hint: bool = True) -> None:
@@ -252,6 +237,14 @@ def build_page_header(*, show_demo_hint: bool = True) -> None:
         st.caption(
             "Demo: sample values are pre-filled — click **Analyze Property** for a one-click run."
         )
+
+
+def render_criteria_summary(lines: list[tuple[str, str]], *, empty_caption: str) -> None:
+    """P4 Phase2: 轻量条件摘要（Markdown 一行）。"""
+    if not lines:
+        st.caption(empty_caption)
+        return
+    st.markdown(" · ".join("**%s:** %s" % (lab, val) for lab, val in lines))
 
 
 def render_demo_footer() -> None:
@@ -652,24 +645,21 @@ with bc:
     analyze = st.button("Analyze Property", type="primary", use_container_width=True)
 
 if not analyze:
-    st.info(
-        "Use **Load Demo Data** to restore samples, **Reset Form** to clear, then **Analyze Property** to run. "
-        "Invalid inputs show under **Validation** without crashing the app."
-    )
+    st.info(lab["idle_analyze_hint"])
 else:
     raw_form = collect_raw_form_from_session()
 
     valid, validation_errors = validate_inputs(raw_form)
     if not valid:
         st.markdown(f"### {lab['validation_section']}")
-        st.error("Please fix the following before re-running analysis.")
+        st.error(lab["validation_intro"])
         st.warning(build_error_message(validation_errors))
         st.stop()
 
     result = None
     err_msg = None
     try:
-        with st.spinner("Running analysis..."):
+        with st.spinner(lab["spinner_analyze"]):
             result, transport_err = run_analysis_for_ui(
                 raw_form,
                 use_local=_use_local,
@@ -689,11 +679,11 @@ else:
 
     if err_msg:
         st.markdown(f"### {lab['errors_section']}")
-        st.error("Unexpected error while running analysis (shown below).")
-        st.warning(_display_text(err_msg, "Unknown error"))
+        st.error(lab["error_unexpected"])
+        st.warning(_display_text(err_msg, lab["unknown_error"]))
 
     if not result:
-        st.error("No result returned.")
+        st.error(lab["error_no_result"])
         st.stop()
 
     # P2 Phase2：API 业务失败时优先展示 error.message（已映射到 result["message"]）
@@ -747,6 +737,13 @@ else:
 
     ok = bool(result.get("success"))
 
+    st.markdown("## %s" % lab["criteria_section"])
+    render_criteria_summary(
+        summarize_analyze_context(normalize_form_values(raw_form)),
+        empty_caption=lab["criteria_empty"],
+    )
+    st.divider()
+
     # ========== Phase6 结果顺序：Overview → Property score → Decision → 四块解释 → 补充区 → References → 占位风险 → Debug ==========
     st.markdown(f"## {lab['overview']}")
     with st.container():
@@ -754,11 +751,11 @@ else:
         with col_o1:
             st.markdown("**Run status**")
             if err_msg:
-                st.error("Failed")
+                st.error(lab["run_status_failed"])
             elif ok:
-                st.success("Completed")
+                st.success(lab["run_status_ok"])
             else:
-                st.warning("Completed with issues")
+                st.warning(lab["run_status_partial"])
             st.caption(f"Engine success flag: `{ok}`")
         with col_o2:
             msg = result.get("message") or ""
@@ -774,7 +771,11 @@ else:
     st.markdown("## %s" % lab["listing_snapshot"])
     st.caption(lab["listing_snapshot_caption"])
     _ctx = normalize_form_values(raw_form)
-    render_listing_result_card(build_analyze_card_model(result, listing_context=_ctx))
+    render_listing_result_card(
+        build_analyze_card_model(result, listing_context=_ctx),
+        detail_bundle=build_analyze_detail_bundle(result, _ctx),
+        detail_expander_key="p4_detail_analyze",
+    )
 
     st.divider()
 
@@ -788,7 +789,7 @@ else:
             except (TypeError, ValueError):
                 st.metric(label=lab["score"], value=_display_text(score, "N/A"))
         else:
-            st.info("No property score returned for this run (N/A).")
+            st.info(lab["score_missing_hint"])
 
     st.divider()
 
@@ -875,8 +876,8 @@ _DEFAULT_BATCH_JSON = """{
     {"rent": 1400, "budget": 1500, "commute_minutes": 15, "bedrooms": 2, "bills_included": true}
   ]
 }"""
-with st.expander("P2 Phase5 — Batch API (`POST /analyze-batch`)", expanded=False):
-    st.caption("Uses **API base URL** above. Disabled when **Use local engine** is on (batch is HTTP-only here).")
+with st.expander(lab["batch_section_expander"], expanded=False):
+    st.caption(lab["batch_section_caption"])
     _batch_ta = st.text_area("Request JSON", value=_DEFAULT_BATCH_JSON, height=220, key="p2_batch_json")
     if st.button("Run batch request", key="p2_batch_run"):
         if _use_local:
@@ -893,11 +894,12 @@ with st.expander("P2 Phase5 — Batch API (`POST /analyze-batch`)", expanded=Fal
             else:
                 try:
                     _bu = _api_base.rstrip("/")
-                    with st.spinner("Calling analyze-batch…"):
+                    with st.spinner(lab["spinner_batch"]):
                         _br = requests.post("%s/analyze-batch" % _bu, json=_payload, timeout=180)
                         _br.raise_for_status()
                         _bj = _br.json()
                     st.session_state["p2_batch_last"] = _bj
+                    st.session_state["p2_batch_last_request"] = _payload
                     with st.expander("Raw JSON response", expanded=False):
                         st.json(_bj)
                 except Exception as ex:
@@ -911,69 +913,129 @@ with st.expander("P2 Phase5 — Batch API (`POST /analyze-batch`)", expanded=Fal
             if isinstance(_berr, dict):
                 _bmsg = _display_text(_berr.get("message"), "")
             if _bmsg:
-                st.warning("Last batch request was not successful: %s" % _bmsg)
+                st.warning(lab["batch_last_failed"] % _bmsg)
         elif isinstance(_last_batch.get("data"), dict):
             _bd = _last_batch["data"]
             st.divider()
-            st.markdown("##### Batch results (Phase5)")
-            st.markdown("**Comparison summary**")
+            section_header(st, lab["batch_results_header"], level=3)
+            st.markdown("**%s**" % lab["batch_criteria_title"])
+            render_criteria_summary(
+                summarize_batch_request(st.session_state.get("p2_batch_last_request")),
+                empty_caption=lab["criteria_empty"],
+            )
+            st.markdown("**%s**" % lab["batch_comparison_title"])
             st.text(_bd.get("comparison_summary") or "N/A")
             _rs = _bd.get("risk_summary")
             if isinstance(_rs, dict):
-                st.markdown("**Risk summary**")
+                st.markdown("**%s**" % lab["batch_risk_summary_title"])
                 st.caption(_rs.get("summary_text") or "N/A")
-            st.markdown("**Ranking**")
-            st.dataframe(_bd.get("ranking") or [], use_container_width=True, hide_index=True)
-
-            _t1 = _bd.get("top_1_recommendation")
-            if isinstance(_t1, dict):
-                st.markdown("##### Top recommendation")
-                render_listing_result_card(
-                    build_batch_row_card_model(_t1, highlight_top=bool(_t1.get("success")))
-                )
-                if _t1.get("success"):
-                    with st.expander("Top pick — extra reasons & concerns", expanded=False):
-                        st.caption("Recommended (sample)")
-                        for _ln in (_t1.get("recommended_reasons") or [])[:8]:
-                            st.markdown("- %s" % _display_text(_ln, ""))
-                        st.caption("Concerns (sample)")
-                        for _ln in (_t1.get("concerns") or [])[:6]:
-                            st.markdown("- %s" % _display_text(_ln, ""))
-
-            _t3 = _bd.get("top_3_recommendations") or []
-            if _t3:
-                st.markdown("**Top 3 indices**")
-                st.write(
-                    [
-                        {
-                            "index": x.get("index"),
-                            "score": x.get("score"),
-                            "code": x.get("decision_code"),
-                        }
-                        for x in _t3
-                        if isinstance(x, dict)
-                    ]
-                )
+            with st.expander(lab["p4_batch_ranking_expander"], expanded=False):
+                st.dataframe(_bd.get("ranking") or [], use_container_width=True, hide_index=True)
 
             _rows = _bd.get("results")
-            st.markdown("##### %s" % lab["batch_listing_cards"])
+            _displayed: list = []
+            _rows_raw: list = []
+            section_header(st, lab["p4_filter_sort_title"], level=4)
             if not isinstance(_rows, list) or len(_rows) == 0:
                 st.info(lab["batch_no_rows"])
             else:
-                for _r in _rows:
-                    if isinstance(_r, dict):
-                        render_listing_result_card(build_batch_row_card_model(_r, highlight_top=False))
-                        if _r.get("success"):
-                            with st.expander(
-                                "Listing #%s — bullets (debug)" % (_r.get("index", "?")),
-                                expanded=False,
-                            ):
-                                st.markdown("**decision_code:** `%s`" % (_r.get("decision_code") or "N/A"))
-                                st.markdown("**Recommended**")
-                                for _ln in (_r.get("recommended_reasons") or [])[:8]:
-                                    st.markdown("- %s" % _display_text(_ln, ""))
-                                st.markdown("**Concerns**")
-                                for _ln in (_r.get("concerns") or [])[:6]:
-                                    st.markdown("- %s" % _display_text(_ln, ""))
+                _rows_raw = [r for r in _rows if isinstance(r, dict)]
+                _top_set = collect_top_indices(_bd)
+                _src_choices = ["all"] + collect_source_values(_rows_raw)
+                _rec_labels = {
+                    "all": "All",
+                    "top_only": "Top only",
+                    "recommended_only": "Recommended only",
+                    "review_only": "Review only",
+                }
+                _bills_labels = {"all": "All", "included_only": "Bills included only"}
+                _fur_labels = {"all": "All", "furnished_only": "Furnished only"}
+                _ptype_labels = {
+                    "all": "All",
+                    "flat": "Flat",
+                    "house": "House",
+                    "studio": "Studio",
+                    "room": "Room",
+                }
+                _sort_labels = {
+                    "score_desc": "Score (high → low)",
+                    "rent_asc": "Rent (low → high)",
+                    "rent_desc": "Rent (high → low)",
+                    "bedrooms_desc": "Bedrooms (high → low)",
+                    "title_asc": "Title (A–Z)",
+                    "postcode_asc": "Postcode (A–Z)",
+                }
+                _r1, _r2, _r3 = st.columns(3)
+                with _r1:
+                    _fv_rec = st.selectbox(
+                        "Recommendation",
+                        options=list(_rec_labels.keys()),
+                        format_func=lambda k: _rec_labels[k],
+                        key="p4_batch_filter_rec",
+                    )
+                with _r2:
+                    _fv_bills = st.selectbox(
+                        "Bills",
+                        options=list(_bills_labels.keys()),
+                        format_func=lambda k: _bills_labels[k],
+                        key="p4_batch_filter_bills",
+                    )
+                with _r3:
+                    _fv_fur = st.selectbox(
+                        "Furnished",
+                        options=list(_fur_labels.keys()),
+                        format_func=lambda k: _fur_labels[k],
+                        key="p4_batch_filter_furnished",
+                    )
+                _r4, _r5, _r6 = st.columns(3)
+                with _r4:
+                    _fv_pt = st.selectbox(
+                        "Property type",
+                        options=list(_ptype_labels.keys()),
+                        format_func=lambda k: _ptype_labels[k],
+                        key="p4_batch_filter_ptype",
+                    )
+                with _r5:
+                    _fv_src = st.selectbox(
+                        "Source",
+                        options=_src_choices,
+                        format_func=lambda k: k if k != "all" else "All",
+                        key="p4_batch_filter_source",
+                    )
+                with _r6:
+                    _fv_sort = st.selectbox(
+                        "Sort by",
+                        options=list(_sort_labels.keys()),
+                        format_func=lambda k: _sort_labels[k],
+                        key="p4_batch_sort",
+                    )
+
+                _filtered = filter_batch_rows(
+                    _rows_raw,
+                    recommendation=_fv_rec,
+                    top_indices=_top_set,
+                    bills=_fv_bills,
+                    furnished=_fv_fur,
+                    property_type=_fv_pt,
+                    source=_fv_src,
+                )
+                _displayed = sort_batch_rows(_filtered, _fv_sort)
+
+            st.divider()
+            section_header(st, lab["p4_batch_results_by_tier"], level=4)
+            if not _rows_raw:
+                st.caption(lab["batch_tier_prereq"])
+            elif len(_displayed) == 0:
+                st.warning(lab["p4_no_matches"])
+            else:
+                render_batch_partitioned_listings(
+                    st,
+                    lab=lab,
+                    batch_data=_bd,
+                    rows_raw=_rows_raw,
+                    displayed=_displayed,
+                    debug_display_text_fn=_display_text,
+                    detail_key_prefix="p4_detail_batch",
+                )
 
 render_demo_footer()
