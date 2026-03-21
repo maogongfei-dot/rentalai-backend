@@ -1,0 +1,38 @@
+# Render Blueprint — RentalAI（最小双服务：FastAPI + Streamlit）
+# 仓库根为 python_learning、应用代码在 rental_app/ 时使用本文件。
+# 若你的 Git 仓库根目录就是 rental_app/，请在下方两个服务中删除 rootDir 字段。
+#
+# 文档：docs.render.com/docs/blueprint-spec
+# 首次部署后：在 Streamlit 服务环境变量中填写 RENTALAI_API_URL = FastAPI 服务的公网 URL（https://…）
+
+services:
+  - type: web
+    name: rentalai-api
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: rental_app
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+
+  - type: web
+    name: rentalai-ui
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: rental_app
+    # Playwright 下载 Chromium；构建可能较慢，若失败需在 Dashboard 调高超时或使用 Docker 运行时
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: streamlit run app_web.py --server.port $PORT --server.address 0.0.0.0
+    healthCheckPath: /
+    envVars:
+      # 进程内分析 + Agent/真实抓取；与本地 README 默认一致
+      - key: RENTALAI_USE_LOCAL
+        value: "1"
+      # 填 FastAPI 服务公网地址，例如 https://rentalai-api.onrender.com（无尾部斜杠）
+      - key: RENTALAI_API_URL
+        sync: false
+      # 可选：持久化 listings.json 到挂载盘路径（需先在 Dashboard 为该 Web Service 添加 Disk）
+      # - key: RENTALAI_LISTINGS_PATH
+      #   value: /opt/rentalai-data/listings.json

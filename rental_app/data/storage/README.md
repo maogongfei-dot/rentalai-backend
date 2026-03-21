@@ -8,6 +8,7 @@
 ## 默认路径
 
 - **`rental_app/data/listings.json`**（由 `DEFAULT_LISTINGS_PATH` 集中定义）
+- 若设置环境变量 **`RENTALAI_LISTINGS_PATH`**（绝对或用户目录路径），则覆盖默认文件位置，便于挂载卷部署。
 - 父目录不存在时会自动创建；文件不存在时读取为 **空列表**。
 
 ## 入口函数

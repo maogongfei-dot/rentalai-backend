@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +10,11 @@ from data.schema.listing_schema import ListingSchema
 
 # 与 schema、normalizer 同级：rental_app/data/listings.json
 _DATA_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_LISTINGS_PATH = str(_DATA_DIR / "listings.json")
+_env_listings = (os.environ.get("RENTALAI_LISTINGS_PATH") or "").strip()
+if _env_listings:
+    DEFAULT_LISTINGS_PATH = str(Path(_env_listings).expanduser().resolve())
+else:
+    DEFAULT_LISTINGS_PATH = str(_DATA_DIR / "listings.json")
 
 
 def _resolve_path(file_path: str | None) -> Path:
