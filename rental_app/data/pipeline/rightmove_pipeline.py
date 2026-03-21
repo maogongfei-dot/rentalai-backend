@@ -29,6 +29,7 @@ class RightmovePipelineResult(TypedDict, total=False):
     updated: int
     skipped: int
     sample_normalized: dict[str, Any] | None
+    normalized_listings: list[dict[str, Any]]
 
 
 def _utc_now_iso() -> str:
@@ -53,6 +54,22 @@ def _maybe_write_sample(path: Path, payload: Any) -> None:
         pass
 
 
+def _maybe_attach_normalized_listings(
+    out: RightmovePipelineResult,
+    normalized: list[ListingSchema] | None,
+    include: bool,
+) -> RightmovePipelineResult:
+    """供多平台聚合层拉取标准化结果；默认不附加以减小返回体积。"""
+    if not include:
+        return out
+    o: dict[str, Any] = dict(out)
+    if normalized is None:
+        o["normalized_listings"] = []
+    else:
+        o["normalized_listings"] = [L.to_dict() for L in normalized]
+    return o  # type: ignore[return-value]
+
+
 def run_rightmove_pipeline(
     *,
     query: dict[str, Any] | None = None,
@@ -61,12 +78,14 @@ def run_rightmove_pipeline(
     storage_path: str | None = None,
     save_raw_sample: bool = False,
     save_normalized_sample: bool = False,
+    include_normalized_listings: bool = False,
 ) -> RightmovePipelineResult:
     """
     RightmoveScraper → normalize_listing_batch(source=rightmove) → save_listings。
 
     - `normalization_skipped`：`is_valid_listing_payload` 未通过的核心弱记录数。
     - `skipped`：storage 批量保存时单条失败计数（与 `save_listings` 语义一致）。
+    - `include_normalized_listings=True` 时附加 `normalized_listings`（供多平台聚合）。
     """
     base_q = dict(query or {})
     save_raw_flag = bool(save_raw_sample) or bool(base_q.get("save_raw_sample", False))
@@ -83,17 +102,21 @@ def run_rightmove_pipeline(
         raw_rows = RightmoveScraper().scrape(query=scrape_q, limit=limit)
     except Exception as e:  # noqa: BLE001 — 闭环需结构化返回
         err = f"{type(e).__name__}: {e}"
-        return {
-            "success": False,
-            "error": err,
-            "raw_count": 0,
-            "normalized_count": 0,
-            "normalization_skipped": 0,
-            "saved": 0,
-            "updated": 0,
-            "skipped": 0,
-            "sample_normalized": None,
-        }
+        return _maybe_attach_normalized_listings(
+            {
+                "success": False,
+                "error": err,
+                "raw_count": 0,
+                "normalized_count": 0,
+                "normalization_skipped": 0,
+                "saved": 0,
+                "updated": 0,
+                "skipped": 0,
+                "sample_normalized": None,
+            },
+            None,
+            include_normalized_listings,
+        )
 
     stamp = _utc_now_iso()
     stamped: list[dict[str, Any]] = []
@@ -113,17 +136,21 @@ def run_rightmove_pipeline(
         normalized = normalize_listing_batch(stamped, source="rightmove")
     except Exception as e:
         err = f"{type(e).__name__}: {e}"
-        return {
-            "success": False,
-            "error": err,
-            "raw_count": len(stamped),
-            "normalized_count": 0,
-            "normalization_skipped": 0,
-            "saved": 0,
-            "updated": 0,
-            "skipped": 0,
-            "sample_normalized": None,
-        }
+        return _maybe_attach_normalized_listings(
+            {
+                "success": False,
+                "error": err,
+                "raw_count": len(stamped),
+                "normalized_count": 0,
+                "normalization_skipped": 0,
+                "saved": 0,
+                "updated": 0,
+                "skipped": 0,
+                "sample_normalized": None,
+            },
+            [],
+            include_normalized_listings,
+        )
 
     norm_skip = sum(
         1
@@ -156,19 +183,25 @@ def run_rightmove_pipeline(
         }
         if not storage_ok and err is None:
             out["error"] = "storage write failed"
-        return out
+        return _maybe_attach_normalized_listings(
+            out, normalized, include_normalized_listings
+        )
 
-    return {
-        "success": True,
-        "error": err,
-        "raw_count": len(stamped),
-        "normalized_count": len(normalized),
-        "normalization_skipped": norm_skip,
-        "saved": 0,
-        "updated": 0,
-        "skipped": 0,
-        "sample_normalized": normalized[0].to_dict() if normalized else None,
-    }
+    return _maybe_attach_normalized_listings(
+        {
+            "success": True,
+            "error": err,
+            "raw_count": len(stamped),
+            "normalized_count": len(normalized),
+            "normalization_skipped": norm_skip,
+            "saved": 0,
+            "updated": 0,
+            "skipped": 0,
+            "sample_normalized": normalized[0].to_dict() if normalized else None,
+        },
+        normalized,
+        include_normalized_listings,
+    )
 
 
 def scrape_and_normalize_rightmove(

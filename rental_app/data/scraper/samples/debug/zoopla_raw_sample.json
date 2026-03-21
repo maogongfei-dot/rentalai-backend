@@ -1,0 +1,31 @@
+{
+  "count": 2,
+  "sample": [
+    {
+      "source": "zoopla",
+      "listing_id": "72110609",
+      "title": "39 Hill Street, Mayfair, London W1J",
+      "price": "£2,817 pcm",
+      "bedrooms": null,
+      "address": "39 Hill Street, Mayfair, London W1J",
+      "url": "https://www.zoopla.co.uk/to-rent/details/72110609/",
+      "source_url": "https://www.zoopla.co.uk/to-rent/details/72110609/",
+      "property_type": "studio",
+      "summary": "Let UK Home are delighted to offer a good sized studio apartment on the 8th floor of this beautiful red brick building, ...",
+      "scraped_at": "2026-03-21T14:12:56.453211+00:00"
+    },
+    {
+      "source": "zoopla",
+      "listing_id": "69231280",
+      "title": "L-000495, 10 Electric Boulevard, Battersea SW11",
+      "price": "£2,850 pcm",
+      "bedrooms": null,
+      "address": "L-000495, 10 Electric Boulevard, Battersea SW11",
+      "url": "https://www.zoopla.co.uk/to-rent/details/69231280/",
+      "source_url": "https://www.zoopla.co.uk/to-rent/details/69231280/",
+      "property_type": "studio",
+      "summary": "An exceptional studio apartment with winter garden in Oakley House, Battersea Roof Gardens, designed by award-winning ...",
+      "scraped_at": "2026-03-21T14:12:56.453211+00:00"
+    }
+  ]
+}

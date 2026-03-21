@@ -31,4 +31,4 @@ python -c "from data.scraper.playwright_runner import run_zoopla_probe; print(ru
 
 ## 下一阶段（P7 Phase2）
 
-- **Zoopla → normalizer → storage** 闭环（镜像 `run_rightmove_pipeline`）。
+- 已实现：**Zoopla → normalizer → storage** 闭环，见 **`docs/P7_ZOOPLA_NORMALIZE_STORE_PIPELINE.md`**（`run_zoopla_pipeline` / `scripts/run_zoopla_pipeline.py`）。
