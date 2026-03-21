@@ -170,7 +170,8 @@ def run_playwright_scrape(config: ScraperRunConfig) -> list[dict[str, Any]]:
     """
     按 `ScraperRunConfig.source` 分发到平台抓取器；返回原始 `list[dict]`。
 
-    **P6 Phase3**：`source=rightmove` 时解析列表页卡片；其余平台仍返回 `[]`。
+    **当前**：`source=rightmove` 时解析列表页；**zoopla** 等平台在 Phase6+ 在此分支接入
+    （或委托 `zoopla_raw_from_config` 类入口），本阶段仍返回 `[]`。
     """
     key = (config.source or "").strip().lower()
     if key == "rightmove":

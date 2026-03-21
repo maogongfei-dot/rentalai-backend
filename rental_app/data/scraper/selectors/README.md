@@ -1,8 +1,8 @@
 # Selectors（P6 预留）
 
-**P6 Phase1**：不添加真实 CSS/XPath。下一阶段按平台分子文件，例如：
+按平台分文件集中管理列表页 selector（与 DOM 实填同步迭代）：
 
-- `rightmove_list.md` — 列表页字段与选择器草案（文档或代码常量）
-- `zoopla_list.md` — 同上
+- **`rightmove_selectors.py`** — Rightmove 列表页（Phase3+ 已使用）
+- **`zoopla_selectors.py`** — Zoopla 占位（Phase5+；Phase6+ 实填）
 
 命名与 DOM 以实际页面为准，需配合 Playwright 在 **小范围、少页数** 下迭代。

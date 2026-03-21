@@ -11,6 +11,15 @@ from .manual_mock_scraper import ManualMockScraper
 from .rightmove_scraper import RightmoveScraper
 from .zoopla_scraper import ZooplaScraper
 
+# 多平台入口：统一经 SCRAPER_REGISTRY + scrape_listings；新增平台在此注册 key 即可。
+# 顺序约定：rightmove（已落地）→ zoopla（准备中）→ manual_mock（开发）→ unknown（占位）。
+SCRAPER_PLATFORM_ORDER: tuple[str, ...] = (
+    "rightmove",
+    "zoopla",
+    "manual_mock",
+    "unknown",
+)
+
 
 class UnknownListingScraper(BaseListingScraper):
     """source=unknown：占位空结果，便于与注册表对齐。"""
@@ -32,6 +41,8 @@ SCRAPER_REGISTRY: dict[str, type[BaseListingScraper]] = {
     "manual_mock": ManualMockScraper,
     "unknown": UnknownListingScraper,
 }
+# 校验与 SCRAPER_PLATFORM_ORDER 一致（轻量文档化，避免注册表漂移）
+assert set(SCRAPER_PLATFORM_ORDER) == set(SCRAPER_REGISTRY.keys())
 
 
 def scrape_listings(

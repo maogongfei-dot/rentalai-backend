@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 from data.schema.listing_schema import ListingSchema
-from data.scraper.listing_scraper import SCRAPER_REGISTRY, scrape_listings
+from data.scraper.listing_scraper import (
+    SCRAPER_PLATFORM_ORDER,
+    SCRAPER_REGISTRY,
+    scrape_listings,
+)
 
 
 def test_registry_has_sources():
-    for s in ("rightmove", "zoopla", "manual_mock", "unknown"):
+    for s in SCRAPER_PLATFORM_ORDER:
         assert s in SCRAPER_REGISTRY
 
 
@@ -29,6 +33,10 @@ def test_rightmove_empty_search_url():
     assert scrape_listings("rightmove", query={"search_url": ""}, normalized=False) == []
 
 
+def test_zoopla_placeholder_returns_empty():
+    assert scrape_listings("zoopla", normalized=False) == []
+
+
 def test_unknown_source_empty():
     assert scrape_listings("not_a_platform", normalized=False) == []
 
@@ -38,5 +46,6 @@ if __name__ == "__main__":
     test_manual_mock_raw()
     test_manual_mock_normalized()
     test_rightmove_empty_search_url()
+    test_zoopla_placeholder_returns_empty()
     test_unknown_source_empty()
     print("test_listing_scraper: all ok")

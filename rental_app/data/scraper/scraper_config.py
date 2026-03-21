@@ -18,7 +18,7 @@ class ScraperRunConfig:
     """
 
     source: str
-    """优先 **rightmove**；第二 **zoopla**。与 SCRAPER_REGISTRY 的 key 对齐。"""
+    """平台名：**rightmove** / **zoopla** 等与 `SCRAPER_REGISTRY` key 对齐；与平台无关的通用任务参数共用本 dataclass，不另建 Zoopla 专用 config。"""
 
     search_url: str = ""
     """列表页或搜索入口 URL（Phase2+ 必填校验可放在 runner）。"""
