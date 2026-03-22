@@ -5,7 +5,7 @@ import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from typing import Any
+from typing import Any, Callable
 
 _logger = logging.getLogger("rentalai.ui")
 
@@ -227,3 +227,155 @@ def run_real_listings_analysis(
     meta["p7_errors"] = msa.get("errors") or []
     syn["meta"] = meta
     return syn, None, request_payload
+
+
+# ---------------------------------------------------------------------------
+# Async variant — submits to POST /tasks and polls GET /tasks/{task_id}
+# ---------------------------------------------------------------------------
+
+_ASYNC_POLL_INTERVAL = 3.0   # seconds between polls
+_ASYNC_MAX_POLLS = 80        # ~4 min max
+
+
+def run_real_listings_analysis_async(
+    *,
+    api_base_url: str,
+    intent: AgentRentalRequest | None = None,
+    form_raw: dict[str, Any] | None = None,
+    sources: list[str] | None = None,
+    limit_per_source: int = 10,
+    persist: bool = True,
+    headless: bool = True,
+    on_status: Callable[[str, str], None] | None = None,
+) -> tuple[dict[str, Any], str | None, dict[str, Any]]:
+    """Like ``run_real_listings_analysis`` but delegates work to the FastAPI
+    backend via ``POST /tasks`` + polling ``GET /tasks/{task_id}``.
+
+    *on_status(task_id, status_text)* is called on each poll iteration so
+    the caller (Streamlit) can update a progress widget.
+
+    Returns the same ``(envelope, optional_error, request_payload)`` tuple.
+    """
+    import requests as _req
+
+    scenario = build_scenario_property_for_request(intent, form_raw)
+    budget, target_pc = _resolve_budget_target_postcode(intent, form_raw)
+
+    request_payload: dict[str, Any] = {
+        "properties": [scenario],
+        "_p7_multi_source": True,
+        "_p7_async": True,
+    }
+
+    base = (api_base_url or "").rstrip("/")
+
+    task_body: dict[str, Any] = {
+        "limit_per_source": limit_per_source,
+        "headless": headless,
+        "persist": persist,
+    }
+    if sources:
+        task_body["sources"] = sources
+    if budget is not None:
+        task_body["budget"] = budget
+    if target_pc:
+        task_body["target_postcode"] = target_pc
+
+    # ---- submit ----
+    try:
+        resp = _req.post("%s/tasks" % base, json=task_body, timeout=15)
+        resp.raise_for_status()
+        created = resp.json()
+    except Exception as exc:
+        dbg = {"exception": "%s: %s" % (type(exc).__name__, exc)}
+        request_payload["_p7_debug"] = dbg
+        return (
+            _synthetic_failure_envelope("Failed to submit async task: %s" % exc, dbg),
+            str(exc),
+            request_payload,
+        )
+
+    task_id = created.get("task_id")
+    if not task_id:
+        dbg = {"exception": "No task_id in response"}
+        request_payload["_p7_debug"] = dbg
+        return (
+            _synthetic_failure_envelope("Server returned no task_id", dbg),
+            "No task_id",
+            request_payload,
+        )
+
+    _logger.info("[ASYNC] submitted task %s", task_id)
+    if on_status:
+        on_status(task_id, "queued")
+
+    # ---- poll ----
+    for poll_n in range(_ASYNC_MAX_POLLS):
+        time.sleep(_ASYNC_POLL_INTERVAL)
+        try:
+            resp = _req.get("%s/tasks/%s" % (base, task_id), timeout=10)
+            resp.raise_for_status()
+            state = resp.json()
+        except Exception:
+            if on_status:
+                on_status(task_id, "polling (network retry %d)" % (poll_n + 1))
+            continue
+
+        status = state.get("status", "unknown")
+        if on_status:
+            on_status(task_id, status)
+
+        if status in ("success", "degraded"):
+            msa = state.get("result") or {}
+            elapsed = state.get("elapsed_seconds") or 0
+            dbg = {
+                "sources_run": msa.get("sources_run") or [],
+                "total_raw_count": msa.get("total_raw_count"),
+                "aggregated_unique_count": msa.get("aggregated_unique_count"),
+                "total_normalized_count": msa.get("total_normalized_count"),
+                "total_analyzed_count": msa.get("total_analyzed_count"),
+                "properties_built_count": msa.get("properties_built_count"),
+                "pipeline_success": msa.get("pipeline_success"),
+                "seconds": elapsed,
+                "async_task_id": task_id,
+            }
+            request_payload["_p7_debug"] = dbg
+
+            env = msa.get("analysis_envelope")
+            if isinstance(env, dict) and env:
+                return _attach_p7_meta(env, dbg), None, request_payload
+
+            agg = int(msa.get("aggregated_unique_count") or 0)
+            msg = (
+                "No listings found, try adjusting your criteria"
+                if agg == 0
+                else "No listings could be analyzed after scraping."
+            )
+            syn = _synthetic_failure_envelope(msg, dbg)
+            meta = dict(syn.get("meta") or {})
+            meta["p7_errors"] = msa.get("errors") or []
+            syn["meta"] = meta
+            return syn, None, request_payload
+
+        if status == "failed":
+            error = state.get("error") or "Unknown error"
+            dbg = {"exception": error, "async_task_id": task_id}
+            request_payload["_p7_debug"] = dbg
+            return (
+                _synthetic_failure_envelope("Analysis failed: %s" % error, dbg),
+                error,
+                request_payload,
+            )
+
+    # poll limit exceeded
+    dbg = {"exception": "Polling timed out", "async_task_id": task_id}
+    request_payload["_p7_debug"] = dbg
+    return (
+        _synthetic_failure_envelope(
+            "Analysis still running after %d polls — check /tasks/%s manually"
+            % (_ASYNC_MAX_POLLS, task_id),
+            dbg,
+        ),
+        "Polling timed out",
+        request_payload,
+    )

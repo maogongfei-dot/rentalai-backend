@@ -40,6 +40,8 @@
 
 **P9 Phase3 Step3（异步任务骨架落地）**：新增 **`task_store.py`**（`TaskRecord` 数据类 + 线程安全 `TaskStore`，进程内 dict 存储，TTL 自动过期，200 条上限）；`api_server.py` 新增 `POST /tasks`（提交多平台分析任务，后台 daemon thread 执行）、`GET /tasks/{task_id}`（查询任务状态/结果）、`GET /tasks`（列出活跃任务）。试点流程：`run_multi_source_analysis`。新增 **`P9_PHASE3_ASYNC_TASK_SKELETON.md`**（骨架架构文档）、**`P9_PHASE3_TASK_API_QUICKREF.md`**（快速 API 参考）。所有旧同步端点不受影响。
 
+**P9 Phase3 Step4（异步试点闭环）**：`api_server.py` 新增 `Semaphore(1)` 并发保护，防止多个 Playwright 实例 OOM。`real_analysis_service.py` 新增 `run_real_listings_analysis_async()` — 通过 HTTP `POST /tasks` + 轮询 `GET /tasks/{task_id}` 完成异步分析，返回与同步版完全兼容的三元组。`app_web.py` 侧栏新增 **Async mode (pilot)** checkbox，勾选后 batch expander 按钮走异步路径，结果复用现有 batch 渲染。旧同步流程完全保留。新增 **`P9_PHASE3_ASYNC_PILOT_INTEGRATION.md`**（完整闭环文档）、**`P9_PHASE3_ASYNC_PILOT_USER_FLOW.md`**（用户流程）。
+
 ---
 
 ## 1. Current Project Structure

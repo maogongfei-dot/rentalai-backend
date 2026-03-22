@@ -193,28 +193,41 @@ class AnalyzeRealRequest(BaseModel):
     persist: bool = Field(default=True)
 
 
+_TASK_SEMAPHORE = threading.Semaphore(1)
+
+
 def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
     """Background thread target: runs multi-source analysis and updates the task store."""
-    _task_store.mark_running(task_id)
-    t0 = time.perf_counter()
-    try:
-        from data.pipeline.analysis_bridge import run_multi_source_analysis
-
-        result = run_multi_source_analysis(
-            sources=params.get("sources"),
-            query={"headless": params.get("headless", True)},
-            limit_per_source=params.get("limit_per_source", 10),
-            persist=params.get("persist", True),
-            budget=params.get("budget"),
-            target_postcode=params.get("target_postcode"),
+    acquired = _TASK_SEMAPHORE.acquire(timeout=5)
+    if not acquired:
+        _task_store.mark_failed(
+            task_id,
+            "Server busy — another analysis task is already running. Try again shortly.",
         )
-        elapsed = time.perf_counter() - t0
-        degraded = bool(result.get("degraded"))
-        _task_store.mark_success(task_id, result, degraded=degraded, elapsed=elapsed)
-    except Exception as exc:
-        elapsed = time.perf_counter() - t0
-        logger.error("[TASK] %s failed: %s", task_id, exc, exc_info=True)
-        _task_store.mark_failed(task_id, str(exc), elapsed=elapsed)
+        return
+    try:
+        _task_store.mark_running(task_id)
+        t0 = time.perf_counter()
+        try:
+            from data.pipeline.analysis_bridge import run_multi_source_analysis
+
+            result = run_multi_source_analysis(
+                sources=params.get("sources"),
+                query={"headless": params.get("headless", True)},
+                limit_per_source=params.get("limit_per_source", 10),
+                persist=params.get("persist", True),
+                budget=params.get("budget"),
+                target_postcode=params.get("target_postcode"),
+            )
+            elapsed = time.perf_counter() - t0
+            degraded = bool(result.get("degraded"))
+            _task_store.mark_success(task_id, result, degraded=degraded, elapsed=elapsed)
+        except Exception as exc:
+            elapsed = time.perf_counter() - t0
+            logger.error("[TASK] %s failed: %s", task_id, exc, exc_info=True)
+            _task_store.mark_failed(task_id, str(exc), elapsed=elapsed)
+    finally:
+        _TASK_SEMAPHORE.release()
 
 
 @app.post("/tasks")

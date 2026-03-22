@@ -34,7 +34,7 @@ from web_ui.listing_result_card import (
 )
 from web_ui.agent_entry import render_p5_agent_entry
 from web_ui.rental_intent import AgentRentalRequest
-from web_ui.real_analysis_service import run_real_listings_analysis
+from web_ui.real_analysis_service import run_real_listings_analysis, run_real_listings_analysis_async
 from web_ui.agent_insight_summary import build_agent_insight_bundle, resolve_intent_for_insights
 from web_ui.agent_summary_panel import render_agent_insight_panel
 from web_ui.batch_results_view import render_batch_partitioned_listings
@@ -660,10 +660,17 @@ st.sidebar.checkbox(
     value=bool(st.session_state.get("p7_persist_listings", True)),
     key="p7_persist_listings",
 )
+st.sidebar.checkbox(
+    "Async mode (pilot)",
+    value=bool(st.session_state.get("p7_async_pilot", False)),
+    key="p7_async_pilot",
+    help="Run analysis via backend async task (POST /tasks). Requires API to be running.",
+)
 
 _p7_lim = int(st.session_state.get("p7_limit_per_source", 8))
 _p7_h = bool(st.session_state.get("p7_headless", True))
 _p7_persist = bool(st.session_state.get("p7_persist_listings", True))
+_p7_async = bool(st.session_state.get("p7_async_pilot", False))
 
 # --- P5 + P7：Agent 入口（自然语言 → 预览 → 真实多平台抓取 + batch）---
 render_p5_agent_entry(
@@ -970,8 +977,12 @@ _DEFAULT_BATCH_JSON = """{
 }"""
 with st.expander(lab["batch_section_expander"], expanded=False):
     st.caption(lab.get("p7_real_batch_intro", ""))
+    _real_btn_label = (
+        lab.get("p7_real_batch_button", "Run real multi-source analysis")
+        + (" (async)" if _p7_async else "")
+    )
     if st.button(
-        lab.get("p7_real_batch_button", "Run real multi-source analysis"),
+        _real_btn_label,
         key="p7_real_batch",
         help=lab.get("p7_real_batch_help", ""),
     ):
@@ -980,29 +991,64 @@ with st.expander(lab["batch_section_expander"], expanded=False):
             AgentRentalRequest.from_dict(_intent_d) if isinstance(_intent_d, dict) else None
         )
         _raw_f = collect_raw_form_from_session()
-        try:
-            with st.spinner(lab.get("p7_real_spinner", "Running…")):
-                _env, _terr, _req = run_real_listings_analysis(
+
+        if _p7_async:
+            # ---- Async pilot path: POST /tasks + poll ----
+            _status_box = st.empty()
+            _status_box.info("Submitting async task to backend…")
+
+            def _on_status(tid: str, status_text: str) -> None:
+                _status_box.info("Task **%s** — %s" % (tid, status_text))
+
+            try:
+                _env, _terr, _req = run_real_listings_analysis_async(
+                    api_base_url=_api_base,
                     intent=_intent_o,
                     form_raw=_raw_f,
                     limit_per_source=_p7_lim,
                     headless=_p7_h,
                     persist=_p7_persist,
+                    on_status=_on_status,
                 )
-        except Exception as _ex:  # noqa: BLE001
-            st.session_state["p2_batch_last"] = {
-                "success": False,
-                "error": {"message": str(_ex)},
-            }
-            st.session_state["p2_batch_last_request"] = {"properties": []}
+            except Exception as _ex:  # noqa: BLE001
+                st.session_state["p2_batch_last"] = {
+                    "success": False,
+                    "error": {"message": str(_ex)},
+                }
+                st.session_state["p2_batch_last_request"] = {"properties": []}
+            else:
+                st.session_state["p2_batch_last"] = _env
+                st.session_state["p2_batch_last_request"] = _req
+                if isinstance(_req, dict) and _req.get("_p7_debug"):
+                    st.session_state["p7_last_debug"] = _req["_p7_debug"]
+                if _terr and isinstance(_req, dict):
+                    _req.setdefault("_p7_transport_note", _terr)
+            st.rerun()
         else:
-            st.session_state["p2_batch_last"] = _env
-            st.session_state["p2_batch_last_request"] = _req
-            if isinstance(_req, dict) and _req.get("_p7_debug"):
-                st.session_state["p7_last_debug"] = _req["_p7_debug"]
-            if _terr and isinstance(_req, dict):
-                _req.setdefault("_p7_transport_note", _terr)
-        st.rerun()
+            # ---- Original sync path (unchanged) ----
+            try:
+                with st.spinner(lab.get("p7_real_spinner", "Running…")):
+                    _env, _terr, _req = run_real_listings_analysis(
+                        intent=_intent_o,
+                        form_raw=_raw_f,
+                        limit_per_source=_p7_lim,
+                        headless=_p7_h,
+                        persist=_p7_persist,
+                    )
+            except Exception as _ex:  # noqa: BLE001
+                st.session_state["p2_batch_last"] = {
+                    "success": False,
+                    "error": {"message": str(_ex)},
+                }
+                st.session_state["p2_batch_last_request"] = {"properties": []}
+            else:
+                st.session_state["p2_batch_last"] = _env
+                st.session_state["p2_batch_last_request"] = _req
+                if isinstance(_req, dict) and _req.get("_p7_debug"):
+                    st.session_state["p7_last_debug"] = _req["_p7_debug"]
+                if _terr and isinstance(_req, dict):
+                    _req.setdefault("_p7_transport_note", _terr)
+            st.rerun()
 
     st.caption(lab["batch_section_caption"])
     _dbg = st.session_state.get("p7_last_debug")
