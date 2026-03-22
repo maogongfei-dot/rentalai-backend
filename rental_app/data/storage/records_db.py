@@ -15,6 +15,7 @@ import json
 import os
 import sqlite3
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -103,6 +104,7 @@ def init_records_db() -> None:
                 CREATE TABLE IF NOT EXISTS task_records (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     task_id TEXT NOT NULL UNIQUE,
+                    user_id TEXT,
                     task_type TEXT,
                     status TEXT,
                     input_summary TEXT,
@@ -120,6 +122,7 @@ def init_records_db() -> None:
                 """
                 CREATE TABLE IF NOT EXISTS analysis_records (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT,
                     analysis_type TEXT NOT NULL,
                     input_hash TEXT,
                     input_summary TEXT,
@@ -151,6 +154,18 @@ def init_records_db() -> None:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    email TEXT NOT NULL UNIQUE,
+                    password TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            _ensure_column(conn, "task_records", "user_id", "TEXT")
+            _ensure_column(conn, "analysis_records", "user_id", "TEXT")
             conn.commit()
 
 
@@ -168,10 +183,11 @@ def upsert_task_record(task: dict[str, Any]) -> None:
             conn.execute(
                 """
                 INSERT INTO task_records (
-                    task_id, task_type, status, input_summary, result_summary, error, degraded,
+                    task_id, user_id, task_type, status, input_summary, result_summary, error, degraded,
                     created_at, updated_at, started_at, finished_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(task_id) DO UPDATE SET
+                    user_id=excluded.user_id,
                     task_type=excluded.task_type,
                     status=excluded.status,
                     input_summary=excluded.input_summary,
@@ -185,6 +201,7 @@ def upsert_task_record(task: dict[str, Any]) -> None:
                 """,
                 (
                     task_id,
+                    task.get("user_id"),
                     task_type,
                     status,
                     _json_text(input_summary),
@@ -207,6 +224,7 @@ def insert_analysis_record(
     result_summary: dict[str, Any] | None,
     raw_result_ref: str | None = None,
     source: str = "unknown",
+    user_id: str | None = None,
 ) -> int:
     now = _utc_now_iso()
     sig = normalize_analysis_input_signature(input_summary)
@@ -215,10 +233,11 @@ def insert_analysis_record(
             cur = conn.execute(
                 """
                 INSERT INTO analysis_records (
-                    analysis_type, input_hash, input_summary, result_summary, raw_result_ref, source, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    user_id, analysis_type, input_hash, input_summary, result_summary, raw_result_ref, source, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    user_id,
                     analysis_type,
                     _input_hash(sig),
                     _json_text(sig),
@@ -236,6 +255,7 @@ def find_reusable_analysis_result(
     *,
     analysis_type: str,
     input_summary: dict[str, Any] | None,
+    user_id: str | None = None,
     max_age_seconds: int = 1800,
 ) -> dict[str, Any] | None:
     """Return cached full result when available and not expired.
@@ -256,14 +276,24 @@ def find_reusable_analysis_result(
     with _DB_LOCK:
         with _connect() as conn:
             row = conn.execute(
-                """
-                SELECT result_summary, created_at
-                FROM analysis_records
-                WHERE analysis_type = ? AND input_hash = ?
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                (analysis_type, h),
+                (
+                    """
+                    SELECT result_summary, created_at
+                    FROM analysis_records
+                    WHERE analysis_type = ? AND input_hash = ? AND user_id = ?
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """
+                    if user_id is not None
+                    else """
+                    SELECT result_summary, created_at
+                    FROM analysis_records
+                    WHERE analysis_type = ? AND input_hash = ? AND user_id IS NULL
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """
+                ),
+                ((analysis_type, h, user_id) if user_id is not None else (analysis_type, h)),
             ).fetchone()
     if not row:
         return None
@@ -351,41 +381,98 @@ def upsert_property_records(rows: list[dict[str, Any]]) -> dict[str, int]:
     return {"inserted": inserted, "updated": updated, "skipped": skipped}
 
 
-def list_task_records(limit: int = 50) -> list[dict[str, Any]]:
+def list_task_records(limit: int = 50, *, user_id: str | None = None) -> list[dict[str, Any]]:
     limit = min(max(int(limit), 1), 200)
     with _DB_LOCK:
         with _connect() as conn:
             rows = conn.execute(
-                """
-                SELECT *
-                FROM task_records
-                ORDER BY updated_at DESC
-                LIMIT ?
-                """,
-                (limit,),
+                (
+                    """
+                    SELECT *
+                    FROM task_records
+                    WHERE user_id = ?
+                    ORDER BY updated_at DESC
+                    LIMIT ?
+                    """
+                    if user_id is not None
+                    else """
+                    SELECT *
+                    FROM task_records
+                    ORDER BY updated_at DESC
+                    LIMIT ?
+                    """
+                ),
+                ((user_id, limit) if user_id is not None else (limit,)),
             ).fetchall()
     out: list[dict[str, Any]] = []
     for row in rows:
-        d = dict(row)
-        d["degraded"] = bool(d.get("degraded"))
-        d["input_summary"] = _json_obj(d.get("input_summary"))
-        d["result_summary"] = _json_obj(d.get("result_summary"))
-        out.append(d)
+        out.append(_task_row_to_dict(row))
     return out
 
 
-def list_analysis_records(limit: int = 50) -> list[dict[str, Any]]:
+def get_task_record_by_task_id(task_id: str) -> dict[str, Any] | None:
+    tid = str(task_id or "").strip()
+    if not tid:
+        return None
+    with _DB_LOCK:
+        with _connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM task_records
+                WHERE task_id = ?
+                LIMIT 1
+                """,
+                (tid,),
+            ).fetchone()
+    if row is None:
+        return None
+    return _task_row_to_dict(row)
+
+
+def get_task_record_by_task_id_for_user(task_id: str, *, user_id: str) -> dict[str, Any] | None:
+    tid = str(task_id or "").strip()
+    uid = str(user_id or "").strip()
+    if not tid or not uid:
+        return None
+    with _DB_LOCK:
+        with _connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM task_records
+                WHERE task_id = ? AND user_id = ?
+                LIMIT 1
+                """,
+                (tid, uid),
+            ).fetchone()
+    if row is None:
+        return None
+    return _task_row_to_dict(row)
+
+
+def list_analysis_records(limit: int = 50, *, user_id: str | None = None) -> list[dict[str, Any]]:
     limit = min(max(int(limit), 1), 200)
     with _DB_LOCK:
         with _connect() as conn:
             rows = conn.execute(
-                """
-                SELECT *
-                FROM analysis_records
-                ORDER BY id DESC
-                LIMIT ?
-                """,
-                (limit,),
+                (
+                    """
+                    SELECT *
+                    FROM analysis_records
+                    WHERE user_id = ?
+                    ORDER BY id DESC
+                    LIMIT ?
+                    """
+                    if user_id is not None
+                    else """
+                    SELECT *
+                    FROM analysis_records
+                    ORDER BY id DESC
+                    LIMIT ?
+                    """
+                ),
+                ((user_id, limit) if user_id is not None else (limit,)),
             ).fetchall()
     out: list[dict[str, Any]] = []
     for row in rows:
@@ -410,4 +497,70 @@ def list_property_records(limit: int = 50) -> list[dict[str, Any]]:
                 (limit,),
             ).fetchall()
     return [dict(r) for r in rows]
+
+
+def _task_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    d = dict(row)
+    d["degraded"] = bool(d.get("degraded"))
+    d["input_summary"] = _json_obj(d.get("input_summary"))
+    d["result_summary"] = _json_obj(d.get("result_summary"))
+    return d
+
+
+def create_user(email: str, password: str) -> dict[str, Any] | None:
+    em = str(email or "").strip().lower()
+    pw = str(password or "")
+    if not em or not pw:
+        return None
+    user_id = uuid.uuid4().hex
+    now = _utc_now_iso()
+    with _DB_LOCK:
+        with _connect() as conn:
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO users (id, email, password, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (user_id, em, _password_hash(pw), now),
+                )
+                conn.commit()
+            except sqlite3.IntegrityError:
+                return None
+    return {"id": user_id, "email": em, "created_at": now}
+
+
+def verify_user(email: str, password: str) -> dict[str, Any] | None:
+    em = str(email or "").strip().lower()
+    pw = str(password or "")
+    if not em or not pw:
+        return None
+    with _DB_LOCK:
+        with _connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, email, created_at, password
+                FROM users
+                WHERE email = ?
+                LIMIT 1
+                """,
+                (em,),
+            ).fetchone()
+    if row is None:
+        return None
+    if row["password"] != _password_hash(pw):
+        return None
+    return {"id": row["id"], "email": row["email"], "created_at": row["created_at"]}
+
+
+def _password_hash(password: str) -> str:
+    return hashlib.sha256(str(password).encode("utf-8")).hexdigest()
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, col_type: str) -> None:
+    rows = conn.execute("PRAGMA table_info(%s)" % table).fetchall()
+    names = {r[1] for r in rows}
+    if column in names:
+        return
+    conn.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, column, col_type))
 

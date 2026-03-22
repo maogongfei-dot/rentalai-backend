@@ -53,6 +53,7 @@ def _process_agent_batch_submit(
     headless: bool,
     persist_listings: bool,
     async_mode: bool = False,
+    auth_token: str | None = None,
 ) -> None:
     """Continue to Analysis → submitting → analysis_*（P7：真实多平台 + batch）。"""
     if st.session_state.get(P5_KEY_PHASE) != PHASE_SUBMITTING:
@@ -75,6 +76,7 @@ def _process_agent_batch_submit(
             persist_listings=persist_listings,
             async_mode=True,
             on_status=_on_status,
+            auth_token=auth_token,
         )
     else:
         with st.spinner(lab.get("p5_agent_spinner_submit", "Running batch analysis…")):
@@ -85,6 +87,7 @@ def _process_agent_batch_submit(
                 limit_per_source=limit_per_source,
                 headless=headless,
                 persist_listings=persist_listings,
+                auth_token=auth_token,
             )
     if resp is None:
         st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_ERROR
@@ -152,6 +155,7 @@ def render_p5_agent_entry(
     headless: bool = True,
     persist_listings: bool = True,
     async_mode: bool = False,
+    auth_token: str | None = None,
 ) -> None:
     """
     顺序：1) 输入 2) Parse 3) 预览 4) Continue to Analysis 5) 状态提示。
@@ -181,6 +185,7 @@ def render_p5_agent_entry(
         headless=headless,
         persist_listings=persist_listings,
         async_mode=async_mode,
+        auth_token=auth_token,
     )
 
     migrate_agent_phase(st.session_state)

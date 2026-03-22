@@ -8,10 +8,12 @@ import os
 import queue
 import time
 import traceback
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import Body, FastAPI, Request
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,13 +24,18 @@ from alert_utils import FailureTracker, send_alert
 from api_analysis import analyze_batch_request_body, modular_analyze_response
 from data.storage.records_db import (
     _DB_PATH as _RECORDS_DB_PATH,
+    create_user,
     find_reusable_analysis_result,
     init_records_db,
     insert_analysis_record,
-    list_analysis_records,
-    list_property_records,
-    list_task_records,
     normalize_analysis_input_signature,
+    verify_user,
+)
+from data.storage.records_query_service import (
+    get_recent_analysis_records,
+    get_recent_property_records,
+    get_recent_task_records,
+    get_task_record_detail,
 )
 from task_store import TaskStore
 
@@ -136,6 +143,37 @@ def _body_dict(body: AnalyzeRequest) -> dict:
     return body.model_dump(exclude_none=True)
 
 
+_AUTH_TOKENS: dict[str, str] = {}
+_AUTH_LOCK = threading.Lock()
+
+
+class AuthRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    email: str
+    password: str
+
+
+def _issue_token(user_id: str) -> str:
+    token = uuid.uuid4().hex
+    with _AUTH_LOCK:
+        _AUTH_TOKENS[token] = user_id
+    return token
+
+
+def _get_user_id_from_request(request: Request) -> str:
+    auth = request.headers.get("Authorization") or ""
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="missing_bearer_token")
+    token = auth[len("Bearer "):].strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="invalid_bearer_token")
+    with _AUTH_LOCK:
+        user_id = _AUTH_TOKENS.get(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="invalid_or_expired_token")
+    return user_id
+
+
 @app.get("/health")
 def health():
     return {
@@ -154,6 +192,29 @@ def alerts_status():
         "threshold": _api_failures._threshold,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.post("/auth/register")
+def auth_register(body: AuthRequest):
+    user = create_user(body.email, body.password)
+    if user is None:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "register_failed", "message": "Email already exists or invalid input."},
+        )
+    return {"user_id": user["id"], "email": user["email"], "created_at": user["created_at"]}
+
+
+@app.post("/auth/login")
+def auth_login(body: AuthRequest):
+    user = verify_user(body.email, body.password)
+    if user is None:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "login_failed", "message": "Invalid email or password."},
+        )
+    token = _issue_token(user["id"])
+    return {"user_id": user["id"], "token": token}
 
 
 @app.post("/analyze")
@@ -261,10 +322,13 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
         "budget": params.get("budget"),
         "target_postcode": params.get("target_postcode"),
     })
+    rec = _task_store.get(task_id)
+    user_id = rec.user_id if rec else None
     if _ANALYSIS_CACHE_ENABLED:
         cached_result = find_reusable_analysis_result(
             analysis_type="multi_source_analysis",
             input_summary=analysis_input,
+            user_id=user_id,
             max_age_seconds=_ANALYSIS_CACHE_MAX_AGE_SECONDS,
         )
         if isinstance(cached_result, dict):
@@ -289,6 +353,7 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
                         "reusable_result": cached_result,
                     },
                     source="cache_hit",
+                    user_id=user_id,
                 )
             except Exception:
                 logger.warning("[DATA] failed to persist cache-hit record for task %s", task_id, exc_info=True)
@@ -329,6 +394,7 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
                     "reusable_result": result if analysis_summary["cacheable"] else None,
                 },
                 source="async_task",
+                user_id=user_id,
             )
         except Exception:
             logger.warning("[DATA] failed to persist analysis record for task %s", task_id, exc_info=True)
@@ -352,6 +418,7 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
                     "reusable_result": None,
                 },
                 source="async_task_failed",
+                user_id=user_id,
             )
         except Exception:
             logger.warning("[DATA] failed to persist failed analysis record for task %s", task_id, exc_info=True)
@@ -363,7 +430,7 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
 
 
 @app.post("/tasks")
-def create_task(body: AnalyzeRealRequest = AnalyzeRealRequest()):
+def create_task(request: Request, body: AnalyzeRealRequest = AnalyzeRealRequest()):
     """Submit a multi-source scrape + analyze job.  Returns immediately with a task_id.
 
     Poll ``GET /tasks/{task_id}`` to check progress and retrieve results.
@@ -373,7 +440,8 @@ def create_task(body: AnalyzeRealRequest = AnalyzeRealRequest()):
         "sources": params.get("sources"),
         "limit_per_source": params.get("limit_per_source"),
     }
-    rec = _task_store.create(input_summary=summary)
+    user_id = _get_user_id_from_request(request)
+    rec = _task_store.create(input_summary=summary, user_id=user_id)
     _start_task_workers_once()
     _TASK_QUEUE.put((rec.task_id, params))
     logger.info("[TASK] queued %s (queue_size=%s)", rec.task_id, _TASK_QUEUE.qsize())
@@ -381,7 +449,7 @@ def create_task(body: AnalyzeRealRequest = AnalyzeRealRequest()):
 
 
 @app.get("/tasks")
-def list_tasks(mode: str = "active", limit: int = 30):
+def list_tasks(request: Request, mode: str = "active", limit: int = 30):
     """List tasks.
 
     Query params:
@@ -389,22 +457,25 @@ def list_tasks(mode: str = "active", limit: int = 30):
                  ``recent``: most recent *limit* tasks regardless of status.
         limit  – max tasks to return (default 30, max 100).
     """
+    user_id = _get_user_id_from_request(request)
     limit = min(max(limit, 1), 100)
     if mode == "recent":
-        return {"tasks": _task_store.list_recent(limit=limit)}
-    return {"tasks": _task_store.list_active()}
+        return {"tasks": _task_store.list_recent(limit=limit, user_id=user_id)}
+    return {"tasks": _task_store.list_active(user_id=user_id)}
 
 
 @app.get("/tasks/stats")
-def task_stats():
+def task_stats(request: Request):
     """Aggregate task counts by status."""
-    return _task_store.stats()
+    user_id = _get_user_id_from_request(request)
+    return _task_store.stats(user_id=user_id)
 
 
 @app.get("/tasks/system")
-def task_system_status():
+def task_system_status(request: Request):
     """Minimal queue + worker observability for ops checks."""
-    stats = _task_store.stats()
+    user_id = _get_user_id_from_request(request)
+    stats = _task_store.stats(user_id=user_id)
     by_status = stats.get("by_status") or {}
     return {
         "queued_count": int(by_status.get("queued", 0)),
@@ -417,10 +488,11 @@ def task_system_status():
 
 
 @app.get("/tasks/{task_id}")
-def get_task(task_id: str):
+def get_task(request: Request, task_id: str):
     """Query the current state of an async task."""
+    user_id = _get_user_id_from_request(request)
     rec = _task_store.get(task_id)
-    if rec is None:
+    if rec is None or rec.user_id != user_id:
         return JSONResponse(
             status_code=404,
             content={"error": "task_not_found", "task_id": task_id},
@@ -447,30 +519,52 @@ def get_task(task_id: str):
 
 
 @app.get("/records/tasks")
-def list_record_tasks(limit: int = 30):
+def list_record_tasks(request: Request, limit: int = 30):
     """Minimal query endpoint for persisted task records."""
+    user_id = _get_user_id_from_request(request)
+    records = get_recent_task_records(limit=limit, user_id=user_id)
     return {
-        "records": list_task_records(limit=limit),
+        "records": records,
+        "count": len(records),
         "storage": "sqlite",
         "db_path": _RECORDS_DB_PATH,
     }
 
 
+@app.get("/records/tasks/{task_id}")
+def get_record_task_detail(request: Request, task_id: str):
+    """Task detail endpoint for persisted task history."""
+    user_id = _get_user_id_from_request(request)
+    rec = get_task_record_detail(task_id, user_id=user_id)
+    if rec is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "record_task_not_found", "task_id": task_id},
+        )
+    return {"record": rec, "storage": "sqlite", "db_path": _RECORDS_DB_PATH}
+
+
 @app.get("/records/analysis")
-def list_record_analysis(limit: int = 30):
+def list_record_analysis(request: Request, limit: int = 30):
     """Minimal query endpoint for persisted analysis records."""
+    user_id = _get_user_id_from_request(request)
+    records = get_recent_analysis_records(limit=limit, user_id=user_id)
     return {
-        "records": list_analysis_records(limit=limit),
+        "records": records,
+        "count": len(records),
         "storage": "sqlite",
         "db_path": _RECORDS_DB_PATH,
     }
 
 
 @app.get("/records/properties")
-def list_record_properties(limit: int = 30):
+def list_record_properties(request: Request, limit: int = 30):
     """Minimal query endpoint for persisted property records."""
+    _ = _get_user_id_from_request(request)
+    records = get_recent_property_records(limit=limit)
     return {
-        "records": list_property_records(limit=limit),
+        "records": records,
+        "count": len(records),
         "storage": "sqlite",
         "db_path": _RECORDS_DB_PATH,
     }

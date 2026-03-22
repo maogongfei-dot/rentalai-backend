@@ -200,6 +200,7 @@ def run_analysis_for_ui(
     use_local: bool,
     api_base_url: str,
     api_endpoint: str = "/analyze",
+    auth_token: str | None = None,
 ) -> tuple[dict | None, str | None]:
     """
     P2 Phase3：HTTP 可调 /analyze、/score-breakdown、/risk-check、/explain-only；
@@ -232,7 +233,8 @@ def run_analysis_for_ui(
     url = "%s%s" % ((api_base_url or "").rstrip("/"), path)
     try:
         _t0 = _time.perf_counter()
-        resp = requests.post(url, json=raw_form, timeout=120)
+        headers = {"Authorization": "Bearer %s" % auth_token} if auth_token else None
+        resp = requests.post(url, json=raw_form, timeout=120, headers=headers)
         resp.raise_for_status()
         data = resp.json()
         _dur = _time.perf_counter() - _t0
@@ -639,6 +641,61 @@ if _api_default.startswith("http://127.") or _api_default.startswith("http://loc
 else:
     st.sidebar.caption("API: **%s**" % _api_default)
 
+# --- P10 Phase2: minimal auth (register/login) ---
+st.sidebar.markdown("### User (P10 minimal auth)")
+_auth_email = st.sidebar.text_input("Email", value=st.session_state.get("auth_email", ""), key="auth_email")
+_auth_password = st.sidebar.text_input("Password", value="", type="password", key="auth_password")
+_auth_token = st.session_state.get("auth_token")
+_auth_user_id = st.session_state.get("auth_user_id")
+_auth_msg = ""
+if st.sidebar.button("Register", key="auth_register_btn", disabled=_use_local):
+    import requests as _req
+    try:
+        _resp = _req.post(
+            "%s/auth/register" % _api_base.rstrip("/"),
+            json={"email": _auth_email, "password": _auth_password},
+            timeout=15,
+        )
+        if _resp.status_code >= 400:
+            _auth_msg = "Register failed: %s" % _resp.text
+        else:
+            _auth_msg = "Register success. Please login."
+    except Exception as _ex:  # noqa: BLE001
+        _auth_msg = "Register error: %s" % _ex
+if st.sidebar.button("Login", key="auth_login_btn", disabled=_use_local):
+    import requests as _req
+    try:
+        _resp = _req.post(
+            "%s/auth/login" % _api_base.rstrip("/"),
+            json={"email": _auth_email, "password": _auth_password},
+            timeout=15,
+        )
+        if _resp.status_code >= 400:
+            _auth_msg = "Login failed: %s" % _resp.text
+            st.session_state.pop("auth_token", None)
+            st.session_state.pop("auth_user_id", None)
+        else:
+            _bj = _resp.json()
+            st.session_state["auth_token"] = _bj.get("token")
+            st.session_state["auth_user_id"] = _bj.get("user_id")
+            _auth_token = st.session_state.get("auth_token")
+            _auth_user_id = st.session_state.get("auth_user_id")
+            _auth_msg = "Login success."
+    except Exception as _ex:  # noqa: BLE001
+        _auth_msg = "Login error: %s" % _ex
+if st.sidebar.button("Logout", key="auth_logout_btn"):
+    st.session_state.pop("auth_token", None)
+    st.session_state.pop("auth_user_id", None)
+    _auth_token = None
+    _auth_user_id = None
+    _auth_msg = "Logged out."
+if _auth_user_id:
+    st.sidebar.caption("Current user: `%s`" % _auth_user_id)
+elif not _use_local:
+    st.sidebar.caption("Please login for async tasks and history queries.")
+if _auth_msg:
+    st.sidebar.caption(_auth_msg)
+
 # --- P7 Phase5: 真实多平台抓取 + batch（侧栏控制 Agent 与 batch 区按钮）---
 st.sidebar.markdown("### %s" % lab.get("p7_sidebar_title", "Real listings (P7)"))
 st.sidebar.caption(lab.get("p7_sidebar_caption", ""))
@@ -683,6 +740,7 @@ render_p5_agent_entry(
     headless=_p7_h,
     persist_listings=_p7_persist,
     async_mode=_p7_async,
+    auth_token=_auth_token,
 )
 
 # --- Phase6: 输入区（表单 → 再操作按钮，顺序与验收一致）---
@@ -747,6 +805,7 @@ else:
                 use_local=_use_local,
                 api_base_url=_api_base,
                 api_endpoint=_api_endpoint,
+                auth_token=_auth_token,
             )
         if transport_err:
             err_msg = transport_err
@@ -1010,6 +1069,7 @@ with st.expander(lab["batch_section_expander"], expanded=False):
                     headless=_p7_h,
                     persist=_p7_persist,
                     on_status=_on_status,
+                    auth_token=_auth_token,
                 )
             except Exception as _ex:  # noqa: BLE001
                 st.session_state["p2_batch_last"] = {
@@ -1085,7 +1145,8 @@ with st.expander(lab["batch_section_expander"], expanded=False):
                     _bu = _api_base.rstrip("/")
                     _batch_url = "%s/analyze-batch" % _bu
                     with st.spinner(lab["spinner_batch"]):
-                        _br = requests.post(_batch_url, json=_payload, timeout=180)
+                        _headers = {"Authorization": "Bearer %s" % _auth_token} if _auth_token else None
+                        _br = requests.post(_batch_url, json=_payload, timeout=180, headers=_headers)
                         _br.raise_for_status()
                         _bj = _br.json()
                     _ui_api_failures.record_success("/analyze-batch")

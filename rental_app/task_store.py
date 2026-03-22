@@ -42,6 +42,7 @@ class TaskRecord:
     status: str  # queued | running | success | failed | timeout | degraded | interrupted
     created_at: str
     updated_at: str
+    user_id: str | None = None
     input_summary: dict[str, Any] = field(default_factory=dict)
     result: dict[str, Any] | None = None
     error: str | None = None
@@ -102,10 +103,12 @@ class TaskStore:
         *,
         task_type: str = "multi_source_analysis",
         priority: int = 0,
+        user_id: str | None = None,
     ) -> TaskRecord:
         now = datetime.now(timezone.utc).isoformat()
         rec = TaskRecord(
             task_id=uuid.uuid4().hex[:12],
+            user_id=str(user_id).strip() if user_id else None,
             status="queued",
             created_at=now,
             updated_at=now,
@@ -183,25 +186,27 @@ class TaskStore:
             finished_at=now,
         )
 
-    def list_active(self) -> list[dict[str, Any]]:
+    def list_active(self, *, user_id: str | None = None) -> list[dict[str, Any]]:
         with self._lock:
             return [
                 {"task_id": r.task_id, "status": r.status, "created_at": r.created_at}
                 for r in self._tasks.values()
                 if r.status in ("queued", "running")
+                and (user_id is None or r.user_id == user_id)
             ]
 
-    def list_recent(self, limit: int = 30) -> list[dict[str, Any]]:
+    def list_recent(self, limit: int = 30, *, user_id: str | None = None) -> list[dict[str, Any]]:
         """Return the *limit* most-recent tasks (all statuses), newest first."""
         with self._lock:
             ordered = sorted(
-                self._tasks.values(),
+                [r for r in self._tasks.values() if (user_id is None or r.user_id == user_id)],
                 key=lambda r: r.updated_at,
                 reverse=True,
             )[:limit]
             return [
                 {
                     "task_id": r.task_id,
+                    "user_id": r.user_id,
                     "status": r.status,
                     "task_type": r.task_type,
                     "stage": r.stage,
@@ -217,13 +222,14 @@ class TaskStore:
                 for r in ordered
             ]
 
-    def stats(self) -> dict[str, Any]:
+    def stats(self, *, user_id: str | None = None) -> dict[str, Any]:
         """Aggregate counts by status."""
         with self._lock:
             counts: dict[str, int] = {}
-            for r in self._tasks.values():
+            rows = [r for r in self._tasks.values() if (user_id is None or r.user_id == user_id)]
+            for r in rows:
                 counts[r.status] = counts.get(r.status, 0) + 1
-            return {"total": len(self._tasks), "by_status": counts}
+            return {"total": len(rows), "by_status": counts}
 
     # ------------------------------------------------------------------
     # Internals

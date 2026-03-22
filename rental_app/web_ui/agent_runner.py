@@ -21,6 +21,7 @@ def run_agent_intent_analysis(
     persist_listings: bool = True,
     async_mode: bool = False,
     on_status: Callable[[str, str], None] | None = None,
+    auth_token: str | None = None,
 ) -> tuple[dict[str, Any] | None, str | None, dict[str, Any]]:
     """
     **Continue to Analysis**：多平台抓取 + `analyze_batch_request_body`。
@@ -41,6 +42,7 @@ def run_agent_intent_analysis(
             headless=headless,
             persist=persist_listings,
             on_status=on_status,
+            auth_token=auth_token,
         )
 
     env, err, payload = run_real_listings_analysis(

@@ -247,6 +247,7 @@ def run_real_listings_analysis_async(
     persist: bool = True,
     headless: bool = True,
     on_status: Callable[[str, str], None] | None = None,
+    auth_token: str | None = None,
 ) -> tuple[dict[str, Any], str | None, dict[str, Any]]:
     """Like ``run_real_listings_analysis`` but delegates work to the FastAPI
     backend via ``POST /tasks`` + polling ``GET /tasks/{task_id}``.
@@ -268,6 +269,9 @@ def run_real_listings_analysis_async(
     }
 
     base = (api_base_url or "").rstrip("/")
+    headers = {}
+    if auth_token:
+        headers["Authorization"] = "Bearer %s" % auth_token
 
     task_body: dict[str, Any] = {
         "limit_per_source": limit_per_source,
@@ -283,7 +287,7 @@ def run_real_listings_analysis_async(
 
     # ---- submit ----
     try:
-        resp = _req.post("%s/tasks" % base, json=task_body, timeout=15)
+        resp = _req.post("%s/tasks" % base, json=task_body, timeout=15, headers=headers or None)
         resp.raise_for_status()
         created = resp.json()
     except Exception as exc:
@@ -313,7 +317,18 @@ def run_real_listings_analysis_async(
     for poll_n in range(_ASYNC_MAX_POLLS):
         time.sleep(_ASYNC_POLL_INTERVAL)
         try:
-            resp = _req.get("%s/tasks/%s" % (base, task_id), timeout=10)
+            resp = _req.get("%s/tasks/%s" % (base, task_id), timeout=10, headers=headers or None)
+            if resp.status_code in (401, 403):
+                dbg = {"exception": "Unauthorized polling request", "async_task_id": task_id}
+                request_payload["_p7_debug"] = dbg
+                return (
+                    _synthetic_failure_envelope(
+                        "Authentication expired while polling task status. Please login again.",
+                        dbg,
+                    ),
+                    "Unauthorized polling request",
+                    request_payload,
+                )
             resp.raise_for_status()
             state = resp.json()
         except Exception:
