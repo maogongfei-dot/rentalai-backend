@@ -63,6 +63,10 @@ def get_recent_analysis_records(limit: int = 30, *, user_id: str) -> list[dict[s
                 "input_hash": r.get("input_hash"),
                 "input_summary": r.get("input_summary"),
                 "result_summary": r.get("result_summary"),
+                "explain_summary": r.get("explain_summary"),
+                "pros": r.get("pros") or [],
+                "cons": r.get("cons") or [],
+                "risk_flags": r.get("risk_flags") or [],
                 "source": r.get("source"),
                 "created_at": r.get("created_at"),
             }

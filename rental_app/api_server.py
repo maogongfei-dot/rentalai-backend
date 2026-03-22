@@ -34,6 +34,7 @@ from data.storage.records_db import (
     normalize_analysis_input_signature,
     verify_user,
 )
+from data.explain.rule_explain import build_p10_explain_for_batch_row, build_p10_explain_from_msa_result
 from data.storage.records_query_service import (
     get_recent_analysis_records,
     get_recent_property_records,
@@ -340,23 +341,30 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
             out["_cache"] = {"hit": True, "source": "analysis_records"}
             _task_store.mark_success(task_id, out, degraded=degraded, elapsed=0.0)
             try:
+                _ex_cache = build_p10_explain_from_msa_result(cached_result)
+                _rs_cache = {
+                    "summary": {
+                        "cache_hit": True,
+                        "cacheable": True,
+                        "success": True,
+                        "degraded": degraded,
+                        "sources_run": cached_result.get("sources_run") or [],
+                        "aggregated_unique_count": cached_result.get("aggregated_unique_count"),
+                        "total_analyzed_count": cached_result.get("total_analyzed_count"),
+                    },
+                    "reusable_result": cached_result,
+                    "p10_explain": _ex_cache,
+                }
                 insert_analysis_record(
                     analysis_type="multi_source_analysis",
                     input_summary=analysis_input,
-                    result_summary={
-                        "summary": {
-                            "cache_hit": True,
-                            "cacheable": True,
-                            "success": True,
-                            "degraded": degraded,
-                            "sources_run": cached_result.get("sources_run") or [],
-                            "aggregated_unique_count": cached_result.get("aggregated_unique_count"),
-                            "total_analyzed_count": cached_result.get("total_analyzed_count"),
-                        },
-                        "reusable_result": cached_result,
-                    },
+                    result_summary=_rs_cache,
                     source="cache_hit",
                     user_id=user_id,
+                    explain_summary=_ex_cache.get("explain_summary"),
+                    pros=_ex_cache.get("pros") or [],
+                    cons=_ex_cache.get("cons") or [],
+                    risk_flags=_ex_cache.get("risk_flags") or [],
                 )
             except Exception:
                 logger.warning("[DATA] failed to persist cache-hit record for task %s", task_id, exc_info=True)
@@ -389,15 +397,22 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
             "error_count": len(result.get("errors") or []),
         }
         try:
+            _ex_run = build_p10_explain_from_msa_result(result)
+            _rs_body = {
+                "summary": analysis_summary,
+                "reusable_result": result if analysis_summary["cacheable"] else None,
+                "p10_explain": _ex_run,
+            }
             insert_analysis_record(
                 analysis_type="multi_source_analysis",
                 input_summary=analysis_input,
-                result_summary={
-                    "summary": analysis_summary,
-                    "reusable_result": result if analysis_summary["cacheable"] else None,
-                },
+                result_summary=_rs_body,
                 source="async_task",
                 user_id=user_id,
+                explain_summary=_ex_run.get("explain_summary"),
+                pros=_ex_run.get("pros") or [],
+                cons=_ex_run.get("cons") or [],
+                risk_flags=_ex_run.get("risk_flags") or [],
             )
         except Exception:
             logger.warning("[DATA] failed to persist analysis record for task %s", task_id, exc_info=True)
@@ -419,9 +434,19 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
                         "error": str(exc),
                     },
                     "reusable_result": None,
+                    "p10_explain": {
+                        "explain_summary": "分析失败，未生成推荐理由。",
+                        "pros": [],
+                        "cons": [],
+                        "risk_flags": [str(exc)],
+                    },
                 },
                 source="async_task_failed",
                 user_id=user_id,
+                explain_summary="分析失败，未生成推荐理由。",
+                pros=[],
+                cons=[],
+                risk_flags=[str(exc)],
             )
         except Exception:
             logger.warning("[DATA] failed to persist failed analysis record for task %s", task_id, exc_info=True)
@@ -610,6 +635,7 @@ def _build_compare_result(rows: list[dict[str, Any]]) -> dict[str, Any]:
         pc = str(pc).strip() if pc is not None else None
         tit = im.get("title") or p.get("title")
         tit = str(tit).strip() if tit is not None else None
+        _ex = build_p10_explain_for_batch_row(p)
         items.append(
             {
                 "slot": i,
@@ -624,6 +650,12 @@ def _build_compare_result(rows: list[dict[str, Any]]) -> dict[str, Any]:
                 "postcode": pc,
                 "score": _float_opt_compare(p.get("score")),
                 "decision_code": p.get("decision_code"),
+                "explain": {
+                    "explain_summary": _ex.get("explain_summary"),
+                    "pros": _ex.get("pros") or [],
+                    "cons": _ex.get("cons") or [],
+                    "risk_flags": _ex.get("risk_flags") or [],
+                },
             }
         )
     score_slots = [(i, items[i]["score"]) for i in range(len(items)) if items[i]["score"] is not None]

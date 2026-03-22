@@ -42,6 +42,7 @@ from web_ui.product_copy import DISPLAY_LABELS
 from web_ui.result_filters import collect_source_values, collect_top_indices, filter_batch_rows
 from web_ui.result_sorters import sort_batch_rows
 from web_ui.result_ui import section_header
+from data.explain.rule_explain import build_p10_explain_for_batch_row
 from web_ui.p10_features import batch_row_compare_label, batch_row_to_favorite_payload
 
 # ---------- P1 Phase5: 输入校验 / 示例数据 / 错误提示 ----------
@@ -1357,6 +1358,45 @@ with st.expander(lab["batch_section_expander"], expanded=False):
                 )
 
                 st.divider()
+                section_header(st, "P10 · 推荐理由 (Explain Engine)", level=4)
+                st.caption("规则驱动（无大模型）：基于各维度得分与表单信息生成摘要、优缺点与风险提示。")
+                if len(_displayed) == 0:
+                    st.caption("当前筛选下无行，无法展示 explain。")
+                else:
+                    for _r in _displayed:
+                        if not isinstance(_r, dict):
+                            continue
+                        _pex = build_p10_explain_for_batch_row(_r)
+                        _sum_preview = (_pex.get("explain_summary") or "")[:72]
+                        with st.expander(
+                            "Listing %s — %s" % (_r.get("index", "?"), _sum_preview or "—"),
+                            expanded=False,
+                        ):
+                            st.markdown("**摘要**")
+                            st.info(_pex.get("explain_summary") or "—")
+                            st.markdown("**优点**")
+                            _pros = _pex.get("pros") or []
+                            if _pros:
+                                for _pr in _pros:
+                                    st.markdown("- %s" % _pr)
+                            else:
+                                st.caption("（无）")
+                            st.markdown("**缺点**")
+                            _cons = _pex.get("cons") or []
+                            if _cons:
+                                for _cn in _cons:
+                                    st.markdown("- %s" % _cn)
+                            else:
+                                st.caption("（无）")
+                            st.markdown("**风险提示**")
+                            _rfs = _pex.get("risk_flags") or []
+                            if _rfs:
+                                for _rf in _rfs:
+                                    st.warning(_rf)
+                            else:
+                                st.caption("（无）")
+
+                st.divider()
                 section_header(st, "P10 · Favorites & compare (this batch)", level=4)
                 if not _auth_token:
                     st.caption("Sidebar: login to save favorites and run **POST /compare** on two listings.")
@@ -1422,7 +1462,27 @@ with st.expander(lab["batch_section_expander"], expanded=False):
                                 st.session_state["p10_compare_last"] = {"error": str(_ex_b)}
                     _last_cmp = st.session_state.get("p10_compare_last")
                     if _last_cmp:
-                        with st.expander("Last compare result", expanded=True):
+                        _cmpd = _last_cmp.get("comparison") if isinstance(_last_cmp, dict) else None
+                        if isinstance(_cmpd, dict):
+                            _items_cmp = _cmpd.get("items") or []
+                            with st.expander("Compare — explain 摘要 (P10)", expanded=True):
+                                for _it in _items_cmp:
+                                    if not isinstance(_it, dict):
+                                        continue
+                                    _exi = _it.get("explain") or {}
+                                    st.markdown(
+                                        "**Listing %s** — %s"
+                                        % (
+                                            _it.get("batch_index"),
+                                            _exi.get("explain_summary") or "—",
+                                        )
+                                    )
+                                    if _exi.get("pros"):
+                                        st.caption("优点: " + " · ".join(_exi.get("pros") or []))
+                                    if _exi.get("cons"):
+                                        st.caption("缺点: " + " · ".join(_exi.get("cons") or []))
+                                    st.divider()
+                        with st.expander("Last compare result (full JSON)", expanded=False):
                             st.json(_last_cmp)
 
             # P5 Phase5：batch 列表与筛选之后 — Agent summary + Refine

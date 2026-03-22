@@ -167,6 +167,10 @@ def init_records_db() -> None:
             )
             _ensure_column(conn, "task_records", "user_id", "TEXT")
             _ensure_column(conn, "analysis_records", "user_id", "TEXT")
+            _ensure_column(conn, "analysis_records", "explain_summary", "TEXT")
+            _ensure_column(conn, "analysis_records", "pros", "TEXT")
+            _ensure_column(conn, "analysis_records", "cons", "TEXT")
+            _ensure_column(conn, "analysis_records", "risk_flags", "TEXT")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS favorite_records (
@@ -254,6 +258,10 @@ def insert_analysis_record(
     raw_result_ref: str | None = None,
     source: str = "unknown",
     user_id: str | None = None,
+    explain_summary: str | None = None,
+    pros: list[Any] | None = None,
+    cons: list[Any] | None = None,
+    risk_flags: list[Any] | None = None,
 ) -> int:
     now = _utc_now_iso()
     sig = normalize_analysis_input_signature(input_summary)
@@ -262,8 +270,10 @@ def insert_analysis_record(
             cur = conn.execute(
                 """
                 INSERT INTO analysis_records (
-                    user_id, analysis_type, input_hash, input_summary, result_summary, raw_result_ref, source, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    user_id, analysis_type, input_hash, input_summary, result_summary,
+                    raw_result_ref, source, created_at,
+                    explain_summary, pros, cons, risk_flags
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -274,6 +284,10 @@ def insert_analysis_record(
                     raw_result_ref,
                     source,
                     now,
+                    explain_summary,
+                    _json_text(pros if pros is not None else []),
+                    _json_text(cons if cons is not None else []),
+                    _json_text(risk_flags if risk_flags is not None else []),
                 ),
             )
             conn.commit()
@@ -505,11 +519,24 @@ def list_analysis_records(limit: int = 50, *, user_id: str | None = None) -> lis
             ).fetchall()
     out: list[dict[str, Any]] = []
     for row in rows:
-        d = dict(row)
-        d["input_summary"] = _json_obj(d.get("input_summary"))
-        d["result_summary"] = _json_obj(d.get("result_summary"))
-        out.append(d)
+        out.append(_analysis_row_to_dict(row))
     return out
+
+
+def _analysis_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    d = dict(row)
+    d["input_summary"] = _json_obj(d.get("input_summary"))
+    d["result_summary"] = _json_obj(d.get("result_summary"))
+    d["pros"] = _json_obj(d.get("pros"))
+    d["cons"] = _json_obj(d.get("cons"))
+    d["risk_flags"] = _json_obj(d.get("risk_flags"))
+    if not isinstance(d.get("pros"), list):
+        d["pros"] = []
+    if not isinstance(d.get("cons"), list):
+        d["cons"] = []
+    if not isinstance(d.get("risk_flags"), list):
+        d["risk_flags"] = []
+    return d
 
 
 def list_property_records(limit: int = 50) -> list[dict[str, Any]]:
