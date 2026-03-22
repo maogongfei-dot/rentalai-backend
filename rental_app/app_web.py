@@ -216,11 +216,15 @@ def run_analysis_for_ui(
             _t0 = _time.perf_counter()
             input_data = normalize_form_values(raw_form)
             engine = run_web_demo_analysis(input_data)
-            _ui_logger.info("[PERF] local engine %s took %.3fs", api_endpoint, _time.perf_counter() - _t0)
+            _dur = _time.perf_counter() - _t0
+            _ui_logger.info("[PERF] local engine %s took %.3fs", api_endpoint, _dur)
+            if _dur > 10.0:
+                _ui_logger.warning("[PERF][SLOW] local engine %s took %.1fs", api_endpoint, _dur)
             envelope = envelope_from_engine_result(engine)
             return legacy_ui_result_from_standard_envelope(envelope), None
         except Exception as e:
-            return None, str(e)
+            _ui_logger.error("Local engine failed | endpoint=%s | error=%s", api_endpoint, e)
+            return None, "Analysis engine error: %s" % e
 
     import requests
 

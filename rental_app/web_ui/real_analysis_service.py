@@ -1,8 +1,15 @@
 # P7 Phase5：前端统一入口 — 多平台抓取 + analyze-batch（不改 pipeline / 评分核心）
 from __future__ import annotations
 
+import logging
+import os
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Any
+
+_logger = logging.getLogger("rentalai.ui")
+
+_REAL_ANALYSIS_TIMEOUT = int(os.environ.get("RENTALAI_REAL_ANALYSIS_TIMEOUT", "180"))
 
 from api_analysis import BATCH_API_VERSION, BATCH_ENDPOINT, build_meta
 from web_ui.intent_to_payload import build_batch_property_from_intent
@@ -142,15 +149,37 @@ def run_real_listings_analysis(
     try:
         from data.pipeline.analysis_bridge import run_multi_source_analysis
 
-        msa = run_multi_source_analysis(
-            sources=sources,
-            query=query,
-            limit_per_source=limit_per_source,
-            persist=persist,
-            storage_path=storage_path,
-            budget=budget,
-            target_postcode=target_pc,
+        def _do_analysis() -> dict[str, Any]:
+            return run_multi_source_analysis(
+                sources=sources,
+                query=query,
+                limit_per_source=limit_per_source,
+                persist=persist,
+                storage_path=storage_path,
+                budget=budget,
+                target_postcode=target_pc,
+            )
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(_do_analysis)
+            msa = fut.result(timeout=_REAL_ANALYSIS_TIMEOUT)
+    except TimeoutError:
+        elapsed = round(time.perf_counter() - t0, 2)
+        _logger.error("[TIMEOUT] run_real_listings_analysis exceeded %ds", _REAL_ANALYSIS_TIMEOUT)
+        dbg = {
+            "sources_run": [],
+            "total_raw_count": 0,
+            "aggregated_unique_count": 0,
+            "total_analyzed_count": 0,
+            "seconds": elapsed,
+            "exception": "TimeoutError: exceeded %ds limit" % _REAL_ANALYSIS_TIMEOUT,
+        }
+        request_payload["_p7_debug"] = dbg
+        syn = _synthetic_failure_envelope(
+            "Real listings analysis timed out after %ds. Try fewer sources or a smaller limit." % _REAL_ANALYSIS_TIMEOUT,
+            dbg,
         )
+        return syn, "Timed out after %ds" % _REAL_ANALYSIS_TIMEOUT, request_payload
     except Exception as e:  # noqa: BLE001
         elapsed = round(time.perf_counter() - t0, 2)
         dbg = {

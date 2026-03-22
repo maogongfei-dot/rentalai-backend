@@ -28,6 +28,10 @@
 
 **P9 Phase2 Step1（性能基线）**：`api_server.py` HTTP 中间件新增 `[PERF]` 耗时日志；`api_analysis.py` 新增引擎耗时 + batch 循环耗时日志；`app_web.py` 新增 local engine / HTTP 请求耗时日志；新增 **`P9_PHASE2_PERFORMANCE_BASELINE.md`**（慢点排查、超时风险图、Top 5 优化优先级、Quick Wins）。
 
+**P9 Phase2 Step2（第一轮性能优化）**：`api_analysis.py` batch 循环 → `ThreadPoolExecutor` 并行 + 50 项上限；`multi_source_pipeline.py` 多平台串行 → 并行；`api_server.py` 慢请求 ≥ 5s 触发 P2 alert；`analysis_bridge.py` 入口校验 + 分段耗时日志；新增 **`P9_PHASE2_QUICK_OPTIMIZATION_ROUND1.md`**。
+
+**P9 Phase2 Step3（超时控制 + 降级保护）**：`multi_source_pipeline.py` 新增 per-source `concurrent.futures` timeout（默认 120 s）；`real_analysis_service.py` 新增整体硬超时（默认 180 s）防止 Streamlit 挂死；`analysis_bridge.py` 新增 `degraded` 布尔标记（部分 pipeline 失败仍继续分析）；`app_web.py` 本地引擎路径增加慢请求警告 + 结构化错误返回；`.env.example` 追加 `RENTALAI_SOURCE_TIMEOUT` / `RENTALAI_REAL_ANALYSIS_TIMEOUT`；新增 **`P9_PHASE2_TIMEOUT_AND_DEGRADE_GUARD.md`**。
+
 ---
 
 ## 1. Current Project Structure

@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
 from pathlib import Path
 from typing import Any
+
+_perf_log = logging.getLogger("rentalai.perf")
 
 from api_analysis import analyze_batch_request_body
 from data.normalizer.listing_normalizer import to_analyze_payload
@@ -171,10 +175,21 @@ def run_multi_source_analysis(
     `run_multi_source_pipeline` → 去重 listing dicts → `analyze_batch_request_body`。
     子 pipeline 部分失败时仍可能对已成功平台的 listings 做 batch 分析。
     """
+    _t_total = time.perf_counter()
+    if limit_per_source <= 0:
+        return {
+            "success": False,
+            "pipeline_success": False,
+            "sources_run": [],
+            "errors": [{"stage": "validation", "error": "limit_per_source must be > 0"}],
+            "total_analyzed_count": 0,
+            "analysis_envelope": None,
+        }
     errors: list[dict[str, Any]] = []
     q = dict(query or {})
     save_dbg = bool(save_analysis_sample) or bool(q.pop("save_analysis_sample", False))
 
+    _t_pipeline = time.perf_counter()
     pl = run_multi_source_pipeline(
         sources=sources,
         query=q,
@@ -185,6 +200,8 @@ def run_multi_source_analysis(
         include_aggregated_listings=True,
     )
 
+    _perf_log.info("[PERF] scraper pipeline took %.3fs", time.perf_counter() - _t_pipeline)
+
     for e in pl.get("errors") or []:
         if isinstance(e, dict):
             row = {"stage": "multi_source_pipeline", **e}
@@ -193,11 +210,13 @@ def run_multi_source_analysis(
         errors.append(row)
 
     listings = pl.get("aggregated_listings") or []
+    _t_analysis = time.perf_counter()
     analysis_block = analyze_multi_source_listings(
         listings,
         budget=budget,
         target_postcode=target_postcode,
     )
+    _perf_log.info("[PERF] batch analysis of %d listings took %.3fs", len(listings), time.perf_counter() - _t_analysis)
 
     for ce in analysis_block.get("conversion_errors") or []:
         if isinstance(ce, dict):
@@ -220,8 +239,14 @@ def run_multi_source_analysis(
     props_built = int(analysis_block.get("properties_built_count") or 0)
     overall_ok = bool(analysis_block.get("success")) and props_built > 0
 
+    pipeline_ok = pl.get("success") is True
+    degraded = overall_ok and not pipeline_ok
+    if degraded:
+        _perf_log.warning("[DEGRADED] analysis succeeded with partial pipeline failure")
+
     out: dict[str, Any] = {
         "success": overall_ok,
+        "degraded": degraded,
         "pipeline_success": pl.get("success"),
         "sources_run": pl.get("sources_run") or [],
         "total_raw_count": pl.get("total_raw_count"),
@@ -261,4 +286,5 @@ def run_multi_source_analysis(
         enabled=save_dbg,
     )
 
+    _perf_log.info("[PERF] run_multi_source_analysis total %.3fs", time.perf_counter() - _t_total)
     return out

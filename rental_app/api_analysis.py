@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 _perf_log = logging.getLogger("rentalai.perf")
+
+_BATCH_MAX_ITEMS = int(os.environ.get("RENTALAI_BATCH_MAX", "50"))
+_BATCH_WORKERS = int(os.environ.get("RENTALAI_BATCH_WORKERS", "4"))
 
 # ---------- 标准元信息与错误类型 ----------
 
@@ -866,18 +871,42 @@ def analyze_batch_request_body(raw_body: Any) -> dict:
                 endpoint=BATCH_ENDPOINT,
                 api_version=BATCH_API_VERSION,
             )
-        rows: list[dict] = []
-        _bt0 = time.perf_counter()
-        for i, item in enumerate(props):
+        if len(props) > _BATCH_MAX_ITEMS:
+            return build_error_response(
+                "Too many properties: %d (max %d)" % (len(props), _BATCH_MAX_ITEMS),
+                ERR_VALIDATION,
+                endpoint=BATCH_ENDPOINT,
+                api_version=BATCH_API_VERSION,
+            )
+
+        def _process_one(idx_item: tuple[int, Any]) -> dict:
+            i, item = idx_item
             out = analyze_property_item_for_batch(i, item)
             row = batch_result_row(out)
             enrich_batch_result_row(row)
-            rows.append(row)
+            return row
+
+        _bt0 = time.perf_counter()
+        workers = min(_BATCH_WORKERS, max(len(props), 1))
+        if workers <= 1 or len(props) <= 1:
+            rows = [_process_one((i, item)) for i, item in enumerate(props)]
+        else:
+            rows_by_idx: dict[int, dict] = {}
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {
+                    pool.submit(_process_one, (i, item)): i
+                    for i, item in enumerate(props)
+                }
+                for fut in as_completed(futures):
+                    idx = futures[fut]
+                    rows_by_idx[idx] = fut.result()
+            rows = [rows_by_idx[i] for i in range(len(props))]
         _perf_log.info(
-            "[PERF] batch engine: %d items in %.3fs (%.3fs/item)",
+            "[PERF] batch engine: %d items in %.3fs (%.3fs/item, workers=%d)",
             len(props),
             time.perf_counter() - _bt0,
             (time.perf_counter() - _bt0) / max(len(props), 1),
+            workers,
         )
         ranking = rank_batch_results(rows)
         top_rec = build_top_recommendations(rows, ranking)

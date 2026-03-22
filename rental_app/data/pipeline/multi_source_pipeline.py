@@ -2,9 +2,16 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 from pathlib import Path
 from typing import Any
+
+_perf_log = logging.getLogger("rentalai.perf")
+
+_PER_SOURCE_TIMEOUT = int(os.environ.get("RENTALAI_SOURCE_TIMEOUT", "120"))
 
 from data.pipeline.rightmove_pipeline import run_rightmove_pipeline
 from data.pipeline.zoopla_pipeline import run_zoopla_pipeline
@@ -125,6 +132,7 @@ def run_multi_source_pipeline(
     errors: list[dict[str, Any]] = []
     per_source_raw: dict[str, dict[str, Any]] = {}
 
+    valid_sources: list[str] = []
     for raw_src in want:
         src = (raw_src or "").strip().lower()
         if not src:
@@ -134,7 +142,13 @@ def run_multi_source_pipeline(
                 {"source": raw_src, "error": f"unknown source (skipped): {raw_src!r}"},
             )
             continue
-        normalized_sources.append(src)
+        valid_sources.append(src)
+    normalized_sources = list(valid_sources)
+
+    def _run_one(src: str) -> tuple[str, dict[str, Any]]:
+        import time as _t
+
+        _t0 = _t.perf_counter()
         try:
             r = PIPELINE_REGISTRY[src](
                 query=child_q,
@@ -143,9 +157,11 @@ def run_multi_source_pipeline(
                 storage_path=storage_path,
                 include_normalized_listings=True,
             )
+            _perf_log.info("[PERF] pipeline %s took %.3fs", src, _t.perf_counter() - _t0)
+            return src, dict(r)
         except Exception as e:  # noqa: BLE001
-            errors.append({"source": src, "error": f"{type(e).__name__}: {e}"})
-            per_source_raw[src] = {
+            _perf_log.info("[PERF] pipeline %s failed after %.3fs", src, _t.perf_counter() - _t0)
+            return src, {
                 "success": False,
                 "error": str(e),
                 "raw_count": 0,
@@ -154,9 +170,42 @@ def run_multi_source_pipeline(
                 "saved": 0,
                 "updated": 0,
                 "skipped": 0,
+                "_exception": f"{type(e).__name__}: {e}",
             }
-            continue
-        per_source_raw[src] = dict(r)
+
+    def _timeout_result(src: str, secs: int) -> dict[str, Any]:
+        _perf_log.warning("[PERF][TIMEOUT] pipeline %s exceeded %ds", src, secs)
+        return {
+            "success": False,
+            "error": "timeout after %ds" % secs,
+            "raw_count": 0,
+            "normalized_count": 0,
+            "normalization_skipped": 0,
+            "saved": 0,
+            "updated": 0,
+            "skipped": 0,
+            "_exception": "TimeoutError: source pipeline exceeded %ds" % secs,
+        }
+
+    if len(valid_sources) > 1:
+        with ThreadPoolExecutor(max_workers=len(valid_sources)) as pool:
+            futures = {pool.submit(_run_one, s): s for s in valid_sources}
+            for fut in as_completed(futures, timeout=_PER_SOURCE_TIMEOUT + 5):
+                src_key = futures[fut]
+                try:
+                    src, result = fut.result(timeout=_PER_SOURCE_TIMEOUT)
+                except TimeoutError:
+                    result = _timeout_result(src_key, _PER_SOURCE_TIMEOUT)
+                    src = src_key
+                per_source_raw[src] = result
+                if result.get("_exception"):
+                    errors.append({"source": src, "error": result.pop("_exception")})
+    else:
+        for src in valid_sources:
+            src, result = _run_one(src)
+            per_source_raw[src] = result
+            if result.get("_exception"):
+                errors.append({"source": src, "error": result.pop("_exception")})
 
     combined: list[dict[str, Any]] = []
     for src, r in per_source_raw.items():

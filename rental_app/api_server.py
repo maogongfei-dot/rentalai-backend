@@ -40,19 +40,37 @@ app.add_middleware(
 )
 
 
+_SLOW_REQUEST_THRESHOLD = 5.0  # seconds
+
+
 @app.middleware("http")
 async def _track_request(request: Request, call_next):
     t0 = time.perf_counter()
     response = await call_next(request)
     duration = time.perf_counter() - t0
     endpoint = request.url.path
-    logger.info(
-        "[PERF] %s %s -> %s in %.3fs",
-        request.method,
-        endpoint,
-        response.status_code,
-        duration,
-    )
+    if duration >= _SLOW_REQUEST_THRESHOLD:
+        logger.warning(
+            "[PERF][SLOW] %s %s -> %s in %.3fs (threshold %.1fs)",
+            request.method,
+            endpoint,
+            response.status_code,
+            duration,
+            _SLOW_REQUEST_THRESHOLD,
+        )
+        send_alert(
+            "Slow request: %s %s took %.1fs" % (request.method, endpoint, duration),
+            level="P2",
+            source="api-server",
+        )
+    else:
+        logger.info(
+            "[PERF] %s %s -> %s in %.3fs",
+            request.method,
+            endpoint,
+            response.status_code,
+            duration,
+        )
     if response.status_code < 500:
         _api_failures.record_success(endpoint)
     return response
