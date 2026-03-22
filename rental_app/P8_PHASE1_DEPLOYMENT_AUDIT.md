@@ -32,6 +32,10 @@
 
 **P9 Phase2 Step3（超时控制 + 降级保护）**：`multi_source_pipeline.py` 新增 per-source `concurrent.futures` timeout（默认 120 s）；`real_analysis_service.py` 新增整体硬超时（默认 180 s）防止 Streamlit 挂死；`analysis_bridge.py` 新增 `degraded` 布尔标记（部分 pipeline 失败仍继续分析）；`app_web.py` 本地引擎路径增加慢请求警告 + 结构化错误返回；`.env.example` 追加 `RENTALAI_SOURCE_TIMEOUT` / `RENTALAI_REAL_ANALYSIS_TIMEOUT`；新增 **`P9_PHASE2_TIMEOUT_AND_DEGRADE_GUARD.md`**。
 
+**P9 Phase2 Step4（复测与收口）**：全链路代码级复测确认 Phase2 所有变更无回归。修复 `multi_source_pipeline.py` 中 `as_completed` 外层 `TimeoutError` 未捕获的边界问题。新增 **`P9_PHASE2_VALIDATION_AND_STABILIZATION.md`**（完整复测报告）、**`P9_PHASE2_CLOSEOUT_SUMMARY.md`**（Phase2 收口总结）。**结论：Phase2 Stabilized。**
+
+**P9 Phase3 Step1（可扩展性风险建模）**：对前端/后端/分析/Scraper/数据层做 10/100/1000 用户承载分析。新增 **`P9_PHASE3_SCALABILITY_RISK_MAP.md`**（Top 5 瓶颈、最先崩的层、必须处理 vs 可延后清单）。最高风险：Streamlit 单进程 + Agent 阻塞 + Chromium 内存压力。
+
 ---
 
 ## 1. Current Project Structure

@@ -128,6 +128,9 @@ curl -s http://127.0.0.1:8000/health
 - **P9 · 性能基线：** **`P9_PHASE2_PERFORMANCE_BASELINE.md`**
 - **P9 · 第一轮性能优化：** **`P9_PHASE2_QUICK_OPTIMIZATION_ROUND1.md`**
 - **P9 · 超时控制与降级保护：** **`P9_PHASE2_TIMEOUT_AND_DEGRADE_GUARD.md`**
+- **P9 · Phase2 复测报告：** **`P9_PHASE2_VALIDATION_AND_STABILIZATION.md`**
+- **P9 · Phase2 收口总结：** **`P9_PHASE2_CLOSEOUT_SUMMARY.md`**
+- **P9 · 可扩展性风险建模：** **`P9_PHASE3_SCALABILITY_RISK_MAP.md`**
 - 部署前联调与上线执行清单：**`P8_PHASE1_PREDEPLOY_CHECKLIST.md`**
 - 部署方案：**`P8_PHASE1_DEPLOYMENT_PLAN.md`**
 - 运行入口汇总：**`P8_PHASE1_RUNTIME_ENTRY_GUIDE.md`**

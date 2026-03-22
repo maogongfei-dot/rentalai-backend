@@ -190,16 +190,24 @@ def run_multi_source_pipeline(
     if len(valid_sources) > 1:
         with ThreadPoolExecutor(max_workers=len(valid_sources)) as pool:
             futures = {pool.submit(_run_one, s): s for s in valid_sources}
-            for fut in as_completed(futures, timeout=_PER_SOURCE_TIMEOUT + 5):
-                src_key = futures[fut]
-                try:
-                    src, result = fut.result(timeout=_PER_SOURCE_TIMEOUT)
-                except TimeoutError:
-                    result = _timeout_result(src_key, _PER_SOURCE_TIMEOUT)
-                    src = src_key
-                per_source_raw[src] = result
-                if result.get("_exception"):
-                    errors.append({"source": src, "error": result.pop("_exception")})
+            try:
+                for fut in as_completed(futures, timeout=_PER_SOURCE_TIMEOUT + 5):
+                    src_key = futures[fut]
+                    try:
+                        src, result = fut.result(timeout=_PER_SOURCE_TIMEOUT)
+                    except TimeoutError:
+                        result = _timeout_result(src_key, _PER_SOURCE_TIMEOUT)
+                        src = src_key
+                    per_source_raw[src] = result
+                    if result.get("_exception"):
+                        errors.append({"source": src, "error": result.pop("_exception")})
+            except TimeoutError:
+                for fut, src_key in futures.items():
+                    if src_key not in per_source_raw:
+                        result = _timeout_result(src_key, _PER_SOURCE_TIMEOUT)
+                        per_source_raw[src_key] = result
+                        if result.get("_exception"):
+                            errors.append({"source": src_key, "error": result.pop("_exception")})
     else:
         for src in valid_sources:
             src, result = _run_one(src)
