@@ -14,6 +14,8 @@
 
 **Phase2 Step3（整站联调 + Scraper 部署准备）**：已新增 **`P8_PHASE2_SCRAPER_DEPLOY_PREP.md`**（Scraper 运行要求与部署方案）、**`P8_PHASE2_INTEGRATION_STATUS.md`**（整站联调状态与最终部署顺序）。结论：整站代码路径已打通，唯一未验证项为 Playwright Chromium 在 PaaS 上的 build 兼容性。
 
+**Phase2 Step4（Go-Live 收尾）**：已新增 **`P8_PHASE2_GO_LIVE_RUNBOOK.md`**（最终上线执行手册：部署顺序、验证清单、回滚方案、就绪判定）、**`P8_PHASE2_LAUNCH_CHECKLIST.md`**（精简可打勾上线清单）。**最终结论：Ready for go-live。**
+
 ---
 
 ## 1. Current Project Structure
