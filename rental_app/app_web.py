@@ -42,6 +42,7 @@ from web_ui.product_copy import DISPLAY_LABELS
 from web_ui.result_filters import collect_source_values, collect_top_indices, filter_batch_rows
 from web_ui.result_sorters import sort_batch_rows
 from web_ui.result_ui import section_header
+from web_ui.p10_features import batch_row_compare_label, batch_row_to_favorite_payload
 
 # ---------- P1 Phase5: 输入校验 / 示例数据 / 错误提示 ----------
 
@@ -696,6 +697,69 @@ elif not _use_local:
 if _auth_msg:
     st.sidebar.caption(_auth_msg)
 
+# --- P10 Phase2: history + favorites (sidebar) ---
+st.sidebar.markdown("### P10 · History & favorites")
+with st.sidebar.expander("Load history / saved list", expanded=False):
+    if _use_local:
+        st.caption("Turn off **local engine** and use the API for history & favorites.")
+    elif not _auth_token:
+        st.caption("Login above to fetch task/analysis history and favorites.")
+    else:
+        import requests as _req_p10
+
+        _bu_p10 = _api_base.rstrip("/")
+        _h_p10 = {"Authorization": "Bearer %s" % _auth_token}
+        if st.button("Refresh task + analysis history", key="p10_sidebar_hist"):
+            try:
+                st.session_state["p10_hist_tasks"] = _req_p10.get(
+                    "%s/records/tasks" % _bu_p10, headers=_h_p10, params={"limit": 15}, timeout=30
+                ).json()
+                st.session_state["p10_hist_analysis"] = _req_p10.get(
+                    "%s/records/analysis" % _bu_p10, headers=_h_p10, params={"limit": 15}, timeout=30
+                ).json()
+                st.session_state.pop("p10_sidebar_err", None)
+            except Exception as _ex_p10:  # noqa: BLE001
+                st.session_state["p10_sidebar_err"] = str(_ex_p10)
+        if st.button("Load my favorites", key="p10_sidebar_fav"):
+            try:
+                st.session_state["p10_favorites"] = _req_p10.get(
+                    "%s/favorites" % _bu_p10, headers=_h_p10, timeout=30
+                ).json()
+                st.session_state.pop("p10_sidebar_err", None)
+            except Exception as _ex_p10:  # noqa: BLE001
+                st.session_state["p10_sidebar_err"] = str(_ex_p10)
+        if st.session_state.get("p10_sidebar_err"):
+            st.warning(st.session_state["p10_sidebar_err"])
+        _ht = st.session_state.get("p10_hist_tasks")
+        if isinstance(_ht, dict) and _ht.get("records") is not None:
+            st.caption("Tasks (latest first): **%s** rows" % _ht.get("count", 0))
+            st.dataframe(_ht.get("records") or [], use_container_width=True, hide_index=True)
+        _ha = st.session_state.get("p10_hist_analysis")
+        if isinstance(_ha, dict) and _ha.get("records") is not None:
+            st.caption("Analysis records: **%s** rows" % _ha.get("count", 0))
+            st.dataframe(_ha.get("records") or [], use_container_width=True, hide_index=True)
+        _fv = st.session_state.get("p10_favorites")
+        if isinstance(_fv, dict) and _fv.get("favorites") is not None:
+            st.caption("Saved favorites: **%s**" % _fv.get("count", 0))
+            _frows = _fv.get("favorites") or []
+            if _frows:
+                st.dataframe(_frows, use_container_width=True, hide_index=True)
+                _del_id = st.text_input("Remove favorite by id", key="p10_fav_del_id")
+                if st.button("Delete favorite", key="p10_fav_del_btn"):
+                    try:
+                        _dr = _req_p10.delete(
+                            "%s/favorites/%s" % (_bu_p10, _del_id.strip()),
+                            headers=_h_p10,
+                            timeout=20,
+                        )
+                        if _dr.status_code >= 400:
+                            st.warning(_dr.text)
+                        else:
+                            st.success("Removed.")
+                            st.session_state.pop("p10_favorites", None)
+                    except Exception as _ex_p10:  # noqa: BLE001
+                        st.warning(str(_ex_p10))
+
 # --- P7 Phase5: 真实多平台抓取 + batch（侧栏控制 Agent 与 batch 区按钮）---
 st.sidebar.markdown("### %s" % lab.get("p7_sidebar_title", "Real listings (P7)"))
 st.sidebar.caption(lab.get("p7_sidebar_caption", ""))
@@ -1291,6 +1355,75 @@ with st.expander(lab["batch_section_expander"], expanded=False):
                     debug_display_text_fn=_display_text,
                     detail_key_prefix="p4_detail_batch",
                 )
+
+                st.divider()
+                section_header(st, "P10 · Favorites & compare (this batch)", level=4)
+                if not _auth_token:
+                    st.caption("Sidebar: login to save favorites and run **POST /compare** on two listings.")
+                elif len(_displayed) == 0:
+                    st.caption("No rows in the current filter — adjust filters to compare or favorite.")
+                else:
+                    import requests as _req_p10b
+
+                    _bu_b = _api_base.rstrip("/")
+                    _h_b = {"Authorization": "Bearer %s" % _auth_token}
+                    _row_list = [r for r in _displayed if isinstance(r, dict)]
+                    _labels_b = [batch_row_compare_label(r) for r in _row_list]
+                    _pick_b = st.multiselect(
+                        "Select one or more listings → **Add to favorites**",
+                        options=_labels_b,
+                        key="p10_batch_fav_pick",
+                    )
+                    if st.button("Add selected to favorites", key="p10_batch_fav_btn"):
+                        _msgs: list[str] = []
+                        for _lab in _pick_b:
+                            _ix = _labels_b.index(_lab)
+                            _body = batch_row_to_favorite_payload(_row_list[_ix])
+                            try:
+                                _fr = _req_p10b.post(
+                                    "%s/favorites" % _bu_b,
+                                    json=_body,
+                                    headers=_h_b,
+                                    timeout=25,
+                                )
+                                if _fr.status_code >= 400:
+                                    try:
+                                        _ej = _fr.json()
+                                        _em = _ej.get("error", _fr.text)
+                                    except Exception:
+                                        _em = _fr.text
+                                    _msgs.append("%s: %s" % (_lab[:40], _em))
+                                else:
+                                    _msgs.append("%s: saved" % _lab[:40])
+                            except Exception as _ex_b:  # noqa: BLE001
+                                _msgs.append(str(_ex_b))
+                        st.caption(" | ".join(_msgs[:6]))
+                    _c_a, _c_b = st.columns(2)
+                    with _c_a:
+                        _cmp_a = st.selectbox("Compare A", _labels_b, key="p10_cmp_a_sel")
+                    with _c_b:
+                        _cmp_b = st.selectbox("Compare B", _labels_b, key="p10_cmp_b_sel")
+                    if st.button("Run compare (POST /compare)", key="p10_cmp_run_btn"):
+                        if _cmp_a == _cmp_b:
+                            st.warning("Pick two different listings.")
+                        else:
+                            _ia = _labels_b.index(_cmp_a)
+                            _ib = _labels_b.index(_cmp_b)
+                            try:
+                                _cr = _req_p10b.post(
+                                    "%s/compare" % _bu_b,
+                                    json={"properties": [_row_list[_ia], _row_list[_ib]]},
+                                    headers=_h_b,
+                                    timeout=30,
+                                )
+                                _cr.raise_for_status()
+                                st.session_state["p10_compare_last"] = _cr.json()
+                            except Exception as _ex_b:  # noqa: BLE001
+                                st.session_state["p10_compare_last"] = {"error": str(_ex_b)}
+                    _last_cmp = st.session_state.get("p10_compare_last")
+                    if _last_cmp:
+                        with st.expander("Last compare result", expanded=True):
+                            st.json(_last_cmp)
 
             # P5 Phase5：batch 列表与筛选之后 — Agent summary + Refine
             st.divider()

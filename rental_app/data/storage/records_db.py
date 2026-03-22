@@ -1,9 +1,10 @@
 """Minimal SQLite data layer for RentalAI records.
 
-Stores three core record types:
+Stores core record types:
 1) task_records
 2) analysis_records
 3) property_records
+4) favorite_records (P10 Phase2)
 
 This module is intentionally lightweight and stdlib-only (sqlite3).
 """
@@ -166,6 +167,34 @@ def init_records_db() -> None:
             )
             _ensure_column(conn, "task_records", "user_id", "TEXT")
             _ensure_column(conn, "analysis_records", "user_id", "TEXT")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS favorite_records (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    listing_url TEXT,
+                    property_id TEXT,
+                    title TEXT,
+                    price REAL,
+                    postcode TEXT,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_favorites_user_created "
+                "ON favorite_records (user_id, created_at DESC)"
+            )
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_user_url "
+                "ON favorite_records (user_id, listing_url) "
+                "WHERE listing_url IS NOT NULL AND listing_url != ''"
+            )
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_user_prop "
+                "ON favorite_records (user_id, property_id) "
+                "WHERE property_id IS NOT NULL AND property_id != ''"
+            )
             conn.commit()
 
 
@@ -555,6 +584,89 @@ def verify_user(email: str, password: str) -> dict[str, Any] | None:
 
 def _password_hash(password: str) -> str:
     return hashlib.sha256(str(password).encode("utf-8")).hexdigest()
+
+
+def insert_favorite_record(
+    user_id: str,
+    *,
+    listing_url: str | None = None,
+    property_id: str | None = None,
+    title: str | None = None,
+    price: float | None = None,
+    postcode: str | None = None,
+) -> dict[str, Any] | None:
+    """Insert a favorite; returns None on duplicate (minimal dedupe)."""
+    uid = str(user_id or "").strip()
+    if not uid:
+        return None
+    url = (str(listing_url).strip() if listing_url else "") or None
+    pid = str(property_id).strip() if property_id else ""
+    pid = pid or None
+    if not url and not pid:
+        return None
+    fav_id = uuid.uuid4().hex
+    now = _utc_now_iso()
+    tit = (title or "").strip() or None
+    pc = (postcode or "").strip() or None
+    with _DB_LOCK:
+        with _connect() as conn:
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO favorite_records (
+                        id, user_id, listing_url, property_id, title, price, postcode, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (fav_id, uid, url, pid, tit, price, pc, now),
+                )
+                conn.commit()
+            except sqlite3.IntegrityError:
+                return None
+    return {
+        "id": fav_id,
+        "user_id": uid,
+        "listing_url": url,
+        "property_id": pid,
+        "title": tit,
+        "price": price,
+        "postcode": pc,
+        "created_at": now,
+    }
+
+
+def delete_favorite_record(user_id: str, favorite_id: str) -> bool:
+    uid = str(user_id or "").strip()
+    fid = str(favorite_id or "").strip()
+    if not uid or not fid:
+        return False
+    with _DB_LOCK:
+        with _connect() as conn:
+            cur = conn.execute(
+                "DELETE FROM favorite_records WHERE id = ? AND user_id = ?",
+                (fid, uid),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+
+
+def list_favorite_records(user_id: str, limit: int = 100) -> list[dict[str, Any]]:
+    uid = str(user_id or "").strip()
+    if not uid:
+        return []
+    limit = min(max(int(limit), 1), 500)
+    with _DB_LOCK:
+        with _connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, user_id, listing_url, property_id, title, price, postcode, created_at
+                FROM favorite_records
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (uid, limit),
+            ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, col_type: str) -> None:

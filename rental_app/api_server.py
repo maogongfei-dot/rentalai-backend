@@ -25,9 +25,12 @@ from api_analysis import analyze_batch_request_body, modular_analyze_response
 from data.storage.records_db import (
     _DB_PATH as _RECORDS_DB_PATH,
     create_user,
+    delete_favorite_record,
     find_reusable_analysis_result,
     init_records_db,
     insert_analysis_record,
+    insert_favorite_record,
+    list_favorite_records,
     normalize_analysis_input_signature,
     verify_user,
 )
@@ -568,6 +571,136 @@ def list_record_properties(request: Request, limit: int = 30):
         "storage": "sqlite",
         "db_path": _RECORDS_DB_PATH,
     }
+
+
+class FavoriteCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    listing_url: Optional[str] = None
+    property_id: Optional[str] = None
+    title: Optional[str] = None
+    price: Optional[float] = None
+    postcode: Optional[str] = None
+
+
+class CompareRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    properties: list[dict[str, Any]]
+
+
+def _float_opt_compare(v: Any) -> float | None:
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_compare_result(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    items: list[dict[str, Any]] = []
+    for i, raw in enumerate(rows):
+        p = raw if isinstance(raw, dict) else {}
+        im = p.get("input_meta") if isinstance(p.get("input_meta"), dict) else {}
+        price = _float_opt_compare(im.get("rent"))
+        if price is None:
+            price = _float_opt_compare(p.get("rent_pcm") or p.get("rent") or p.get("price"))
+        pc = im.get("postcode") or p.get("postcode")
+        pc = str(pc).strip() if pc is not None else None
+        tit = im.get("title") or p.get("title")
+        tit = str(tit).strip() if tit is not None else None
+        items.append(
+            {
+                "slot": i,
+                "batch_index": p.get("index"),
+                "title": tit,
+                "listing_url": im.get("source_url") or p.get("listing_url"),
+                "price": price,
+                "bedrooms": _float_opt_compare(im.get("bedrooms") or p.get("bedrooms")),
+                "commute_minutes": _float_opt_compare(
+                    im.get("commute_minutes") or p.get("commute_minutes")
+                ),
+                "postcode": pc,
+                "score": _float_opt_compare(p.get("score")),
+                "decision_code": p.get("decision_code"),
+            }
+        )
+    score_slots = [(i, items[i]["score"]) for i in range(len(items)) if items[i]["score"] is not None]
+    price_slots = [(i, items[i]["price"]) for i in range(len(items)) if items[i]["price"] is not None]
+    highest_score_slot = max(score_slots, key=lambda x: x[1])[0] if score_slots else None
+    lowest_price_slot = min(price_slots, key=lambda x: x[1])[0] if price_slots else None
+    return {
+        "items": items,
+        "summary": {
+            "highest_score_slot": highest_score_slot,
+            "lowest_price_slot": lowest_price_slot,
+            "count": len(items),
+        },
+    }
+
+
+@app.post("/favorites")
+def add_favorite(request: Request, body: FavoriteCreate):
+    user_id = _get_user_id_from_request(request)
+    url = (body.listing_url or "").strip() or None
+    pid = (body.property_id or "").strip() or None
+    if not url and not pid:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "missing_identifier", "message": "Provide listing_url and/or property_id."},
+        )
+    rec = insert_favorite_record(
+        user_id,
+        listing_url=url,
+        property_id=pid,
+        title=body.title,
+        price=body.price,
+        postcode=body.postcode,
+    )
+    if rec is None:
+        return JSONResponse(
+            status_code=409,
+            content={"error": "duplicate_or_invalid", "message": "Already favorited or could not save."},
+        )
+    return {"favorite": rec, "storage": "sqlite", "db_path": _RECORDS_DB_PATH}
+
+
+@app.get("/favorites")
+def list_favorites(request: Request, limit: int = 100):
+    user_id = _get_user_id_from_request(request)
+    limit = min(max(limit, 1), 500)
+    rows = list_favorite_records(user_id, limit=limit)
+    return {
+        "favorites": rows,
+        "count": len(rows),
+        "storage": "sqlite",
+        "db_path": _RECORDS_DB_PATH,
+    }
+
+
+@app.delete("/favorites/{favorite_id}")
+def remove_favorite(request: Request, favorite_id: str):
+    user_id = _get_user_id_from_request(request)
+    ok = delete_favorite_record(user_id, favorite_id)
+    if not ok:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "favorite_not_found", "id": favorite_id},
+        )
+    return {"ok": True, "id": favorite_id}
+
+
+@app.post("/compare")
+def compare_listings(request: Request, body: CompareRequest):
+    _ = _get_user_id_from_request(request)
+    props = body.properties if isinstance(body.properties, list) else []
+    if len(props) < 2 or len(props) > 5:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "invalid_count", "message": "Send between 2 and 5 property objects."},
+        )
+    return {"comparison": _build_compare_result(props)}
 
 
 _start_task_workers_once()
