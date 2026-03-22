@@ -36,6 +36,10 @@
 
 **P9 Phase3 Step1（可扩展性风险建模）**：对前端/后端/分析/Scraper/数据层做 10/100/1000 用户承载分析。新增 **`P9_PHASE3_SCALABILITY_RISK_MAP.md`**（Top 5 瓶颈、最先崩的层、必须处理 vs 可延后清单）。最高风险：Streamlit 单进程 + Agent 阻塞 + Chromium 内存压力。
 
+**P9 Phase3 Step2（架构升级方案设计）**：将 Scalability Risk Map 转化为分阶段升级蓝图。新增 **`P9_PHASE3_ARCHITECTURE_UPGRADE_PLAN.md`**（目标架构、异步任务模型、TaskStore 设计、Agent 后端化方案、Phase A/B/C/D 递进计划）、**`P9_PHASE3_ASYNC_DECISION_SUMMARY.md`**（异步/同步/解耦/延后决策清单）。核心决策：Agent 路径异步化 + Scraper 移入后端 + 进程内 TaskStore 模式。
+
+**P9 Phase3 Step3（异步任务骨架落地）**：新增 **`task_store.py`**（`TaskRecord` 数据类 + 线程安全 `TaskStore`，进程内 dict 存储，TTL 自动过期，200 条上限）；`api_server.py` 新增 `POST /tasks`（提交多平台分析任务，后台 daemon thread 执行）、`GET /tasks/{task_id}`（查询任务状态/结果）、`GET /tasks`（列出活跃任务）。试点流程：`run_multi_source_analysis`。新增 **`P9_PHASE3_ASYNC_TASK_SKELETON.md`**（骨架架构文档）、**`P9_PHASE3_TASK_API_QUICKREF.md`**（快速 API 参考）。所有旧同步端点不受影响。
+
 ---
 
 ## 1. Current Project Structure

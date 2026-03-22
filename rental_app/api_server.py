@@ -14,8 +14,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+import threading
+
 from alert_utils import FailureTracker, send_alert
 from api_analysis import analyze_batch_request_body, modular_analyze_response
+from task_store import TaskStore
 
 logger = logging.getLogger("rentalai.api")
 logging.basicConfig(
@@ -24,6 +27,7 @@ logging.basicConfig(
 )
 
 _api_failures = FailureTracker(threshold=3, source="api-server")
+_task_store = TaskStore()
 
 app = FastAPI(
     title="RentalAI API",
@@ -170,3 +174,93 @@ def analyze_batch(body: dict = Body(default_factory=dict)):
     逐项复用与 /analyze 相同的引擎；单项失败不拖垮整批。
     """
     return analyze_batch_request_body(body)
+
+
+# ---------------------------------------------------------------------------
+# Async task endpoints (P9 Phase3 skeleton)
+# ---------------------------------------------------------------------------
+
+class AnalyzeRealRequest(BaseModel):
+    """Request body for POST /tasks — multi-source scrape + analyze."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    sources: Optional[list[str]] = Field(default=None)
+    limit_per_source: int = Field(default=10, ge=1, le=50)
+    budget: Optional[float] = Field(default=None)
+    target_postcode: Optional[str] = Field(default=None)
+    headless: bool = Field(default=True)
+    persist: bool = Field(default=True)
+
+
+def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
+    """Background thread target: runs multi-source analysis and updates the task store."""
+    _task_store.mark_running(task_id)
+    t0 = time.perf_counter()
+    try:
+        from data.pipeline.analysis_bridge import run_multi_source_analysis
+
+        result = run_multi_source_analysis(
+            sources=params.get("sources"),
+            query={"headless": params.get("headless", True)},
+            limit_per_source=params.get("limit_per_source", 10),
+            persist=params.get("persist", True),
+            budget=params.get("budget"),
+            target_postcode=params.get("target_postcode"),
+        )
+        elapsed = time.perf_counter() - t0
+        degraded = bool(result.get("degraded"))
+        _task_store.mark_success(task_id, result, degraded=degraded, elapsed=elapsed)
+    except Exception as exc:
+        elapsed = time.perf_counter() - t0
+        logger.error("[TASK] %s failed: %s", task_id, exc, exc_info=True)
+        _task_store.mark_failed(task_id, str(exc), elapsed=elapsed)
+
+
+@app.post("/tasks")
+def create_task(body: AnalyzeRealRequest = AnalyzeRealRequest()):
+    """Submit a multi-source scrape + analyze job.  Returns immediately with a task_id.
+
+    Poll ``GET /tasks/{task_id}`` to check progress and retrieve results.
+    """
+    params = body.model_dump(exclude_none=True)
+    summary = {
+        "sources": params.get("sources"),
+        "limit_per_source": params.get("limit_per_source"),
+    }
+    rec = _task_store.create(input_summary=summary)
+    threading.Thread(
+        target=_run_analysis_task,
+        args=(rec.task_id, params),
+        daemon=True,
+    ).start()
+    return {"task_id": rec.task_id, "status": rec.status}
+
+
+@app.get("/tasks/{task_id}")
+def get_task(task_id: str):
+    """Query the current state of an async task."""
+    rec = _task_store.get(task_id)
+    if rec is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "task_not_found", "task_id": task_id},
+        )
+    out: dict[str, Any] = {
+        "task_id": rec.task_id,
+        "status": rec.status,
+        "created_at": rec.created_at,
+        "updated_at": rec.updated_at,
+        "degraded": rec.degraded,
+        "elapsed_seconds": rec.elapsed_seconds,
+        "error": rec.error,
+    }
+    if rec.status in ("success", "degraded"):
+        out["result"] = rec.result
+    return out
+
+
+@app.get("/tasks")
+def list_tasks():
+    """List currently active (queued/running) tasks."""
+    return {"tasks": _task_store.list_active()}
