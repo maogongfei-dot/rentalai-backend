@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Analysis history — RentalAI</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <nav class="top-nav" aria-label="Main">
+      <a href="/">Home</a>
+      <span class="nav-sep">·</span>
+      <a href="/history" aria-current="page">History</a>
+    </nav>
+    <main class="wrap result-wrap">
+      <h1 class="section-title">Your analysis history</h1>
+      <p class="muted">Recent runs saved from the result page. Open a row to see full details.</p>
+
+      <p id="history-loading" class="muted">Loading…</p>
+      <p id="history-error" class="err hidden" role="alert"></p>
+      <p id="history-empty" class="muted hidden">No analysis history yet.</p>
+
+      <div class="history-table-wrap">
+        <table class="history-table" aria-label="Saved analyses">
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Input</th>
+              <th scope="col">Title</th>
+              <th scope="col">Score</th>
+              <th scope="col">Verdict</th>
+              <th scope="col">Detail</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody"></tbody>
+        </table>
+      </div>
+    </main>
+    <script src="/assets/history_shelf.js"></script>
+    <script src="/assets/history_page.js"></script>
+    <script>
+      window.RentalAIHistoryPage.loadHistory();
+    </script>
+  </body>
+</html>

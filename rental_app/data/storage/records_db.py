@@ -96,6 +96,10 @@ def normalize_analysis_input_signature(input_summary: dict[str, Any] | None) -> 
     out["target_postcode"] = str(tp).strip().upper() if isinstance(tp, str) and tp.strip() else None
     lu = src.get("listing_url")
     out["listing_url"] = str(lu).strip() if isinstance(lu, str) and lu.strip() else None
+    hid = src.get("history_task_id")
+    out["history_task_id"] = (
+        str(hid).strip() if isinstance(hid, str) and str(hid).strip() else None
+    )
     return out
 
 
@@ -494,6 +498,50 @@ def get_task_record_by_task_id_for_user(task_id: str, *, user_id: str) -> dict[s
     if row is None:
         return None
     return _task_row_to_dict(row)
+
+
+UI_HISTORY_ANALYSIS_TYPE = "p10_ui_history"
+
+
+def list_ui_history_records(limit: int = 50, *, user_id: str) -> list[dict[str, Any]]:
+    """Phase3 UI 保存的分析快照（按用户、最新优先）。"""
+    uid = str(user_id or "").strip()
+    if not uid:
+        return []
+    limit = min(max(int(limit), 1), 200)
+    with _DB_LOCK:
+        with _connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM analysis_records
+                WHERE user_id = ? AND analysis_type = ?
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (uid, UI_HISTORY_ANALYSIS_TYPE, limit),
+            ).fetchall()
+    return [_analysis_row_to_dict(r) for r in rows]
+
+
+def get_ui_history_record_for_user(record_id: int, *, user_id: str) -> dict[str, Any] | None:
+    uid = str(user_id or "").strip()
+    if not uid or record_id <= 0:
+        return None
+    with _DB_LOCK:
+        with _connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM analysis_records
+                WHERE id = ? AND user_id = ? AND analysis_type = ?
+                LIMIT 1
+                """,
+                (int(record_id), uid, UI_HISTORY_ANALYSIS_TYPE),
+            ).fetchone()
+    if row is None:
+        return None
+    return _analysis_row_to_dict(row)
 
 
 def list_analysis_records(limit: int = 50, *, user_id: str | None = None) -> list[dict[str, Any]]:

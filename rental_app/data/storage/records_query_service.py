@@ -9,9 +9,11 @@ from typing import Any
 
 from data.storage.records_db import (
     get_task_record_by_task_id_for_user,
+    get_ui_history_record_for_user,
     list_analysis_records,
     list_property_records,
     list_task_records,
+    list_ui_history_records,
 )
 
 
@@ -72,6 +74,47 @@ def get_recent_analysis_records(limit: int = 30, *, user_id: str) -> list[dict[s
             }
         )
     return out
+
+
+def ui_history_item_view(row: dict[str, Any]) -> dict[str, Any]:
+    """history 列表行：供 Phase3 `/records/ui-history` 使用。"""
+    rs = row.get("result_summary") if isinstance(row.get("result_summary"), dict) else {}
+    dp = rs.get("display_payload") if isinstance(rs.get("display_payload"), dict) else {}
+    header = dp.get("header") if isinstance(dp.get("header"), dict) else {}
+    prop = dp.get("property") if isinstance(dp.get("property"), dict) else {}
+    ex = dp.get("explain") if isinstance(dp.get("explain"), dict) else {}
+    return {
+        "record_id": row.get("id"),
+        "created_at": row.get("created_at"),
+        "task_id": rs.get("task_id"),
+        "input_value": rs.get("input_value") if rs.get("input_value") is not None else "",
+        "title": prop.get("title"),
+        "final_score": header.get("final_score"),
+        "verdict": header.get("verdict_label"),
+        "summary_line": row.get("explain_summary") or ex.get("summary"),
+    }
+
+
+def get_ui_history_items(limit: int = 50, *, user_id: str) -> list[dict[str, Any]]:
+    rows = list_ui_history_records(limit=limit, user_id=user_id)
+    return [ui_history_item_view(r) for r in rows]
+
+
+def get_ui_history_detail(record_id: int, *, user_id: str) -> dict[str, Any] | None:
+    row = get_ui_history_record_for_user(record_id, user_id=user_id)
+    if row is None:
+        return None
+    rs = row.get("result_summary") if isinstance(row.get("result_summary"), dict) else {}
+    return {
+        "record_id": row.get("id"),
+        "created_at": row.get("created_at"),
+        "user_id": row.get("user_id"),
+        "saved_result_payload": rs,
+        "explain_summary": row.get("explain_summary"),
+        "pros": row.get("pros") or [],
+        "cons": row.get("cons") or [],
+        "risk_flags": row.get("risk_flags") or [],
+    }
 
 
 def get_recent_property_records(limit: int = 30) -> list[dict[str, Any]]:

@@ -1,0 +1,103 @@
+/**
+ * P10 Phase3 Step3 — /history list UI.
+ */
+(function (global) {
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function renderRows(items) {
+    var tbody = document.getElementById("history-tbody");
+    var empty = document.getElementById("history-empty");
+    var err = document.getElementById("history-error");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+    if (err) err.classList.add("hidden");
+    if (!items || !items.length) {
+      if (empty) empty.classList.remove("hidden");
+      return;
+    }
+    if (empty) empty.classList.add("hidden");
+    items.forEach(function (row) {
+      var tr = document.createElement("tr");
+      var taskId = row.task_id ? String(row.task_id) : "";
+      var href = taskId ? "/result/" + encodeURIComponent(taskId) : "";
+      var title = row.title || "—";
+      var score = row.final_score != null ? String(row.final_score) : "N/A";
+      var verdict = row.verdict || "N/A";
+      var when = row.created_at || "—";
+      var inp = row.input_value ? String(row.input_value) : "—";
+      if (inp.length > 48) inp = inp.slice(0, 45) + "…";
+      var linkCell = href
+        ? '<a class="history-link" href="' + href + '">View</a>'
+        : "\u2014";
+      tr.innerHTML =
+        "<td>" +
+        esc(when) +
+        "</td><td>" +
+        esc(inp) +
+        "</td><td>" +
+        esc(title) +
+        "</td><td>" +
+        esc(score) +
+        "</td><td>" +
+        esc(verdict) +
+        "</td><td>" +
+        linkCell +
+        "</td>";
+      tbody.appendChild(tr);
+    });
+  }
+
+  function loadHistory() {
+    var load = document.getElementById("history-loading");
+    var err = document.getElementById("history-error");
+    var empty = document.getElementById("history-empty");
+    if (load) load.classList.remove("hidden");
+    if (err) err.classList.add("hidden");
+    if (empty) empty.classList.add("hidden");
+
+    var H = global.RentalAIHistoryShelf;
+    if (!H || typeof H.getToken !== "function") {
+      if (load) load.classList.add("hidden");
+      if (err) {
+        err.textContent = "Failed to load history";
+        err.classList.remove("hidden");
+      }
+      return;
+    }
+
+    H.getToken()
+      .then(function (token) {
+        return fetch("/records/ui-history?limit=50", {
+          headers: { Authorization: "Bearer " + token },
+        });
+      })
+      .then(function (r) {
+        if (load) load.classList.add("hidden");
+        if (!r.ok) {
+          if (err) {
+            err.textContent = "Failed to load history";
+            err.classList.remove("hidden");
+          }
+          return;
+        }
+        return r.json().then(function (j) {
+          renderRows(j.items || []);
+        });
+      })
+      .catch(function () {
+        if (load) load.classList.add("hidden");
+        if (err) {
+          err.textContent = "Failed to load history";
+          err.classList.remove("hidden");
+        }
+      });
+  }
+
+  global.RentalAIHistoryPage = { loadHistory: loadHistory };
+})(window);

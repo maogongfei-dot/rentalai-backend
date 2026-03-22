@@ -7,6 +7,11 @@
     <link rel="stylesheet" href="/assets/style.css" />
   </head>
   <body>
+    <nav class="top-nav" aria-label="Main">
+      <a href="/">Home</a>
+      <span class="nav-sep">·</span>
+      <a href="/history">History</a>
+    </nav>
     <main class="wrap">
       <h1>Find the Best Rental with AI</h1>
       <p class="hint">
@@ -22,6 +27,7 @@
       <div id="load" class="hidden">Analyzing...</div>
       <div id="err" class="err hidden"></div>
     </main>
+    <script src="/assets/history_shelf.js"></script>
     <script src="/assets/app.js"></script>
     <script>
       document.getElementById("go").onclick = function () {

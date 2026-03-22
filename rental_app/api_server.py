@@ -3,6 +3,7 @@
 # 生产/PaaS: uvicorn api_server:app --host 0.0.0.0 --port $PORT
 # 需在 rental_app 目录下执行（或设置 rootDir），以便正确 import web_bridge
 
+import json
 import logging
 import os
 import queue
@@ -26,6 +27,7 @@ from alert_utils import FailureTracker, send_alert
 from api_analysis import analyze_batch_request_body, modular_analyze_response
 from data.storage.records_db import (
     _DB_PATH as _RECORDS_DB_PATH,
+    UI_HISTORY_ANALYSIS_TYPE,
     create_user,
     delete_favorite_record,
     find_reusable_analysis_result,
@@ -46,6 +48,8 @@ from data.storage.records_query_service import (
     get_recent_property_records,
     get_recent_task_records,
     get_task_record_detail,
+    get_ui_history_detail,
+    get_ui_history_items,
 )
 from task_store import TaskStore
 
@@ -620,6 +624,138 @@ def list_record_analysis(request: Request, limit: int = 30):
     }
 
 
+_MAX_UI_HISTORY_RAW_CHARS = 200_000
+
+
+def _truncate_raw_task_snapshot(obj: Any) -> Any | None:
+    if obj is None:
+        return None
+    try:
+        s = json.dumps(obj, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        return {"_serialization": "failed", "_note": "raw_task_snapshot omitted"}
+    if len(s) <= _MAX_UI_HISTORY_RAW_CHARS:
+        return obj
+    return {
+        "_truncated": True,
+        "original_length": len(s),
+        "preview_json_prefix": s[:_MAX_UI_HISTORY_RAW_CHARS],
+    }
+
+
+class UiHistorySaveBody(BaseModel):
+    """Phase3：结果页保存到 SQLite analysis_records（analysis_type=p10_ui_history）。"""
+
+    model_config = ConfigDict(extra="ignore")
+
+    task_id: str = Field(..., min_length=4, max_length=80)
+    input_value: Optional[str] = Field(default=None, max_length=2000)
+    display_payload: dict[str, Any] = Field(default_factory=dict)
+    raw_task_snapshot: Optional[dict[str, Any]] = None
+
+
+@app.post("/records/ui-history")
+def save_ui_history_record(request: Request, body: UiHistorySaveBody):
+    """Persist a user-readable analysis snapshot after the Phase3 result page loads."""
+    user_id = _get_user_id_from_request(request)
+    tid = (body.task_id or "").strip()
+    if not tid:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "invalid_task_id", "message": "task_id is required."},
+        )
+    dp = body.display_payload if isinstance(body.display_payload, dict) else {}
+    ex = dp.get("explain") if isinstance(dp.get("explain"), dict) else {}
+    header = dp.get("header") if isinstance(dp.get("header"), dict) else {}
+    rk = dp.get("risk") if isinstance(dp.get("risk"), dict) else {}
+
+    iv = (body.input_value or "").strip()
+    input_summary: dict[str, Any] = {"history_task_id": tid}
+    if iv:
+        if iv.lower().startswith("http"):
+            input_summary["listing_url"] = iv
+        else:
+            input_summary["target_postcode"] = iv
+
+    raw_snap = _truncate_raw_task_snapshot(body.raw_task_snapshot)
+    saved: dict[str, Any] = {
+        "schema": "saved_result_payload_v1",
+        "task_id": tid,
+        "user_id": user_id,
+        "input_value": iv,
+        "display_payload": dp,
+    }
+    if raw_snap is not None:
+        saved["raw_task_snapshot"] = raw_snap
+
+    explain_line = (ex.get("summary") or header.get("verdict_label") or "") or ""
+    explain_line = str(explain_line)[:2000] if explain_line else None
+    pros = ex.get("pros") if isinstance(ex.get("pros"), list) else []
+    cons = ex.get("cons") if isinstance(ex.get("cons"), list) else []
+    risk_flags = rk.get("risk_flags") if isinstance(rk.get("risk_flags"), list) else []
+
+    try:
+        rid = insert_analysis_record(
+            analysis_type=UI_HISTORY_ANALYSIS_TYPE,
+            input_summary=input_summary,
+            result_summary=saved,
+            source="ui_phase3",
+            user_id=user_id,
+            explain_summary=explain_line,
+            pros=pros,
+            cons=cons,
+            risk_flags=risk_flags,
+        )
+    except Exception as exc:
+        logger.warning("[UI-HISTORY] insert failed: %s", exc, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "save_failed", "message": "Could not save analysis record."},
+        )
+    return {"ok": True, "record_id": rid, "analysis_type": UI_HISTORY_ANALYSIS_TYPE}
+
+
+@app.get("/records/ui-history")
+def list_ui_history(request: Request, limit: int = 50):
+    """List Phase3 UI-saved analysis rows for the authenticated user."""
+    user_id = _get_user_id_from_request(request)
+    limit = min(max(limit, 1), 100)
+    try:
+        items = get_ui_history_items(limit=limit, user_id=user_id)
+    except Exception as exc:
+        logger.error("[UI-HISTORY] list failed: %s", exc, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "load_failed", "message": "Failed to load history."},
+        )
+    return {
+        "items": items,
+        "count": len(items),
+        "storage": "sqlite",
+        "db_path": _RECORDS_DB_PATH,
+    }
+
+
+@app.get("/records/ui-history/{record_id}")
+def get_ui_history_one(request: Request, record_id: int):
+    """Single saved snapshot (optional; primary UX still uses /result/{task_id})."""
+    user_id = _get_user_id_from_request(request)
+    try:
+        detail = get_ui_history_detail(record_id, user_id=user_id)
+    except Exception as exc:
+        logger.error("[UI-HISTORY] detail failed: %s", exc, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "load_failed", "message": "Failed to load record."},
+        )
+    if detail is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "record_not_found", "message": "Record not found"},
+        )
+    return {"record": detail, "storage": "sqlite", "db_path": _RECORDS_DB_PATH}
+
+
 @app.get("/records/properties")
 def list_record_properties(request: Request, limit: int = 30):
     """Minimal query endpoint for persisted property records."""
@@ -795,6 +931,21 @@ def web_phase3_result(task_id: str):
             content={
                 "error": "web_public_missing",
                 "message": "Phase3 UI not found. Expected web_public/result.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
+@app.get("/history")
+def web_phase3_history():
+    """P10 Phase3 Step3 — saved analysis history (static HTML)."""
+    page = _WEB_PUBLIC_DIR / "history.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Phase3 UI not found. Expected web_public/history.html beside api_server.py.",
             },
         )
     return FileResponse(page)

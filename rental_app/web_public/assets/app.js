@@ -2,34 +2,13 @@
   var POLL_MS = 2500;
 
   function getToken() {
+    var H = global.RentalAIHistoryShelf;
+    if (H && typeof H.getToken === "function") {
+      return H.getToken();
+    }
     var t = localStorage.getItem("rentalai_bearer");
     if (t) return Promise.resolve(t);
-    var id = crypto.randomUUID();
-    var email = "guest_" + id.replace(/-/g, "") + "@guest.rentalai.local";
-    var password = crypto.randomUUID().replace(/-/g, "").slice(0, 32);
-    return fetch("/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email, password: password }),
-    })
-      .then(function (r1) {
-        if (!r1.ok) return Promise.reject(new Error("register failed"));
-        return fetch("/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email, password: password }),
-        });
-      })
-      .then(function (r2) {
-        if (!r2.ok) return Promise.reject(new Error("login failed"));
-        return r2.json();
-      })
-      .then(function (j2) {
-        t = j2.token;
-        if (!t) return Promise.reject(new Error("no token"));
-        localStorage.setItem("rentalai_bearer", t);
-        return t;
-      });
+    return Promise.reject(new Error("auth helper not loaded"));
   }
 
   function pollUntilDone(taskId, token, loadEl) {

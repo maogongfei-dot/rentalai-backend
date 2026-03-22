@@ -393,6 +393,15 @@
     try {
       global.__rentalaiLastDisplayPayload = p;
     } catch (e3) {}
+
+    try {
+      if (
+        global.RentalAIHistoryShelf &&
+        typeof global.RentalAIHistoryShelf.trySaveCompletedResult === "function"
+      ) {
+        global.RentalAIHistoryShelf.trySaveCompletedResult(vm);
+      }
+    } catch (e4) {}
   }
 
   global.RentalAIResultView = {

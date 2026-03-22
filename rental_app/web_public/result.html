@@ -7,8 +7,14 @@
     <link rel="stylesheet" href="/assets/style.css" />
   </head>
   <body>
+    <nav class="top-nav" aria-label="Main">
+      <a href="/">Home</a>
+      <span class="nav-sep">·</span>
+      <a href="/history">History</a>
+      <span class="nav-sep">·</span>
+      <a href="/">New analysis</a>
+    </nav>
     <main class="wrap result-wrap">
-      <p class="back-link"><a href="/">← New analysis</a></p>
 
       <div id="loading-panel" class="card card-muted">
         <h1 class="section-title">Analyzing…</h1>
@@ -102,6 +108,7 @@
             <ul id="risk-next-ul" class="bullet-list"></ul>
           </div>
         </section>
+        <p class="back-link"><a href="/">← New analysis</a></p>
       </div>
 
       <details id="debug-details" class="debug-details hidden">
@@ -109,6 +116,7 @@
         <pre id="debug-json" class="debug-pre"></pre>
       </details>
     </main>
+    <script src="/assets/history_shelf.js"></script>
     <script src="/assets/result_view_model.js"></script>
     <script src="/assets/app.js"></script>
     <script>
