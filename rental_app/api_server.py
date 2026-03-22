@@ -3,13 +3,27 @@
 # 生产/PaaS: uvicorn api_server:app --host 0.0.0.0 --port $PORT
 # 需在 rental_app 目录下执行（或设置 rootDir），以便正确 import web_bridge
 
+import logging
+import time
+import traceback
+from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import Body, FastAPI
+from fastapi import Body, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from alert_utils import FailureTracker, send_alert
 from api_analysis import analyze_batch_request_body, modular_analyze_response
+
+logger = logging.getLogger("rentalai.api")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
+_api_failures = FailureTracker(threshold=3, source="api-server")
 
 app = FastAPI(
     title="RentalAI API",
@@ -24,6 +38,47 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _track_request(request: Request, call_next):
+    t0 = time.perf_counter()
+    response = await call_next(request)
+    duration = time.perf_counter() - t0
+    endpoint = request.url.path
+    logger.info(
+        "[PERF] %s %s -> %s in %.3fs",
+        request.method,
+        endpoint,
+        response.status_code,
+        duration,
+    )
+    if response.status_code < 500:
+        _api_failures.record_success(endpoint)
+    return response
+
+
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    endpoint = request.url.path
+    tb = traceback.format_exc()
+    logger.error(
+        "Unhandled exception on %s %s: %s\n%s",
+        request.method,
+        endpoint,
+        exc,
+        tb,
+    )
+    _api_failures.record_failure(endpoint, str(exc))
+    send_alert(
+        "500 on %s %s: %s" % (request.method, endpoint, exc),
+        level="P1",
+        source="api-server",
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"error": "internal_error", "message": str(exc)},
+    )
 
 
 class AnalyzeRequest(BaseModel):
@@ -48,7 +103,22 @@ def _body_dict(body: AnalyzeRequest) -> dict:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "rentalai-api", "api_version": "P2-Phase5"}
+    return {
+        "status": "ok",
+        "service": "rentalai-api",
+        "api_version": "P2-Phase5",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@app.get("/alerts")
+def alerts_status():
+    """Current consecutive-failure counts per endpoint (resets on success)."""
+    return {
+        "failure_counts": _api_failures.get_counts(),
+        "threshold": _api_failures._threshold,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @app.post("/analyze")

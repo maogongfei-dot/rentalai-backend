@@ -9,9 +9,21 @@
 #
 # 依赖: pip install -r requirements.txt  (含 streamlit)
 
+import logging
 import os
 
 import streamlit as st
+
+_ui_logger = logging.getLogger("rentalai.ui")
+if not _ui_logger.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
+from alert_utils import FailureTracker, send_alert
+
+_ui_api_failures = FailureTracker(threshold=3, source="streamlit-ui")
 
 from web_ui.condition_summary import summarize_analyze_context, summarize_batch_request
 from web_ui.listing_detail_panel import build_analyze_detail_bundle, build_batch_detail_bundle
@@ -195,12 +207,16 @@ def run_analysis_for_ui(
     """
     from api_analysis import envelope_from_engine_result, legacy_ui_result_from_standard_envelope
 
+    import time as _time
+
     if use_local:
         try:
             from web_bridge import run_web_demo_analysis
 
+            _t0 = _time.perf_counter()
             input_data = normalize_form_values(raw_form)
             engine = run_web_demo_analysis(input_data)
+            _ui_logger.info("[PERF] local engine %s took %.3fs", api_endpoint, _time.perf_counter() - _t0)
             envelope = envelope_from_engine_result(engine)
             return legacy_ui_result_from_standard_envelope(envelope), None
         except Exception as e:
@@ -211,15 +227,23 @@ def run_analysis_for_ui(
     path = api_endpoint if str(api_endpoint).startswith("/") else "/%s" % api_endpoint
     url = "%s%s" % ((api_base_url or "").rstrip("/"), path)
     try:
+        _t0 = _time.perf_counter()
         resp = requests.post(url, json=raw_form, timeout=120)
         resp.raise_for_status()
         data = resp.json()
+        _dur = _time.perf_counter() - _t0
+        _ui_logger.info("[PERF] HTTP %s -> %s in %.3fs", path, resp.status_code, _dur)
         if not isinstance(data, dict):
             return None, "API returned non-JSON object"
+        _ui_api_failures.record_success(path)
         return legacy_ui_result_from_standard_envelope(data), None
     except requests.RequestException as e:
+        _ui_logger.error("API request failed | url=%s | error=%s", url, e)
+        _ui_api_failures.record_failure(path, str(e))
         return None, "API request failed: %s" % (e,)
     except ValueError as e:
+        _ui_logger.error("Invalid JSON from API | url=%s | error=%s", url, e)
+        _ui_api_failures.record_failure(path, str(e))
         return None, "Invalid JSON from API: %s" % (e,)
 
 
@@ -1008,15 +1032,19 @@ with st.expander(lab["batch_section_expander"], expanded=False):
             else:
                 try:
                     _bu = _api_base.rstrip("/")
+                    _batch_url = "%s/analyze-batch" % _bu
                     with st.spinner(lab["spinner_batch"]):
-                        _br = requests.post("%s/analyze-batch" % _bu, json=_payload, timeout=180)
+                        _br = requests.post(_batch_url, json=_payload, timeout=180)
                         _br.raise_for_status()
                         _bj = _br.json()
+                    _ui_api_failures.record_success("/analyze-batch")
                     st.session_state["p2_batch_last"] = _bj
                     st.session_state["p2_batch_last_request"] = _payload
                     with st.expander("Raw JSON response", expanded=False):
                         st.json(_bj)
                 except Exception as ex:
+                    _ui_logger.error("Batch request failed | url=%s | error=%s", _batch_url, ex)
+                    _ui_api_failures.record_failure("/analyze-batch", str(ex))
                     st.error(_display_text(str(ex), "Request failed"))
 
     _last_batch = st.session_state.get("p2_batch_last")

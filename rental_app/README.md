@@ -123,6 +123,9 @@ curl -s http://127.0.0.1:8000/health
 - **Phase3 · 上线后值班清单：** **`P8_PHASE3_POST_LAUNCH_CHECKLIST.md`**
 - **P9 · 问题分级与排查框架：** **`P9_PHASE1_ISSUE_TRIAGE_BOARD.md`**
 - **P9 · 稳定性巡检清单：** **`P9_PHASE1_STABILITY_REVIEW_CHECKLIST.md`**
+- **P9 · 监控基线：** **`P9_PHASE1_MONITORING_BASELINE.md`**
+- **P9 · 报警系统：** **`P9_PHASE1_ALERTING_SYSTEM.md`**
+- **P9 · 性能基线：** **`P9_PHASE2_PERFORMANCE_BASELINE.md`**
 - 部署前联调与上线执行清单：**`P8_PHASE1_PREDEPLOY_CHECKLIST.md`**
 - 部署方案：**`P8_PHASE1_DEPLOYMENT_PLAN.md`**
 - 运行入口汇总：**`P8_PHASE1_RUNTIME_ENTRY_GUIDE.md`**

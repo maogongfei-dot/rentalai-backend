@@ -22,6 +22,12 @@
 
 **P9 Phase1 Step1（上线后稳定性框架）**：已新增 **`P9_PHASE1_ISSUE_TRIAGE_BOARD.md`**（问题分类 E1-E8、严重度 P0-P3、排查入口、风险清单）、**`P9_PHASE1_STABILITY_REVIEW_CHECKLIST.md`**（定期巡检打勾清单）。系统进入稳定观察阶段。
 
+**P9 Phase1 Step2（基础监控基线）**：`api_server.py` 新增 `logging` + 全局异常处理器 + `/health` 增加 `timestamp`；`app_web.py` 新增结构化 API 错误日志；新增 **`P9_PHASE1_MONITORING_BASELINE.md`**（监控基线、排查路径、当前局限）。
+
+**P9 Phase1 Step3（报警系统）**：新增 **`alert_utils.py`**（`send_alert` + `FailureTracker` + 可选 webhook）；`api_server.py` 集成连续失败追踪 + 成功重置中间件 + `/alerts` 诊断端点；`app_web.py` 集成前端侧 API 失败追踪；新增 **`P9_PHASE1_ALERTING_SYSTEM.md`**。
+
+**P9 Phase2 Step1（性能基线）**：`api_server.py` HTTP 中间件新增 `[PERF]` 耗时日志；`api_analysis.py` 新增引擎耗时 + batch 循环耗时日志；`app_web.py` 新增 local engine / HTTP 请求耗时日志；新增 **`P9_PHASE2_PERFORMANCE_BASELINE.md`**（慢点排查、超时风险图、Top 5 优化优先级、Quick Wins）。
+
 ---
 
 ## 1. Current Project Structure

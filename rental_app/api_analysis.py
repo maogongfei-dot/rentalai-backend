@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any
+
+_perf_log = logging.getLogger("rentalai.perf")
 
 # ---------- 标准元信息与错误类型 ----------
 
@@ -225,7 +229,9 @@ def run_standard_pipeline(
         from web_bridge import normalize_web_form_inputs
 
         input_data = normalize_web_form_inputs(coerced)
+        _t0 = time.perf_counter()
         engine_out = call_analysis_engine(input_data)
+        _perf_log.info("[PERF] engine %s took %.3fs", endpoint, time.perf_counter() - _t0)
         if not engine_out.get("success"):
             msg = engine_out.get("message") or "Engine reported failure"
             return (
@@ -861,11 +867,18 @@ def analyze_batch_request_body(raw_body: Any) -> dict:
                 api_version=BATCH_API_VERSION,
             )
         rows: list[dict] = []
+        _bt0 = time.perf_counter()
         for i, item in enumerate(props):
             out = analyze_property_item_for_batch(i, item)
             row = batch_result_row(out)
             enrich_batch_result_row(row)
             rows.append(row)
+        _perf_log.info(
+            "[PERF] batch engine: %d items in %.3fs (%.3fs/item)",
+            len(props),
+            time.perf_counter() - _bt0,
+            (time.perf_counter() - _bt0) / max(len(props), 1),
+        )
         ranking = rank_batch_results(rows)
         top_rec = build_top_recommendations(rows, ranking)
         top3 = top_rec.get("top3") or []
