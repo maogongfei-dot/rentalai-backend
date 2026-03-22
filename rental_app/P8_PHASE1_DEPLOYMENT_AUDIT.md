@@ -16,6 +16,12 @@
 
 **Phase2 Step4（Go-Live 收尾）**：已新增 **`P8_PHASE2_GO_LIVE_RUNBOOK.md`**（最终上线执行手册：部署顺序、验证清单、回滚方案、就绪判定）、**`P8_PHASE2_LAUNCH_CHECKLIST.md`**（精简可打勾上线清单）。**最终结论：Ready for go-live。**
 
+**Phase3 Step3（真实联调验证）**：已新增 **`P8_PHASE3_REAL_INTEGRATION_FIX.md`**（CORS / API 路径 / 环境变量联调检查）。结论：**全部 Pass，无需代码修改**——API 路径完全一致、CORS 对 MVP 足够、Streamlit 服务端请求不受浏览器 CORS 限制。
+
+**Phase3 Step4（Go-Live 验证 + 上线后监控）**：已新增 **`P8_PHASE3_GO_LIVE_VERIFICATION.md`**（端到端验证步骤、监控入口、排查顺序、回退方案）、**`P8_PHASE3_POST_LAUNCH_CHECKLIST.md`**（上线后值班打勾清单）。**最终结论：Go-Live Confirmed。**
+
+**P9 Phase1 Step1（上线后稳定性框架）**：已新增 **`P9_PHASE1_ISSUE_TRIAGE_BOARD.md`**（问题分类 E1-E8、严重度 P0-P3、排查入口、风险清单）、**`P9_PHASE1_STABILITY_REVIEW_CHECKLIST.md`**（定期巡检打勾清单）。系统进入稳定观察阶段。
+
 ---
 
 ## 1. Current Project Structure
