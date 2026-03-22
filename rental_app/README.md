@@ -113,6 +113,9 @@ curl -s http://127.0.0.1:8000/health
 ## 7. 更多文档
 
 - **Phase2 · 仅后端部署 Runbook：** **`P8_PHASE2_BACKEND_DEPLOY_RUNBOOK.md`**
+- **Phase2 · 仅前端部署 Runbook：** **`P8_PHASE2_FRONTEND_DEPLOY_RUNBOOK.md`**
+- **Phase2 · Scraper 部署准备：** **`P8_PHASE2_SCRAPER_DEPLOY_PREP.md`**
+- **Phase2 · 整站联调状态：** **`P8_PHASE2_INTEGRATION_STATUS.md`**
 - 部署前联调与上线执行清单：**`P8_PHASE1_PREDEPLOY_CHECKLIST.md`**
 - 部署方案：**`P8_PHASE1_DEPLOYMENT_PLAN.md`**
 - 运行入口汇总：**`P8_PHASE1_RUNTIME_ENTRY_GUIDE.md`**

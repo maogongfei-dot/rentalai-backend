@@ -10,6 +10,10 @@
 
 **Phase2 Step1（后端部署 Runbook）**：已新增 **`P8_PHASE2_BACKEND_DEPLOY_RUNBOOK.md`**、仓库根 **`render.backend.yaml`**（仅 API）；`api_server.py` 头注释补充生产启动方式。
 
+**Phase2 Step2（前端部署 Runbook）**：已新增 **`P8_PHASE2_FRONTEND_DEPLOY_RUNBOOK.md`**、仓库根 **`render.frontend.yaml`**（仅 Streamlit UI）；`app_web.py` 侧栏 API 提示改为环境变量感知；`.env.example` 补充 `RENTALAI_API_URL` 本地/线上双示例。
+
+**Phase2 Step3（整站联调 + Scraper 部署准备）**：已新增 **`P8_PHASE2_SCRAPER_DEPLOY_PREP.md`**（Scraper 运行要求与部署方案）、**`P8_PHASE2_INTEGRATION_STATUS.md`**（整站联调状态与最终部署顺序）。结论：整站代码路径已打通，唯一未验证项为 Playwright Chromium 在 PaaS 上的 build 兼容性。
+
 ---
 
 ## 1. Current Project Structure

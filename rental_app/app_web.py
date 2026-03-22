@@ -595,7 +595,7 @@ _api_base = st.sidebar.text_input(
     "API base URL",
     value=_api_default or "http://127.0.0.1:8000",
     disabled=_use_local,
-    help="Example: http://127.0.0.1:8000 — start with: uvicorn api_server:app --port 8000",
+    help="Set via env RENTALAI_API_URL or type here. Local: http://127.0.0.1:8000",
 )
 _api_endpoint = st.sidebar.selectbox(
     "API endpoint",
@@ -606,7 +606,10 @@ _api_endpoint = st.sidebar.selectbox(
 )
 if _use_local:
     st.sidebar.caption("Local mode always uses full engine output (≈ POST /analyze).")
-st.sidebar.caption("Start API: `uvicorn api_server:app --host 127.0.0.1 --port 8000`")
+if _api_default.startswith("http://127.") or _api_default.startswith("http://localhost"):
+    st.sidebar.caption("Start API: `uvicorn api_server:app --host 127.0.0.1 --port 8000`")
+else:
+    st.sidebar.caption("API: **%s**" % _api_default)
 
 # --- P7 Phase5: 真实多平台抓取 + batch（侧栏控制 Agent 与 batch 区按钮）---
 st.sidebar.markdown("### %s" % lab.get("p7_sidebar_title", "Real listings (P7)"))

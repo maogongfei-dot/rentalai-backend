@@ -1,0 +1,23 @@
+# P8 Phase2 Step2 — 仅部署 Streamlit 前端（RentalAI）
+# 与 render.yaml 中 rentalai-ui 服务等价；用于在后端已上线后单独部署 UI。
+# 仓库根为 python_learning、应用代码在 rental_app/ 时使用。
+# 若 Git 根仅为 rental_app/，删除下方 rootDir 字段。
+#
+# 部署后必须配置：
+#   RENTALAI_API_URL = 已部署 rentalai-api 的公网 URL（https://...，无尾部斜杠）
+
+services:
+  - type: web
+    name: rentalai-ui
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: rental_app
+    buildCommand: pip install -r requirements.txt && playwright install chromium
+    startCommand: streamlit run app_web.py --server.port $PORT --server.address 0.0.0.0
+    healthCheckPath: /
+    envVars:
+      - key: RENTALAI_USE_LOCAL
+        value: "1"
+      - key: RENTALAI_API_URL
+        sync: false
