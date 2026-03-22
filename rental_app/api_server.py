@@ -4,6 +4,8 @@
 # 需在 rental_app 目录下执行（或设置 rootDir），以便正确 import web_bridge
 
 import logging
+import os
+import queue
 import time
 import traceback
 from datetime import datetime, timezone
@@ -18,6 +20,14 @@ import threading
 
 from alert_utils import FailureTracker, send_alert
 from api_analysis import analyze_batch_request_body, modular_analyze_response
+from data.storage.records_db import (
+    _DB_PATH as _RECORDS_DB_PATH,
+    init_records_db,
+    insert_analysis_record,
+    list_analysis_records,
+    list_property_records,
+    list_task_records,
+)
 from task_store import TaskStore
 
 logger = logging.getLogger("rentalai.api")
@@ -27,6 +37,7 @@ logging.basicConfig(
 )
 
 _api_failures = FailureTracker(threshold=3, source="api-server")
+init_records_db()
 _task_store = TaskStore()
 
 app = FastAPI(
@@ -193,41 +204,97 @@ class AnalyzeRealRequest(BaseModel):
     persist: bool = Field(default=True)
 
 
-_TASK_SEMAPHORE = threading.Semaphore(1)
+_MAX_CONCURRENT_TASKS = max(1, int(os.environ.get("MAX_CONCURRENT_TASKS", "2")))
+_TASK_QUEUE: "queue.Queue[tuple[str, dict[str, Any]]]" = queue.Queue()
+_WORKERS_STARTED = False
+_WORKERS_LOCK = threading.Lock()
+
+
+def _task_worker_loop(worker_idx: int) -> None:
+    """Background worker: consume queued tasks and execute them."""
+    while True:
+        task_id, params = _TASK_QUEUE.get()
+        try:
+            logger.info(
+                "[TASK][worker-%s] dequeued %s (queue_size=%s)",
+                worker_idx,
+                task_id,
+                _TASK_QUEUE.qsize(),
+            )
+            _run_analysis_task(task_id, params)
+        finally:
+            _TASK_QUEUE.task_done()
+
+
+def _start_task_workers_once() -> None:
+    global _WORKERS_STARTED
+    with _WORKERS_LOCK:
+        if _WORKERS_STARTED:
+            return
+        for i in range(_MAX_CONCURRENT_TASKS):
+            threading.Thread(
+                target=_task_worker_loop,
+                args=(i + 1,),
+                daemon=True,
+                name="rentalai-task-worker-%s" % (i + 1),
+            ).start()
+        _WORKERS_STARTED = True
+    logger.info("[TASK] started %s worker(s); max concurrent=%s", _MAX_CONCURRENT_TASKS, _MAX_CONCURRENT_TASKS)
 
 
 def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
     """Background thread target: runs multi-source analysis and updates the task store."""
-    acquired = _TASK_SEMAPHORE.acquire(timeout=300)
-    if not acquired:
-        _task_store.mark_failed(
-            task_id,
-            "Queue timeout — waited 5 minutes but the previous task did not finish.",
-        )
-        return
+    logger.info("[TASK] %s started execution", task_id)
+    _task_store.mark_running(task_id, stage="scraping")
+    t0 = time.perf_counter()
     try:
-        _task_store.mark_running(task_id, stage="scraping")
-        t0 = time.perf_counter()
-        try:
-            from data.pipeline.analysis_bridge import run_multi_source_analysis
+        from data.pipeline.analysis_bridge import run_multi_source_analysis
 
-            result = run_multi_source_analysis(
-                sources=params.get("sources"),
-                query={"headless": params.get("headless", True)},
-                limit_per_source=params.get("limit_per_source", 10),
-                persist=params.get("persist", True),
-                budget=params.get("budget"),
-                target_postcode=params.get("target_postcode"),
+        result = run_multi_source_analysis(
+            sources=params.get("sources"),
+            query={"headless": params.get("headless", True)},
+            limit_per_source=params.get("limit_per_source", 10),
+            persist=params.get("persist", True),
+            budget=params.get("budget"),
+            target_postcode=params.get("target_postcode"),
+        )
+        elapsed = time.perf_counter() - t0
+        degraded = bool(result.get("degraded"))
+        _task_store.mark_success(task_id, result, degraded=degraded, elapsed=elapsed)
+        analysis_summary = {
+            "success": bool(result.get("success")),
+            "degraded": degraded,
+            "pipeline_success": result.get("pipeline_success"),
+            "sources_run": result.get("sources_run") or [],
+            "aggregated_unique_count": result.get("aggregated_unique_count"),
+            "total_analyzed_count": result.get("total_analyzed_count"),
+            "error_count": len(result.get("errors") or []),
+        }
+        analysis_input = {
+            "sources": params.get("sources"),
+            "limit_per_source": params.get("limit_per_source"),
+            "budget": params.get("budget"),
+            "target_postcode": params.get("target_postcode"),
+        }
+        try:
+            insert_analysis_record(
+                analysis_type="multi_source_analysis",
+                input_summary=analysis_input,
+                result_summary=analysis_summary,
+                source="async_task",
             )
-            elapsed = time.perf_counter() - t0
-            degraded = bool(result.get("degraded"))
-            _task_store.mark_success(task_id, result, degraded=degraded, elapsed=elapsed)
-        except Exception as exc:
-            elapsed = time.perf_counter() - t0
-            logger.error("[TASK] %s failed: %s", task_id, exc, exc_info=True)
-            _task_store.mark_failed(task_id, str(exc), elapsed=elapsed)
-    finally:
-        _TASK_SEMAPHORE.release()
+        except Exception:
+            logger.warning("[DATA] failed to persist analysis record for task %s", task_id, exc_info=True)
+        logger.info("[TASK] %s finished with %s in %.2fs", task_id, "degraded" if degraded else "success", elapsed)
+    except Exception as exc:
+        elapsed = time.perf_counter() - t0
+        logger.error("[TASK] %s failed: %s", task_id, exc, exc_info=True)
+        _task_store.mark_failed(task_id, str(exc), elapsed=elapsed)
+        send_alert(
+            "Task %s failed: %s" % (task_id, exc),
+            level="P2",
+            source="api-server",
+        )
 
 
 @app.post("/tasks")
@@ -242,39 +309,10 @@ def create_task(body: AnalyzeRealRequest = AnalyzeRealRequest()):
         "limit_per_source": params.get("limit_per_source"),
     }
     rec = _task_store.create(input_summary=summary)
-    threading.Thread(
-        target=_run_analysis_task,
-        args=(rec.task_id, params),
-        daemon=True,
-    ).start()
+    _start_task_workers_once()
+    _TASK_QUEUE.put((rec.task_id, params))
+    logger.info("[TASK] queued %s (queue_size=%s)", rec.task_id, _TASK_QUEUE.qsize())
     return {"task_id": rec.task_id, "status": rec.status}
-
-
-@app.get("/tasks/{task_id}")
-def get_task(task_id: str):
-    """Query the current state of an async task."""
-    rec = _task_store.get(task_id)
-    if rec is None:
-        return JSONResponse(
-            status_code=404,
-            content={"error": "task_not_found", "task_id": task_id},
-        )
-    out: dict[str, Any] = {
-        "task_id": rec.task_id,
-        "status": rec.status,
-        "task_type": rec.task_type,
-        "stage": rec.stage,
-        "created_at": rec.created_at,
-        "updated_at": rec.updated_at,
-        "input_summary": rec.input_summary,
-        "degraded": rec.degraded,
-        "elapsed_seconds": rec.elapsed_seconds,
-        "error": rec.error,
-        "last_error_at": rec.last_error_at,
-    }
-    if rec.status in ("success", "degraded"):
-        out["result"] = rec.result
-    return out
 
 
 @app.get("/tasks")
@@ -296,3 +334,81 @@ def list_tasks(mode: str = "active", limit: int = 30):
 def task_stats():
     """Aggregate task counts by status."""
     return _task_store.stats()
+
+
+@app.get("/tasks/system")
+def task_system_status():
+    """Minimal queue + worker observability for ops checks."""
+    stats = _task_store.stats()
+    by_status = stats.get("by_status") or {}
+    return {
+        "queued_count": int(by_status.get("queued", 0)),
+        "running_count": int(by_status.get("running", 0)),
+        "success_count": int(by_status.get("success", 0)),
+        "failed_count": int(by_status.get("failed", 0)),
+        "degraded_count": int(by_status.get("degraded", 0)),
+        "max_concurrent_tasks": _MAX_CONCURRENT_TASKS,
+    }
+
+
+@app.get("/tasks/{task_id}")
+def get_task(task_id: str):
+    """Query the current state of an async task."""
+    rec = _task_store.get(task_id)
+    if rec is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "task_not_found", "task_id": task_id},
+        )
+    out: dict[str, Any] = {
+        "task_id": rec.task_id,
+        "status": rec.status,
+        "task_type": rec.task_type,
+        "stage": rec.stage,
+        "priority": rec.priority,
+        "created_at": rec.created_at,
+        "updated_at": rec.updated_at,
+        "started_at": rec.started_at,
+        "finished_at": rec.finished_at,
+        "input_summary": rec.input_summary,
+        "degraded": rec.degraded,
+        "elapsed_seconds": rec.elapsed_seconds,
+        "error": rec.error,
+        "last_error_at": rec.last_error_at,
+    }
+    if rec.status in ("success", "degraded"):
+        out["result"] = rec.result
+    return out
+
+
+@app.get("/records/tasks")
+def list_record_tasks(limit: int = 30):
+    """Minimal query endpoint for persisted task records."""
+    return {
+        "records": list_task_records(limit=limit),
+        "storage": "sqlite",
+        "db_path": _RECORDS_DB_PATH,
+    }
+
+
+@app.get("/records/analysis")
+def list_record_analysis(limit: int = 30):
+    """Minimal query endpoint for persisted analysis records."""
+    return {
+        "records": list_analysis_records(limit=limit),
+        "storage": "sqlite",
+        "db_path": _RECORDS_DB_PATH,
+    }
+
+
+@app.get("/records/properties")
+def list_record_properties(limit: int = 30):
+    """Minimal query endpoint for persisted property records."""
+    return {
+        "records": list_property_records(limit=limit),
+        "storage": "sqlite",
+        "db_path": _RECORDS_DB_PATH,
+    }
+
+
+_start_task_workers_once()

@@ -51,6 +51,16 @@ Examples:
 
 ---
 
+## Task System Status
+
+| | |
+|---|---|
+| Method | `GET` |
+| Path | `/tasks/system` |
+| Response | `{"queued_count": 1, "running_count": 2, "success_count": 10, "failed_count": 1, "degraded_count": 1, "max_concurrent_tasks": 2}` |
+
+---
+
 ## Persisted Fields
 
 All `TaskRecord` fields are persisted to `.task_store.json`:

@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from data.schema.listing_schema import ListingSchema
+try:
+    from data.storage.records_db import upsert_property_records as _db_upsert_property_records
+except Exception:  # pragma: no cover - keep JSON storage usable without SQLite
+    _db_upsert_property_records = None
 
 # 与 schema、normalizer 同级：rental_app/data/listings.json
 _DATA_DIR = Path(__file__).resolve().parent.parent
@@ -145,6 +149,12 @@ def save_listings(
             "skipped": total,
             "total": total,
         }
+    if _db_upsert_property_records is not None:
+        try:
+            _db_upsert_property_records([_coerce_listing(x).to_dict() for x in listings])
+        except Exception:
+            # Do not break primary JSON storage if sqlite mirror fails.
+            pass
     return {
         "success": True,
         "saved": saved,

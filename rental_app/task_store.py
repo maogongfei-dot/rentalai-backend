@@ -22,6 +22,10 @@ from pathlib import Path
 from typing import Any
 
 _logger = logging.getLogger("rentalai.tasks")
+try:
+    from data.storage.records_db import upsert_task_record as _db_upsert_task_record
+except Exception:  # pragma: no cover - data layer is optional at runtime
+    _db_upsert_task_record = None
 
 _TASK_TTL_SECONDS = 3600  # keep finished tasks visible for 1 hour
 _DEFAULT_PERSIST_PATH = os.environ.get(
@@ -46,6 +50,9 @@ class TaskRecord:
     task_type: str = "multi_source_analysis"
     stage: str = ""
     last_error_at: str | None = None
+    priority: int = 0
+    started_at: str | None = None
+    finished_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -94,6 +101,7 @@ class TaskStore:
         input_summary: dict[str, Any] | None = None,
         *,
         task_type: str = "multi_source_analysis",
+        priority: int = 0,
     ) -> TaskRecord:
         now = datetime.now(timezone.utc).isoformat()
         rec = TaskRecord(
@@ -104,12 +112,14 @@ class TaskStore:
             input_summary=input_summary or {},
             task_type=task_type,
             stage="queued",
+            priority=priority,
         )
         with self._lock:
             self._maybe_evict()
             self._tasks[rec.task_id] = rec
             self._flush_unlocked()
-        _logger.info("[TASK] created %s (type=%s)", rec.task_id, task_type)
+            self._sync_db_unlocked(rec)
+        _logger.info("[TASK] enqueued %s (type=%s, priority=%s)", rec.task_id, task_type, priority)
         return rec
 
     def get(self, task_id: str) -> TaskRecord | None:
@@ -117,7 +127,18 @@ class TaskStore:
             return self._tasks.get(task_id)
 
     def mark_running(self, task_id: str, *, stage: str = "running") -> None:
-        self._update(task_id, status="running", stage=stage)
+        with self._lock:
+            rec = self._tasks.get(task_id)
+            if rec is None:
+                return
+            if rec.started_at is None:
+                rec.started_at = datetime.now(timezone.utc).isoformat()
+            rec.status = "running"
+            rec.stage = stage
+            rec.updated_at = datetime.now(timezone.utc).isoformat()
+            self._flush_unlocked()
+            self._sync_db_unlocked(rec)
+        _logger.info("[TASK] %s -> running", task_id)
 
     def mark_success(
         self,
@@ -127,6 +148,7 @@ class TaskStore:
         degraded: bool = False,
         elapsed: float | None = None,
     ) -> None:
+        finished_at = datetime.now(timezone.utc).isoformat()
         self._update(
             task_id,
             status="degraded" if degraded else "success",
@@ -134,6 +156,7 @@ class TaskStore:
             degraded=degraded,
             elapsed_seconds=elapsed,
             stage="done",
+            finished_at=finished_at,
         )
 
     def mark_failed(self, task_id: str, error: str, *, elapsed: float | None = None) -> None:
@@ -145,6 +168,7 @@ class TaskStore:
             elapsed_seconds=elapsed,
             stage="failed",
             last_error_at=now,
+            finished_at=now,
         )
 
     def mark_timeout(self, task_id: str, *, elapsed: float | None = None) -> None:
@@ -156,6 +180,7 @@ class TaskStore:
             elapsed_seconds=elapsed,
             stage="timeout",
             last_error_at=now,
+            finished_at=now,
         )
 
     def list_active(self) -> list[dict[str, Any]]:
@@ -185,6 +210,9 @@ class TaskStore:
                     "elapsed_seconds": r.elapsed_seconds,
                     "degraded": r.degraded,
                     "error": r.error,
+                    "priority": r.priority,
+                    "started_at": r.started_at,
+                    "finished_at": r.finished_at,
                 }
                 for r in ordered
             ]
@@ -211,6 +239,7 @@ class TaskStore:
                     setattr(rec, k, v)
             rec.updated_at = datetime.now(timezone.utc).isoformat()
             self._flush_unlocked()
+            self._sync_db_unlocked(rec)
         _logger.info("[TASK] %s -> %s", task_id, fields.get("status", "update"))
 
     def _maybe_evict(self) -> None:
@@ -259,25 +288,36 @@ class TaskStore:
         now = datetime.now(timezone.utc).isoformat()
         loaded = 0
         interrupted = 0
+        known_fields = set(TaskRecord.__dataclass_fields__.keys())
         for tid, data in raw.items():
             try:
-                rec = TaskRecord(**{
-                    k: v for k, v in data.items() if hasattr(TaskRecord, k)
-                })
+                rec = TaskRecord(**{k: v for k, v in data.items() if k in known_fields})
                 if rec.status in ("queued", "running"):
                     rec.status = "interrupted"
                     rec.stage = "interrupted"
                     rec.error = rec.error or "Process restarted while task was in progress."
                     rec.last_error_at = now
+                    if rec.finished_at is None:
+                        rec.finished_at = now
                     rec.updated_at = now
                     interrupted += 1
                 self._tasks[tid] = rec
+                self._sync_db_unlocked(rec)
                 loaded += 1
             except Exception:
                 _logger.warning("[TASK] skipping corrupt record %s", tid)
         _logger.info(
             "[TASK] loaded %d tasks from disk (%d marked interrupted)", loaded, interrupted
         )
+
+    def _sync_db_unlocked(self, rec: TaskRecord) -> None:
+        """Best-effort SQLite mirror for task metadata. Caller holds _lock."""
+        if _db_upsert_task_record is None:
+            return
+        try:
+            _db_upsert_task_record(rec.to_dict())
+        except Exception:
+            _logger.debug("[TASK] sqlite sync failed for %s", rec.task_id, exc_info=True)
 
 
 def _iso_epoch(iso: str) -> float:
