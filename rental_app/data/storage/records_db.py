@@ -32,7 +32,7 @@ def _utc_now_iso() -> str:
 
 def _json_text(value: Any) -> str:
     try:
-        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     except (TypeError, ValueError):
         return "{}"
 
@@ -75,6 +75,26 @@ def _input_hash(value: dict[str, Any] | None) -> str | None:
     return hashlib.sha256(payload).hexdigest()
 
 
+def normalize_analysis_input_signature(input_summary: dict[str, Any] | None) -> dict[str, Any]:
+    """Build a stable, minimal input signature for cache matching."""
+    src = input_summary if isinstance(input_summary, dict) else {}
+    out: dict[str, Any] = {}
+    sources = src.get("sources")
+    if isinstance(sources, list):
+        out["sources"] = sorted(
+            {str(s).strip().lower() for s in sources if str(s).strip()}
+        )
+    elif isinstance(sources, str) and sources.strip():
+        out["sources"] = [sources.strip().lower()]
+    else:
+        out["sources"] = []
+    out["limit_per_source"] = int(src.get("limit_per_source") or 10)
+    out["budget"] = src.get("budget")
+    tp = src.get("target_postcode")
+    out["target_postcode"] = str(tp).strip().upper() if isinstance(tp, str) and tp.strip() else None
+    return out
+
+
 def init_records_db() -> None:
     with _DB_LOCK:
         with _connect() as conn:
@@ -109,6 +129,10 @@ def init_records_db() -> None:
                     created_at TEXT NOT NULL
                 )
                 """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_analysis_type_hash_created "
+                "ON analysis_records (analysis_type, input_hash, created_at DESC)"
             )
             conn.execute(
                 """
@@ -185,6 +209,7 @@ def insert_analysis_record(
     source: str = "unknown",
 ) -> int:
     now = _utc_now_iso()
+    sig = normalize_analysis_input_signature(input_summary)
     with _DB_LOCK:
         with _connect() as conn:
             cur = conn.execute(
@@ -195,8 +220,8 @@ def insert_analysis_record(
                 """,
                 (
                     analysis_type,
-                    _input_hash(input_summary),
-                    _json_text(input_summary or {}),
+                    _input_hash(sig),
+                    _json_text(sig),
                     _json_text(result_summary or {}),
                     raw_result_ref,
                     source,
@@ -205,6 +230,65 @@ def insert_analysis_record(
             )
             conn.commit()
             return int(cur.lastrowid)
+
+
+def find_reusable_analysis_result(
+    *,
+    analysis_type: str,
+    input_summary: dict[str, Any] | None,
+    max_age_seconds: int = 1800,
+) -> dict[str, Any] | None:
+    """Return cached full result when available and not expired.
+
+    Cache payload is expected in analysis_records.result_summary:
+      {
+        "summary": {...},
+        "reusable_result": {...}
+      }
+    """
+    if not analysis_type:
+        return None
+    sig = normalize_analysis_input_signature(input_summary)
+    h = _input_hash(sig)
+    if not h:
+        return None
+    now = datetime.now(timezone.utc)
+    with _DB_LOCK:
+        with _connect() as conn:
+            row = conn.execute(
+                """
+                SELECT result_summary, created_at
+                FROM analysis_records
+                WHERE analysis_type = ? AND input_hash = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (analysis_type, h),
+            ).fetchone()
+    if not row:
+        return None
+    created_raw = row["created_at"]
+    try:
+        created_dt = datetime.fromisoformat(created_raw)
+        age = (now - created_dt).total_seconds()
+        if age > max(1, int(max_age_seconds)):
+            return None
+    except (TypeError, ValueError):
+        return None
+    payload = _json_obj(row["result_summary"])
+    if not isinstance(payload, dict):
+        return None
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    if summary.get("success") is not True:
+        return None
+    if bool(summary.get("degraded")):
+        return None
+    if summary.get("cacheable") is False:
+        return None
+    reusable = payload.get("reusable_result")
+    if not isinstance(reusable, dict):
+        return None
+    return reusable
 
 
 def upsert_property_records(rows: list[dict[str, Any]]) -> dict[str, int]:

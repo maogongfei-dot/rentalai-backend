@@ -22,11 +22,13 @@ from alert_utils import FailureTracker, send_alert
 from api_analysis import analyze_batch_request_body, modular_analyze_response
 from data.storage.records_db import (
     _DB_PATH as _RECORDS_DB_PATH,
+    find_reusable_analysis_result,
     init_records_db,
     insert_analysis_record,
     list_analysis_records,
     list_property_records,
     list_task_records,
+    normalize_analysis_input_signature,
 )
 from task_store import TaskStore
 
@@ -205,6 +207,12 @@ class AnalyzeRealRequest(BaseModel):
 
 
 _MAX_CONCURRENT_TASKS = max(1, int(os.environ.get("MAX_CONCURRENT_TASKS", "2")))
+_ANALYSIS_CACHE_ENABLED = os.environ.get("RENTALAI_ANALYSIS_CACHE_ENABLED", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+)
+_ANALYSIS_CACHE_MAX_AGE_SECONDS = max(1, int(os.environ.get("RENTALAI_ANALYSIS_CACHE_MAX_AGE_SECONDS", "1800")))
 _TASK_QUEUE: "queue.Queue[tuple[str, dict[str, Any]]]" = queue.Queue()
 _WORKERS_STARTED = False
 _WORKERS_LOCK = threading.Lock()
@@ -247,6 +255,46 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
     logger.info("[TASK] %s started execution", task_id)
     _task_store.mark_running(task_id, stage="scraping")
     t0 = time.perf_counter()
+    analysis_input = normalize_analysis_input_signature({
+        "sources": params.get("sources"),
+        "limit_per_source": params.get("limit_per_source"),
+        "budget": params.get("budget"),
+        "target_postcode": params.get("target_postcode"),
+    })
+    if _ANALYSIS_CACHE_ENABLED:
+        cached_result = find_reusable_analysis_result(
+            analysis_type="multi_source_analysis",
+            input_summary=analysis_input,
+            max_age_seconds=_ANALYSIS_CACHE_MAX_AGE_SECONDS,
+        )
+        if isinstance(cached_result, dict):
+            degraded = bool(cached_result.get("degraded"))
+            out = dict(cached_result)
+            out["_cache"] = {"hit": True, "source": "analysis_records"}
+            _task_store.mark_success(task_id, out, degraded=degraded, elapsed=0.0)
+            try:
+                insert_analysis_record(
+                    analysis_type="multi_source_analysis",
+                    input_summary=analysis_input,
+                    result_summary={
+                        "summary": {
+                            "cache_hit": True,
+                            "cacheable": True,
+                            "success": True,
+                            "degraded": degraded,
+                            "sources_run": cached_result.get("sources_run") or [],
+                            "aggregated_unique_count": cached_result.get("aggregated_unique_count"),
+                            "total_analyzed_count": cached_result.get("total_analyzed_count"),
+                        },
+                        "reusable_result": cached_result,
+                    },
+                    source="cache_hit",
+                )
+            except Exception:
+                logger.warning("[DATA] failed to persist cache-hit record for task %s", task_id, exc_info=True)
+            logger.info("[TASK] %s cache hit; skipped recompute", task_id)
+            return
+    logger.info("[TASK] %s cache miss; running analysis", task_id)
     try:
         from data.pipeline.analysis_bridge import run_multi_source_analysis
 
@@ -264,23 +312,22 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
         analysis_summary = {
             "success": bool(result.get("success")),
             "degraded": degraded,
+            "cache_hit": False,
+            "cacheable": bool(result.get("success")) and not degraded,
             "pipeline_success": result.get("pipeline_success"),
             "sources_run": result.get("sources_run") or [],
             "aggregated_unique_count": result.get("aggregated_unique_count"),
             "total_analyzed_count": result.get("total_analyzed_count"),
             "error_count": len(result.get("errors") or []),
         }
-        analysis_input = {
-            "sources": params.get("sources"),
-            "limit_per_source": params.get("limit_per_source"),
-            "budget": params.get("budget"),
-            "target_postcode": params.get("target_postcode"),
-        }
         try:
             insert_analysis_record(
                 analysis_type="multi_source_analysis",
                 input_summary=analysis_input,
-                result_summary=analysis_summary,
+                result_summary={
+                    "summary": analysis_summary,
+                    "reusable_result": result if analysis_summary["cacheable"] else None,
+                },
                 source="async_task",
             )
         except Exception:
@@ -290,6 +337,24 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
         elapsed = time.perf_counter() - t0
         logger.error("[TASK] %s failed: %s", task_id, exc, exc_info=True)
         _task_store.mark_failed(task_id, str(exc), elapsed=elapsed)
+        try:
+            insert_analysis_record(
+                analysis_type="multi_source_analysis",
+                input_summary=analysis_input,
+                result_summary={
+                    "summary": {
+                        "success": False,
+                        "degraded": False,
+                        "cache_hit": False,
+                        "cacheable": False,
+                        "error": str(exc),
+                    },
+                    "reusable_result": None,
+                },
+                source="async_task_failed",
+            )
+        except Exception:
+            logger.warning("[DATA] failed to persist failed analysis record for task %s", task_id, exc_info=True)
         send_alert(
             "Task %s failed: %s" % (task_id, exc),
             level="P2",
