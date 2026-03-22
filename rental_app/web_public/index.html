@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RentalAI</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Find the Best Rental with AI</h1>
+      <p class="hint">
+        Enter a UK postcode or area, or paste a Rightmove / Zoopla search URL.
+      </p>
+      <input
+        type="text"
+        id="q"
+        placeholder="e.g. SW1A 1AA or https://www.rightmove.co.uk/..."
+        autocomplete="off"
+      />
+      <button type="button" id="go">Analyze</button>
+      <div id="load" class="hidden">Analyzing...</div>
+      <div id="err" class="err hidden"></div>
+    </main>
+    <script src="/assets/app.js"></script>
+    <script>
+      document.getElementById("go").onclick = function () {
+        window.RentalAIPhase3.startAnalyze();
+      };
+    </script>
+  </body>
+</html>

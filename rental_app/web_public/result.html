@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Analysis result — RentalAI</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <main class="wrap result-wrap">
+      <p class="back-link"><a href="/">← New analysis</a></p>
+
+      <div id="loading-panel" class="card card-muted">
+        <h1 class="section-title">Analyzing…</h1>
+        <p id="loading-status" class="muted">
+          This may take a few minutes. You can leave this page open; it will update
+          automatically.
+        </p>
+      </div>
+
+      <div id="failed-panel" class="hidden">
+        <section class="card card-error">
+          <h1 class="section-title" id="failed-title">Analysis failed</h1>
+          <p id="failed-sub">Please try again.</p>
+          <p id="failed-detail-wrap" class="hidden">
+            <span class="muted">Detail:</span>
+            <span id="failed-detail"></span>
+          </p>
+        </section>
+      </div>
+
+      <div id="result-panel" class="hidden">
+        <section class="card card-header-block" aria-labelledby="hdr-title">
+          <h1 id="hdr-title" class="section-title">Result</h1>
+          <div class="verdict-row">
+            <span class="label">Recommendation</span>
+            <strong id="hdr-verdict" class="verdict-value">—</strong>
+          </div>
+          <div class="verdict-row">
+            <span class="label">Final score</span>
+            <strong id="hdr-score" class="score-value">—</strong>
+          </div>
+          <p class="meta-line muted">
+            <span>Task <code id="hdr-task-id">—</code></span>
+            <span class="sep">·</span>
+            <span id="hdr-status">—</span>
+            <span id="hdr-elapsed-wrap" class="hidden">
+              <span class="sep">·</span>
+              <span id="hdr-elapsed"></span>
+            </span>
+          </p>
+        </section>
+
+        <section id="sec-property" class="card">
+          <h2 class="section-title">Property overview</h2>
+          <div id="prop-title" class="prop-row hidden">
+            <span class="label">Title</span>
+            <span data-value></span>
+          </div>
+          <div id="prop-price" class="prop-row hidden">
+            <span class="label">Rent / price (pcm)</span>
+            <span data-value></span>
+          </div>
+          <div id="prop-postcode" class="prop-row hidden">
+            <span class="label">Postcode / location</span>
+            <span data-value></span>
+          </div>
+          <div id="prop-bedrooms" class="prop-row hidden">
+            <span class="label">Bedrooms</span>
+            <span data-value></span>
+          </div>
+          <div id="prop-bills" class="prop-row hidden">
+            <span class="label">Bills</span>
+            <span data-value></span>
+          </div>
+          <p id="prop-url-wrap" class="hidden">
+            <a id="prop-url" href="#" target="_blank" rel="noopener noreferrer">Open listing</a>
+          </p>
+        </section>
+
+        <section class="card">
+          <h2 class="section-title">Explain summary</h2>
+          <p id="ex-summary" class="explain-summary">—</p>
+          <h3 class="subsection-title">Pros</h3>
+          <ul id="ex-pros" class="bullet-list"></ul>
+          <h3 class="subsection-title">Cons</h3>
+          <ul id="ex-cons" class="bullet-list"></ul>
+        </section>
+
+        <section class="card">
+          <h2 class="section-title">Risk flags</h2>
+          <p id="risk-no-flags" class="muted hidden">No major risk flags detected.</p>
+          <div id="risk-has-flags">
+            <ul id="risk-flags-ul" class="bullet-list"></ul>
+          </div>
+          <div id="risk-severity-row" class="hidden prop-row">
+            <span class="label">Severity</span>
+            <span id="risk-severity"></span>
+          </div>
+          <div id="risk-next-block" class="hidden">
+            <h3 class="subsection-title">Suggested next steps</h3>
+            <ul id="risk-next-ul" class="bullet-list"></ul>
+          </div>
+        </section>
+      </div>
+
+      <details id="debug-details" class="debug-details hidden">
+        <summary>Raw / debug (task JSON)</summary>
+        <pre id="debug-json" class="debug-pre"></pre>
+      </details>
+    </main>
+    <script src="/assets/result_view_model.js"></script>
+    <script src="/assets/app.js"></script>
+    <script>
+      window.RentalAIPhase3.renderResultPage();
+    </script>
+  </body>
+</html>

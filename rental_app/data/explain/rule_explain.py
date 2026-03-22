@@ -156,6 +156,11 @@ def _best_success_row_from_msa(msa: dict[str, Any]) -> dict[str, Any] | None:
     return best
 
 
+def get_representative_batch_row(msa: dict[str, Any]) -> dict[str, Any] | None:
+    """Highest-scoring successful analyze-batch row for UI / summaries (same basis as P10 explain)."""
+    return _best_success_row_from_msa(msa)
+
+
 def build_p10_explain_from_msa_result(msa: dict[str, Any]) -> dict[str, Any]:
     """
     Build a run-level explain for a multi-source analysis result dict

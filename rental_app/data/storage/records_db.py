@@ -94,6 +94,8 @@ def normalize_analysis_input_signature(input_summary: dict[str, Any] | None) -> 
     out["budget"] = src.get("budget")
     tp = src.get("target_postcode")
     out["target_postcode"] = str(tp).strip().upper() if isinstance(tp, str) and tp.strip() else None
+    lu = src.get("listing_url")
+    out["listing_url"] = str(lu).strip() if isinstance(lu, str) and lu.strip() else None
     return out
 
 

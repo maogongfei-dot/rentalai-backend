@@ -10,12 +10,14 @@ import time
 import traceback
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import Body, FastAPI, Request
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 import threading
@@ -34,7 +36,11 @@ from data.storage.records_db import (
     normalize_analysis_input_signature,
     verify_user,
 )
-from data.explain.rule_explain import build_p10_explain_for_batch_row, build_p10_explain_from_msa_result
+from data.explain.rule_explain import (
+    build_p10_explain_for_batch_row,
+    build_p10_explain_from_msa_result,
+    get_representative_batch_row,
+)
 from data.storage.records_query_service import (
     get_recent_analysis_records,
     get_recent_property_records,
@@ -58,6 +64,8 @@ app = FastAPI(
     description="P2 Phase5 — modular endpoints + /analyze-batch (standard recommendations)",
     version="0.6.0",
 )
+
+_WEB_PUBLIC_DIR = Path(__file__).resolve().parent / "web_public"
 
 app.add_middleware(
     CORSMiddleware,
@@ -267,6 +275,10 @@ class AnalyzeRealRequest(BaseModel):
     limit_per_source: int = Field(default=10, ge=1, le=50)
     budget: Optional[float] = Field(default=None)
     target_postcode: Optional[str] = Field(default=None)
+    listing_url: Optional[str] = Field(
+        default=None,
+        description="Optional list/search URL; when set, passed as scraper search_url (host hints source).",
+    )
     headless: bool = Field(default=True)
     persist: bool = Field(default=True)
 
@@ -299,6 +311,19 @@ def _task_worker_loop(worker_idx: int) -> None:
             _TASK_QUEUE.task_done()
 
 
+def _task_scrape_query_and_sources(params: dict[str, Any]) -> tuple[dict[str, Any], list[str] | None]:
+    """Build scraper query + optional source override when a listing/search URL is provided."""
+    query: dict[str, Any] = {"headless": bool(params.get("headless", True))}
+    sources: list[str] | None = params.get("sources")
+    listing_url = (params.get("listing_url") or "").strip()
+    if listing_url:
+        query["search_url"] = listing_url
+        if sources is None:
+            low = listing_url.lower()
+            sources = ["zoopla"] if "zoopla" in low else ["rightmove"]
+    return query, sources
+
+
 def _start_task_workers_once() -> None:
     global _WORKERS_STARTED
     with _WORKERS_LOCK:
@@ -325,6 +350,7 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
         "limit_per_source": params.get("limit_per_source"),
         "budget": params.get("budget"),
         "target_postcode": params.get("target_postcode"),
+        "listing_url": (params.get("listing_url") or "").strip() or None,
     })
     rec = _task_store.get(task_id)
     user_id = rec.user_id if rec else None
@@ -339,9 +365,11 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
             degraded = bool(cached_result.get("degraded"))
             out = dict(cached_result)
             out["_cache"] = {"hit": True, "source": "analysis_records"}
+            _ex_cache = build_p10_explain_from_msa_result(cached_result)
+            out["p10_explain"] = _ex_cache
+            out["representative_row"] = get_representative_batch_row(cached_result)
             _task_store.mark_success(task_id, out, degraded=degraded, elapsed=0.0)
             try:
-                _ex_cache = build_p10_explain_from_msa_result(cached_result)
                 _rs_cache = {
                     "summary": {
                         "cache_hit": True,
@@ -374,9 +402,10 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
     try:
         from data.pipeline.analysis_bridge import run_multi_source_analysis
 
+        _q, _sources = _task_scrape_query_and_sources(params)
         result = run_multi_source_analysis(
-            sources=params.get("sources"),
-            query={"headless": params.get("headless", True)},
+            sources=_sources,
+            query=_q,
             limit_per_source=params.get("limit_per_source", 10),
             persist=params.get("persist", True),
             budget=params.get("budget"),
@@ -384,7 +413,11 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
         )
         elapsed = time.perf_counter() - t0
         degraded = bool(result.get("degraded"))
-        _task_store.mark_success(task_id, result, degraded=degraded, elapsed=elapsed)
+        _ex_run = build_p10_explain_from_msa_result(result)
+        result_out = dict(result)
+        result_out["p10_explain"] = _ex_run
+        result_out["representative_row"] = get_representative_batch_row(result)
+        _task_store.mark_success(task_id, result_out, degraded=degraded, elapsed=elapsed)
         analysis_summary = {
             "success": bool(result.get("success")),
             "degraded": degraded,
@@ -467,6 +500,8 @@ def create_task(request: Request, body: AnalyzeRealRequest = AnalyzeRealRequest(
     summary = {
         "sources": params.get("sources"),
         "limit_per_source": params.get("limit_per_source"),
+        "target_postcode": params.get("target_postcode"),
+        "listing_url": (params.get("listing_url") or "").strip() or None,
     }
     user_id = _get_user_id_from_request(request)
     rec = _task_store.create(input_summary=summary, user_id=user_id)
@@ -733,6 +768,41 @@ def compare_listings(request: Request, body: CompareRequest):
             content={"error": "invalid_count", "message": "Send between 2 and 5 property objects."},
         )
     return {"comparison": _build_compare_result(props)}
+
+
+@app.get("/")
+def web_phase3_home():
+    """P10 Phase3 — minimal product homepage (static HTML)."""
+    index = _WEB_PUBLIC_DIR / "index.html"
+    if not index.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Phase3 UI not found. Expected web_public/index.html beside api_server.py.",
+            },
+        )
+    return FileResponse(index)
+
+
+@app.get("/result/{task_id}")
+def web_phase3_result(task_id: str):
+    """P10 Phase3 — task result page (static HTML; task_id read client-side from path)."""
+    page = _WEB_PUBLIC_DIR / "result.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Phase3 UI not found. Expected web_public/result.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
+_assets_dir = _WEB_PUBLIC_DIR / "assets"
+if _assets_dir.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="p10_phase3_assets")
 
 
 _start_task_workers_once()
