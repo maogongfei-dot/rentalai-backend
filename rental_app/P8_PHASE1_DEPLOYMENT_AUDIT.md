@@ -18,6 +18,10 @@
 
 **Phase3 Step3（真实联调验证）**：已新增 **`P8_PHASE3_REAL_INTEGRATION_FIX.md`**（CORS / API 路径 / 环境变量联调检查）。结论：**全部 Pass，无需代码修改**——API 路径完全一致、CORS 对 MVP 足够、Streamlit 服务端请求不受浏览器 CORS 限制。
 
+**P9 Phase4 Step2（第二流程异步化 — Agent 入口）**：Agent 入口已正式接入异步任务系统。`agent_runner.py` / `agent_entry.py` / `app_web.py` 增加 `async_mode` 参数传递；后端 `_TASK_SEMAPHORE` timeout 从 5 秒升级为 300 秒（排队模式）。新增 **`P9_PHASE4_SECOND_ASYNC_INTEGRATION.md`**、**`P9_PHASE4_ASYNC_SYSTEM_STATUS.md`**。
+
+**P9 Phase4 Step3（任务可靠性强化）**：TaskStore 增加 JSON 文件持久化（`.task_store.json`），服务重启后终态任务保留、运行中任务标记 `interrupted`。TaskRecord 新增 `task_type` / `stage` / `last_error_at` 字段。`GET /tasks` 支持 `mode=recent` 查看历史任务，新增 `GET /tasks/stats` 统计端点。TTL 从 10 分钟延长至 1 小时。新增 **`P9_PHASE4_TASK_RELIABILITY_UPGRADE.md`**、**`P9_PHASE4_TASK_OPERATIONS_QUICKREF.md`**。
+
 **Phase3 Step4（Go-Live 验证 + 上线后监控）**：已新增 **`P8_PHASE3_GO_LIVE_VERIFICATION.md`**（端到端验证步骤、监控入口、排查顺序、回退方案）、**`P8_PHASE3_POST_LAUNCH_CHECKLIST.md`**（上线后值班打勾清单）。**最终结论：Go-Live Confirmed。**
 
 **P9 Phase1 Step1（上线后稳定性框架）**：已新增 **`P9_PHASE1_ISSUE_TRIAGE_BOARD.md`**（问题分类 E1-E8、严重度 P0-P3、排查入口、风险清单）、**`P9_PHASE1_STABILITY_REVIEW_CHECKLIST.md`**（定期巡检打勾清单）。系统进入稳定观察阶段。
@@ -41,6 +45,10 @@
 **P9 Phase3 Step3（异步任务骨架落地）**：新增 **`task_store.py`**（`TaskRecord` 数据类 + 线程安全 `TaskStore`，进程内 dict 存储，TTL 自动过期，200 条上限）；`api_server.py` 新增 `POST /tasks`（提交多平台分析任务，后台 daemon thread 执行）、`GET /tasks/{task_id}`（查询任务状态/结果）、`GET /tasks`（列出活跃任务）。试点流程：`run_multi_source_analysis`。新增 **`P9_PHASE3_ASYNC_TASK_SKELETON.md`**（骨架架构文档）、**`P9_PHASE3_TASK_API_QUICKREF.md`**（快速 API 参考）。所有旧同步端点不受影响。
 
 **P9 Phase3 Step4（异步试点闭环）**：`api_server.py` 新增 `Semaphore(1)` 并发保护，防止多个 Playwright 实例 OOM。`real_analysis_service.py` 新增 `run_real_listings_analysis_async()` — 通过 HTTP `POST /tasks` + 轮询 `GET /tasks/{task_id}` 完成异步分析，返回与同步版完全兼容的三元组。`app_web.py` 侧栏新增 **Async mode (pilot)** checkbox，勾选后 batch expander 按钮走异步路径，结果复用现有 batch 渲染。旧同步流程完全保留。新增 **`P9_PHASE3_ASYNC_PILOT_INTEGRATION.md`**（完整闭环文档）、**`P9_PHASE3_ASYNC_PILOT_USER_FLOW.md`**（用户流程）。
+
+**P9 Phase3 Step5（异步试点复测 + 收口）**：全链路代码级逐行审查确认 Phase3 异步骨架无回归、无状态泄漏、无并发问题。小修复：`GET /tasks/{task_id}` 补齐 `input_summary` 字段。新增 **`P9_PHASE3_ASYNC_PILOT_VALIDATION.md`**（完整复测报告）、**`P9_PHASE3_CLOSEOUT_SUMMARY.md`**（Phase3 收口总结）。**结论：Phase3 Validated — 可以安全扩展到下一个流程。**
+
+**P9 Phase4 Step1（异步模式推广设计）**：选定 Agent 入口（`render_p5_agent_entry` → `run_agent_intent_analysis` → `run_real_listings_analysis`）为第二个异步化流程。新增 **`P9_PHASE4_ASYNC_EXPANSION_PLAN.md`**（标准后端/前端/错误/日志接入模式、递进扩展计划、风险分析）、**`P9_PHASE4_ASYNC_RULES.md`**（Always Async / Prefer Async / Keep Sync / Anti-Patterns 规则）。纯设计阶段，无代码修改。
 
 ---
 

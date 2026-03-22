@@ -52,12 +52,20 @@ def _process_agent_batch_submit(
     limit_per_source: int,
     headless: bool,
     persist_listings: bool,
+    async_mode: bool = False,
 ) -> None:
     """Continue to Analysis → submitting → analysis_*（P7：真实多平台 + batch）。"""
     if st.session_state.get(P5_KEY_PHASE) != PHASE_SUBMITTING:
         return
     it = AgentRentalRequest.from_dict(st.session_state.get(P5_KEY_INTENT) or {})
-    with st.spinner(lab.get("p5_agent_spinner_submit", "Running batch analysis…")):
+
+    if async_mode:
+        _status_box = st.empty()
+        _status_box.info("Submitting async task to backend…")
+
+        def _on_status(tid: str, status_text: str) -> None:
+            _status_box.info("Task **%s** — %s" % (tid, status_text))
+
         resp, err, payload = run_agent_intent_analysis(
             it,
             use_local=use_local,
@@ -65,7 +73,19 @@ def _process_agent_batch_submit(
             limit_per_source=limit_per_source,
             headless=headless,
             persist_listings=persist_listings,
+            async_mode=True,
+            on_status=_on_status,
         )
+    else:
+        with st.spinner(lab.get("p5_agent_spinner_submit", "Running batch analysis…")):
+            resp, err, payload = run_agent_intent_analysis(
+                it,
+                use_local=use_local,
+                api_base_url=api_base_url,
+                limit_per_source=limit_per_source,
+                headless=headless,
+                persist_listings=persist_listings,
+            )
     if resp is None:
         st.session_state[P5_KEY_PHASE] = PHASE_ANALYSIS_ERROR
         st.session_state["p5_agent_last_error"] = err or "Unknown error"
@@ -131,6 +151,7 @@ def render_p5_agent_entry(
     limit_per_source: int = 10,
     headless: bool = True,
     persist_listings: bool = True,
+    async_mode: bool = False,
 ) -> None:
     """
     顺序：1) 输入 2) Parse 3) 预览 4) Continue to Analysis 5) 状态提示。
@@ -159,6 +180,7 @@ def render_p5_agent_entry(
         limit_per_source=limit_per_source,
         headless=headless,
         persist_listings=persist_listings,
+        async_mode=async_mode,
     )
 
     migrate_agent_phase(st.session_state)

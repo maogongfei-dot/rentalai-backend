@@ -1,9 +1,12 @@
 # P5 Phase3 + P7 Phase5: Agent 调度 — intent → 真实多平台抓取 + analyze-batch
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
-from web_ui.real_analysis_service import run_real_listings_analysis
+from web_ui.real_analysis_service import (
+    run_real_listings_analysis,
+    run_real_listings_analysis_async,
+)
 from web_ui.rental_intent import AgentRentalRequest
 from web_ui.rental_intent_parser import intent_has_key_signals
 
@@ -16,17 +19,29 @@ def run_agent_intent_analysis(
     limit_per_source: int = 10,
     headless: bool = True,
     persist_listings: bool = True,
+    async_mode: bool = False,
+    on_status: Callable[[str, str], None] | None = None,
 ) -> tuple[dict[str, Any] | None, str | None, dict[str, Any]]:
     """
-    **Continue to Analysis**：本地 Playwright 多平台抓取 + `analyze_batch_request_body`。
+    **Continue to Analysis**：多平台抓取 + `analyze_batch_request_body`。
     与 P4 **Batch results** 使用同一封套（`p2_batch_last`）。
 
-    `use_local` / `api_base_url` 保留签名以兼容调用方；本路径始终进程内执行（与 P2 HTTP batch 无关）。
+    When *async_mode* is True, delegates to the FastAPI backend via
+    ``POST /tasks`` + polling, using the same pattern as the batch button.
 
     Returns:
         (batch_envelope_dict, transport_error_if_exception, request_payload)
     """
-    _ = (use_local, api_base_url)  # 保留参数：与 app_web 兼容；Agent 不走 HTTP batch
+    if async_mode:
+        return run_real_listings_analysis_async(
+            api_base_url=api_base_url,
+            intent=intent,
+            form_raw=None,
+            limit_per_source=limit_per_source,
+            headless=headless,
+            persist=persist_listings,
+            on_status=on_status,
+        )
 
     env, err, payload = run_real_listings_analysis(
         intent=intent,

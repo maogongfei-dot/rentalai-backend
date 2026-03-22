@@ -682,6 +682,7 @@ render_p5_agent_entry(
     limit_per_source=_p7_lim,
     headless=_p7_h,
     persist_listings=_p7_persist,
+    async_mode=_p7_async,
 )
 
 # --- Phase6: 输入区（表单 → 再操作按钮，顺序与验收一致）---

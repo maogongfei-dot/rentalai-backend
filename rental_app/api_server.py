@@ -198,15 +198,15 @@ _TASK_SEMAPHORE = threading.Semaphore(1)
 
 def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
     """Background thread target: runs multi-source analysis and updates the task store."""
-    acquired = _TASK_SEMAPHORE.acquire(timeout=5)
+    acquired = _TASK_SEMAPHORE.acquire(timeout=300)
     if not acquired:
         _task_store.mark_failed(
             task_id,
-            "Server busy — another analysis task is already running. Try again shortly.",
+            "Queue timeout — waited 5 minutes but the previous task did not finish.",
         )
         return
     try:
-        _task_store.mark_running(task_id)
+        _task_store.mark_running(task_id, stage="scraping")
         t0 = time.perf_counter()
         try:
             from data.pipeline.analysis_bridge import run_multi_source_analysis
@@ -262,11 +262,15 @@ def get_task(task_id: str):
     out: dict[str, Any] = {
         "task_id": rec.task_id,
         "status": rec.status,
+        "task_type": rec.task_type,
+        "stage": rec.stage,
         "created_at": rec.created_at,
         "updated_at": rec.updated_at,
+        "input_summary": rec.input_summary,
         "degraded": rec.degraded,
         "elapsed_seconds": rec.elapsed_seconds,
         "error": rec.error,
+        "last_error_at": rec.last_error_at,
     }
     if rec.status in ("success", "degraded"):
         out["result"] = rec.result
@@ -274,6 +278,21 @@ def get_task(task_id: str):
 
 
 @app.get("/tasks")
-def list_tasks():
-    """List currently active (queued/running) tasks."""
+def list_tasks(mode: str = "active", limit: int = 30):
+    """List tasks.
+
+    Query params:
+        mode   – ``active`` (default): queued/running only.
+                 ``recent``: most recent *limit* tasks regardless of status.
+        limit  – max tasks to return (default 30, max 100).
+    """
+    limit = min(max(limit, 1), 100)
+    if mode == "recent":
+        return {"tasks": _task_store.list_recent(limit=limit)}
     return {"tasks": _task_store.list_active()}
+
+
+@app.get("/tasks/stats")
+def task_stats():
+    """Aggregate task counts by status."""
+    return _task_store.stats()

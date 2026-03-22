@@ -137,6 +137,14 @@ curl -s http://127.0.0.1:8000/health
 - **P9 · 任务 API 快速参考：** **`P9_PHASE3_TASK_API_QUICKREF.md`**
 - **P9 · 异步试点闭环：** **`P9_PHASE3_ASYNC_PILOT_INTEGRATION.md`**
 - **P9 · 异步试点用户流程：** **`P9_PHASE3_ASYNC_PILOT_USER_FLOW.md`**
+- **P9 · 异步试点复测报告：** **`P9_PHASE3_ASYNC_PILOT_VALIDATION.md`**
+- **P9 · Phase3 收口总结：** **`P9_PHASE3_CLOSEOUT_SUMMARY.md`**
+- **P9 · 异步推广计划：** **`P9_PHASE4_ASYNC_EXPANSION_PLAN.md`**
+- **P9 · 异步规则：** **`P9_PHASE4_ASYNC_RULES.md`**
+- **P9 · 第二流程异步化报告：** **`P9_PHASE4_SECOND_ASYNC_INTEGRATION.md`**
+- **P9 · 异步系统状态：** **`P9_PHASE4_ASYNC_SYSTEM_STATUS.md`**
+- **P9 · 任务可靠性升级：** **`P9_PHASE4_TASK_RELIABILITY_UPGRADE.md`**
+- **P9 · 任务操作快速参考：** **`P9_PHASE4_TASK_OPERATIONS_QUICKREF.md`**
 - 部署前联调与上线执行清单：**`P8_PHASE1_PREDEPLOY_CHECKLIST.md`**
 - 部署方案：**`P8_PHASE1_DEPLOYMENT_PLAN.md`**
 - 运行入口汇总：**`P8_PHASE1_RUNTIME_ENTRY_GUIDE.md`**
