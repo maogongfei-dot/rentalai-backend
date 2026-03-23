@@ -5,34 +5,11 @@
   var SAVE_KEY_PREFIX = "rentalai_ui_saved_task_";
 
   function getToken() {
-    var t = localStorage.getItem("rentalai_bearer");
-    if (t) return Promise.resolve(t);
-    var id = crypto.randomUUID();
-    var email = "guest_" + id.replace(/-/g, "") + "@guest.rentalai.local";
-    var password = crypto.randomUUID().replace(/-/g, "").slice(0, 32);
-    return fetch("/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email, password: password }),
-    })
-      .then(function (r1) {
-        if (!r1.ok) return Promise.reject(new Error("register failed"));
-        return fetch("/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email, password: password }),
-        });
-      })
-      .then(function (r2) {
-        if (!r2.ok) return Promise.reject(new Error("login failed"));
-        return r2.json();
-      })
-      .then(function (j2) {
-        t = j2.token;
-        if (!t) return Promise.reject(new Error("no token"));
-        localStorage.setItem("rentalai_bearer", t);
-        return t;
-      });
+    var A = global.RentalAIAuth;
+    if (!A || typeof A.requireToken !== "function") {
+      return Promise.reject(new Error("not_logged_in"));
+    }
+    return A.requireToken();
   }
 
   function deriveInputValue(rawTaskState) {
@@ -50,7 +27,18 @@
     b.classList.remove("hidden");
     b.classList.remove("save-banner-ok");
     b.classList.remove("save-banner-err");
+    b.classList.remove("save-banner-warn");
     b.classList.add(ok ? "save-banner-ok" : "save-banner-err");
+    b.textContent = text;
+  }
+
+  function setSaveBannerWarn(text) {
+    var b = document.getElementById("save-status");
+    if (!b) return;
+    b.classList.remove("hidden");
+    b.classList.remove("save-banner-ok");
+    b.classList.remove("save-banner-err");
+    b.classList.add("save-banner-warn");
     b.textContent = text;
   }
 
@@ -92,7 +80,11 @@
           setSaveBanner(true, "Analysis saved to your history.");
         });
       })
-      .catch(function () {
+      .catch(function (e) {
+        if (e && e.message === "not_logged_in") {
+          setSaveBannerWarn("Log in to save analysis to your history.");
+          return;
+        }
         setSaveBanner(false, "Failed to save analysis record");
       });
   }

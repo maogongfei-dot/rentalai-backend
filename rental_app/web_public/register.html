@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Register — RentalAI</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <nav class="top-nav" aria-label="Main">
+      <a href="/">Home</a>
+      <span class="nav-sep">·</span>
+      <a href="/login">Login</a>
+    </nav>
+    <main class="wrap narrow-wrap">
+      <h1 class="section-title">Register</h1>
+      <p class="muted">Create an account to save analyses to your history.</p>
+
+      <form id="register-form" class="card auth-form" autocomplete="on">
+        <label class="field-label" for="register-email">Email</label>
+        <input
+          id="register-email"
+          name="email"
+          type="email"
+          required
+          autocomplete="username"
+        />
+
+        <label class="field-label" for="register-password">Password</label>
+        <input
+          id="register-password"
+          name="password"
+          type="password"
+          required
+          minlength="4"
+          autocomplete="new-password"
+        />
+
+        <button type="submit" class="auth-submit">Register</button>
+      </form>
+
+      <p id="register-err" class="err hidden" role="alert"></p>
+      <p class="muted"><a href="/login">Already have an account? Log in</a></p>
+    </main>
+    <script src="/assets/auth_session.js"></script>
+    <script src="/assets/register_page.js"></script>
+  </body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Log in — RentalAI</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <nav class="top-nav" aria-label="Main">
+      <a href="/">Home</a>
+      <span class="nav-sep">·</span>
+      <a href="/register">Register</a>
+    </nav>
+    <main class="wrap narrow-wrap">
+      <h1 class="section-title">Log in</h1>
+      <p class="muted">Use your account to run analysis and save history.</p>
+
+      <form id="login-form" class="card auth-form" autocomplete="on">
+        <label class="field-label" for="login-email">Email</label>
+        <input
+          id="login-email"
+          name="email"
+          type="email"
+          required
+          autocomplete="username"
+        />
+
+        <label class="field-label" for="login-password">Password</label>
+        <input
+          id="login-password"
+          name="password"
+          type="password"
+          required
+          autocomplete="current-password"
+        />
+
+        <button type="submit" class="auth-submit">Login</button>
+      </form>
+
+      <p id="login-err" class="err hidden" role="alert"></p>
+      <p class="muted"><a href="/register">Create an account</a></p>
+    </main>
+    <script src="/assets/auth_session.js"></script>
+    <script src="/assets/login_page.js"></script>
+  </body>
+</html>

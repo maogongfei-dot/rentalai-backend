@@ -636,6 +636,40 @@ def create_user(email: str, password: str) -> dict[str, Any] | None:
     return {"id": user_id, "email": em, "created_at": now}
 
 
+def email_exists(email: str) -> bool:
+    em = str(email or "").strip().lower()
+    if not em:
+        return False
+    with _DB_LOCK:
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT 1 AS ok FROM users WHERE email = ? LIMIT 1",
+                (em,),
+            ).fetchone()
+    return row is not None
+
+
+def get_user_by_id(user_id: str) -> dict[str, Any] | None:
+    """Return id, email, created_at (no password)."""
+    uid = str(user_id or "").strip()
+    if not uid:
+        return None
+    with _DB_LOCK:
+        with _connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, email, created_at
+                FROM users
+                WHERE id = ?
+                LIMIT 1
+                """,
+                (uid,),
+            ).fetchone()
+    if row is None:
+        return None
+    return {"id": row["id"], "email": row["email"], "created_at": row["created_at"]}
+
+
 def verify_user(email: str, password: str) -> dict[str, Any] | None:
     em = str(email or "").strip().lower()
     pw = str(password or "")

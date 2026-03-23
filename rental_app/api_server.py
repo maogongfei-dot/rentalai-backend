@@ -30,7 +30,9 @@ from data.storage.records_db import (
     UI_HISTORY_ANALYSIS_TYPE,
     create_user,
     delete_favorite_record,
+    email_exists,
     find_reusable_analysis_result,
+    get_user_by_id,
     init_records_db,
     insert_analysis_record,
     insert_favorite_record,
@@ -176,13 +178,18 @@ def _issue_token(user_id: str) -> str:
     return token
 
 
-def _get_user_id_from_request(request: Request) -> str:
+def _extract_bearer_token(request: Request) -> str | None:
     auth = request.headers.get("Authorization") or ""
     if not auth.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="missing_bearer_token")
-    token = auth[len("Bearer "):].strip()
+        return None
+    token = auth[len("Bearer ") :].strip()
+    return token or None
+
+
+def _get_user_id_from_request(request: Request) -> str:
+    token = _extract_bearer_token(request)
     if not token:
-        raise HTTPException(status_code=401, detail="invalid_bearer_token")
+        raise HTTPException(status_code=401, detail="missing_bearer_token")
     with _AUTH_LOCK:
         user_id = _AUTH_TOKENS.get(token)
     if not user_id:
@@ -212,13 +219,31 @@ def alerts_status():
 
 @app.post("/auth/register")
 def auth_register(body: AuthRequest):
+    em = str(body.email or "").strip()
+    pw = str(body.password or "")
+    if not em or not pw:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "register_failed", "message": "Invalid email or password."},
+        )
+    if email_exists(em):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "register_failed", "message": "User already exists"},
+        )
     user = create_user(body.email, body.password)
     if user is None:
         return JSONResponse(
             status_code=400,
-            content={"error": "register_failed", "message": "Email already exists or invalid input."},
+            content={"error": "register_failed", "message": "Could not create account."},
         )
-    return {"user_id": user["id"], "email": user["email"], "created_at": user["created_at"]}
+    token = _issue_token(user["id"])
+    return {
+        "user_id": user["id"],
+        "email": user["email"],
+        "created_at": user["created_at"],
+        "token": token,
+    }
 
 
 @app.post("/auth/login")
@@ -230,7 +255,30 @@ def auth_login(body: AuthRequest):
             content={"error": "login_failed", "message": "Invalid email or password."},
         )
     token = _issue_token(user["id"])
-    return {"user_id": user["id"], "token": token}
+    return {"user_id": user["id"], "email": user["email"], "token": token}
+
+
+@app.post("/auth/logout")
+def auth_logout(request: Request):
+    """Invalidate the current bearer token (in-process store)."""
+    token = _extract_bearer_token(request)
+    if token:
+        with _AUTH_LOCK:
+            _AUTH_TOKENS.pop(token, None)
+    return {"ok": True}
+
+
+@app.get("/auth/me")
+def auth_me(request: Request):
+    """Resolve bearer token to a minimal public profile."""
+    user_id = _get_user_id_from_request(request)
+    user = get_user_by_id(user_id)
+    if user is None:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "invalid_or_expired_token", "message": "Session expired. Please log in again."},
+        )
+    return {"user_id": user["id"], "email": user["email"], "created_at": user["created_at"]}
 
 
 @app.post("/analyze")
@@ -947,6 +995,30 @@ def web_phase3_history():
                 "error": "web_public_missing",
                 "message": "Phase3 UI not found. Expected web_public/history.html beside api_server.py.",
             },
+        )
+    return FileResponse(page)
+
+
+@app.get("/login")
+def web_phase3_login():
+    """P10 Phase3 Step4 — login form (static HTML)."""
+    page = _WEB_PUBLIC_DIR / "login.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={"error": "web_public_missing", "message": "Expected web_public/login.html."},
+        )
+    return FileResponse(page)
+
+
+@app.get("/register")
+def web_phase3_register():
+    """P10 Phase3 Step4 — registration form (static HTML)."""
+    page = _WEB_PUBLIC_DIR / "register.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={"error": "web_public_missing", "message": "Expected web_public/register.html."},
         )
     return FileResponse(page)
 

@@ -79,6 +79,13 @@
       })
       .then(function (r) {
         if (load) load.classList.add("hidden");
+        if (r.status === 401) {
+          if (err) {
+            err.innerHTML = 'Please <a href="/login">log in</a> first.';
+            err.classList.remove("hidden");
+          }
+          return;
+        }
         if (!r.ok) {
           if (err) {
             err.textContent = "Failed to load history";
@@ -90,11 +97,15 @@
           renderRows(j.items || []);
         });
       })
-      .catch(function () {
+      .catch(function (e) {
         if (load) load.classList.add("hidden");
         if (err) {
-          err.textContent = "Failed to load history";
           err.classList.remove("hidden");
+          if (e && e.message === "not_logged_in") {
+            err.innerHTML = 'Please <a href="/login">log in</a> first.';
+          } else {
+            err.textContent = "Failed to load history";
+          }
         }
       });
   }

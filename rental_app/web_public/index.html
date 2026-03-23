@@ -11,11 +11,17 @@
       <a href="/">Home</a>
       <span class="nav-sep">·</span>
       <a href="/history">History</a>
+      <span class="nav-sep">·</span>
+      <span data-auth-nav class="auth-slot"></span>
     </nav>
     <main class="wrap">
       <h1>Find the Best Rental with AI</h1>
       <p class="hint">
         Enter a UK postcode or area, or paste a Rightmove / Zoopla search URL.
+      </p>
+      <p class="hint muted login-hint">
+        <strong>Log in</strong> is required to run analysis and save it to your history.
+        <a href="/login">Login</a> or <a href="/register">Register</a>.
       </p>
       <input
         type="text"
@@ -27,6 +33,7 @@
       <div id="load" class="hidden">Analyzing...</div>
       <div id="err" class="err hidden"></div>
     </main>
+    <script src="/assets/auth_session.js"></script>
     <script src="/assets/history_shelf.js"></script>
     <script src="/assets/app.js"></script>
     <script>

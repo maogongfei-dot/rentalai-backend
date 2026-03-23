@@ -2,13 +2,11 @@
   var POLL_MS = 2500;
 
   function getToken() {
-    var H = global.RentalAIHistoryShelf;
-    if (H && typeof H.getToken === "function") {
-      return H.getToken();
+    var A = global.RentalAIAuth;
+    if (!A || typeof A.requireToken !== "function") {
+      return Promise.reject(new Error("not_logged_in"));
     }
-    var t = localStorage.getItem("rentalai_bearer");
-    if (t) return Promise.resolve(t);
-    return Promise.reject(new Error("auth helper not loaded"));
+    return A.requireToken();
   }
 
   function pollUntilDone(taskId, token, loadEl) {
@@ -50,7 +48,7 @@
     var err = document.getElementById("err");
     var go = document.getElementById("go");
     err.classList.add("hidden");
-    err.textContent = "";
+    err.innerHTML = "";
     var raw = ((qEl && qEl.value) || "").trim();
     if (!raw) {
       err.textContent = "Please enter a postcode, area, or listing URL.";
@@ -88,10 +86,15 @@
           window.location.href = "/result/" + encodeURIComponent(taskId);
         });
       })
-      .catch(function () {
-        err.textContent = "Analysis failed, please try again";
-        err.classList.remove("hidden");
+      .catch(function (e) {
         load.classList.add("hidden");
+        err.classList.remove("hidden");
+        if (e && e.message === "not_logged_in") {
+          err.innerHTML =
+            'Please <a href="/login">log in</a> to run analysis and save history.';
+        } else {
+          err.textContent = "Analysis failed, please try again";
+        }
       })
       .then(function () {
         go.disabled = false;
@@ -161,12 +164,16 @@
         return poll(0);
       })
       .catch(function (e) {
-        var msg =
-          e && e.message === "task_not_found"
-            ? "Task not found (wrong account or expired)."
-            : e && e.message
-              ? String(e.message).slice(0, 200)
-              : "";
+        var msg;
+        if (e && e.message === "not_logged_in") {
+          msg = "Please log in first to view this result.";
+        } else if (e && e.message === "task_not_found") {
+          msg = "Task not found (wrong account or expired).";
+        } else if (e && e.message) {
+          msg = String(e.message).slice(0, 200);
+        } else {
+          msg = "";
+        }
         RV.renderFromViewModel({
           phase: "failed",
           errorMessage: msg || "Network or server error",
