@@ -1,13 +1,20 @@
-# RentalAI 基础依赖
-# 安装: pip install -r requirements.txt
+# RentalAI — core install
+#   cd rental_app
+#   pip install -r requirements.txt
+#
+# 真实房源抓取（异步 /tasks 多源分析）需要 Chromium：
+#   playwright install chromium
 
-# P1 Phase1: Web UI
-streamlit>=1.28.0
+# Phase4 Web 产品（FastAPI + 静态 Phase3 UI）
+fastapi>=0.109.0,<1
+uvicorn[standard]>=0.27.0,<1
+pydantic>=2.0,<3
 
-# P2 Phase1: HTTP API + UI 调用
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
+# HTTP 客户端（Streamlit 调 API、部分脚本）
 requests>=2.31.0
 
-# P6 Phase2: Playwright（页面探针；安装后需执行一次: playwright install chromium）
+# 列表页抓取（Rightmove / Zoopla）
 playwright>=1.40.0
+
+# 旧版 Streamlit 演示界面（可选；仅在使用 app_web.py 时需要）
+streamlit>=1.28.0

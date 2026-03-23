@@ -1,4 +1,4 @@
 # 单应用仅支持一条 web 进程。默认：FastAPI。
 # 部署 Streamlit 时请改为（并删掉上一行 web）：
 # web: streamlit run app_web.py --server.port $PORT --server.address 0.0.0.0
-web: uvicorn api_server:app --host 0.0.0.0 --port $PORT
+web: python run.py

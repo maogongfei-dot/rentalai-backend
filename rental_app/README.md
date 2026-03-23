@@ -1,160 +1,85 @@
-# RentalAI（`rental_app`）
+# RentalAI
 
-租赁决策演示：Streamlit 界面、FastAPI 分析接口、Playwright 列表抓取（Rightmove / Zoopla）与本地 JSON 房源存储。
+## 1. 项目介绍
 
-**运行目录**：请在 **`rental_app`** 下执行本文所有命令（与 `api_server.py`、`app_web.py` 内注释一致），以保证 `import data.*`、`import web_bridge` 等路径正确。
+RentalAI 用规则与结构化数据帮助评估租房选项：浏览器内 **注册 / 登录** → **输入邮编或房源列表 URL** → 异步 **分析** → **结果页**（分数、Explain、风险）→ 自动 **保存到个人历史**。
 
----
-
-## 1. 前置条件
-
-- **Python**：建议 3.10+（与当前开发环境一致即可）
-- **系统**：抓取功能需可运行 **Playwright Chromium**（Linux 服务器需安装依赖库，见 [Playwright 文档](https://playwright.dev/python/docs/intro)）
-
----
-
-## 2. 安装依赖
+## 2. 安装步骤
 
 ```bash
 cd rental_app
 pip install -r requirements.txt
+```
+
+若需要使用真实多平台列表抓取（异步任务 `/tasks`），再安装 Chromium：
+
+```bash
 playwright install chromium
 ```
 
-可选：复制环境变量模板（见下文），在 shell 中 `export` 所需变量，或自行写入进程管理器配置。
+可选：复制环境变量模板并编辑（`run.py` 会自动加载同目录下的 `.env`）：
 
 ```bash
 cp .env.example .env
-# 编辑 .env 后，在 Linux/macOS 可： set -a && source .env && set +a
 ```
 
----
+## 3. 启动方式
 
-## 3. 环境变量（摘要）
-
-| 变量 | 用途 |
-|------|------|
-| `RENTALAI_API_URL` | 侧栏关闭「Use local engine」时，Streamlit 请求 FastAPI 的根地址（默认 `http://127.0.0.1:8000`） |
-| `RENTALAI_USE_LOCAL` | `1`/`true`/`yes`：单条 **Analyze Property** 走进程内分析，不连 HTTP |
-| `RENTALAI_LISTINGS_PATH` | 可选；覆盖默认的 `data/listings.json` 绝对路径（持久化挂载卷时使用） |
-| `STREAMLIT_SERVER_*` | 官方 Streamlit 配置（端口、监听地址等） |
-
-完整说明与占位符见 **`.env.example`**。
-
----
-
-## 4. 启动顺序与本地最小联调
-
-### 4.1 仅界面 + 进程内分析（最常见本地演示）
-
-1. 设置 `RENTALAI_USE_LOCAL=1`（或与侧栏勾选 **Use local engine** 一致）
-2. 启动 Streamlit：
+**推荐唯一入口（Phase4 产品版）：**
 
 ```bash
-streamlit run app_web.py
+cd rental_app
+python run.py
 ```
 
-浏览器默认 **http://localhost:8501**。  
-此模式下 **Agent / 真实多平台分析** 仍会在本机启动 **Playwright**（与是否启动 FastAPI 无关）。
-
-### 4.2 界面通过 HTTP 调用分析 API
-
-1. **先** 启动 FastAPI（终端 1）：
+等价命令（高级用户）：
 
 ```bash
+cd rental_app
 uvicorn api_server:app --host 127.0.0.1 --port 8000
 ```
 
-2. **再** 启动 Streamlit（终端 2），侧栏关闭 **Use local engine**，并将 **API base URL** 设为 `http://127.0.0.1:8000`（或 `export RENTALAI_API_URL=http://127.0.0.1:8000`）
+环境变量（见 `.env.example`）：`RENTALAI_HOST`、`RENTALAI_PORT` 或平台注入的 `PORT`、`RENTALAI_RELOAD`、`RENTALAI_DEBUG`、`RENTALAI_SECRET_KEY`（预留）、`RENTALAI_RECORDS_DB_PATH` 等。
+
+## 4. 访问地址
+
+默认：**http://127.0.0.1:8000/**
+
+健康检查：**http://127.0.0.1:8000/health**
+
+主要页面：
+
+| 路径 | 说明 |
+|------|------|
+| `/` | 首页（分析入口） |
+| `/login` | 登录 |
+| `/register` | 注册 |
+| `/result/{task_id}` | 分析结果 |
+| `/history` | 已保存分析列表 |
+
+## 5. 功能说明
+
+- **分析**：登录后提交邮编或 Rightmove/Zoopla 列表 URL，后台异步抓取并批量评分（耗时取决于网络与 Playwright）。
+- **结果页**：展示推荐结论、分数、房源摘要、Explain（pros/cons）、风险与折叠 Debug JSON。
+- **历史记录**：结果落库后可在 `/history` 查看；**数据按登录用户隔离**。
+- **用户系统**：邮箱 + 密码注册/登录；Bearer token 会话（服务端内存；进程重启需重新登录）。
+
+---
+
+## 进阶：Streamlit 演示界面（可选）
+
+旧版 **`app_web.py`** 仍为可选入口，与 Phase3 静态站独立：
 
 ```bash
+cd rental_app
 streamlit run app_web.py
 ```
 
-3. **Batch 折叠区** 中「Run batch request」在 **Use local engine 开启** 时会被禁用；需 HTTP batch 时请关闭 local 并确保 API 可达。
+默认 **http://localhost:8501**。与 FastAPI 联调时需另开终端启动 `python run.py`，并配置 `RENTALAI_API_URL`（见 `.env.example`）。
 
-### 4.3 抓取模块（不通过 Streamlit）
+更多部署、抓取脚本与历史设计文档见仓库内 `docs/`、`P8_*.md`、`P9_*.md`、`P10_*.md`。
 
-抓取由 **pipeline / scraper** 在 Python 中调用；调试可用脚本（均在 `rental_app` 下）：
+## 说明
 
-```bash
-python scripts/run_rightmove_pipeline.py --limit 3 --no-save
-python scripts/run_multi_source_analysis.py --sources rightmove,zoopla --limit 2 --no-save
-```
-
-无需单独常驻「抓取服务」进程；生产若要与 Web 解耦，见 **`P8_PHASE1_RUNTIME_ENTRY_GUIDE.md`** 与 **`P8_PHASE1_DEPLOYMENT_AUDIT.md`**。
-
----
-
-## 5. 健康检查
-
-API 启动后：
-
-```bash
-curl -s http://127.0.0.1:8000/health
-```
-
----
-
-## 6. 云端部署（第一版：Render Blueprint）
-
-仓库根目录提供 **`render.yaml`**（若 monorepo 根为 `python_learning/`，文件在该根下，`rootDir: rental_app`）。若 **Git 仓库根就是 `rental_app/`**，请将 `render.yaml` 移入该根并 **删除** 各服务下的 `rootDir: rental_app` 字段，或在 Render 控制台将根目录设为 `rental_app`。
-
-1. 将仓库连接 [Render](https://render.com) 并选择 **Blueprint**，使用上述 `render.yaml`。
-2. 首次部署完成后，在 **`rentalai-ui`** 服务中设置环境变量 **`RENTALAI_API_URL`** = `rentalai-api` 的公网 URL（无尾部斜杠）。
-3. Playwright 在 **UI 服务构建阶段** 执行 `playwright install chromium`；若构建失败，见 **`P8_PHASE1_DEPLOYMENT_PLAN.md`** 风险与排错。
-
-**Heroku 风格单进程**：`rental_app/Procfile` 默认启动 FastAPI；Streamlit 需 **另起一个应用** 并替换其中 `web:` 行（见文件内注释）。
-
-完整架构、变量映射与顺序：**`P8_PHASE1_DEPLOYMENT_PLAN.md`**。
-
----
-
-## 7. 更多文档
-
-- **Phase2 · 仅后端部署 Runbook：** **`P8_PHASE2_BACKEND_DEPLOY_RUNBOOK.md`**
-- **Phase2 · 仅前端部署 Runbook：** **`P8_PHASE2_FRONTEND_DEPLOY_RUNBOOK.md`**
-- **Phase2 · Scraper 部署准备：** **`P8_PHASE2_SCRAPER_DEPLOY_PREP.md`**
-- **Phase2 · 整站联调状态：** **`P8_PHASE2_INTEGRATION_STATUS.md`**
-- **Phase2 · Go-Live 执行手册：** **`P8_PHASE2_GO_LIVE_RUNBOOK.md`**
-- **Phase2 · 上线打勾清单：** **`P8_PHASE2_LAUNCH_CHECKLIST.md`**
-- **Phase3 · 真实联调验证：** **`P8_PHASE3_REAL_INTEGRATION_FIX.md`**
-- **Phase3 · Go-Live 验证方案：** **`P8_PHASE3_GO_LIVE_VERIFICATION.md`**
-- **Phase3 · 上线后值班清单：** **`P8_PHASE3_POST_LAUNCH_CHECKLIST.md`**
-- **P9 · 问题分级与排查框架：** **`P9_PHASE1_ISSUE_TRIAGE_BOARD.md`**
-- **P9 · 稳定性巡检清单：** **`P9_PHASE1_STABILITY_REVIEW_CHECKLIST.md`**
-- **P9 · 监控基线：** **`P9_PHASE1_MONITORING_BASELINE.md`**
-- **P9 · 报警系统：** **`P9_PHASE1_ALERTING_SYSTEM.md`**
-- **P9 · 性能基线：** **`P9_PHASE2_PERFORMANCE_BASELINE.md`**
-- **P9 · 第一轮性能优化：** **`P9_PHASE2_QUICK_OPTIMIZATION_ROUND1.md`**
-- **P9 · 超时控制与降级保护：** **`P9_PHASE2_TIMEOUT_AND_DEGRADE_GUARD.md`**
-- **P9 · Phase2 复测报告：** **`P9_PHASE2_VALIDATION_AND_STABILIZATION.md`**
-- **P9 · Phase2 收口总结：** **`P9_PHASE2_CLOSEOUT_SUMMARY.md`**
-- **P9 · 可扩展性风险建模：** **`P9_PHASE3_SCALABILITY_RISK_MAP.md`**
-- **P9 · 架构升级方案：** **`P9_PHASE3_ARCHITECTURE_UPGRADE_PLAN.md`**
-- **P9 · 异步化决策总结：** **`P9_PHASE3_ASYNC_DECISION_SUMMARY.md`**
-- **P9 · 异步任务骨架：** **`P9_PHASE3_ASYNC_TASK_SKELETON.md`**
-- **P9 · 任务 API 快速参考：** **`P9_PHASE3_TASK_API_QUICKREF.md`**
-- **P9 · 异步试点闭环：** **`P9_PHASE3_ASYNC_PILOT_INTEGRATION.md`**
-- **P9 · 异步试点用户流程：** **`P9_PHASE3_ASYNC_PILOT_USER_FLOW.md`**
-- **P9 · 异步试点复测报告：** **`P9_PHASE3_ASYNC_PILOT_VALIDATION.md`**
-- **P9 · Phase3 收口总结：** **`P9_PHASE3_CLOSEOUT_SUMMARY.md`**
-- **P9 · 异步推广计划：** **`P9_PHASE4_ASYNC_EXPANSION_PLAN.md`**
-- **P9 · 异步规则：** **`P9_PHASE4_ASYNC_RULES.md`**
-- **P9 · 第二流程异步化报告：** **`P9_PHASE4_SECOND_ASYNC_INTEGRATION.md`**
-- **P9 · 异步系统状态：** **`P9_PHASE4_ASYNC_SYSTEM_STATUS.md`**
-- **P9 · 任务可靠性升级：** **`P9_PHASE4_TASK_RELIABILITY_UPGRADE.md`**
-- **P9 · 任务操作快速参考：** **`P9_PHASE4_TASK_OPERATIONS_QUICKREF.md`**
-- 部署前联调与上线执行清单：**`P8_PHASE1_PREDEPLOY_CHECKLIST.md`**
-- 部署方案：**`P8_PHASE1_DEPLOYMENT_PLAN.md`**
-- 运行入口汇总：**`P8_PHASE1_RUNTIME_ENTRY_GUIDE.md`**
-- 部署审计：**`P8_PHASE1_DEPLOYMENT_AUDIT.md`**
-- Web 组件说明：**`web_ui/README.md`**
-- 各阶段设计：**`docs/`**
-
----
-
-## 8. 说明
-
-- **无** `package.json`：前端为 Streamlit，非独立 Node 工程；无 `npm run build` / `npm start`。
-- 请勿将含密钥的 **`.env`** 提交到版本库；模板文件为 **`.env.example`**。
+- Phase3 静态 UI **无** `package.json`；产品入口为 **`python run.py`**。
+- 请勿提交含密钥的 **`.env`**；模板为 **`.env.example`**。

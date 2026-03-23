@@ -1,5 +1,6 @@
 # P2 Phase1–4: RentalAI HTTP API（FastAPI）
-# 本地: uvicorn api_server:app --reload --host 127.0.0.1 --port 8000
+# 推荐本地一键启动（Phase4）: python run.py
+# 等价: uvicorn api_server:app --reload --host 127.0.0.1 --port 8000
 # 生产/PaaS: uvicorn api_server:app --host 0.0.0.0 --port $PORT
 # 需在 rental_app 目录下执行（或设置 rootDir），以便正确 import web_bridge
 
