@@ -1,9 +1,12 @@
-# Render Blueprint — RentalAI（最小双服务：FastAPI + Streamlit）
-# 仓库根为 python_learning、应用代码在 rental_app/ 时使用本文件。
-# 若你的 Git 仓库根目录就是 rental_app/，请在下方两个服务中删除 rootDir 字段。
+# Render Blueprint — RentalAI（Phase5：公网部署）
 #
-# 文档：docs.render.com/docs/blueprint-spec
-# 首次部署后：在 Streamlit 服务环境变量中填写 RENTALAI_API_URL = FastAPI 服务的公网 URL（https://…）
+# 仓库根为 python_learning、代码在 rental_app/ 时保持 rootDir: rental_app。
+# 若 Git 仓库根就是 rental_app/，请删除两个服务下的 rootDir 字段。
+#
+# Phase3 产品（首页/登录/分析/历史）全部由 rentalai-api 提供 → 公网链接即该服务的 URL。
+# rentalai-ui（Streamlit）为可选第二站点；仅需 Phase3 时可不在 Dashboard 创建该服务。
+#
+# 文档：https://render.com/docs/blueprint-spec
 
 services:
   - type: web
@@ -12,7 +15,8 @@ services:
     region: oregon
     plan: free
     rootDir: rental_app
-    buildCommand: pip install -r requirements.txt
+    # 与异步 /tasks 多源抓取一致：构建阶段安装 Chromium（体积大，首次构建可能数分钟）
+    buildCommand: pip install -r requirements.txt && playwright install chromium
     startCommand: python run.py
     healthCheckPath: /health
 

@@ -79,6 +79,33 @@ streamlit run app_web.py
 
 更多部署、抓取脚本与历史设计文档见仓库内 `docs/`、`P8_*.md`、`P9_*.md`、`P10_*.md`。
 
+## Deployment（Phase5 · Render）
+
+**技术栈**：Phase3 公网产品 = **FastAPI + Uvicorn**（`python run.py`），与本地相同命令；平台注入 **`PORT`** 后自动监听 **`0.0.0.0`**。
+
+**推荐平台**：**[Render](https://render.com)**（仓库已含 **`render.yaml`**，Blueprint 部署）。
+
+**关键文件**
+
+| 文件 | 说明 |
+|------|------|
+| `render.yaml`（仓库根） | 定义 `rentalai-api`（必选，含 `playwright install chromium`）与可选 `rentalai-ui`（Streamlit） |
+| `rental_app/run.py` | 启动命令 |
+| `rental_app/runtime.txt` | Python 版本 |
+| `rental_app/Procfile` | 其他 PaaS 备用：`web: python run.py` |
+
+**环境变量（摘要）**
+
+- 平台自动：**`PORT`**
+- 建议生产：**勿开启** `RENTALAI_RELOAD`；`RENTALAI_DEBUG=0`
+- 持久化（可选）：`RENTALAI_RECORDS_DB_PATH`、`RENTALAI_TASK_STORE_PATH`（配合 Render Disk）
+
+完整说明与数据风险见 **`P10_PHASE5_DEPLOYMENT.md`**。
+
+**部署后公网入口**：仅 Phase3 时，使用 Render 上 **`rentalai-api`** 服务的 URL（例如 `https://rentalai-api.onrender.com`）即可。
+
+---
+
 ## 说明
 
 - Phase3 静态 UI **无** `package.json`；产品入口为 **`python run.py`**。
