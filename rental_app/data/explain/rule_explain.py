@@ -3,7 +3,7 @@ P10 Phase2 — Rule-based Explain Engine (no LLM).
 
 Aligns score bands with module2_scoring._EXPLAIN_SCORE_STRONG / _EXPLAIN_SCORE_WEAK (80 / 50).
 Input: analyze-batch result row and/or multi-source analysis aggregate result.
-Output: explain_summary, pros, cons, risk_flags (user-facing Chinese).
+Output: explain_summary, pros, cons, risk_flags (user-facing English).
 """
 
 from __future__ import annotations
@@ -43,18 +43,18 @@ def _scores_from_row(row: dict[str, Any]) -> dict[str, float | None]:
 
 
 _PROS = {
-    "price": "租金维度得分较高，价格相对更有竞争力",
-    "commute": "通勤维度得分较高，通勤时间相对更理想",
-    "bills": "账单相关维度得分较好",
-    "bedrooms": "卧室/户型维度与需求匹配较好",
-    "area": "区域/地段匹配度较好",
+    "price": "Rent looks relatively competitive versus similar listings (price dimension scores well).",
+    "commute": "Commute looks relatively workable (commute dimension scores well).",
+    "bills": "Bills-related signals look reasonable (bills dimension scores well).",
+    "bedrooms": "Bedrooms / layout alignment looks solid versus typical needs.",
+    "area": "Area / location fit looks relatively strong.",
 }
 _CONS = {
-    "price": "租金维度得分偏低，租金压力可能较大",
-    "commute": "通勤维度得分偏低，通勤时间可能偏长",
-    "bills": "账单相关维度得分偏低",
-    "bedrooms": "卧室/户型匹配度一般",
-    "area": "区域/地段匹配度一般",
+    "price": "Rent pressure may be high (price dimension scores on the low side).",
+    "commute": "Commute may be a concern (commute dimension scores on the low side).",
+    "bills": "Bills-related signals are weaker — confirm what is included.",
+    "bedrooms": "Bedrooms / layout match is only moderate.",
+    "area": "Area / location fit is only moderate.",
 }
 
 
@@ -72,10 +72,10 @@ def build_p10_explain_for_batch_row(row: dict[str, Any]) -> dict[str, Any]:
     row = row if isinstance(row, dict) else {}
     if not row.get("success"):
         return {
-            "explain_summary": "该条分析未成功，暂无法生成推荐理由。",
+            "explain_summary": "This row did not analyze successfully, so we cannot generate a recommendation summary.",
             "pros": [],
             "cons": [],
-            "risk_flags": ["分析失败或数据不足，请重试或调整条件。"],
+            "risk_flags": ["Analysis failed or data was insufficient — retry or adjust your search."],
             "dimensions": {},
         }
 
@@ -94,38 +94,42 @@ def build_p10_explain_for_batch_row(row: dict[str, Any]) -> dict[str, Any]:
     risk_flags: list[str] = []
     im = row.get("input_meta") if isinstance(row.get("input_meta"), dict) else {}
     if im.get("bills_included") is False:
-        risk_flags.append("未勾选包账单：可能存在水电煤等额外支出，需自行核实。")
+        risk_flags.append(
+            "Bills are not included: budget for utilities and council tax separately and confirm with the agent/landlord."
+        )
     pc = im.get("postcode") or im.get("area")
     if isinstance(pc, str) and pc.strip() and (scores.get("area") is not None and scores.get("area", 100) <= _WEAK):
-        risk_flags.append("区域匹配得分偏低：建议结合治安、交通与生活配套自行核实。")
+        risk_flags.append(
+            "Area fit scores on the low side — double-check transport, amenities, and how the neighbourhood feels for you."
+        )
     if scores.get("price") is not None and scores.get("price", 100) <= _WEAK:
-        risk_flags.append("租金维度偏弱：注意是否超出预算或需压缩其他开支。")
+        risk_flags.append("Rent looks relatively expensive versus the model — confirm it still fits your monthly budget.")
     if scores.get("commute") is not None and scores.get("commute", 100) <= _WEAK:
-        risk_flags.append("通勤维度偏弱：建议用地图实测高峰通勤时间。")
+        risk_flags.append("Commute scores on the low side — test realistic peak-time travel before you commit.")
 
     dc = str(row.get("decision_code") or "").strip().lower()
     if dc == "not_recommended":
-        risk_flags.append("综合决策倾向谨慎：建议结合线下看房与其它信息再决定。")
+        risk_flags.append("Overall decision leans cautious — view in person and validate details before proceeding.")
 
     fs = _to_float(row.get("score"))
-    # One-line summary (Chinese)
+    # One-line summary
     if pros and not cons:
-        summary = "整体表现偏积极：%s。" % pros[0]
+        summary = "Overall tilt is positive: %s" % pros[0]
     elif cons and not pros:
-        summary = "需重点关注：%s。" % cons[0]
+        summary = "Main watch-out: %s" % cons[0]
     elif pros and cons:
-        summary = "该房源在「%s」方面较有优势，但「%s」需留意。" % (
-            pros[0][:20],
-            cons[0][:20],
+        summary = "There is a strength around “%s”, but “%s” needs attention." % (
+            pros[0][:40],
+            cons[0][:40],
         )
     else:
-        summary = "各维度得分中等，无明显短板也无突出亮点，建议结合个人偏好判断。"
+        summary = "Scores are middling across dimensions — decide based on your personal priorities and a real viewing."
 
     if fs is not None:
         if fs >= 80:
-            summary = "综合分较高。" + summary
+            summary = "Final score is relatively high. " + summary
         elif fs <= 55:
-            summary = "综合分偏低。" + summary
+            summary = "Final score is on the low side. " + summary
 
     return {
         "explain_summary": summary[:500],
@@ -170,12 +174,12 @@ def build_p10_explain_from_msa_result(msa: dict[str, Any]) -> dict[str, Any]:
     row = _best_success_row_from_msa(msa)
     if row is None:
         return {
-            "explain_summary": "本轮分析无成功条目或缺少评分，暂无法生成汇总推荐理由。",
+            "explain_summary": "No successful scored listings in this run — widen the search or retry.",
             "pros": [],
             "cons": [],
-            "risk_flags": ["请检查抓取结果或缩小筛选条件后重试。"],
+            "risk_flags": ["Check scrape results or narrow filters, then try again."],
             "dimensions": {},
         }
     ex = build_p10_explain_for_batch_row(row)
-    ex["explain_summary"] = "【本轮优选条目】 " + ex.get("explain_summary", "")
+    ex["explain_summary"] = "Top match: " + ex.get("explain_summary", "")
     return ex

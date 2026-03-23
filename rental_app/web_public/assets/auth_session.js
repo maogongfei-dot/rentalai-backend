@@ -1,5 +1,6 @@
 /**
- * P10 Phase3 Step4 — browser session for registered users (Bearer token + profile in localStorage).
+ * P10 Phase3 Step4 — browser session (Bearer token + profile in localStorage).
+ * P10 Phase7 — guest session header for tasks without blocking analysis.
  */
 (function (global) {
   var K = {
@@ -7,6 +8,7 @@
     userId: "rentalai_user_id",
     email: "rentalai_user_email",
   };
+  var GUEST_KEY = "rentalai_guest_session";
 
   function esc(s) {
     return String(s == null ? "" : s)
@@ -22,6 +24,8 @@
     if (data.user_id) localStorage.setItem(K.userId, String(data.user_id));
     if (data.email) localStorage.setItem(K.email, String(data.email));
     initAuthNav();
+    updateHomeGuestNotice();
+    updateResultGuestBanner();
   }
 
   function clearSession() {
@@ -29,6 +33,8 @@
     localStorage.removeItem(K.userId);
     localStorage.removeItem(K.email);
     initAuthNav();
+    updateHomeGuestNotice();
+    updateResultGuestBanner();
   }
 
   function getStoredToken() {
@@ -43,6 +49,59 @@
     var t = getStoredToken();
     if (!t) return Promise.reject(new Error("not_logged_in"));
     return Promise.resolve(t);
+  }
+
+  function ensureGuestSessionId() {
+    try {
+      var x = sessionStorage.getItem(GUEST_KEY);
+      if (x && /^[a-fA-F0-9\-]{8,128}$/.test(x)) return x;
+      x = "";
+      if (global.crypto && typeof global.crypto.randomUUID === "function") {
+        x = global.crypto.randomUUID();
+      } else {
+        x = String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+      }
+      sessionStorage.setItem(GUEST_KEY, x);
+      return x;
+    } catch (e) {
+      return (Date.now().toString(16) + Math.random().toString(16).slice(2, 18)).replace(/[^a-f0-9]/gi, "0").slice(0, 40);
+    }
+  }
+
+  function getTaskApiHeaders() {
+    var h = { "Content-Type": "application/json" };
+    var t = getStoredToken();
+    if (t) {
+      h.Authorization = "Bearer " + t;
+      return h;
+    }
+    h["X-Guest-Session"] = ensureGuestSessionId();
+    return h;
+  }
+
+  function updateHomeGuestNotice() {
+    var el = document.getElementById("home-guest-notice");
+    if (!el) return;
+    if (isLoggedIn()) el.classList.add("hidden");
+    else el.classList.remove("hidden");
+  }
+
+  function updateResultGuestBanner() {
+    var el = document.getElementById("result-guest-banner");
+    if (!el) return;
+    if (isLoggedIn()) el.classList.add("hidden");
+    else el.classList.remove("hidden");
+  }
+
+  function guardHistoryLinks() {
+    document.querySelectorAll('a[href="/history"]').forEach(function (a) {
+      a.addEventListener("click", function (ev) {
+        if (!isLoggedIn()) {
+          ev.preventDefault();
+          window.alert("Login to save your analysis history");
+        }
+      });
+    });
   }
 
   function logout() {
@@ -101,12 +160,17 @@
         localStorage.setItem(K.email, String(j.email));
         if (j.user_id) localStorage.setItem(K.userId, String(j.user_id));
         initAuthNav();
+        updateHomeGuestNotice();
+        updateResultGuestBanner();
       })
       .catch(function () {});
   }
 
   function onReady() {
     initAuthNav();
+    updateHomeGuestNotice();
+    updateResultGuestBanner();
+    guardHistoryLinks();
     if (getStoredToken() && !localStorage.getItem(K.email)) {
       backfillProfileFromServer();
     }
@@ -124,7 +188,10 @@
     requireToken: requireToken,
     isLoggedIn: isLoggedIn,
     getStoredToken: getStoredToken,
+    getTaskApiHeaders: getTaskApiHeaders,
+    ensureGuestSessionId: ensureGuestSessionId,
     logout: logout,
     initAuthNav: initAuthNav,
+    updateHomeGuestNotice: updateHomeGuestNotice,
   };
 })(window);

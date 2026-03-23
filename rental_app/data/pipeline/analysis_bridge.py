@@ -15,6 +15,164 @@ from data.pipeline.multi_source_pipeline import run_multi_source_pipeline
 from data.schema.listing_schema import ListingSchema
 
 _DEBUG_DIR = Path(__file__).resolve().parent.parent / "scraper" / "samples" / "debug"
+
+
+def _to_float_simple(v: Any) -> float | None:
+    if v is None or isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        s = v.strip().replace(",", "")
+        if not s:
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
+    return None
+
+
+def _to_int_simple(v: Any) -> int | None:
+    f = _to_float_simple(v)
+    if f is None:
+        return None
+    if abs(f - round(f)) < 1e-9:
+        return int(round(f))
+    return int(f)
+
+
+def _clean_lower(s: Any) -> str:
+    if s is None:
+        return ""
+    t = str(s).strip().lower()
+    return t
+
+
+def _listing_property_category(listing_pt: Any) -> str | None:
+    a = _clean_lower(listing_pt)
+    if not a:
+        return None
+    if "studio" in a:
+        return "studio"
+    if any(x in a for x in ("flat", "apartment", "apt", "maisonette")):
+        return "flat"
+    if any(
+        x in a
+        for x in (
+            "house",
+            "bungalow",
+            "detached",
+            "semi-detached",
+            "semi detached",
+            "terraced",
+            "terrace",
+            "cottage",
+            "town house",
+            "townhouse",
+        )
+    ):
+        return "house"
+    return None
+
+
+def _wanted_property_category(want_raw: Any) -> str | None:
+    w = _clean_lower(want_raw)
+    if not w or w == "other":
+        return None
+    if w == "apartment":
+        w = "flat"
+    if w in ("flat", "house", "studio"):
+        return w
+    return None
+
+
+def _listing_matches_property_type(listing: dict[str, Any], want_raw: Any) -> bool:
+    want = _wanted_property_category(want_raw)
+    if want is None:
+        return True
+    lcat = _listing_property_category(listing.get("property_type"))
+    if lcat is None:
+        return True
+    return lcat == want
+
+
+def _listing_matches_bedrooms(listing: dict[str, Any], bedrooms_pref: Any) -> bool:
+    if bedrooms_pref is None:
+        return True
+    sp = str(bedrooms_pref).strip().upper()
+    if not sp:
+        return True
+    lb = _to_int_simple(listing.get("bedrooms"))
+    if lb is None:
+        return True
+    if sp == "4+":
+        return lb >= 4
+    try:
+        need = int(float(sp))
+    except ValueError:
+        return True
+    return lb == need
+
+
+def _listing_matches_bathrooms(listing: dict[str, Any], min_bath: Any) -> bool:
+    need = _to_float_simple(min_bath)
+    if need is None:
+        return True
+    lb = _to_float_simple(listing.get("bathrooms"))
+    if lb is None:
+        return True
+    return lb + 1e-6 >= need
+
+
+def _listing_matches_distance(listing: dict[str, Any], dist_pref: Any) -> bool:
+    key = _clean_lower(dist_pref)
+    if not key or key == "any":
+        return True
+    max_miles = {"1": 1.0, "3": 3.0, "5": 5.0}.get(key)
+    if max_miles is None:
+        return True
+    dm = _to_float_simple(listing.get("distance_miles"))
+    if dm is None:
+        dm = _to_float_simple(listing.get("target_postcode_distance_miles"))
+    if dm is None:
+        return True
+    return dm <= max_miles + 0.05
+
+
+def _listing_matches_prefs_row(listing: dict[str, Any], prefs: dict[str, Any]) -> bool:
+    if not isinstance(listing, dict):
+        return False
+    if not _listing_matches_property_type(listing, prefs.get("property_type")):
+        return False
+    if not _listing_matches_bedrooms(listing, prefs.get("bedrooms")):
+        return False
+    if not _listing_matches_bathrooms(listing, prefs.get("bathrooms")):
+        return False
+    if not _listing_matches_distance(listing, prefs.get("distance_to_centre")):
+        return False
+    return True
+
+
+def filter_aggregated_listings_by_preferences(
+    listings: list[dict[str, Any]],
+    prefs: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Soft filter before batch analyze; if nothing matches, returns the original list."""
+    if not listings:
+        return listings
+    if not prefs or not isinstance(prefs, dict):
+        return listings
+    has_any = any(
+        prefs.get(k) not in (None, "", "any")
+        for k in ("property_type", "bedrooms", "bathrooms", "distance_to_centre", "safety_preference")
+    )
+    if not has_any:
+        return listings
+    filtered = [d for d in listings if isinstance(d, dict) and _listing_matches_prefs_row(d, prefs)]
+    if not filtered:
+        return listings
+    return filtered
 _ANALYSIS_SAMPLE_PATH = _DEBUG_DIR / "multi_source_analysis_sample.json"
 
 
@@ -170,6 +328,7 @@ def run_multi_source_analysis(
     save_analysis_sample: bool = False,
     budget: float | None = None,
     target_postcode: str | None = None,
+    user_preferences: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     `run_multi_source_pipeline` → 去重 listing dicts → `analyze_batch_request_body`。
@@ -210,9 +369,11 @@ def run_multi_source_analysis(
         errors.append(row)
 
     listings = pl.get("aggregated_listings") or []
+    ux_prefs = user_preferences if isinstance(user_preferences, dict) else None
+    listings_for_batch = filter_aggregated_listings_by_preferences(listings, ux_prefs)
     _t_analysis = time.perf_counter()
     analysis_block = analyze_multi_source_listings(
-        listings,
+        listings_for_batch,
         budget=budget,
         target_postcode=target_postcode,
     )
@@ -265,6 +426,7 @@ def run_multi_source_analysis(
         "sample_analyzed_listing": _first_success_batch_row(data.get("results")),
         "analysis_envelope": env if env else None,
         "errors": errors,
+        "user_preferences": dict(ux_prefs) if ux_prefs else {},
     }
 
     _maybe_write_analysis_sample(

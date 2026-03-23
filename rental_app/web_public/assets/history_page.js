@@ -62,10 +62,20 @@
     if (empty) empty.classList.add("hidden");
 
     var H = global.RentalAIHistoryShelf;
+    var A = global.RentalAIAuth;
     if (!H || typeof H.getToken !== "function") {
       if (load) load.classList.add("hidden");
       if (err) {
         err.textContent = "Failed to load history";
+        err.classList.remove("hidden");
+      }
+      return;
+    }
+
+    if (!A || typeof A.isLoggedIn !== "function" || !A.isLoggedIn()) {
+      if (load) load.classList.add("hidden");
+      if (err) {
+        err.textContent = "Login to save your analysis history";
         err.classList.remove("hidden");
       }
       return;

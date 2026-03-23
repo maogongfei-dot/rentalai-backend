@@ -207,7 +207,7 @@ a {
 .top-nav {
   font-size: 0.95rem;
   margin: 0 0 0.75rem;
-  max-width: 44rem;
+  max-width: 48rem;
 }
 
 .nav-sep {
@@ -324,4 +324,81 @@ a {
   background: #fff8e1;
   border: 1px solid #ffe082;
   color: #5d4037;
+}
+
+/* P10 Phase7 — structured home form */
+.wrap-wide {
+  max-width: 48rem;
+}
+
+.page-header {
+  margin-bottom: 0.35rem;
+}
+
+.form-card {
+  margin-top: 0.35rem;
+}
+
+.form-section {
+  margin-bottom: 1.1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.form-section:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.form-section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.45rem;
+  color: #333;
+}
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.field-col {
+  flex: 1 1 11rem;
+}
+
+.form-card .field-label {
+  display: block;
+  margin-top: 0.55rem;
+  margin-bottom: 0.2rem;
+}
+
+.form-card .field-label:first-child,
+.form-section .field-label:first-of-type {
+  margin-top: 0;
+}
+
+select {
+  padding: 0.45rem 0.5rem;
+  font-size: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.guest-banner {
+  padding: 0.5rem 0.65rem;
+  background: #fff8e6;
+  border: 1px solid #f0e0b2;
+  border-radius: 6px;
+}
+
+.small-print {
+  font-size: 0.85rem;
+  margin-top: 0.35rem;
+}
+
+.actions-row {
+  margin-top: 0.65rem;
 }

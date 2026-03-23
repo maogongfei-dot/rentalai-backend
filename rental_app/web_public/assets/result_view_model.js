@@ -1,6 +1,5 @@
 /**
- * P10 Phase3 Step2 — 结果页展示适配层（不触碰后端分析逻辑）。
- * 从 GET /tasks/{id} 响应构建 normalized 的 display_payload，并写入 DOM。
+ * P10 Phase3 Step2 — Result page adapter: builds display_payload from GET /tasks/{id} and renders DOM.
  */
 (function (global) {
   var VERDICT_LABELS = {
@@ -11,7 +10,7 @@
     na: "N/A",
   };
 
-  /** 将 pros/cons/risk 等统一为 string[]；支持 string（含换行）、单值、数组。 */
+  /** Normalize pros/cons/risk to string[] (strings with newlines, scalars, or arrays). */
   function normalizeStrList(x) {
     if (x == null) return [];
     if (Array.isArray(x)) {
@@ -99,7 +98,7 @@
   }
 
   /**
-   * @param {object} taskState — GET /tasks/{task_id} 完整 JSON
+   * @param {object} taskState — full GET /tasks/{task_id} JSON
    * @returns {{ display_payload: object, phase: string, errorMessage?: string }}
    */
   function buildResultViewModel(taskState) {
@@ -286,9 +285,7 @@
     if (span) span.textContent = String(value);
   }
 
-  /**
-   * 根据 buildResultViewModel 输出切换面板并填充内容。
-   */
+  /** Toggle panels and fill DOM from buildResultViewModel output. */
   function renderFromViewModel(vm) {
     var dbgPre = document.getElementById("debug-json");
     var dbgDetails = document.getElementById("debug-details");

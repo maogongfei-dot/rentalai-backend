@@ -100,6 +100,34 @@ def normalize_analysis_input_signature(input_summary: dict[str, Any] | None) -> 
     out["history_task_id"] = (
         str(hid).strip() if isinstance(hid, str) and str(hid).strip() else None
     )
+    # P10 Phase7 — optional UX preferences (cache signature only; does not change scoring formulas)
+    pt = src.get("property_type")
+    out["property_type"] = str(pt).strip().lower() if isinstance(pt, str) and pt.strip() else None
+    br = src.get("bedrooms")
+    if isinstance(br, (int, float)) and br == int(br):
+        out["bedrooms"] = str(int(br))
+    elif isinstance(br, str) and br.strip():
+        out["bedrooms"] = br.strip().upper()
+    else:
+        out["bedrooms"] = None
+    bt = src.get("bathrooms")
+    if isinstance(bt, (int, float)):
+        out["bathrooms"] = float(bt)
+    elif isinstance(bt, str) and bt.strip():
+        try:
+            out["bathrooms"] = float(bt.strip())
+        except ValueError:
+            out["bathrooms"] = None
+    else:
+        out["bathrooms"] = None
+    dc = src.get("distance_to_centre")
+    out["distance_to_centre"] = (
+        str(dc).strip().lower() if isinstance(dc, str) and str(dc).strip() else None
+    )
+    sp = src.get("safety_preference")
+    out["safety_preference"] = (
+        str(sp).strip().lower() if isinstance(sp, str) and str(sp).strip() else None
+    )
     return out
 
 

@@ -78,7 +78,7 @@ def _to_bool(value: Any) -> bool | None:
         return None
     if isinstance(value, str):
         s = value.strip().lower()
-        if s in ("yes", "true", "1", "y", "included", "include", "包", "包含"):
+        if s in ("yes", "true", "1", "y", "included", "include"):
             return True
         if s in ("no", "false", "0", "n", "excluded", "not included"):
             return False

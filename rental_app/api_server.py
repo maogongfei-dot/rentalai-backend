@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import queue
+import re
 import time
 import traceback
 import uuid
@@ -198,6 +199,63 @@ def _get_user_id_from_request(request: Request) -> str:
     return user_id
 
 
+def _get_task_identity(request: Request) -> str:
+    """Bearer → real user id; otherwise stable guest id from X-Guest-Session (P10 Phase7)."""
+    token = _extract_bearer_token(request)
+    if token:
+        with _AUTH_LOCK:
+            uid = _AUTH_TOKENS.get(token)
+        if uid:
+            return uid
+    raw = (request.headers.get("X-Guest-Session") or "").strip()
+    if raw and re.fullmatch(r"[a-fA-F0-9\-]{8,128}", raw):
+        compact = raw.replace("-", "")[:48]
+        return "guest:" + compact
+    return "guest:anonymous"
+
+
+def _db_user_id_for_analysis(task_user_id: str | None) -> str | None:
+    if not task_user_id:
+        return None
+    if str(task_user_id).startswith("guest:"):
+        return None
+    return str(task_user_id)
+
+
+def _ux_prefs_from_params(params: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for k in (
+        "property_type",
+        "bedrooms",
+        "bathrooms",
+        "distance_to_centre",
+        "safety_preference",
+    ):
+        if k not in params:
+            continue
+        v = params.get(k)
+        if v is None or v == "":
+            continue
+        out[k] = v
+    return out
+
+
+def _append_high_safety_note(explain: dict[str, Any], prefs: dict[str, Any]) -> None:
+    if not isinstance(explain, dict):
+        return
+    sp = prefs.get("safety_preference")
+    if not (isinstance(sp, str) and sp.strip().lower() == "high"):
+        return
+    msg = (
+        "You selected a high safety preference — independently verify local crime statistics, "
+        "policing coverage, and how the area feels at night."
+    )
+    rf = list(explain.get("risk_flags") or [])
+    if msg not in rf:
+        rf.append(msg)
+    explain["risk_flags"] = rf
+
+
 @app.get("/health")
 def health():
     return {
@@ -332,6 +390,20 @@ class AnalyzeRealRequest(BaseModel):
         default=None,
         description="Optional list/search URL; when set, passed as scraper search_url (host hints source).",
     )
+    property_type: Optional[str] = Field(
+        default=None,
+        description="flat | apartment | house | studio | other",
+    )
+    bedrooms: Optional[str] = Field(default=None, description="1, 2, 3, or 4+")
+    bathrooms: Optional[float] = Field(default=None, ge=0.5, le=20)
+    distance_to_centre: Optional[str] = Field(
+        default=None,
+        description="1 | 3 | 5 | any (miles, optional soft filter when listing has distance)",
+    )
+    safety_preference: Optional[str] = Field(
+        default=None,
+        description="high | medium | low (notes only; no listing-level safety data)",
+    )
     headless: bool = Field(default=True)
     persist: bool = Field(default=True)
 
@@ -398,20 +470,23 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
     logger.info("[TASK] %s started execution", task_id)
     _task_store.mark_running(task_id, stage="scraping")
     t0 = time.perf_counter()
+    prefs = _ux_prefs_from_params(params)
     analysis_input = normalize_analysis_input_signature({
         "sources": params.get("sources"),
         "limit_per_source": params.get("limit_per_source"),
         "budget": params.get("budget"),
         "target_postcode": params.get("target_postcode"),
         "listing_url": (params.get("listing_url") or "").strip() or None,
+        **prefs,
     })
     rec = _task_store.get(task_id)
     user_id = rec.user_id if rec else None
+    db_user_id = _db_user_id_for_analysis(user_id)
     if _ANALYSIS_CACHE_ENABLED:
         cached_result = find_reusable_analysis_result(
             analysis_type="multi_source_analysis",
             input_summary=analysis_input,
-            user_id=user_id,
+            user_id=db_user_id,
             max_age_seconds=_ANALYSIS_CACHE_MAX_AGE_SECONDS,
         )
         if isinstance(cached_result, dict):
@@ -419,6 +494,7 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
             out = dict(cached_result)
             out["_cache"] = {"hit": True, "source": "analysis_records"}
             _ex_cache = build_p10_explain_from_msa_result(cached_result)
+            _append_high_safety_note(_ex_cache, prefs)
             out["p10_explain"] = _ex_cache
             out["representative_row"] = get_representative_batch_row(cached_result)
             _task_store.mark_success(task_id, out, degraded=degraded, elapsed=0.0)
@@ -441,7 +517,7 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
                     input_summary=analysis_input,
                     result_summary=_rs_cache,
                     source="cache_hit",
-                    user_id=user_id,
+                    user_id=db_user_id,
                     explain_summary=_ex_cache.get("explain_summary"),
                     pros=_ex_cache.get("pros") or [],
                     cons=_ex_cache.get("cons") or [],
@@ -463,10 +539,12 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
             persist=params.get("persist", True),
             budget=params.get("budget"),
             target_postcode=params.get("target_postcode"),
+            user_preferences=prefs,
         )
         elapsed = time.perf_counter() - t0
         degraded = bool(result.get("degraded"))
         _ex_run = build_p10_explain_from_msa_result(result)
+        _append_high_safety_note(_ex_run, prefs)
         result_out = dict(result)
         result_out["p10_explain"] = _ex_run
         result_out["representative_row"] = get_representative_batch_row(result)
@@ -494,7 +572,7 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
                 input_summary=analysis_input,
                 result_summary=_rs_body,
                 source="async_task",
-                user_id=user_id,
+                user_id=db_user_id,
                 explain_summary=_ex_run.get("explain_summary"),
                 pros=_ex_run.get("pros") or [],
                 cons=_ex_run.get("cons") or [],
@@ -521,15 +599,15 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
                     },
                     "reusable_result": None,
                     "p10_explain": {
-                        "explain_summary": "分析失败，未生成推荐理由。",
+                        "explain_summary": "Analysis did not complete; no recommendation summary is available.",
                         "pros": [],
                         "cons": [],
                         "risk_flags": [str(exc)],
                     },
                 },
                 source="async_task_failed",
-                user_id=user_id,
-                explain_summary="分析失败，未生成推荐理由。",
+                user_id=db_user_id,
+                explain_summary="Analysis did not complete; no recommendation summary is available.",
                 pros=[],
                 cons=[],
                 risk_flags=[str(exc)],
@@ -553,10 +631,16 @@ def create_task(request: Request, body: AnalyzeRealRequest = AnalyzeRealRequest(
     summary = {
         "sources": params.get("sources"),
         "limit_per_source": params.get("limit_per_source"),
+        "budget": params.get("budget"),
         "target_postcode": params.get("target_postcode"),
         "listing_url": (params.get("listing_url") or "").strip() or None,
+        "property_type": params.get("property_type"),
+        "bedrooms": params.get("bedrooms"),
+        "bathrooms": params.get("bathrooms"),
+        "distance_to_centre": params.get("distance_to_centre"),
+        "safety_preference": params.get("safety_preference"),
     }
-    user_id = _get_user_id_from_request(request)
+    user_id = _get_task_identity(request)
     rec = _task_store.create(input_summary=summary, user_id=user_id)
     _start_task_workers_once()
     _TASK_QUEUE.put((rec.task_id, params))
@@ -573,7 +657,7 @@ def list_tasks(request: Request, mode: str = "active", limit: int = 30):
                  ``recent``: most recent *limit* tasks regardless of status.
         limit  – max tasks to return (default 30, max 100).
     """
-    user_id = _get_user_id_from_request(request)
+    user_id = _get_task_identity(request)
     limit = min(max(limit, 1), 100)
     if mode == "recent":
         return {"tasks": _task_store.list_recent(limit=limit, user_id=user_id)}
@@ -583,14 +667,14 @@ def list_tasks(request: Request, mode: str = "active", limit: int = 30):
 @app.get("/tasks/stats")
 def task_stats(request: Request):
     """Aggregate task counts by status."""
-    user_id = _get_user_id_from_request(request)
+    user_id = _get_task_identity(request)
     return _task_store.stats(user_id=user_id)
 
 
 @app.get("/tasks/system")
 def task_system_status(request: Request):
     """Minimal queue + worker observability for ops checks."""
-    user_id = _get_user_id_from_request(request)
+    user_id = _get_task_identity(request)
     stats = _task_store.stats(user_id=user_id)
     by_status = stats.get("by_status") or {}
     return {
@@ -606,7 +690,7 @@ def task_system_status(request: Request):
 @app.get("/tasks/{task_id}")
 def get_task(request: Request, task_id: str):
     """Query the current state of an async task."""
-    user_id = _get_user_id_from_request(request)
+    user_id = _get_task_identity(request)
     rec = _task_store.get(task_id)
     if rec is None or rec.user_id != user_id:
         return JSONResponse(

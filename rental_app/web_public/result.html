@@ -17,12 +17,14 @@
       <span data-auth-nav class="auth-slot"></span>
     </nav>
     <main class="wrap result-wrap">
+      <p id="result-guest-banner" class="hint muted guest-banner hidden" role="status">
+        You are not logged in. Your analysis will not be saved.
+      </p>
 
       <div id="loading-panel" class="card card-muted">
         <h1 class="section-title">Analyzing…</h1>
         <p id="loading-status" class="muted">
-          This may take a few minutes. You can leave this page open; it will update
-          automatically.
+          This may take a few minutes. You can leave this page open; it will update automatically.
         </p>
       </div>
 
@@ -45,11 +47,11 @@
             <strong id="hdr-verdict" class="verdict-value">—</strong>
           </div>
           <div class="verdict-row">
-            <span class="label">Final score</span>
+            <span class="label">Final Score</span>
             <strong id="hdr-score" class="score-value">—</strong>
           </div>
           <p class="meta-line muted">
-            <span>Task <code id="hdr-task-id">—</code></span>
+            <span>Reference <code id="hdr-task-id">—</code></span>
             <span class="sep">·</span>
             <span id="hdr-status">—</span>
             <span id="hdr-elapsed-wrap" class="hidden">
@@ -60,13 +62,13 @@
         </section>
 
         <section id="sec-property" class="card">
-          <h2 class="section-title">Property overview</h2>
+          <h2 class="section-title">Property Overview</h2>
           <div id="prop-title" class="prop-row hidden">
             <span class="label">Title</span>
             <span data-value></span>
           </div>
           <div id="prop-price" class="prop-row hidden">
-            <span class="label">Rent / price (pcm)</span>
+            <span class="label">Rent (pcm)</span>
             <span data-value></span>
           </div>
           <div id="prop-postcode" class="prop-row hidden">
@@ -87,7 +89,7 @@
         </section>
 
         <section class="card">
-          <h2 class="section-title">Explain summary</h2>
+          <h2 class="section-title">Explain Summary</h2>
           <p id="ex-summary" class="explain-summary">—</p>
           <h3 class="subsection-title">Pros</h3>
           <ul id="ex-pros" class="bullet-list"></ul>
@@ -96,7 +98,7 @@
         </section>
 
         <section class="card">
-          <h2 class="section-title">Risk flags</h2>
+          <h2 class="section-title">Risk Flags</h2>
           <p id="risk-no-flags" class="muted hidden">No major risk flags detected.</p>
           <div id="risk-has-flags">
             <ul id="risk-flags-ul" class="bullet-list"></ul>
@@ -110,11 +112,12 @@
             <ul id="risk-next-ul" class="bullet-list"></ul>
           </div>
         </section>
+        <p id="save-status" class="save-banner hidden" role="status"></p>
         <p class="back-link"><a href="/">← New analysis</a></p>
       </div>
 
       <details id="debug-details" class="debug-details hidden">
-        <summary>Raw / debug (task JSON)</summary>
+        <summary>Technical details (support)</summary>
         <pre id="debug-json" class="debug-pre"></pre>
       </details>
     </main>

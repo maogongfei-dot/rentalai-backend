@@ -14,22 +14,104 @@
       <span class="nav-sep">·</span>
       <span data-auth-nav class="auth-slot"></span>
     </nav>
-    <main class="wrap">
-      <h1>Find the Best Rental with AI</h1>
-      <p class="hint">
-        Enter a UK postcode or area, or paste a Rightmove / Zoopla search URL.
-      </p>
-      <p class="hint muted login-hint">
-        <strong>Log in</strong> is required to run analysis and save it to your history.
-        <a href="/login">Login</a> or <a href="/register">Register</a>.
-      </p>
-      <input
-        type="text"
-        id="q"
-        placeholder="e.g. SW1A 1AA or https://www.rightmove.co.uk/..."
-        autocomplete="off"
-      />
-      <button type="button" id="go">Analyze</button>
+    <main class="wrap wrap-wide">
+      <header class="page-header">
+        <h1>Find a rental that fits your decision</h1>
+        <p class="hint">
+          Set your preferences, add a UK postcode or area (or a Rightmove / Zoopla search URL), then run the analysis.
+        </p>
+        <p id="home-guest-notice" class="hint muted guest-banner hidden" role="status">
+          You are not logged in. Your analysis will not be saved.
+        </p>
+      </header>
+
+      <section class="card form-card" aria-labelledby="prefs-heading">
+        <h2 id="prefs-heading" class="section-title">Your search</h2>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Property</h3>
+          <label class="field-label" for="property-type">Property type</label>
+          <select id="property-type" name="property_type">
+            <option value="">No preference</option>
+            <option value="flat">Flat</option>
+            <option value="apartment">Apartment</option>
+            <option value="house">House</option>
+            <option value="studio">Studio</option>
+            <option value="other">Other</option>
+          </select>
+
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label" for="bedrooms">Bedrooms</label>
+              <select id="bedrooms" name="bedrooms">
+                <option value="">No preference</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4+">4+</option>
+              </select>
+            </div>
+            <div class="field-col">
+              <label class="field-label" for="bathrooms">Bathrooms (minimum)</label>
+              <select id="bathrooms" name="bathrooms">
+                <option value="">No preference</option>
+                <option value="1">1</option>
+                <option value="1.5">1.5</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Budget and location</h3>
+          <label class="field-label" for="budget">Monthly budget (optional, £)</label>
+          <input
+            type="text"
+            id="budget"
+            name="budget"
+            inputmode="decimal"
+            placeholder="e.g. 1500"
+            autocomplete="off"
+          />
+
+          <label class="field-label" for="location">Postcode / area or listing URL</label>
+          <input
+            type="text"
+            id="location"
+            name="location"
+            placeholder="e.g. SW1A 1AA or https://www.rightmove.co.uk/..."
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Optional preferences</h3>
+          <label class="field-label" for="distance">Distance to city centre</label>
+          <select id="distance" name="distance_to_centre">
+            <option value="any">Any</option>
+            <option value="1">Within 1 mile</option>
+            <option value="3">Within 3 miles</option>
+            <option value="5">Within 5 miles</option>
+          </select>
+
+          <label class="field-label" for="safety">Safety preference</label>
+          <select id="safety" name="safety_preference">
+            <option value="">No preference</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <p class="hint muted small-print">
+            Safety is a personal judgement — we surface a reminder when you pick “high”; always verify independently.
+          </p>
+        </div>
+      </section>
+
+      <div class="actions-row">
+        <button type="button" id="go">Analyze</button>
+      </div>
       <div id="load" class="hidden">Analyzing...</div>
       <div id="err" class="err hidden"></div>
     </main>

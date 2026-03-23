@@ -1,5 +1,5 @@
 /**
- * P10 Phase3 Step3 — shared auth + auto-save completed analysis to /records/ui-history.
+ * P10 Phase3 Step3 — auto-save completed analysis to /records/ui-history (logged-in only).
  */
 (function (global) {
   var SAVE_KEY_PREFIX = "rentalai_ui_saved_task_";
@@ -17,8 +17,12 @@
     var s = rawTaskState.input_summary;
     if (!s || typeof s !== "object") return "";
     if (s.listing_url) return String(s.listing_url);
-    if (s.target_postcode) return String(s.target_postcode);
-    return "";
+    var parts = [];
+    if (s.target_postcode) parts.push(String(s.target_postcode));
+    if (s.property_type) parts.push(String(s.property_type));
+    if (s.bedrooms) parts.push(String(s.bedrooms) + " bed");
+    if (s.budget != null && String(s.budget).trim()) parts.push("£" + String(s.budget));
+    return parts.length ? parts.join(" · ") : "";
   }
 
   function setSaveBanner(ok, text) {
@@ -57,6 +61,12 @@
       return;
     }
 
+    var Auth = global.RentalAIAuth;
+    if (!Auth || !Auth.isLoggedIn || !Auth.isLoggedIn()) {
+      setSaveBannerWarn("You are not logged in. Your analysis will not be saved.");
+      return;
+    }
+
     getToken()
       .then(function (token) {
         var body = {
@@ -82,7 +92,7 @@
       })
       .catch(function (e) {
         if (e && e.message === "not_logged_in") {
-          setSaveBannerWarn("Log in to save analysis to your history.");
+          setSaveBannerWarn("Login to save your analysis history");
           return;
         }
         setSaveBanner(false, "Failed to save analysis record");
