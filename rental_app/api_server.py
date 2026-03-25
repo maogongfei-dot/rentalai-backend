@@ -373,6 +373,38 @@ def analyze_batch(body: dict = Body(default_factory=dict)):
     return analyze_batch_request_body(body)
 
 
+@app.post("/api/ai-analyze")
+def api_ai_analyze(body: dict = Body(default_factory=dict)):
+    """
+    Phase1：自然语言 → 规则解析 → Module5 排序 → Top 房源。
+    请求体 JSON：`{ \"raw_user_query\": \"...\" }`（兼容顶层 `query`）。
+    """
+    from ai_recommendation_bridge import public_response_payload, run_ai_analyze
+
+    if not isinstance(body, dict):
+        body = {}
+    q = (body.get("raw_user_query") or body.get("query") or "").strip()
+    if not q:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": "empty_query",
+                "message": "raw_user_query is required",
+            },
+        )
+    try:
+        out = run_ai_analyze(q)
+        payload = public_response_payload(out)
+        return JSONResponse(content=payload)
+    except Exception as exc:
+        logger.exception("ai-analyze failed")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "server_error", "message": str(exc)},
+        )
+
+
 # ---------------------------------------------------------------------------
 # Async task endpoints (P9 Phase3 skeleton)
 # ---------------------------------------------------------------------------
@@ -1037,6 +1069,21 @@ def compare_listings(request: Request, body: CompareRequest):
             content={"error": "invalid_count", "message": "Send between 2 and 5 property objects."},
         )
     return {"comparison": _build_compare_result(props)}
+
+
+@app.get("/ai-result")
+def web_ai_result():
+    """Phase1 AI — 需求解析与推荐结果页（静态 HTML，数据由 sessionStorage 注入）。"""
+    page = _WEB_PUBLIC_DIR / "ai_result.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/ai_result.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
 
 
 @app.get("/")

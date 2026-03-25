@@ -15,8 +15,28 @@
       <span data-auth-nav class="auth-slot"></span>
     </nav>
     <main class="wrap wrap-wide">
+      <!-- Phase1 AI：首页一句话入口 → POST /api/ai-analyze → /ai-result -->
+      <section class="card form-card" aria-labelledby="ai-rental-heading">
+        <h1 id="ai-rental-heading" class="section-title">AI租房助手</h1>
+        <p class="hint">
+          用一句话描述你的租房需求，我来帮你分析房源、风险和性价比
+        </p>
+        <label class="field-label" for="ai-query">你的需求</label>
+        <textarea id="ai-query" name="ai_query" rows="4" placeholder="例如：Milton Keynes 一居室，月租 1200 以内…"></textarea>
+        <div class="actions-row">
+          <button type="button" id="ai-go">开始分析</button>
+        </div>
+        <p class="hint muted small-print">提示：Enter 提交 · Shift+Enter 换行</p>
+        <ul class="hint muted ai-examples" aria-label="示例">
+          <li>我想找 Milton Keynes 月租 1200 以内、通勤方便的一居室</li>
+          <li>我想租一个包 bill、离车站近、适合情侣住的房子</li>
+          <li>帮我看看这个房子值不值得租，预算 1500，最好安全一点</li>
+        </ul>
+        <div id="ai-err" class="err hidden" role="alert"></div>
+      </section>
+
       <header class="page-header">
-        <h1>Find a rental that fits your decision</h1>
+        <h2>Find a rental that fits your decision</h2>
         <p class="hint">
           Set your preferences, add a UK postcode or area (or a Rightmove / Zoopla search URL), then run the analysis.
         </p>
@@ -118,6 +138,7 @@
     <script src="/assets/auth_session.js"></script>
     <script src="/assets/history_shelf.js"></script>
     <script src="/assets/app.js"></script>
+    <script src="/assets/ai_home.js"></script>
     <script>
       document.getElementById("go").onclick = function () {
         window.RentalAIPhase3.startAnalyze();

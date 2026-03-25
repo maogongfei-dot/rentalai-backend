@@ -211,6 +211,29 @@ def _input_to_house(d: dict) -> dict | None:
     return house
 
 
+def listing_dict_to_engine_house(
+    listing_dict: dict,
+    *,
+    budget: float | None = None,
+    target_postcode: str | None = None,
+) -> dict | None:
+    """
+    标准 listing dict → module2 rank_houses 使用的 house（多房源排序 / AI 桥接）。
+    委托 normalize_listing_payload + to_analyze_payload + normalize_web_form_inputs + _input_to_house。
+    """
+    from data.normalizer.listing_normalizer import normalize_listing_payload, to_analyze_payload
+
+    if not isinstance(listing_dict, dict):
+        return None
+    try:
+        ls = normalize_listing_payload(listing_dict)
+        payload = to_analyze_payload(ls, budget=budget, target_postcode=target_postcode)
+        normalized = normalize_web_form_inputs(payload)
+        return _input_to_house(normalized)
+    except Exception:
+        return None
+
+
 if __name__ == "__main__":
     result = run_web_demo_analysis({
         "rent": 1200,
