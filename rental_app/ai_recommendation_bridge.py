@@ -217,11 +217,71 @@ def _build_houses_from_listings(
     return out
 
 
+def _build_explain_v2(house: dict) -> dict:
+    why_good = []
+    why_not = []
+    risks = []
+
+    rent = house.get("rent")
+    score = house.get("final_score")
+    commute = house.get("commute_minutes")
+    bills = house.get("bills")
+    bedrooms = house.get("bedrooms")
+
+    # 性价比
+    if score is not None:
+        if score >= 8:
+            why_good.append("整体性价比高")
+        elif score < 6:
+            why_not.append("综合评分较低")
+
+    # 租金
+    if rent is not None:
+        if rent <= 1200:
+            why_good.append("租金较低")
+        elif rent > 1800:
+            why_not.append("租金偏高")
+            risks.append("预算压力较大")
+
+    # 通勤
+    if commute is not None:
+        if commute <= 30:
+            why_good.append("通勤方便")
+        else:
+            why_not.append("通勤时间较长")
+
+    # bills
+    if bills is False:
+        risks.append("不包含bill，实际支出更高")
+
+    # 户型
+    if bedrooms is not None:
+        if bedrooms == 0:
+            risks.append("Studio空间较小")
+
+    explain = "，".join(why_good[:2] + why_not[:1]) if (why_good or why_not) else "综合表现一般"
+
+    return {
+        "explain": explain,
+        "why_good": why_good,
+        "why_not": why_not,
+        "risks": risks,
+    }
+
+
 def _simplify_recommendations(ranking_data: dict[str, Any]) -> list[dict[str, Any]]:
     houses = ranking_data.get("houses") or []
     rec: list[dict[str, Any]] = []
     for h in houses[:_TOP_N]:
         house = h.get("house") or {}
+        house = {
+            **house,
+            "final_score": h.get("final_score"),
+            "commute_minutes": house.get("commute_minutes")
+            if house.get("commute_minutes") is not None
+            else house.get("commute_mins"),
+        }
+        exp = _build_explain_v2(house)
         rec.append(
             {
                 "rank": h.get("rank"),
@@ -236,6 +296,10 @@ def _simplify_recommendations(ranking_data: dict[str, Any]) -> list[dict[str, An
                 "listing_id": house.get("listing_id"),
                 "source_url": house.get("source_url"),
                 "scores": h.get("scores") if isinstance(h.get("scores"), dict) else {},
+                "explain": exp["explain"],
+                "why_good": exp["why_good"],
+                "why_not": exp["why_not"],
+                "risks": exp["risks"],
             }
         )
     return rec
