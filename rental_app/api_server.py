@@ -1086,6 +1086,21 @@ def web_ai_result():
     return FileResponse(page)
 
 
+@app.get("/compare")
+def web_compare():
+    """Phase1 — 收藏房源对比页（静态 HTML；数据来自 localStorage + sessionStorage）。"""
+    page = _WEB_PUBLIC_DIR / "compare.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/compare.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
 @app.get("/")
 def web_phase3_home():
     """P10 Phase3 — minimal product homepage (static HTML)."""

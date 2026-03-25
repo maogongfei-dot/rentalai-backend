@@ -82,6 +82,9 @@
   if (recoEmpty) recoEmpty.classList.add("hidden");
 
   recos.forEach(function (r) {
+    var favs = JSON.parse(localStorage.getItem("fav_list") || "[]");
+    var isFav = favs.includes(String(r.listing_id || r.rank));
+    var btnText = isFav ? "✅ 已收藏" : "⭐ 收藏";
     var li = document.createElement("li");
     li.className = "reco-item card";
     var title = r.title || r.house_label || "房源";
@@ -126,7 +129,12 @@
       " · " +
       escapeHtml(loc) +
       (score ? "<br />" + escapeHtml(score) : "") +
-      explainHtml;
+      explainHtml +
+      "<br/><button class='fav-btn' data-id='" +
+      (r.listing_id || r.rank) +
+      "'>" +
+      btnText +
+      "</button>";
     if (r.source_url) {
       var a = document.createElement("a");
       a.href = r.source_url;
@@ -137,6 +145,20 @@
       li.appendChild(a);
     }
     recoList.appendChild(li);
+  });
+
+  document.addEventListener("click", function (e) {
+    if (e.target && e.target.classList.contains("fav-btn")) {
+      var id = e.target.getAttribute("data-id");
+
+      var favs = JSON.parse(localStorage.getItem("fav_list") || "[]");
+
+      if (!favs.includes(id)) {
+        favs.push(id);
+        localStorage.setItem("fav_list", JSON.stringify(favs));
+        e.target.innerText = "✅ 已收藏";
+      }
+    }
   });
 
   function escapeHtml(s) {

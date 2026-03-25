@@ -474,3 +474,15 @@ select {
   font-weight: bold;
   font-size: 0.9rem;
 }
+
+.fav-btn {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.compare-card {
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin: 10px 0;
+}
