@@ -241,7 +241,6 @@ def _build_explain_v2(house: dict) -> dict:
             why_good.append("租金较低")
         elif rent > 1800:
             why_not.append("租金偏高")
-            risks.append("预算压力较大")
 
     # 通勤
     if commute is not None:
@@ -252,12 +251,34 @@ def _build_explain_v2(house: dict) -> dict:
 
     # bills
     if bills is False:
-        risks.append("不包含bill，实际支出更高")
+        risks.append("不包bill，实际每月支出可能增加£200-£400")
 
     # 户型
     if bedrooms is not None:
         if bedrooms == 0:
             risks.append("Studio空间较小")
+
+    # 押金风险（简单模拟）
+    deposit = house.get("deposit")
+    if deposit is not None:
+        if rent is not None and deposit > rent * 5:
+            risks.append("押金偏高，注意是否合理")
+
+    # 租金压力
+    if rent is not None:
+        if rent > 1800:
+            risks.append("租金较高，长期负担较大")
+
+    # 区域风险（简单规则）
+    area = house.get("area")
+    if area:
+        if "unknown" in area.lower():
+            risks.append("区域信息不明确，建议实地查看")
+
+    # 通勤风险
+    if commute is not None:
+        if commute > 45:
+            risks.append("通勤时间较长，可能影响生活质量")
 
     explain = "，".join(why_good[:2] + why_not[:1]) if (why_good or why_not) else "综合表现一般"
 

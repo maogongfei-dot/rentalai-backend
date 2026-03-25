@@ -447,3 +447,24 @@ select {
 .actions-row {
   margin-top: 0.65rem;
 }
+
+.explain-main {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.explain-good {
+  color: #2e7d32;
+  font-size: 0.85rem;
+}
+
+.explain-bad {
+  color: #c62828;
+  font-size: 0.85rem;
+}
+
+.explain-risk {
+  color: #ed6c02;
+  font-size: 0.85rem;
+}

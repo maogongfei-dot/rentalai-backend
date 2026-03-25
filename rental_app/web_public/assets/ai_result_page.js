@@ -90,6 +90,19 @@
     var loc = [r.postcode, r.area].filter(Boolean).join(" · ") || "地区 —";
     var score =
       r.final_score != null ? "总分 " + Number(r.final_score).toFixed(1) : "";
+    var explainHtml = "";
+    if (r.explain) {
+      explainHtml += "<div class='explain-main'>" + escapeHtml(r.explain) + "</div>";
+    }
+    if (r.why_good && r.why_good.length) {
+      explainHtml += "<div class='explain-good'>👍 " + r.why_good.join("，") + "</div>";
+    }
+    if (r.why_not && r.why_not.length) {
+      explainHtml += "<div class='explain-bad'>❌ " + r.why_not.join("，") + "</div>";
+    }
+    if (r.risks && r.risks.length) {
+      explainHtml += "<div class='explain-risk'>⚠️ " + r.risks.join("，") + "</div>";
+    }
     li.innerHTML =
       "<strong>" +
       escapeHtml(title) +
@@ -99,7 +112,8 @@
       escapeHtml(beds) +
       " · " +
       escapeHtml(loc) +
-      (score ? "<br />" + escapeHtml(score) : "");
+      (score ? "<br />" + escapeHtml(score) : "") +
+      explainHtml;
     if (r.source_url) {
       var a = document.createElement("a");
       a.href = r.source_url;
