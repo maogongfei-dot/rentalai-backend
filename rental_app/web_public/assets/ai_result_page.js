@@ -103,6 +103,19 @@
     if (r.risks && r.risks.length) {
       explainHtml += "<div class='explain-risk'>⚠️ " + r.risks.join("，") + "</div>";
     }
+    if (r.decision) {
+      var label = "";
+      if (r.decision === "RECOMMENDED") label = "✅ 建议租";
+      else if (r.decision === "CAUTION") label = "⚠️ 谨慎";
+      else label = "❌ 不建议";
+
+      explainHtml +=
+        "<div class='decision'>" +
+        label +
+        "：" +
+        escapeHtml(r.decision_reason || "") +
+        "</div>";
+    }
     li.innerHTML =
       "<strong>" +
       escapeHtml(title) +

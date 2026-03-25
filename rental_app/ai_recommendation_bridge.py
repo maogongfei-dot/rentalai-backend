@@ -290,6 +290,27 @@ def _build_explain_v2(house: dict) -> dict:
     }
 
 
+def _build_decision(house: dict, explain_block: dict) -> dict:
+    score = house.get("final_score", 0)
+    risks = explain_block.get("risks", [])
+
+    # 基础规则
+    if score >= 8 and len(risks) <= 1:
+        decision = "RECOMMENDED"
+        reason = "整体表现优秀，风险较低，可以优先考虑"
+    elif score >= 6:
+        decision = "CAUTION"
+        reason = "整体还可以，但存在一些需要注意的点"
+    else:
+        decision = "NOT_RECOMMENDED"
+        reason = "评分较低或风险较多，不建议选择"
+
+    return {
+        "decision": decision,
+        "decision_reason": reason,
+    }
+
+
 def _simplify_recommendations(ranking_data: dict[str, Any]) -> list[dict[str, Any]]:
     houses = ranking_data.get("houses") or []
     rec: list[dict[str, Any]] = []
@@ -303,6 +324,7 @@ def _simplify_recommendations(ranking_data: dict[str, Any]) -> list[dict[str, An
             else house.get("commute_mins"),
         }
         exp = _build_explain_v2(house)
+        dec = _build_decision(house, exp)
         rec.append(
             {
                 "rank": h.get("rank"),
@@ -321,6 +343,8 @@ def _simplify_recommendations(ranking_data: dict[str, Any]) -> list[dict[str, An
                 "why_good": exp["why_good"],
                 "why_not": exp["why_not"],
                 "risks": exp["risks"],
+                "decision": dec["decision"],
+                "decision_reason": dec["decision_reason"],
             }
         )
     return rec

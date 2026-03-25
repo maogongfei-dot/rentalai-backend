@@ -468,3 +468,9 @@ select {
   color: #ed6c02;
   font-size: 0.85rem;
 }
+
+.decision {
+  margin-top: 6px;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
