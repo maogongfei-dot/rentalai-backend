@@ -279,6 +279,26 @@ def _extract_property_type(text: str, room_type: str | None) -> str | None:
     return None
 
 
+def _extract_exclusions(text: str) -> tuple[list[str], list[str], list[str]]:
+    """否定/排除：写入 excluded_*，供多轮 merge 与筛选（C4）。"""
+    ex_pt: list[str] = []
+    ex_rt: list[str] = []
+    ex_notes: list[str] = []
+    tl = text.lower()
+    if re.search(r"不要\s*studio|no\s*studio|exclude\s*studio|不要开间", tl):
+        ex_pt.append("studio")
+    if re.search(r"不要\s*flat|不要\s*apartment|不要公寓", tl):
+        ex_pt.append("flat")
+    if re.search(r"不要\s*house|不要独栋", tl):
+        ex_pt.append("house")
+    if re.search(r"不要\s*room|不要单间|不想合租|不要合租|no\s*room\b", tl):
+        ex_rt.append("room")
+        ex_notes.append("不想合租")
+    if re.search(r"不要太远|不想太远|别太远", tl):
+        ex_notes.append("不要太远")
+    return ex_pt, ex_rt, ex_notes
+
+
 def parse_user_query(raw: str) -> dict[str, Any]:
     """
     Query Parser v2：将用户一句需求解析为 structured_query；未识别则 None / False / []。
@@ -358,6 +378,9 @@ def parse_user_query(raw: str) -> dict[str, Any]:
     if budget_flexible and (budget_min is not None or budget_max is not None):
         notes_list.append("flexible budget")
 
+    ex_pt, ex_rt, ex_notes = _extract_exclusions(text)
+    notes_list.extend(ex_notes)
+
     return {
         "raw_user_query": raw_user_query,
         "city": city,
@@ -377,4 +400,7 @@ def parse_user_query(raw: str) -> dict[str, Any]:
         "quiet_priority": quiet_priority if quiet_priority else None,
         "property_type": property_type,
         "notes": notes_list,
+        "excluded_property_types": ex_pt,
+        "excluded_room_types": ex_rt,
+        "excluded_notes": ex_notes,
     }

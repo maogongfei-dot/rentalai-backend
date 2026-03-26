@@ -379,8 +379,13 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
     Phase1：自然语言 → 规则解析 → Module5 排序 → Top 房源。
     请求体 JSON：`{ \"raw_user_query\": \"...\" }`（兼容顶层 `query`）。
     Phase A5：可选 `dataset`: demo | realistic | multi_source（指定时以对应本地样本为主候选池）。
+    Phase C4：可选 `previous_structured_query`、`conversation_id` → 多轮 merge + 内存会话。
     """
-    from ai_recommendation_bridge import public_response_payload, run_ai_analyze
+    from ai_recommendation_bridge import (
+        public_response_payload,
+        run_ai_analyze,
+        run_ai_analyze_multiturn,
+    )
 
     if not isinstance(body, dict):
         body = {}
@@ -398,8 +403,22 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
     dataset = None
     if isinstance(ds, str) and ds.strip().lower() in ("demo", "realistic", "multi_source"):
         dataset = ds.strip().lower()
+    prev_sq = body.get("previous_structured_query")
+    conv_id = body.get("conversation_id")
+    use_multiturn = (
+        (isinstance(prev_sq, dict) and prev_sq)
+        or (isinstance(conv_id, str) and conv_id.strip())
+    )
     try:
-        out = run_ai_analyze(q, dataset=dataset)
+        if use_multiturn:
+            out = run_ai_analyze_multiturn(
+                q,
+                previous_structured_query=prev_sq if isinstance(prev_sq, dict) else None,
+                conversation_id=conv_id if isinstance(conv_id, str) else None,
+                dataset=dataset,
+            )
+        else:
+            out = run_ai_analyze(q, dataset=dataset)
         payload = public_response_payload(out)
         return JSONResponse(content=payload)
     except Exception as exc:

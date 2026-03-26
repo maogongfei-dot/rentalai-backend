@@ -13,10 +13,19 @@ from house_canonical import canonical_records_to_listing_rows, canonical_to_list
 from house_samples_loader import load_house_samples
 from house_source_adapters import clean_and_normalize_house_record
 from module2_scoring import get_area_from_postcode
+from rental_decision_v2 import build_decision_v2, build_top_decision_summary
 from rental_explain_v2 import (
     build_explain_v2,
     build_match_summary,
     build_recommendation_summary,
+)
+from rental_multiturn import (
+    CONVERSATION_STORE,
+    build_conversation_payload,
+    detect_followup_intent,
+    merge_structured_query,
+    update_conversation_store,
+    _ensure_conversation_id,
 )
 from rental_query_parser import parse_user_query
 from scoring_adapter import generate_ranking_api_response
@@ -169,6 +178,30 @@ def _passes_filters(row: dict[str, Any], sq: dict[str, Any], *, require_city: bo
         if city.lower() not in _blob(row):
             return False
 
+    if not _passes_exclusion_filters(row, sq):
+        return False
+
+    return True
+
+
+def _passes_exclusion_filters(row: dict[str, Any], sq: dict[str, Any]) -> bool:
+    """C4：排除 studio / room / flat 等（与 structured_query.excluded_* 对齐）。"""
+    ex_pt = [str(x).lower() for x in (sq.get("excluded_property_types") or [])]
+    ex_rt = [str(x).lower() for x in (sq.get("excluded_room_types") or [])]
+    if not ex_pt and not ex_rt:
+        return True
+    pt = (row.get("property_type") or "").lower()
+    blob = _blob(row)
+    if "studio" in ex_pt and ("studio" in pt or "studio" in blob):
+        return False
+    if "flat" in ex_pt and any(x in pt for x in ("flat", "apartment", "maisonette")):
+        return False
+    if "house" in ex_pt and "house" in pt:
+        return False
+    if "room" in ex_rt and (
+        "room" in pt or "share" in blob or "house share" in blob
+    ):
+        return False
     return True
 
 
@@ -399,9 +432,19 @@ def _simplify_recommendations(
             base_scores=scores,
             legacy_explain=exp,
         )
+        # Phase C3：综合核心匹配与风险层 → decision_v2；再生成 match_summary（与最终标签一致）
+        decision_v2 = build_decision_v2(
+            house,
+            structured_query,
+            ev2_core,
+            base_scores=scores,
+            risks=exp.get("risks"),
+            why_not=exp.get("why_not"),
+        )
+        label = decision_v2.get("decision_label") or dec["decision"]
         explain_v2 = {
             **ev2_core,
-            "match_summary": build_match_summary(ev2_core, dec["decision"]),
+            "match_summary": build_match_summary(ev2_core, label),
         }
         rec.append(
             {
@@ -431,9 +474,10 @@ def _simplify_recommendations(
                 "why_good": exp["why_good"],
                 "why_not": exp["why_not"],
                 "risks": exp["risks"],
-                "decision": dec["decision"],
-                "decision_reason": dec["decision_reason"],
+                "decision": label,
+                "decision_reason": decision_v2.get("decision_summary") or dec["decision_reason"],
                 "explain_v2": explain_v2,
+                "decision_v2": decision_v2,
             }
         )
     return rec
@@ -474,6 +518,7 @@ def _rank_from_pool(
     ranking_data = api_resp.get("data") or {}
     recommendations = _simplify_recommendations(ranking_data, structured)
     recommendation_summary = build_recommendation_summary(structured, recommendations)
+    top_decision_block = build_top_decision_summary(recommendations, structured)
 
     summ: dict[str, Any] = {
         "total_candidates": total_candidates,
@@ -493,21 +538,21 @@ def _rank_from_pool(
         "structured_query": structured,
         "recommendations": recommendations,
         "recommendation_summary": recommendation_summary,
+        "decision_summary": top_decision_block,
         "summary": summ,
         "_ranking_full": ranking_data,
     }
 
 
-def run_ai_analyze(
+def run_ai_analyze_with_structured(
     raw_user_query: str,
+    structured: dict[str, Any],
     dataset: str | None = None,
 ) -> dict[str, Any]:
     """
-    单入口：原始 query → 解析 → 候选房源 → generate_ranking_api_response。
-    Phase A5：dataset 为 demo|realistic|multi_source 时，候选池以对应本地样本为主（canonical 加载）；
-    未传 dataset 时保持原行为（SQLite + 可选 multisource 前置 + 合并 + 回退）。
+    已解析的 structured_query → 与 run_ai_analyze 相同候选池与排序（C4 多轮 merge 后复用）。
     """
-    structured = parse_user_query(raw_user_query)
+    structured = dict(structured) if structured else {}
 
     multisource_prepended = os.environ.get(
         "RENTALAI_AI_APPEND_MULTISOURCE_SAMPLES", "0"
@@ -573,6 +618,85 @@ def run_ai_analyze(
     )
 
 
+def run_ai_analyze(
+    raw_user_query: str,
+    dataset: str | None = None,
+) -> dict[str, Any]:
+    """
+    单入口：原始 query → 解析 → 候选房源 → generate_ranking_api_response。
+    Phase A5：dataset 为 demo|realistic|multi_source 时，候选池以对应本地样本为主（canonical 加载）；
+    未传 dataset 时保持原行为（SQLite + 可选 multisource 前置 + 合并 + 回退）。
+    """
+    return run_ai_analyze_with_structured(
+        raw_user_query,
+        parse_user_query(raw_user_query),
+        dataset=dataset,
+    )
+
+
+def run_ai_analyze_multiturn(
+    raw_user_query: str,
+    previous_structured_query: dict[str, Any] | None = None,
+    conversation_id: str | None = None,
+    dataset: str | None = None,
+) -> dict[str, Any]:
+    """
+    C4：多轮 — 解析当前句 → follow-up 意图 → merge → 推荐。
+    previous_structured_query 与 conversation_id 可组合；可从内存 store 恢复上一轮 merged_query。
+    """
+    current_sq = parse_user_query(raw_user_query)
+    followup = detect_followup_intent(raw_user_query)
+    intent = str(followup.get("intent") or "generic_followup")
+
+    prev = previous_structured_query if previous_structured_query else None
+    if prev is None and conversation_id:
+        cid = _ensure_conversation_id(conversation_id)
+        st = CONVERSATION_STORE.get(cid)
+        if st and isinstance(st.get("merged_query"), dict):
+            prev = deepcopy(st["merged_query"])
+
+    # single_turn vs multi_turn：有上下文合并，或「重新来」且存在上一轮
+    if intent == "restart_search":
+        merged_sq = deepcopy(current_sq)
+        turn_mode = "multi_turn" if prev is not None else "single_turn"
+    elif prev is not None:
+        merged_sq = merge_structured_query(prev, current_sq)
+        turn_mode = "multi_turn"
+    else:
+        merged_sq = deepcopy(current_sq)
+        turn_mode = "single_turn"
+
+    base = run_ai_analyze_with_structured(raw_user_query, merged_sq, dataset=dataset)
+
+    # 多轮入口每次写入内存 store，保证首轮也能返回 conversation_id 供下一轮只带 id 调用
+    cid_out = _ensure_conversation_id(conversation_id)
+    turn_idx, history = update_conversation_store(
+        cid_out,
+        raw_user_query=raw_user_query,
+        structured_query=current_sq,
+        merged_query=merged_sq,
+    )
+
+    conversation = build_conversation_payload(
+        conversation_id=cid_out,
+        turn_index=turn_idx,
+        history=history,
+        current_structured_query=current_sq,
+        merged_query=merged_sq,
+    )
+
+    out = dict(base)
+    out["current_structured_query"] = current_sq
+    out["merged_query"] = merged_sq
+    out["followup_intent"] = followup
+    out["turn_mode"] = turn_mode
+    out["conversation_id"] = cid_out
+    out["conversation"] = conversation
+    out["structured_query"] = merged_sq
+    out["raw_user_query"] = raw_user_query.strip()
+    return out
+
+
 def run_ai_analyze_with_records(
     raw_user_query: str,
     records: list[dict[str, Any]],
@@ -629,12 +753,24 @@ def run_ai_analyze_with_records(
 
 def public_response_payload(result: dict[str, Any]) -> dict[str, Any]:
     """去掉内部大字段，仅返回前端与契约需要的键。"""
-    return {
+    payload: dict[str, Any] = {
         "success": result.get("success"),
         "message": result.get("message"),
         "raw_user_query": result.get("raw_user_query"),
         "structured_query": result.get("structured_query"),
         "recommendations": result.get("recommendations"),
         "recommendation_summary": result.get("recommendation_summary"),
+        "decision_summary": result.get("decision_summary"),
         "summary": result.get("summary"),
     }
+    # C4 多轮：单轮 analyze 无这些键时为 None
+    for k in (
+        "current_structured_query",
+        "merged_query",
+        "followup_intent",
+        "turn_mode",
+        "conversation_id",
+        "conversation",
+    ):
+        payload[k] = result.get(k)
+    return payload
