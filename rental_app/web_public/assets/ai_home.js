@@ -26,7 +26,11 @@
     }
     clearErr();
     btn.disabled = true;
-    fetch("/api/ai-analyze", {
+    var apiBase =
+      typeof window.RENTALAI_API_BASE === "string"
+        ? window.RENTALAI_API_BASE.replace(/\/$/, "")
+        : "";
+    fetch(apiBase + "/api/ai-analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ raw_user_query: q }),

@@ -1133,7 +1133,7 @@ def web_phase3_result(task_id: str):
 
 @app.get("/history")
 def web_phase3_history():
-    """P10 Phase3 Step3 — saved analysis history (static HTML)."""
+    """分析历史列表（localStorage analysis_history，静态 history.html）。"""
     page = _WEB_PUBLIC_DIR / "history.html"
     if not page.is_file():
         return JSONResponse(
@@ -1141,6 +1141,21 @@ def web_phase3_history():
             content={
                 "error": "web_public_missing",
                 "message": "Phase3 UI not found. Expected web_public/history.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
+@app.get("/history-detail")
+def web_history_detail():
+    """分析历史单条详情（sessionStorage history_current，静态 history_detail.html）。"""
+    page = _WEB_PUBLIC_DIR / "history_detail.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/history_detail.html beside api_server.py.",
             },
         )
     return FileResponse(page)

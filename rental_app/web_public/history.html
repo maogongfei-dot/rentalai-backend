@@ -1,48 +1,21 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hans">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Analysis history — RentalAI</title>
+    <title>分析历史记录 · RentalAI</title>
     <link rel="stylesheet" href="/assets/style.css" />
   </head>
   <body>
-    <nav class="top-nav" aria-label="Main">
-      <a href="/">Home</a>
-      <span class="nav-sep">·</span>
-      <a href="/history" aria-current="page">History</a>
-      <span class="nav-sep">·</span>
-      <span data-auth-nav class="auth-slot"></span>
-    </nav>
-    <main class="wrap result-wrap">
-      <h1 class="section-title">Your analysis history</h1>
-      <p class="muted">Recent runs saved from the result page. Open a row to see full details.</p>
-
-      <p id="history-loading" class="muted">Loading…</p>
-      <p id="history-error" class="err hidden" role="alert"></p>
-      <p id="history-empty" class="muted hidden">No analysis history yet.</p>
-
-      <div class="history-table-wrap">
-        <table class="history-table" aria-label="Saved analyses">
-          <thead>
-            <tr>
-              <th scope="col">When</th>
-              <th scope="col">Input</th>
-              <th scope="col">Title</th>
-              <th scope="col">Score</th>
-              <th scope="col">Verdict</th>
-              <th scope="col">Detail</th>
-            </tr>
-          </thead>
-          <tbody id="history-tbody"></tbody>
-        </table>
-      </div>
+    <script src="/assets/auth_local.js"></script>
+    <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
+    <main class="wrap wrap-wide result-wrap">
+      <p class="back-link"><a href="/ai-result">← 结果页</a> · <a href="/">首页</a></p>
+      <header class="page-header">
+        <h1>分析历史记录</h1>
+      </header>
+      <div id="history-list"></div>
     </main>
-    <script src="/assets/auth_session.js"></script>
-    <script src="/assets/history_shelf.js"></script>
-    <script src="/assets/history_page.js"></script>
-    <script>
-      window.RentalAIHistoryPage.loadHistory();
-    </script>
+    <script src="/assets/history_local_page.js"></script>
   </body>
 </html>

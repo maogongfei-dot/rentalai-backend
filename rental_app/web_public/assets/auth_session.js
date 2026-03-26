@@ -96,6 +96,9 @@
   function guardHistoryLinks() {
     document.querySelectorAll('a[href="/history"]').forEach(function (a) {
       a.addEventListener("click", function (ev) {
+        try {
+          if (localStorage.getItem("current_user")) return;
+        } catch (e) {}
         if (!isLoggedIn()) {
           ev.preventDefault();
           window.alert("Login to save your analysis history");

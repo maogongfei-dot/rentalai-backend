@@ -1,47 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hans">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Log in — RentalAI</title>
+    <title>登录 RentalAI</title>
     <link rel="stylesheet" href="/assets/style.css" />
   </head>
   <body>
     <nav class="top-nav" aria-label="Main">
-      <a href="/">Home</a>
-      <span class="nav-sep">·</span>
-      <a href="/register">Register</a>
+      <span class="hint">RentalAI</span>
     </nav>
     <main class="wrap narrow-wrap">
-      <h1 class="section-title">Log in</h1>
-      <p class="muted">Use your account to save analysis history and open saved runs.</p>
+      <h1 class="section-title">登录 RentalAI</h1>
+      <p class="hint">本地演示账号，无需密码。</p>
 
-      <form id="login-form" class="card auth-form" autocomplete="on">
-        <label class="field-label" for="login-email">Email</label>
+      <div class="card form-card">
+        <label class="field-label" for="local-login-input">用户名或邮箱</label>
         <input
-          id="login-email"
-          name="email"
-          type="email"
-          required
+          id="local-login-input"
+          type="text"
           autocomplete="username"
+          placeholder="例如：Alex 或 alex@example.com"
         />
-
-        <label class="field-label" for="login-password">Password</label>
-        <input
-          id="login-password"
-          name="password"
-          type="password"
-          required
-          autocomplete="current-password"
-        />
-
-        <button type="submit" class="auth-submit">Login</button>
-      </form>
-
-      <p id="login-err" class="err hidden" role="alert"></p>
-      <p class="muted"><a href="/register">Create an account</a></p>
+        <div class="actions-row">
+          <button type="button" id="local-login-go">进入我的租房助手</button>
+        </div>
+      </div>
     </main>
-    <script src="/assets/auth_session.js"></script>
-    <script src="/assets/login_page.js"></script>
+    <script src="/assets/login_local_page.js"></script>
   </body>
 </html>

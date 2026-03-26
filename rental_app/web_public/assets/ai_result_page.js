@@ -2,6 +2,13 @@
  * Phase1 AI 结果页：从 sessionStorage 读取 /api/ai-analyze 响应并渲染
  */
 (function () {
+  function favStorageKey() {
+    if (window.RentalAILocalAuth && window.RentalAILocalAuth.favStorageKey) {
+      return window.RentalAILocalAuth.favStorageKey();
+    }
+    return "fav_list";
+  }
+
   var KEY = "ai_analyze_last";
   var LABELS = {
     raw_user_query: "原始输入",
@@ -40,6 +47,57 @@
   var recoList = document.getElementById("reco-list");
   var recoEmpty = document.getElementById("reco-empty");
   var summaryLine = document.getElementById("summary-line");
+
+  // History v1：保存本次分析 → analysis_history，并写入 user_id / display_name（尽早注册点击）
+  (function registerAnalysisHistorySave() {
+    var saveBtn = document.querySelector(".save-analysis-btn");
+    if (!saveBtn) return;
+    saveBtn.addEventListener("click", function () {
+      var rawSave = sessionStorage.getItem(KEY);
+      if (!rawSave) {
+        alert("暂无分析数据");
+        return;
+      }
+      var parsed;
+      try {
+        parsed = JSON.parse(rawSave);
+      } catch (err) {
+        alert("暂无分析数据");
+        return;
+      }
+      if (!parsed || !parsed.success) {
+        alert("暂无分析数据");
+        return;
+      }
+      var cu =
+        window.RentalAILocalAuth && window.RentalAILocalAuth.getUser
+          ? window.RentalAILocalAuth.getUser()
+          : null;
+      if (!cu || !cu.user_id) {
+        alert("请先登录");
+        return;
+      }
+      var list = [];
+      try {
+        list = JSON.parse(localStorage.getItem("analysis_history") || "[]");
+      } catch (e) {
+        list = [];
+      }
+      if (!Array.isArray(list)) list = [];
+      var entry = {
+        id: String(Date.now()),
+        user_id: cu.user_id,
+        display_name: cu.display_name || "",
+        saved_at: new Date().toISOString(),
+        raw_user_query: parsed.raw_user_query,
+        structured_query: parsed.structured_query || {},
+        recommendations: parsed.recommendations || [],
+      };
+      list.push(entry);
+      localStorage.setItem("analysis_history", JSON.stringify(list));
+      alert("已保存到历史记录");
+    });
+  })();
 
   if (!data || !data.success) {
     if (rawEl) rawEl.textContent = "未找到分析结果，请从首页重新提交。";
@@ -82,7 +140,7 @@
   if (recoEmpty) recoEmpty.classList.add("hidden");
 
   recos.forEach(function (r) {
-    var favs = JSON.parse(localStorage.getItem("fav_list") || "[]");
+    var favs = JSON.parse(localStorage.getItem(favStorageKey()) || "[]");
     var isFav = favs.includes(String(r.listing_id || r.rank));
     var btnText = isFav ? "✅ 已收藏" : "⭐ 收藏";
     var li = document.createElement("li");
@@ -151,11 +209,11 @@
     if (e.target && e.target.classList.contains("fav-btn")) {
       var id = e.target.getAttribute("data-id");
 
-      var favs = JSON.parse(localStorage.getItem("fav_list") || "[]");
+      var favs = JSON.parse(localStorage.getItem(favStorageKey()) || "[]");
 
       if (!favs.includes(id)) {
         favs.push(id);
-        localStorage.setItem("fav_list", JSON.stringify(favs));
+        localStorage.setItem(favStorageKey(), JSON.stringify(favs));
         e.target.innerText = "✅ 已收藏";
       }
     }

@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/ai-result", "destination": "/ai_result.html" },
+    { "source": "/compare", "destination": "/compare.html" },
+    { "source": "/history", "destination": "/history.html" },
+    { "source": "/history-detail", "destination": "/history_detail.html" },
+    { "source": "/register", "destination": "/register.html" },
+    { "source": "/result/:path*", "destination": "/result.html" }
+  ]
+}

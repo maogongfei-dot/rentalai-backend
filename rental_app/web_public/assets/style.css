@@ -486,3 +486,68 @@ select {
   padding: 10px;
   margin: 10px 0;
 }
+
+.history-actions {
+  margin-top: 0.35rem;
+  margin-bottom: 0.65rem;
+}
+
+.history-card {
+  margin: 10px 0;
+}
+
+.local-user-name {
+  font-size: 0.9rem;
+}
+
+.local-logout-btn {
+  font: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+}
+
+.demo-unified-nav {
+  flex-wrap: wrap;
+  row-gap: 0.25rem;
+}
+
+.result-actions {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.home-quick-links {
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+}
+
+.demo-how-to {
+  margin-top: 0.75rem;
+}
+
+.demo-how-to-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.demo-clear-zone {
+  margin-top: 1.25rem;
+  text-align: center;
+}
+
+.demo-clear-btn {
+  font-size: 0.8rem;
+  color: #666;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0.35rem 0.55rem;
+}

@@ -1,32 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hans">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>RentalAI</title>
+    <!-- 部署到 Vercel 且 API 在 Render 时：填写后端根地址，无尾部斜杠，例如 https://xxx.onrender.com -->
+    <meta name="rentalai-api-base" content="" />
+    <title>RentalAI · AI 租房助手</title>
     <link rel="stylesheet" href="/assets/style.css" />
   </head>
   <body>
-    <nav class="top-nav" aria-label="Main">
-      <a href="/">Home</a>
-      <span class="nav-sep">·</span>
-      <a href="/history">History</a>
-      <span class="nav-sep">·</span>
-      <span data-auth-nav class="auth-slot"></span>
-    </nav>
+    <script src="/assets/auth_local.js"></script>
+    <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
+
     <main class="wrap wrap-wide">
-      <!-- Phase1 AI：首页一句话入口 → POST /api/ai-analyze → /ai-result -->
+      <!-- Phase1：主入口 — 一句话需求 → /api/ai-analyze → /ai-result -->
       <section class="card form-card" aria-labelledby="ai-rental-heading">
-        <h1 id="ai-rental-heading" class="section-title">AI租房助手</h1>
-        <p class="hint">
-          用一句话描述你的租房需求，我来帮你分析房源、风险和性价比
-        </p>
+        <h1 id="ai-rental-heading" class="section-title">AI 租房助手</h1>
+        <p class="hint">用一句话描述需求，查看推荐、风险与决策建议。</p>
         <label class="field-label" for="ai-query">你的需求</label>
-        <textarea id="ai-query" name="ai_query" rows="4" placeholder="例如：Milton Keynes 一居室，月租 1200 以内…"></textarea>
+        <textarea
+          id="ai-query"
+          name="ai_query"
+          rows="4"
+          placeholder="例如：Milton Keynes 一居室，月租 1200 以内…"
+        ></textarea>
         <div class="actions-row">
           <button type="button" id="ai-go">开始分析</button>
         </div>
         <p class="hint muted small-print">提示：Enter 提交 · Shift+Enter 换行</p>
+        <p class="home-quick-links">
+          <a href="/history">去历史记录</a>
+          <span class="nav-sep">·</span>
+          <a href="/compare">去房源对比</a>
+        </p>
         <ul class="hint muted ai-examples" aria-label="示例">
           <li>我想找 Milton Keynes 月租 1200 以内、通勤方便的一居室</li>
           <li>我想租一个包 bill、离车站近、适合情侣住的房子</li>
@@ -35,18 +41,23 @@
         <div id="ai-err" class="err hidden" role="alert"></div>
       </section>
 
-      <header class="page-header">
-        <h2>Find a rental that fits your decision</h2>
-        <p class="hint">
-          Set your preferences, add a UK postcode or area (or a Rightmove / Zoopla search URL), then run the analysis.
-        </p>
-        <p id="home-guest-notice" class="hint muted guest-banner hidden" role="status">
-          You are not logged in. Your analysis will not be saved.
-        </p>
-      </header>
+      <!-- 如何使用（静态说明区） -->
+      <section class="card demo-how-to" aria-labelledby="how-to-heading">
+        <h2 id="how-to-heading" class="section-title">如何使用</h2>
+        <ol class="hint demo-how-to-list">
+          <li>输入一句租房需求</li>
+          <li>查看推荐结果和风险提示</li>
+          <li>收藏想要的房源</li>
+          <li>去历史记录和对比页继续决策</li>
+        </ol>
+      </section>
 
-      <section class="card form-card" aria-labelledby="prefs-heading">
-        <h2 id="prefs-heading" class="section-title">Your search</h2>
+      <!-- Phase3 表单搜索：折叠，避免与 Demo 主流程抢视线 -->
+      <details class="card form-card">
+        <summary class="section-title">扩展示例：Phase3 表单搜索（可选）</summary>
+        <p class="hint muted">
+          使用下方表单与「Analyze」可走原有 Phase3 分析流程（与上方 AI 一句话入口不同）。
+        </p>
 
         <div class="form-section">
           <h3 class="form-section-title">Property</h3>
@@ -123,21 +134,24 @@
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
-          <p class="hint muted small-print">
-            Safety is a personal judgement — we surface a reminder when you pick “high”; always verify independently.
-          </p>
         </div>
-      </section>
 
-      <div class="actions-row">
-        <button type="button" id="go">Analyze</button>
-      </div>
-      <div id="load" class="hidden">Analyzing...</div>
-      <div id="err" class="err hidden"></div>
+        <div class="actions-row">
+          <button type="button" id="go">Analyze</button>
+        </div>
+        <div id="load" class="hidden">Analyzing...</div>
+        <div id="err" class="err hidden"></div>
+      </details>
+
+      <!-- 本地 Demo：清空测试数据（仅开发演示） -->
+      <p class="demo-clear-zone">
+        <button type="button" id="demo-clear-storage-btn" class="demo-clear-btn">清空本地测试数据</button>
+      </p>
     </main>
     <script src="/assets/auth_session.js"></script>
     <script src="/assets/history_shelf.js"></script>
     <script src="/assets/app.js"></script>
+    <script src="/assets/api_config.js"></script>
     <script src="/assets/ai_home.js"></script>
     <script>
       document.getElementById("go").onclick = function () {

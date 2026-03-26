@@ -1,5 +1,10 @@
 (function () {
-  var favs = JSON.parse(localStorage.getItem("fav_list") || "[]");
+  // 收藏：按当前用户读取 fav_list_{user_id}
+  var favKey =
+    window.RentalAILocalAuth && window.RentalAILocalAuth.favStorageKey
+      ? window.RentalAILocalAuth.favStorageKey()
+      : "fav_list";
+  var favs = JSON.parse(localStorage.getItem(favKey) || "[]");
 
   var raw = sessionStorage.getItem("ai_analyze_last");
   var data;

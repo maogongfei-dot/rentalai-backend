@@ -1,5 +1,8 @@
 # Render Blueprint — RentalAI（Phase5：公网部署）
 #
+# 若静态 UI 部署在 Vercel、仅本仓库作 API：可只部署 rentalai-api；前端在 index.html 配置
+# rentalai-api-base 指向本服务公网 URL（见 rental_app/DEPLOYMENT_PLAN.md）。
+#
 # 仓库根为 python_learning、代码在 rental_app/ 时保持 rootDir: rental_app。
 # 若 Git 仓库根就是 rental_app/，请删除两个服务下的 rootDir 字段。
 #
