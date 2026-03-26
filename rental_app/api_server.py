@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import Body, FastAPI, File, Request, UploadFile
+from fastapi import Body, FastAPI, File, Form, Request, UploadFile
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -560,6 +560,85 @@ async def api_contract_analyze_pdf(file: UploadFile | None = File(None)):
             "analysis": analysis,
         },
     }
+
+
+_HOUSE_IMPORT_MAX_BYTES = max(1, int(os.environ.get("RENTALAI_HOUSE_IMPORT_MAX_BYTES", str(5 * 1024 * 1024))))
+
+
+@app.post("/api/houses/import")
+async def api_houses_import(
+    file: UploadFile | None = File(None),
+    source: str = Form("generic"),
+):
+    """
+    Phase A4：multipart 字段 file（.json / .csv）+ 可选 source → 解析 → clean_and_normalize → 摘要与预览（不落库）。
+    """
+    from house_import_service import import_house_records
+
+    if file is None or not (file.filename or "").strip():
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "no_file",
+                "message": "multipart field 'file' with a .json or .csv is required",
+            },
+        )
+
+    filename = (file.filename or "").strip()
+    ext = Path(filename).suffix.lower()
+    if ext not in (".json", ".csv"):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "unsupported_file_type",
+                "message": "only .json and .csv files are accepted",
+            },
+        )
+
+    try:
+        raw = await file.read()
+    except Exception as exc:
+        logger.exception("houses import read failed")
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "error": "read_failed", "message": str(exc)},
+        )
+
+    if not raw:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "empty_upload",
+                "message": "uploaded file is empty",
+            },
+        )
+
+    if len(raw) > _HOUSE_IMPORT_MAX_BYTES:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "file_too_large",
+                "message": "file exceeds maximum size (%s bytes)" % _HOUSE_IMPORT_MAX_BYTES,
+            },
+        )
+
+    src = (source or "generic").strip() or "generic"
+    out = import_house_records(raw, filename=filename, source=src)
+    if not out.get("ok"):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": out.get("error", "import_failed"),
+                "message": out.get("message", "import failed"),
+            },
+        )
+
+    return {"ok": True, "result": out["result"]}
 
 
 # ---------------------------------------------------------------------------

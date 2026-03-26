@@ -2,15 +2,15 @@
 from __future__ import annotations
 
 import io
-import json
 import os
 import sys
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 from data.storage.listing_storage import export_listings_as_dicts
-from house_canonical import canonical_to_listing_row, normalize_house_record
+from house_canonical import canonical_to_listing_row
+from house_samples_loader import load_house_samples
+from house_source_adapters import clean_and_normalize_house_record
 from module2_scoring import get_area_from_postcode
 from rental_query_parser import parse_user_query
 from scoring_adapter import generate_ranking_api_response
@@ -23,31 +23,43 @@ _MAX_POOL = 80
 
 def _normalize_pool(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
-    Phase A1：进入过滤与排序前统一走 canonical → 引擎兼容扁平 dict。
+    Phase A1/A3：先按 source 清洗（clean_*）再 canonical → 引擎兼容扁平 dict。
     """
     out: list[dict[str, Any]] = []
     for r in rows:
         if not isinstance(r, dict):
             continue
         src = str(r.get("source") or "unknown")
-        canon = normalize_house_record(r, source=src)
+        canon = clean_and_normalize_house_record(r, source=src)
         out.append(canonical_to_listing_row(canon))
     return out
 
 
-def _demo_listings_path() -> Path:
-    return Path(__file__).resolve().parent / "data" / "ai_demo_listings.json"
+def _maybe_prepend_multisource(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Phase A3：设 RENTALAI_AI_APPEND_MULTISOURCE_SAMPLES=1 时在主库前插入多来源原始样本（再走 _normalize_pool）。"""
+    if os.environ.get("RENTALAI_AI_APPEND_MULTISOURCE_SAMPLES", "0").lower() not in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return rows
+    from house_samples_loader import load_multi_source_house_samples_raw
+
+    return load_multi_source_house_samples_raw() + rows
+
+
+def _use_realistic_samples() -> bool:
+    """推荐链路切换点：默认启用 Phase A2 realistic 样本；设 RENTALAI_AI_USE_REALISTIC_SAMPLES=0 则回退为仅 demo。"""
+    return os.environ.get("RENTALAI_AI_USE_REALISTIC_SAMPLES", "1").lower() not in (
+        "0",
+        "false",
+        "no",
+    )
 
 
 def _load_demo_listings() -> list[dict[str, Any]]:
-    p = _demo_listings_path()
-    if not p.is_file():
-        return []
-    try:
-        raw = json.loads(p.read_text(encoding="utf-8"))
-        return [x for x in raw if isinstance(x, dict)]
-    except (OSError, json.JSONDecodeError):
-        return []
+    """兼容旧名：等价于 load_house_samples('demo')。"""
+    return load_house_samples("demo")
 
 
 def _blob(row: dict[str, Any]) -> str:
@@ -167,8 +179,11 @@ def _filter_pool(rows: list[dict[str, Any]], sq: dict[str, Any]) -> tuple[list[d
     return any_rent, True
 
 
-def _merge_demo_for_city(pool: list[dict[str, Any]], sq: dict[str, Any]) -> list[dict[str, Any]]:
-    """主库无匹配城市时，合并 ai_demo_listings 中同城样本（去重）。"""
+def _merge_auxiliary_for_city(pool: list[dict[str, Any]], sq: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    主库无匹配城市时，先合并 realistic_house_samples（Phase A2），再合并原 demo（去重）。
+    realistic 样本数据入口见 house_samples_loader.load_house_samples('realistic')。
+    """
     city = (sq.get("city") or "").strip().lower()
     if not city:
         return pool
@@ -176,14 +191,21 @@ def _merge_demo_for_city(pool: list[dict[str, Any]], sq: dict[str, Any]) -> list
         return pool
     seen = {str(r.get("listing_id")) for r in pool if r.get("listing_id")}
     extra: list[dict[str, Any]] = []
-    for r in _normalize_pool(_load_demo_listings()):
-        lid = r.get("listing_id")
-        if lid and str(lid) in seen:
-            continue
-        if city in _blob(r):
-            extra.append(r)
-            if lid:
-                seen.add(str(lid))
+
+    batches: list[list[dict[str, Any]]] = []
+    if _use_realistic_samples():
+        batches.append(load_house_samples("realistic"))
+    batches.append(load_house_samples("demo"))
+
+    for batch in batches:
+        for r in _normalize_pool(batch):
+            lid = r.get("listing_id")
+            if lid and str(lid) in seen:
+                continue
+            if city in _blob(r):
+                extra.append(r)
+                if lid:
+                    seen.add(str(lid))
     return pool + extra
 
 
@@ -369,23 +391,44 @@ def run_ai_analyze(raw_user_query: str) -> dict[str, Any]:
     """
     单入口：原始 query → 解析 → 候选房源 → generate_ranking_api_response。
     返回统一 JSON（供 /api/ai-analyze 与前端使用）。
+    Phase A2：主库为空时优先使用 realistic_house_samples，再回退 ai_demo_listings；均先 _normalize_pool。
     """
     structured = parse_user_query(raw_user_query)
 
-    main_rows = _normalize_pool(export_listings_as_dicts())
-    pool, relaxed_city = _filter_pool(main_rows, structured)
-    pool = _merge_demo_for_city(pool, structured)
+    multisource_prepended = os.environ.get(
+        "RENTALAI_AI_APPEND_MULTISOURCE_SAMPLES", "0"
+    ).lower() in ("1", "true", "yes")
+    main_rows = _normalize_pool(_maybe_prepend_multisource(export_listings_as_dicts()))
+    filtered_main, relaxed_city = _filter_pool(main_rows, structured)
+    pool = _merge_auxiliary_for_city(filtered_main, structured)
 
+    if filtered_main:
+        sample_source = "main"
+    elif pool:
+        sample_source = "auxiliary_merge"
+    else:
+        sample_source = None
     used_demo = False
+
+    if not pool and _use_realistic_samples():
+        realistic = _normalize_pool(load_house_samples("realistic"))
+        pool, relaxed_city = _filter_pool(realistic, structured)
+        if pool:
+            sample_source = "realistic"
+
     if not pool:
-        demo = _normalize_pool(_load_demo_listings())
+        demo = _normalize_pool(load_house_samples("demo"))
         pool, relaxed_city = _filter_pool(demo, structured)
-        used_demo = bool(pool)
+        if pool:
+            sample_source = "demo"
+            used_demo = True
 
     if not pool:
         # 最简兜底：demo 全量（仅租金有效）
-        pool = [r for r in _normalize_pool(_load_demo_listings()) if r.get("rent_pcm") is not None]
-        used_demo = bool(pool)
+        pool = [r for r in _normalize_pool(load_house_samples("demo")) if r.get("rent_pcm") is not None]
+        if pool:
+            sample_source = "demo_rent_only"
+            used_demo = True
 
     want_pt = structured.get("property_type")
     if want_pt:
@@ -420,6 +463,8 @@ def run_ai_analyze(raw_user_query: str) -> dict[str, Any]:
             "total_candidates": total_candidates,
             "top_count": len(recommendations),
             "used_demo_listings": used_demo,
+            "sample_source": sample_source or "unknown",
+            "multisource_samples_prepended": multisource_prepended,
             "city_filter_relaxed": relaxed_city,
         },
         "_ranking_full": ranking_data,

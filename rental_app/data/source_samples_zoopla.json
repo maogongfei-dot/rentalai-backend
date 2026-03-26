@@ -1,0 +1,63 @@
+[
+  {
+    "source": "zoopla_style",
+    "listing_id": "zp-sim-2001",
+    "listing_url": "https://example-zoopla.test/listings/2001",
+    "price": 1180,
+    "num_bedrooms": 2,
+    "num_bathrooms": 1,
+    "address": "Bletchley, Milton Keynes MK3",
+    "description": "Spacious 2 bed near Bletchley station",
+    "category": "Flat",
+    "listingUrn": "urn:zoopla:2001",
+    "postcode": "MK3 5DU",
+    "city": "Milton Keynes",
+    "furnished_state": "furnished",
+    "featured": false
+  },
+  {
+    "source": "zoopla_style",
+    "listing_id": "zp-sim-2002",
+    "listing_url": "https://example-zoopla.test/listings/2002",
+    "price": 795,
+    "num_bedrooms": 1,
+    "num_bathrooms": 1,
+    "address": "Camden High Street, London NW1",
+    "description": "Double room in shared house",
+    "category": "Room",
+    "postcode": "NW1 8NH",
+    "city": "London",
+    "furnished_state": "furnished",
+    "featured": true
+  },
+  {
+    "source": "zoopla_style",
+    "listing_id": "zp-sim-2003",
+    "listing_url": "https://example-zoopla.test/listings/2003",
+    "price": 850,
+    "num_bedrooms": 0,
+    "num_bathrooms": 1,
+    "address": "Ancoats, Manchester M4",
+    "description": "Budget studio",
+    "category": "Studio",
+    "postcode": "M4 5BU",
+    "city": "Manchester",
+    "furnished_state": "part furnished",
+    "featured": false
+  },
+  {
+    "source": "zoopla_style",
+    "listing_id": "zp-sim-2004",
+    "listing_url": "https://example-zoopla.test/listings/2004",
+    "price": 1050,
+    "num_bedrooms": 2,
+    "num_bathrooms": 1,
+    "address": "Digbeth, Birmingham B5",
+    "description": "2 bed in creative quarter",
+    "category": "Apartment",
+    "postcode": "B5 5SR",
+    "city": "Birmingham",
+    "furnished_state": "unfurnished",
+    "featured": false
+  }
+]

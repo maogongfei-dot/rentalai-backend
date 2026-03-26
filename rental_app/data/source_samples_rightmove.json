@@ -1,0 +1,57 @@
+[
+  {
+    "source": "rightmove_style",
+    "id": "rm-sim-1001",
+    "property_url": "https://example-rightmove.test/property/1001",
+    "price_pcm": 1125,
+    "display_address": "Midsummer Boulevard, Milton Keynes MK9",
+    "property_sub_type": "Flat",
+    "bedrooms": 1,
+    "bathrooms": 1,
+    "summary": "Modern 1 bed flat in central MK",
+    "letting_type": "Long term",
+    "furnished_type": "Furnished",
+    "postcode": "MK9 3GB",
+    "location": { "city": "Milton Keynes", "postcode": "MK9 3GB" }
+  },
+  {
+    "source": "rightmove_style",
+    "id": "rm-sim-1002",
+    "property_url": "https://example-rightmove.test/property/1002",
+    "price_pcm": 1380,
+    "display_address": "Commercial Street, London E1",
+    "property_sub_type": "Studio",
+    "bedrooms": 0,
+    "bathrooms": 1,
+    "summary": "Studio near Shoreditch",
+    "furnished_type": "Part furnished",
+    "postcode": "E1 6LS"
+  },
+  {
+    "source": "rightmove_style",
+    "id": "rm-sim-1003",
+    "property_url": "https://example-rightmove.test/property/1003",
+    "price_pcm": 1295,
+    "display_address": "Portland Street, Manchester M1",
+    "property_sub_type": "Apartment",
+    "bedrooms": 2,
+    "bathrooms": 2,
+    "summary": "City centre 2 bed",
+    "furnished_type": "Furnished",
+    "postcode": "M1 1AD",
+    "city": "Manchester"
+  },
+  {
+    "source": "rightmove_style",
+    "id": "rm-sim-1004",
+    "property_url": "https://example-rightmove.test/property/1004",
+    "price_pcm": 995,
+    "display_address": "Broad Street, Birmingham B1",
+    "property_sub_type": "Flat",
+    "bedrooms": 1,
+    "bathrooms": 1,
+    "summary": "Canal-side one bed",
+    "furnished_type": "Unfurnished",
+    "postcode": "B1 1TB"
+  }
+]
