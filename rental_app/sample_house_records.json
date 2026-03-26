@@ -1,0 +1,62 @@
+[
+  {
+    "listing_id": "sample-a1",
+    "source": "sample",
+    "price": 1100,
+    "bedrooms": 2,
+    "link": "https://example.com/a1",
+    "house_label": "2 bed flat via price + link",
+    "postcode": "MK9 1AA",
+    "city": "Milton Keynes",
+    "bills_included": true
+  },
+  {
+    "listing_id": "sample-a2",
+    "source": "sample",
+    "rent": 1250,
+    "beds": 1,
+    "source_url": "https://example.com/a2",
+    "listing_title": "1 bed via rent + beds",
+    "address_text": "Bletchley",
+    "area": "bletchley",
+    "bill_included": false
+  },
+  {
+    "listing_id": "sample-a3",
+    "source": "sample",
+    "monthly_rent": "£1,400 pcm",
+    "bed": 0,
+    "url": "https://example.com/a3",
+    "title": "Studio via monthly_rent + bed",
+    "post_code": "E1 6LS",
+    "city": "London",
+    "includes_bills": "yes"
+  },
+  {
+    "listing_id": "sample-a4",
+    "source": "sample",
+    "rent_pcm": 950,
+    "bedroom": 3,
+    "listing_url": "https://example.com/a4",
+    "title": "House via rent_pcm + bedroom",
+    "full_address": "Manchester M3",
+    "area_name": "manchester",
+    "deposit_amount": 950,
+    "commute_mins": 20,
+    "couple_friendly": true
+  },
+  {
+    "listing_id": "sample-a5",
+    "source": "sample",
+    "price": 800,
+    "beds": 2,
+    "features": ["parking", "garden"],
+    "notes": "Near station",
+    "near_station": true,
+    "final_score": 7.5,
+    "scores": {
+      "value": 8.0,
+      "location": 7.0
+    }
+  }
+]

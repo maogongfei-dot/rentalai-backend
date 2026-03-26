@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from data.storage.listing_storage import export_listings_as_dicts
+from house_canonical import canonical_to_listing_row, normalize_house_record
 from module2_scoring import get_area_from_postcode
 from rental_query_parser import parse_user_query
 from scoring_adapter import generate_ranking_api_response
@@ -18,6 +19,20 @@ from web_bridge import listing_dict_to_engine_house
 
 _TOP_N = 15
 _MAX_POOL = 80
+
+
+def _normalize_pool(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Phase A1：进入过滤与排序前统一走 canonical → 引擎兼容扁平 dict。
+    """
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        src = str(r.get("source") or "unknown")
+        canon = normalize_house_record(r, source=src)
+        out.append(canonical_to_listing_row(canon))
+    return out
 
 
 def _demo_listings_path() -> Path:
@@ -161,7 +176,7 @@ def _merge_demo_for_city(pool: list[dict[str, Any]], sq: dict[str, Any]) -> list
         return pool
     seen = {str(r.get("listing_id")) for r in pool if r.get("listing_id")}
     extra: list[dict[str, Any]] = []
-    for r in _load_demo_listings():
+    for r in _normalize_pool(_load_demo_listings()):
         lid = r.get("listing_id")
         if lid and str(lid) in seen:
             continue
@@ -357,19 +372,19 @@ def run_ai_analyze(raw_user_query: str) -> dict[str, Any]:
     """
     structured = parse_user_query(raw_user_query)
 
-    main_rows = export_listings_as_dicts()
+    main_rows = _normalize_pool(export_listings_as_dicts())
     pool, relaxed_city = _filter_pool(main_rows, structured)
     pool = _merge_demo_for_city(pool, structured)
 
     used_demo = False
     if not pool:
-        demo = _load_demo_listings()
+        demo = _normalize_pool(_load_demo_listings())
         pool, relaxed_city = _filter_pool(demo, structured)
         used_demo = bool(pool)
 
     if not pool:
         # 最简兜底：demo 全量（仅租金有效）
-        pool = [r for r in _load_demo_listings() if r.get("rent_pcm") is not None]
+        pool = [r for r in _normalize_pool(_load_demo_listings()) if r.get("rent_pcm") is not None]
         used_demo = bool(pool)
 
     want_pt = structured.get("property_type")

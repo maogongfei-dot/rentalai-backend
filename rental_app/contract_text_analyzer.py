@@ -3,6 +3,8 @@
 Phase B2：句子级 matched_text、explanation、recommendation_action 等。
 Phase B3：contract_legal_mapping 提供 legal_context 与 summary_note（法律解释映射层，非正式法律意见）。
 Phase B4：contract_action_mapping 提供 action_priority、checklist、提问、证据与 summary.next_step_summary。
+Phase B6：contract_missing_clauses 提供 missing_clauses 与 summary 完整性字段。
+Phase B7：contract_report_builder 提供 contract_report 综合报告层。
 """
 
 from __future__ import annotations
@@ -12,6 +14,8 @@ from typing import Any, Optional
 
 from contract_action_mapping import build_next_step_summary, enrich_risk_with_actions
 from contract_legal_mapping import build_summary_note, enrich_risk_with_legal_context
+from contract_missing_clauses import build_completeness_summary, detect_missing_clauses
+from contract_report_builder import build_contract_report
 
 # --- 风险主题（与 API risk_type 一致）---
 RISK_TYPE_DEPOSIT = "deposit"
@@ -441,9 +445,14 @@ def _overall_level(high: int, medium: int, low: int) -> str:
 
 def analyze_contract_text(contract_text: str) -> dict[str, Any]:
     """
-    合同文本分析入口：detected_risks 含 B2/B3/B4 字段；summary 含 summary_note 与 next_step_summary。
+    合同文本分析入口：detected_risks 含 B2/B3/B4 字段；summary 含 summary_note 与 next_step_summary；
+    missing_clauses（B6）与 contract_report（B7）与风险扫描并存。
     """
     text = contract_text.strip()
+    # Phase B6：条款完整性（仅列出 missing / partial_missing）
+    missing_clauses = detect_missing_clauses(text)
+    completeness = build_completeness_summary(text)
+
     sentences = _split_sentences(text)
 
     scanners = [
@@ -474,17 +483,27 @@ def analyze_contract_text(contract_text: str) -> dict[str, Any]:
     summary_note = build_summary_note(detected)
     next_step_summary = build_next_step_summary(detected)
 
+    summary_payload: dict[str, Any] = {
+        "risk_count": len(detected),
+        "high_risk_count": high_n,
+        "medium_risk_count": med_n,
+        "low_risk_count": low_n,
+        "risk_types": types,
+        "overall_level": overall,
+        "summary_note": summary_note,
+        "next_step_summary": next_step_summary,
+        "missing_clause_count": completeness["missing_clause_count"],
+        "partial_missing_count": completeness["partial_missing_count"],
+        "completeness_level": completeness["completeness_level"],
+        "completeness_note": completeness["completeness_note"],
+    }
+    # Phase B7：contract_report 生成逻辑（不替代原有字段）
+    contract_report = build_contract_report(text, detected, missing_clauses, summary_payload)
+
     return {
         "contract_text": text,
         "detected_risks": detected,
-        "summary": {
-            "risk_count": len(detected),
-            "high_risk_count": high_n,
-            "medium_risk_count": med_n,
-            "low_risk_count": low_n,
-            "risk_types": types,
-            "overall_level": overall,
-            "summary_note": summary_note,
-            "next_step_summary": next_step_summary,
-        },
+        "missing_clauses": missing_clauses,
+        "summary": summary_payload,
+        "contract_report": contract_report,
     }

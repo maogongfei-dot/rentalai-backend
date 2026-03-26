@@ -219,14 +219,17 @@ def listing_dict_to_engine_house(
 ) -> dict | None:
     """
     标准 listing dict → module2 rank_houses 使用的 house（多房源排序 / AI 桥接）。
-    委托 normalize_listing_payload + to_analyze_payload + normalize_web_form_inputs + _input_to_house。
+    Phase A1：先经 house_canonical 统一字段，再 normalize_listing_payload + to_analyze_payload + _input_to_house。
     """
     from data.normalizer.listing_normalizer import normalize_listing_payload, to_analyze_payload
+    from house_canonical import canonical_to_listing_row, normalize_house_record
 
     if not isinstance(listing_dict, dict):
         return None
     try:
-        ls = normalize_listing_payload(listing_dict)
+        src = str(listing_dict.get("source") or "unknown")
+        row = canonical_to_listing_row(normalize_house_record(listing_dict, source=src))
+        ls = normalize_listing_payload(row, source=row.get("source"))
         payload = to_analyze_payload(ls, budget=budget, target_postcode=target_postcode)
         normalized = normalize_web_form_inputs(payload)
         return _input_to_house(normalized)
