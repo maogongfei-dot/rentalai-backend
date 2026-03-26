@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import Body, FastAPI, Request
+from fastapi import Body, FastAPI, File, Request, UploadFile
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -438,6 +438,128 @@ def api_contract_analyze_text(body: ContractAnalyzeTextBody = Body(...)):
             status_code=500,
             content={"ok": False, "error": "server_error", "message": str(exc)},
         )
+
+
+_CONTRACT_PDF_MAX_BYTES = max(1, int(os.environ.get("RENTALAI_CONTRACT_PDF_MAX_BYTES", str(15 * 1024 * 1024))))
+_CONTRACT_PREVIEW_CHARS = max(100, int(os.environ.get("RENTALAI_CONTRACT_PREVIEW_CHARS", "500")))
+
+
+@app.post("/api/contract/analyze-pdf")
+async def api_contract_analyze_pdf(file: UploadFile | None = File(None)):
+    """
+    合同 PDF 分析（Phase B5）：multipart 字段名 file → 抽取文本 → 复用 analyze_contract_text。
+    """
+    from contract_pdf_extract import extract_text_from_pdf_bytes
+    from contract_text_analyzer import analyze_contract_text
+
+    # 接口接收文件逻辑：无文件或空文件名
+    if file is None or not (file.filename or "").strip():
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "no_file",
+                "message": "multipart field 'file' with a PDF is required",
+            },
+        )
+
+    filename = (file.filename or "").strip()
+    if not filename.lower().endswith(".pdf"):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "invalid_file_type",
+                "message": "only .pdf files are accepted",
+            },
+        )
+
+    try:
+        raw = await file.read()
+    except Exception as exc:
+        logger.exception("contract analyze-pdf read failed")
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "error": "read_failed", "message": str(exc)},
+        )
+
+    if not raw:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "empty_upload",
+                "message": "uploaded file is empty",
+            },
+        )
+
+    if len(raw) > _CONTRACT_PDF_MAX_BYTES:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "file_too_large",
+                "message": "PDF exceeds maximum size (%s bytes)" % _CONTRACT_PDF_MAX_BYTES,
+            },
+        )
+
+    # PDF 文本提取：逐页 extract_text，失败页跳过；整份无法打开则 pdf_extract_failed
+    try:
+        extracted = extract_text_from_pdf_bytes(raw)
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "pdf_extract_failed",
+                "message": str(exc),
+            },
+        )
+    except Exception as exc:
+        logger.exception("contract analyze-pdf extract failed")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "pdf_extract_failed",
+                "message": str(exc),
+            },
+        )
+
+    # 错误处理：无可提取文本（常见于扫描版/纯图 PDF）
+    if not (extracted or "").strip():
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "empty_extracted_text",
+                "message": "no extractable text in PDF (may be scanned/image-only; OCR not supported in this phase)",
+            },
+        )
+
+    # 复用与 POST /api/contract/analyze-text 相同的 analyze_contract_text 引擎
+    try:
+        analysis = analyze_contract_text(extracted)
+    except Exception as exc:
+        logger.exception("contract analyze-pdf analysis failed")
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": "server_error", "message": str(exc)},
+        )
+
+    preview = extracted[:_CONTRACT_PREVIEW_CHARS]
+    if len(extracted) > _CONTRACT_PREVIEW_CHARS:
+        preview = preview + "…"
+
+    return {
+        "ok": True,
+        "result": {
+            "source_type": "pdf",
+            "filename": filename,
+            "extracted_text_preview": preview,
+            "analysis": analysis,
+        },
+    }
 
 
 # ---------------------------------------------------------------------------

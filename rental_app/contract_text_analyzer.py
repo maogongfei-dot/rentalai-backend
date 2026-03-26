@@ -2,6 +2,7 @@
 合同文本分析（Phase B1/B2/B3）：rule-based 风险识别入口，不接 LLM。
 Phase B2：句子级 matched_text、explanation、recommendation_action 等。
 Phase B3：contract_legal_mapping 提供 legal_context 与 summary_note（法律解释映射层，非正式法律意见）。
+Phase B4：contract_action_mapping 提供 action_priority、checklist、提问、证据与 summary.next_step_summary。
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any, Optional
 
+from contract_action_mapping import build_next_step_summary, enrich_risk_with_actions
 from contract_legal_mapping import build_summary_note, enrich_risk_with_legal_context
 
 # --- 风险主题（与 API risk_type 一致）---
@@ -439,7 +441,7 @@ def _overall_level(high: int, medium: int, low: int) -> str:
 
 def analyze_contract_text(contract_text: str) -> dict[str, Any]:
     """
-    合同文本分析入口：detected_risks 含 B2 字段 + B3 legal_context 等；summary 含 summary_note。
+    合同文本分析入口：detected_risks 含 B2/B3/B4 字段；summary 含 summary_note 与 next_step_summary。
     """
     text = contract_text.strip()
     sentences = _split_sentences(text)
@@ -461,6 +463,8 @@ def analyze_contract_text(contract_text: str) -> dict[str, Any]:
 
     # Phase B3：逐条合并法律解释映射
     detected = [enrich_risk_with_legal_context(r) for r in detected]
+    # Phase B4：行动建议层（action_priority / checklist / 提问 / 证据）
+    detected = [enrich_risk_with_actions(r) for r in detected]
 
     high_n = sum(1 for r in detected if r.get("severity") == "high")
     med_n = sum(1 for r in detected if r.get("severity") == "medium")
@@ -468,6 +472,7 @@ def analyze_contract_text(contract_text: str) -> dict[str, Any]:
     types = [r["risk_type"] for r in detected]
     overall = _overall_level(high_n, med_n, low_n)
     summary_note = build_summary_note(detected)
+    next_step_summary = build_next_step_summary(detected)
 
     return {
         "contract_text": text,
@@ -480,5 +485,6 @@ def analyze_contract_text(contract_text: str) -> dict[str, Any]:
             "risk_types": types,
             "overall_level": overall,
             "summary_note": summary_note,
+            "next_step_summary": next_step_summary,
         },
     }
