@@ -405,6 +405,41 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
         )
 
 
+class ContractAnalyzeTextBody(BaseModel):
+    """POST /api/contract/analyze-text — 纯文本合同风险扫描（rule-based）。"""
+
+    model_config = ConfigDict(extra="ignore")
+    contract_text: str = Field(default="", description="Full or partial tenancy contract text")
+
+
+@app.post("/api/contract/analyze-text")
+def api_contract_analyze_text(body: ContractAnalyzeTextBody = Body(...)):
+    """
+    合同文本分析入口（Phase B1）：返回 detected_risks / summary，后续可接 PDF 解析结果复用同一结构。
+    """
+    from contract_text_analyzer import analyze_contract_text
+
+    ct = (body.contract_text or "").strip()
+    if not ct:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "empty_contract_text",
+                "message": "contract_text is required and must be non-empty",
+            },
+        )
+    try:
+        result = analyze_contract_text(ct)
+        return {"ok": True, "result": result}
+    except Exception as exc:
+        logger.exception("contract analyze-text failed")
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": "server_error", "message": str(exc)},
+        )
+
+
 # ---------------------------------------------------------------------------
 # Async task endpoints (P9 Phase3 skeleton)
 # ---------------------------------------------------------------------------
