@@ -378,6 +378,7 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
     """
     Phase1：自然语言 → 规则解析 → Module5 排序 → Top 房源。
     请求体 JSON：`{ \"raw_user_query\": \"...\" }`（兼容顶层 `query`）。
+    Phase A5：可选 `dataset`: demo | realistic | multi_source（指定时以对应本地样本为主候选池）。
     """
     from ai_recommendation_bridge import public_response_payload, run_ai_analyze
 
@@ -393,8 +394,12 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
                 "message": "raw_user_query is required",
             },
         )
+    ds = body.get("dataset")
+    dataset = None
+    if isinstance(ds, str) and ds.strip().lower() in ("demo", "realistic", "multi_source"):
+        dataset = ds.strip().lower()
     try:
-        out = run_ai_analyze(q)
+        out = run_ai_analyze(q, dataset=dataset)
         payload = public_response_payload(out)
         return JSONResponse(content=payload)
     except Exception as exc:

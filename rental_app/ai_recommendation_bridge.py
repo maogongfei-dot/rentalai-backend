@@ -8,10 +8,16 @@ from copy import deepcopy
 from typing import Any
 
 from data.storage.listing_storage import export_listings_as_dicts
-from house_canonical import canonical_to_listing_row
+from house_candidate_loader import load_candidate_houses
+from house_canonical import canonical_records_to_listing_rows, canonical_to_listing_row
 from house_samples_loader import load_house_samples
 from house_source_adapters import clean_and_normalize_house_record
 from module2_scoring import get_area_from_postcode
+from rental_explain_v2 import (
+    build_explain_v2,
+    build_match_summary,
+    build_recommendation_summary,
+)
 from rental_query_parser import parse_user_query
 from scoring_adapter import generate_ranking_api_response
 from state import init_state
@@ -241,12 +247,30 @@ def _build_houses_from_listings(
         )
         if not h:
             continue
-        # 展示用元数据
+        # 展示用元数据（Phase A5：优先 canonical 风格字段 listing_title）
         meta = {
-            "listing_title": row.get("title") or row.get("address") or "",
+            "listing_title": row.get("title")
+            or row.get("listing_title")
+            or row.get("address")
+            or "",
             "listing_id": row.get("listing_id"),
             "source_url": row.get("source_url"),
         }
+        for key in (
+            "city",
+            "bathrooms",
+            "deposit",
+            "property_type",
+            "couple_friendly",
+            "near_station",
+            "features",
+            "scores",
+            "source",
+            "final_score",
+            "notes",
+        ):
+            if key in row and row[key] is not None:
+                meta[key] = row[key]
         merged = {**h, **{k: v for k, v in meta.items() if v is not None}}
         if not merged.get("area") and row.get("postcode"):
             merged["area"] = get_area_from_postcode(row.get("postcode"))
@@ -254,7 +278,7 @@ def _build_houses_from_listings(
     return out
 
 
-def _build_explain_v2(house: dict) -> dict:
+def _build_legacy_explain_block(house: dict) -> dict:
     why_good = []
     why_not = []
     risks = []
@@ -348,7 +372,10 @@ def _build_decision(house: dict, explain_block: dict) -> dict:
     }
 
 
-def _simplify_recommendations(ranking_data: dict[str, Any]) -> list[dict[str, Any]]:
+def _simplify_recommendations(
+    ranking_data: dict[str, Any],
+    structured_query: dict[str, Any],
+) -> list[dict[str, Any]]:
     houses = ranking_data.get("houses") or []
     rec: list[dict[str, Any]] = []
     for h in houses[:_TOP_N]:
@@ -360,8 +387,22 @@ def _simplify_recommendations(ranking_data: dict[str, Any]) -> list[dict[str, An
             if house.get("commute_minutes") is not None
             else house.get("commute_mins"),
         }
-        exp = _build_explain_v2(house)
+        exp = _build_legacy_explain_block(house)
         dec = _build_decision(house, exp)
+        scores = h.get("scores") if isinstance(h.get("scores"), dict) else {}
+        if not scores and isinstance(house.get("scores"), dict):
+            scores = house.get("scores") or {}
+        # Phase C2：structured_query 对照 + 旧版 explain 列表 → explain_v2
+        ev2_core = build_explain_v2(
+            house,
+            structured_query,
+            base_scores=scores,
+            legacy_explain=exp,
+        )
+        explain_v2 = {
+            **ev2_core,
+            "match_summary": build_match_summary(ev2_core, dec["decision"]),
+        }
         rec.append(
             {
                 "rank": h.get("rank"),
@@ -370,66 +411,46 @@ def _simplify_recommendations(ranking_data: dict[str, Any]) -> list[dict[str, An
                 "title": house.get("listing_title") or house.get("house_label"),
                 "rent": house.get("rent"),
                 "bedrooms": house.get("bedrooms"),
+                "bathrooms": house.get("bathrooms"),
                 "area": house.get("area"),
+                "city": house.get("city"),
                 "postcode": house.get("postcode"),
                 "bills": house.get("bills"),
+                "deposit": house.get("deposit"),
+                "furnished": house.get("furnished"),
+                "property_type": house.get("property_type"),
+                "couple_friendly": house.get("couple_friendly"),
+                "near_station": house.get("near_station"),
+                "features": house.get("features"),
+                "notes": house.get("notes"),
                 "listing_id": house.get("listing_id"),
+                "source": house.get("source"),
                 "source_url": house.get("source_url"),
-                "scores": h.get("scores") if isinstance(h.get("scores"), dict) else {},
+                "scores": scores,
                 "explain": exp["explain"],
                 "why_good": exp["why_good"],
                 "why_not": exp["why_not"],
                 "risks": exp["risks"],
                 "decision": dec["decision"],
                 "decision_reason": dec["decision_reason"],
+                "explain_v2": explain_v2,
             }
         )
     return rec
 
 
-def run_ai_analyze(raw_user_query: str) -> dict[str, Any]:
-    """
-    单入口：原始 query → 解析 → 候选房源 → generate_ranking_api_response。
-    返回统一 JSON（供 /api/ai-analyze 与前端使用）。
-    Phase A2：主库为空时优先使用 realistic_house_samples，再回退 ai_demo_listings；均先 _normalize_pool。
-    """
-    structured = parse_user_query(raw_user_query)
-
-    multisource_prepended = os.environ.get(
-        "RENTALAI_AI_APPEND_MULTISOURCE_SAMPLES", "0"
-    ).lower() in ("1", "true", "yes")
-    main_rows = _normalize_pool(_maybe_prepend_multisource(export_listings_as_dicts()))
-    filtered_main, relaxed_city = _filter_pool(main_rows, structured)
-    pool = _merge_auxiliary_for_city(filtered_main, structured)
-
-    if filtered_main:
-        sample_source = "main"
-    elif pool:
-        sample_source = "auxiliary_merge"
-    else:
-        sample_source = None
-    used_demo = False
-
-    if not pool and _use_realistic_samples():
-        realistic = _normalize_pool(load_house_samples("realistic"))
-        pool, relaxed_city = _filter_pool(realistic, structured)
-        if pool:
-            sample_source = "realistic"
-
-    if not pool:
-        demo = _normalize_pool(load_house_samples("demo"))
-        pool, relaxed_city = _filter_pool(demo, structured)
-        if pool:
-            sample_source = "demo"
-            used_demo = True
-
-    if not pool:
-        # 最简兜底：demo 全量（仅租金有效）
-        pool = [r for r in _normalize_pool(load_house_samples("demo")) if r.get("rent_pcm") is not None]
-        if pool:
-            sample_source = "demo_rent_only"
-            used_demo = True
-
+def _rank_from_pool(
+    raw_user_query: str,
+    structured: dict[str, Any],
+    pool: list[dict[str, Any]],
+    *,
+    sample_source: str,
+    used_demo: bool,
+    multisource_prepended: bool,
+    relaxed_city: bool,
+    dataset_used: str | None = None,
+) -> dict[str, Any]:
+    """候选 listing 行 pool → 评分排序 → recommendations（Phase A5 共用）。"""
     want_pt = structured.get("property_type")
     if want_pt:
         pool = [r for r in pool if _property_type_ok(r, want_pt)] or pool
@@ -451,7 +472,19 @@ def run_ai_analyze(raw_user_query: str) -> dict[str, Any]:
         sys.stdout = _old_stdout
 
     ranking_data = api_resp.get("data") or {}
-    recommendations = _simplify_recommendations(ranking_data)
+    recommendations = _simplify_recommendations(ranking_data, structured)
+    recommendation_summary = build_recommendation_summary(structured, recommendations)
+
+    summ: dict[str, Any] = {
+        "total_candidates": total_candidates,
+        "top_count": len(recommendations),
+        "used_demo_listings": used_demo,
+        "sample_source": sample_source or "unknown",
+        "multisource_samples_prepended": multisource_prepended,
+        "city_filter_relaxed": relaxed_city,
+    }
+    if dataset_used:
+        summ["dataset"] = dataset_used
 
     return {
         "success": bool(api_resp.get("success")),
@@ -459,16 +492,139 @@ def run_ai_analyze(raw_user_query: str) -> dict[str, Any]:
         "raw_user_query": structured.get("raw_user_query") or raw_user_query.strip(),
         "structured_query": structured,
         "recommendations": recommendations,
-        "summary": {
-            "total_candidates": total_candidates,
-            "top_count": len(recommendations),
-            "used_demo_listings": used_demo,
-            "sample_source": sample_source or "unknown",
-            "multisource_samples_prepended": multisource_prepended,
-            "city_filter_relaxed": relaxed_city,
-        },
+        "recommendation_summary": recommendation_summary,
+        "summary": summ,
         "_ranking_full": ranking_data,
     }
+
+
+def run_ai_analyze(
+    raw_user_query: str,
+    dataset: str | None = None,
+) -> dict[str, Any]:
+    """
+    单入口：原始 query → 解析 → 候选房源 → generate_ranking_api_response。
+    Phase A5：dataset 为 demo|realistic|multi_source 时，候选池以对应本地样本为主（canonical 加载）；
+    未传 dataset 时保持原行为（SQLite + 可选 multisource 前置 + 合并 + 回退）。
+    """
+    structured = parse_user_query(raw_user_query)
+
+    multisource_prepended = os.environ.get(
+        "RENTALAI_AI_APPEND_MULTISOURCE_SAMPLES", "0"
+    ).lower() in ("1", "true", "yes")
+
+    dataset_key = (dataset or "").strip().lower() or None
+    used_demo = False
+    relaxed_city = False
+
+    # dataset 切换：统一从 load_candidate_houses 取 canonical → listing 行
+    if dataset_key in ("demo", "realistic", "multi_source"):
+        canon = load_candidate_houses(dataset_key)
+        main_rows = canonical_records_to_listing_rows(canon)
+    else:
+        main_rows = _normalize_pool(_maybe_prepend_multisource(export_listings_as_dicts()))
+
+    filtered_main, relaxed_city = _filter_pool(main_rows, structured)
+    pool = _merge_auxiliary_for_city(filtered_main, structured)
+
+    if dataset_key in ("demo", "realistic", "multi_source"):
+        if filtered_main:
+            sample_source = "dataset_%s" % dataset_key
+        elif pool:
+            sample_source = "auxiliary_merge"
+        else:
+            sample_source = None
+    else:
+        if filtered_main:
+            sample_source = "main"
+        elif pool:
+            sample_source = "auxiliary_merge"
+        else:
+            sample_source = None
+
+    if not pool and _use_realistic_samples():
+        realistic = _normalize_pool(load_house_samples("realistic"))
+        pool, relaxed_city = _filter_pool(realistic, structured)
+        if pool:
+            sample_source = "realistic"
+
+    if not pool:
+        demo = _normalize_pool(load_house_samples("demo"))
+        pool, relaxed_city = _filter_pool(demo, structured)
+        if pool:
+            sample_source = "demo"
+            used_demo = True
+
+    if not pool:
+        pool = [r for r in _normalize_pool(load_house_samples("demo")) if r.get("rent_pcm") is not None]
+        if pool:
+            sample_source = "demo_rent_only"
+            used_demo = True
+
+    return _rank_from_pool(
+        raw_user_query,
+        structured,
+        pool,
+        sample_source=sample_source or "unknown",
+        used_demo=used_demo,
+        multisource_prepended=multisource_prepended,
+        relaxed_city=relaxed_city,
+        dataset_used=dataset_key,
+    )
+
+
+def run_ai_analyze_with_records(
+    raw_user_query: str,
+    records: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Phase A5：已标准化 canonical 记录（与 A4 import 全量 records 一致）→ 推荐。
+    池为空或过滤后为空时，仍按全局 realistic/demo 回退，避免无结果。
+    """
+    structured = parse_user_query(raw_user_query)
+    multisource_prepended = False
+    used_demo = False
+    relaxed_city = False
+
+    pool = canonical_records_to_listing_rows(records)
+    filtered_main, relaxed_city = _filter_pool(pool, structured)
+    pool = _merge_auxiliary_for_city(filtered_main, structured)
+    sample_source = "imported"
+
+    if filtered_main:
+        sample_source = "imported"
+    elif pool:
+        sample_source = "auxiliary_merge"
+
+    if not pool and _use_realistic_samples():
+        realistic = _normalize_pool(load_house_samples("realistic"))
+        pool, relaxed_city = _filter_pool(realistic, structured)
+        if pool:
+            sample_source = "realistic_fallback"
+
+    if not pool:
+        demo = _normalize_pool(load_house_samples("demo"))
+        pool, relaxed_city = _filter_pool(demo, structured)
+        if pool:
+            sample_source = "demo_fallback"
+            used_demo = True
+
+    if not pool:
+        pool = [r for r in _normalize_pool(load_house_samples("demo")) if r.get("rent_pcm") is not None]
+        if pool:
+            sample_source = "demo_rent_only"
+            used_demo = True
+
+    return _rank_from_pool(
+        raw_user_query,
+        structured,
+        pool,
+        sample_source=sample_source,
+        used_demo=used_demo,
+        multisource_prepended=multisource_prepended,
+        relaxed_city=relaxed_city,
+        dataset_used="imported",
+    )
 
 
 def public_response_payload(result: dict[str, Any]) -> dict[str, Any]:
@@ -479,5 +635,6 @@ def public_response_payload(result: dict[str, Any]) -> dict[str, Any]:
         "raw_user_query": result.get("raw_user_query"),
         "structured_query": result.get("structured_query"),
         "recommendations": result.get("recommendations"),
+        "recommendation_summary": result.get("recommendation_summary"),
         "summary": result.get("summary"),
     }

@@ -266,6 +266,22 @@ def canonical_to_listing_row(canonical: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in row.items() if v is not None}
 
 
+def canonical_records_to_listing_rows(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    批量将 canonical 转为引擎用扁平 listing 行；无 rent 的条目跳过（Phase A5）。
+    """
+    if not isinstance(records, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for c in records:
+        if not isinstance(c, dict):
+            continue
+        row = canonical_to_listing_row(c)
+        if row.get("rent_pcm") is not None:
+            out.append(row)
+    return out
+
+
 def normalize_house_records(records: list[dict[str, Any]], source: str = "unknown") -> list[dict[str, Any]]:
     """批量标准化；单条非 dict 时按空 dict 处理。"""
     if not isinstance(records, list):

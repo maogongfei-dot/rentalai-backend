@@ -105,9 +105,12 @@ def import_house_records(
     file_bytes: bytes,
     filename: str,
     source: str = "generic",
+    *,
+    return_full_records: bool = False,
 ) -> dict[str, Any]:
     """
     import service：按扩展名解析 → 逐条 clean_and_normalize → 统计成功/失败。
+    return_full_records=True 时 result 含完整 canonical records（供 A5 推荐；体积可能较大）。
     返回 { ok, result } 或 { ok, error, message }。
     """
     fn = (filename or "").strip()
@@ -187,15 +190,41 @@ def import_house_records(
 
     preview = [_strip_for_preview(r) for r in normalized[:_PREVIEW_LIMIT]]
 
+    result: dict[str, Any] = {
+        "source": src,
+        "file_type": file_type,
+        "filename": fn or "upload",
+        "imported_count": len(normalized),
+        "failed_count": max(0, failed_count),
+        "preview": preview,
+        "errors": errors[:_ERRORS_LIMIT],
+    }
+    if return_full_records:
+        result["records"] = normalized
+
+    return {"ok": True, "result": result}
+
+
+def recommend_from_imported_file(
+    file_bytes: bytes,
+    filename: str,
+    raw_user_query: str,
+    source: str = "generic",
+) -> dict[str, Any]:
+    """
+    Phase A5：导入 → 全量 canonical → run_ai_analyze_with_records（不落库）。
+    """
+    imp = import_house_records(
+        file_bytes, filename, source=source, return_full_records=True
+    )
+    if not imp.get("ok"):
+        return imp
+    from ai_recommendation_bridge import run_ai_analyze_with_records
+
+    records = (imp.get("result") or {}).get("records") or []
+    rec_out = run_ai_analyze_with_records(raw_user_query, records)
     return {
         "ok": True,
-        "result": {
-            "source": src,
-            "file_type": file_type,
-            "filename": fn or "upload",
-            "imported_count": len(normalized),
-            "failed_count": max(0, failed_count),
-            "preview": preview,
-            "errors": errors[:_ERRORS_LIMIT],
-        },
+        "import": {k: v for k, v in (imp.get("result") or {}).items() if k != "records"},
+        "recommendation": rec_out,
     }
