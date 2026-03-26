@@ -44,3 +44,9 @@
 
 - **本地假登录**、**localStorage/sessionStorage** 不随账号同步到服务器。
 - 前后端分域时，仅 **AI 分析请求** 经 `RENTALAI_API_BASE` 指向 Render；其它 Phase3 的 `/tasks`、`/auth/*` 若仍写死相对路径，需在同域部署或另行改造（本 Demo 主路径为 `/api/ai-analyze`）。
+
+---
+
+## 7. 相关文档
+
+- **逐步上线与检查表**：同目录 **`LAUNCH_CHECKLIST.md`**

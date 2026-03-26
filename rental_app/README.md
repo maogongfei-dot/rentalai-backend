@@ -148,7 +148,8 @@ streamlit run app_web.py
 2. 打开 Vercel 站点首页，确认已填 `rentalai-api-base`。
 3. 登录（本地假登录）→ 输入需求 → **开始分析** → 应进入结果页并看到推荐数据。
 
-更细的步骤与限制见 **`DEPLOYMENT_PLAN.md`**。
+更细的步骤与限制见 **`DEPLOYMENT_PLAN.md`**。  
+**按表执行上线**：**`LAUNCH_CHECKLIST.md`**（Vercel + Render 步骤、API 替换、检查清单、发布后测试顺序）。
 
 ---
 
@@ -162,4 +163,4 @@ streamlit run app_web.py
 
 - 请勿提交含密钥的 **`.env`**；模板为 **`.env.example`**。
 - 项目状态与路线图见同目录 **`PROJECT_STATUS.md`**。
-- **分域部署清单**见 **`DEPLOYMENT_PLAN.md`**。
+- **分域部署清单**见 **`DEPLOYMENT_PLAN.md`**；**上线执行表**见 **`LAUNCH_CHECKLIST.md`**。
