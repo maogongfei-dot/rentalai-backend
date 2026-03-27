@@ -13,9 +13,13 @@ from house_canonical import canonical_records_to_listing_rows, canonical_to_list
 from house_samples_loader import load_house_samples
 from house_source_adapters import clean_and_normalize_house_record
 from module2_scoring import get_area_from_postcode
-from rental_decision_v2 import build_decision_v2, build_top_decision_summary
+from ai.llm_adapter import (
+    llm_generate_decision,
+    llm_generate_explain,
+    llm_parse_query,
+)
+from rental_decision_v2 import build_top_decision_summary
 from rental_explain_v2 import (
-    build_explain_v2,
     build_match_summary,
     build_recommendation_summary,
 )
@@ -27,7 +31,6 @@ from rental_multiturn import (
     update_conversation_store,
     _ensure_conversation_id,
 )
-from rental_query_parser import parse_user_query
 from scoring_adapter import generate_ranking_api_response
 from state import init_state
 from web_bridge import listing_dict_to_engine_house
@@ -425,21 +428,19 @@ def _simplify_recommendations(
         scores = h.get("scores") if isinstance(h.get("scores"), dict) else {}
         if not scores and isinstance(house.get("scores"), dict):
             scores = house.get("scores") or {}
-        # Phase C2：structured_query 对照 + 旧版 explain 列表 → explain_v2
-        ev2_core = build_explain_v2(
+        # Phase C2 / C5：经 llm_adapter（默认规则）生成 explain_v2 与 decision_v2
+        ev2_core = llm_generate_explain(
             house,
             structured_query,
             base_scores=scores,
             legacy_explain=exp,
         )
-        # Phase C3：综合核心匹配与风险层 → decision_v2；再生成 match_summary（与最终标签一致）
-        decision_v2 = build_decision_v2(
+        decision_v2 = llm_generate_decision(
             house,
             structured_query,
             ev2_core,
             base_scores=scores,
-            risks=exp.get("risks"),
-            why_not=exp.get("why_not"),
+            legacy_explain=exp,
         )
         label = decision_v2.get("decision_label") or dec["decision"]
         explain_v2 = {
@@ -629,7 +630,7 @@ def run_ai_analyze(
     """
     return run_ai_analyze_with_structured(
         raw_user_query,
-        parse_user_query(raw_user_query),
+        llm_parse_query(raw_user_query),
         dataset=dataset,
     )
 
@@ -644,7 +645,7 @@ def run_ai_analyze_multiturn(
     C4：多轮 — 解析当前句 → follow-up 意图 → merge → 推荐。
     previous_structured_query 与 conversation_id 可组合；可从内存 store 恢复上一轮 merged_query。
     """
-    current_sq = parse_user_query(raw_user_query)
+    current_sq = llm_parse_query(raw_user_query)
     followup = detect_followup_intent(raw_user_query)
     intent = str(followup.get("intent") or "generic_followup")
 
@@ -705,7 +706,7 @@ def run_ai_analyze_with_records(
     Phase A5：已标准化 canonical 记录（与 A4 import 全量 records 一致）→ 推荐。
     池为空或过滤后为空时，仍按全局 realistic/demo 回退，避免无结果。
     """
-    structured = parse_user_query(raw_user_query)
+    structured = llm_parse_query(raw_user_query)
     multisource_prepended = False
     used_demo = False
     relaxed_city = False
