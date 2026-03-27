@@ -16,6 +16,9 @@ pypdf>=4.0,<6
 # HTTP 客户端（Streamlit 调 API、部分脚本）
 requests>=2.31.0
 
+# Zoopla 列表页 requests + HTML 解析（scraper/zoopla_scraper.py）
+beautifulsoup4>=4.12.0
+
 # 列表页抓取（Rightmove / Zoopla）
 playwright>=1.40.0
 

@@ -379,6 +379,7 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
     Phase1：自然语言 → 规则解析 → Module5 排序 → Top 房源。
     请求体 JSON：`{ \"raw_user_query\": \"...\" }`（兼容顶层 `query`）。
     Phase A5：可选 `dataset`: demo | realistic | multi_source（指定时以对应本地样本为主候选池）。
+    Phase D2：可选 `dataset`: zoopla（structured_query 由解析器生成，经 fetch_zoopla_listings → 推荐）。
     Phase C4：可选 `previous_structured_query`、`conversation_id` → 多轮 merge + 内存会话。
     """
     from ai_recommendation_bridge import (
@@ -401,7 +402,12 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
         )
     ds = body.get("dataset")
     dataset = None
-    if isinstance(ds, str) and ds.strip().lower() in ("demo", "realistic", "multi_source"):
+    if isinstance(ds, str) and ds.strip().lower() in (
+        "demo",
+        "realistic",
+        "multi_source",
+        "zoopla",
+    ):
         dataset = ds.strip().lower()
     prev_sq = body.get("previous_structured_query")
     conv_id = body.get("conversation_id")

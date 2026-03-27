@@ -8,7 +8,7 @@ from copy import deepcopy
 from typing import Any
 
 from data.storage.listing_storage import export_listings_as_dicts
-from house_candidate_loader import load_candidate_houses
+from house_candidate_loader import get_last_candidate_load_meta, load_candidate_houses
 from house_canonical import canonical_records_to_listing_rows, canonical_to_listing_row
 from house_samples_loader import load_house_samples
 from house_source_adapters import clean_and_normalize_house_record
@@ -552,6 +552,7 @@ def run_ai_analyze_with_structured(
 ) -> dict[str, Any]:
     """
     已解析的 structured_query → 与 run_ai_analyze 相同候选池与排序（C4 多轮 merge 后复用）。
+    dataset=zoopla 时 structured_query 会传入 load_candidate_houses，驱动 Zoopla 抓取与 normalize。
     """
     structured = dict(structured) if structured else {}
 
@@ -567,6 +568,10 @@ def run_ai_analyze_with_structured(
     if dataset_key in ("demo", "realistic", "multi_source"):
         canon = load_candidate_houses(dataset_key)
         main_rows = canonical_records_to_listing_rows(canon)
+    elif dataset_key == "zoopla":
+        # Phase D2：structured_query 传入 loader → fetch_zoopla_listings → clean/normalize
+        canon = load_candidate_houses("zoopla", structured_query=structured)
+        main_rows = canonical_records_to_listing_rows(canon)
     else:
         main_rows = _normalize_pool(_maybe_prepend_multisource(export_listings_as_dicts()))
 
@@ -576,6 +581,13 @@ def run_ai_analyze_with_structured(
     if dataset_key in ("demo", "realistic", "multi_source"):
         if filtered_main:
             sample_source = "dataset_%s" % dataset_key
+        elif pool:
+            sample_source = "auxiliary_merge"
+        else:
+            sample_source = None
+    elif dataset_key == "zoopla":
+        if filtered_main:
+            sample_source = "dataset_zoopla"
         elif pool:
             sample_source = "auxiliary_merge"
         else:
@@ -607,7 +619,7 @@ def run_ai_analyze_with_structured(
             sample_source = "demo_rent_only"
             used_demo = True
 
-    return _rank_from_pool(
+    out = _rank_from_pool(
         raw_user_query,
         structured,
         pool,
@@ -617,6 +629,20 @@ def run_ai_analyze_with_structured(
         relaxed_city=relaxed_city,
         dataset_used=dataset_key,
     )
+    # Phase D2：Zoopla 抓取模式（live / mock / realistic 回退）写入 summary，便于前端与调试
+    if dataset_key == "zoopla":
+        meta = get_last_candidate_load_meta()
+        summ = out.setdefault("summary", {})
+        sm = meta.get("zoopla_source_mode")
+        if sm:
+            summ["source_mode"] = sm
+        if sm == "zoopla_mock_fallback":
+            note = "Zoopla live fetch unavailable or empty; using built-in mock listings."
+            summ["note"] = (summ.get("note") + " " if summ.get("note") else "") + note
+        elif sm == "zoopla_realistic_fallback":
+            note = "Zoopla pool unavailable or empty after normalize; using realistic sample pool."
+            summ["note"] = (summ.get("note") + " " if summ.get("note") else "") + note
+    return out
 
 
 def run_ai_analyze(
@@ -626,6 +652,7 @@ def run_ai_analyze(
     """
     单入口：原始 query → 解析 → 候选房源 → generate_ranking_api_response。
     Phase A5：dataset 为 demo|realistic|multi_source 时，候选池以对应本地样本为主（canonical 加载）；
+    Phase D2：dataset=zoopla 时走 fetch_zoopla_listings(structured_query) → normalize → ranking；
     未传 dataset 时保持原行为（SQLite + 可选 multisource 前置 + 合并 + 回退）。
     """
     return run_ai_analyze_with_structured(
@@ -633,6 +660,11 @@ def run_ai_analyze(
         llm_parse_query(raw_user_query),
         dataset=dataset,
     )
+
+
+def run_ai_analyze_zoopla(raw_user_query: str) -> dict[str, Any]:
+    """Phase D2：单测入口 — 固定 dataset=zoopla，跑完整推荐链路。"""
+    return run_ai_analyze(raw_user_query, dataset="zoopla")
 
 
 def run_ai_analyze_multiturn(
