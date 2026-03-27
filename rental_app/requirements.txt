@@ -19,7 +19,8 @@ requests>=2.31.0
 # Zoopla 列表页 requests + HTML 解析（scraper/zoopla_scraper.py）
 beautifulsoup4>=4.12.0
 
-# 列表页抓取（Rightmove / Zoopla）
+# Phase D3：可选 RENTALAI_ZOOPLA_FETCH_MODE=playwright（scraper/zoopla_playwright_scraper.py）；安装后需 playwright install chromium
+# 列表页抓取（Rightmove / Zoopla / data/scraper）
 playwright>=1.40.0
 
 # 旧版 Streamlit 演示界面（可选；仅在使用 app_web.py 时需要）

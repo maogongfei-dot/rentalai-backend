@@ -33,10 +33,19 @@ cd rental_app
 pip install -r requirements.txt
 ```
 
-若需要使用 Playwright 抓取相关能力（异步任务等），再执行：
+若需要使用 Playwright 抓取相关能力（异步任务、`RENTALAI_ZOOPLA_FETCH_MODE=playwright` 等），再执行：
 
 ```bash
 playwright install chromium
+```
+
+**Phase D3（Zoopla 浏览器抓取骨架）**：`scraper/zoopla_scraper.py` 默认 **`RENTALAI_ZOOPLA_FETCH_MODE=requests`**（HTTP + BeautifulSoup）。设为 **`playwright`** 时用 Chromium 打开搜索页再复用同一套 HTML 解析；Playwright 未安装、浏览器未装或页面失败时，统一入口会 **回退到 requests**，仍失败则用 **内置 mock**，`/api/ai-analyze` + `dataset=zoopla` 仍可跑。
+
+探针（验证能否拿到页面 HTML）：
+
+```bash
+cd rental_app
+python -c "from scraper.zoopla_playwright_scraper import test_zoopla_playwright_probe; print(test_zoopla_playwright_probe({'city':'London'}))"
 ```
 
 ### 2. 环境变量（可选）

@@ -1,12 +1,25 @@
-# Zoopla 租赁列表：requests + BeautifulSoup；失败时返回固定 mock 数据
+# Zoopla 租赁列表：统一入口 requests / Playwright（见 RENTALAI_ZOOPLA_FETCH_MODE）；失败时 mock
 from __future__ import annotations
 
+import logging
+import os
 import re
 from typing import Any
 from urllib.parse import urlencode, urljoin
 
 import requests
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
+
+# Phase D3：抓取模式 — "requests"（默认）| "playwright"；环境变量 RENTALAI_ZOOPLA_FETCH_MODE
+ZOOPLA_FETCH_MODE = os.environ.get("RENTALAI_ZOOPLA_FETCH_MODE", "requests")
+
+
+def _effective_zoopla_fetch_mode() -> str:
+    """每次读取环境变量，便于测试中切换模式。"""
+    m = os.environ.get("RENTALAI_ZOOPLA_FETCH_MODE", "requests").strip().lower()
+    return m if m in ("requests", "playwright") else "requests"
 
 _ZOOPLA_ORIGIN = "https://www.zoopla.co.uk"
 
@@ -148,7 +161,18 @@ def _parse_listing_card(
     query: dict[str, Any],
 ) -> dict[str, Any] | None:
     link = card.select_one('a[href*="/to-rent/details/"]')
+    if link is None:
+        # CSR / 变体 DOM：链接不一定被首个选择器命中
+        for a in card.find_all("a", href=True):
+            if "/to-rent/details/" in (a.get("href") or ""):
+                link = a
+                break
     href = link.get("href") if link else None
+    if not href:
+        # 部分页面把 listing id 写在 data 属性或片段中
+        m = _DETAIL_ID_RE.search(str(card))
+        if m:
+            href = f"/to-rent/details/{m.group(1)}/"
     if not href:
         return None
     mid = _DETAIL_ID_RE.search(href)
@@ -157,9 +181,14 @@ def _parse_listing_card(
     listing_id = mid.group(1)
     source_url = urljoin(page_url, href)
 
+    blob = card.get_text("\n", strip=True)
+
     price_el = card.select_one('[class*="price_priceText"]')
     price_text = price_el.get_text(" ", strip=True) if price_el else ""
     rent_pcm = _parse_pcm(price_text)
+    if rent_pcm is None:
+        # Playwright / DOM 变体：class 不含 price_priceText 时仍可从卡片全文抽 £pcm
+        rent_pcm = _parse_pcm(blob)
     if rent_pcm is None:
         return None
 
@@ -168,8 +197,6 @@ def _parse_listing_card(
 
     sum_el = card.select_one('[class*="summary_summary"]')
     summary = sum_el.get_text("\n", strip=True) if sum_el else ""
-
-    blob = card.get_text("\n", strip=True)
     bedrooms = _bedrooms_from_text(blob)
     property_type = _property_type_from_text(summary, blob)
 
@@ -309,29 +336,64 @@ def _mock_listings(query: dict[str, Any]) -> list[dict[str, Any]]:
 
 def fetch_zoopla_listings_with_meta(query: dict) -> tuple[list[dict], str]:
     """
-    Same as ``fetch_zoopla_listings`` but returns ``(records, source_mode)``:
-    ``live_zoopla`` when HTML parse succeeded, else ``zoopla_mock_fallback``.
+    统一入口：按 ``RENTALAI_ZOOPLA_FETCH_MODE`` 选择 requests 或 playwright；
+    返回 ``(records, source_mode)`` — ``live_zoopla`` 或 ``zoopla_mock_fallback``。
+
+    Playwright 路径：零条或异常时回退 requests，再失败则 mock（并打日志）。
     """
     q = dict(query or {})
+    mode = _effective_zoopla_fetch_mode()
+    logger.info("zoopla unified fetch: mode=%s", mode)
+
+    if mode == "playwright":
+        try:
+            from scraper.zoopla_playwright_scraper import fetch_zoopla_listings_playwright
+
+            rows = fetch_zoopla_listings_playwright(q)
+            if rows:
+                logger.info("zoopla: playwright ok, parsed=%s listings", len(rows))
+                return rows, "live_zoopla"
+            logger.info("zoopla: playwright returned 0 listings, fallback to requests")
+        except Exception as exc:
+            logger.warning("zoopla: playwright failed (%s), fallback to requests", exc)
+
+        try:
+            rows = _fetch_live_listings(q)
+            if rows:
+                logger.info("zoopla: requests fallback ok, parsed=%s listings", len(rows))
+                return rows, "live_zoopla"
+        except Exception as exc:
+            logger.warning("zoopla: requests fallback failed: %s", exc)
+        logger.info("zoopla: using mock after playwright+requests failure")
+        return _mock_listings(q), "zoopla_mock_fallback"
+
+    # 默认：requests + BeautifulSoup
     try:
         rows = _fetch_live_listings(q)
         if rows:
+            logger.info("zoopla: requests ok, parsed=%s listings", len(rows))
             return rows, "live_zoopla"
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("zoopla: requests fetch failed: %s", exc)
+    logger.info("zoopla: using mock (requests path empty or error)")
     return _mock_listings(q), "zoopla_mock_fallback"
 
 
 def fetch_zoopla_listings(query: dict) -> list[dict]:
     """
-    Fetch Zoopla rental listings for a structured query.
+    统一对外入口（推荐链路只调本函数）。
 
-    Builds a search URL from ``city`` / ``postcode`` / ``budget_max`` (optional
-    ``search_url`` / ``url`` override). Uses HTTP GET + BeautifulSoup. On any
-    failure or empty parse, returns five mock listings.
+    - ``RENTALAI_ZOOPLA_FETCH_MODE=requests``（默认）：HTTP GET + BeautifulSoup
+    - ``RENTALAI_ZOOPLA_FETCH_MODE=playwright``：Chromium 取 HTML 后同源解析；失败则回退 requests 再 mock
+
+    构建 URL 字段：``city`` / ``postcode`` / ``budget_max``，可选 ``search_url`` / ``url``。
     """
     rows, _ = fetch_zoopla_listings_with_meta(query)
     return rows
 
 
-__all__ = ["fetch_zoopla_listings", "fetch_zoopla_listings_with_meta"]
+__all__ = [
+    "ZOOPLA_FETCH_MODE",
+    "fetch_zoopla_listings",
+    "fetch_zoopla_listings_with_meta",
+]
