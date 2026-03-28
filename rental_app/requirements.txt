@@ -25,3 +25,5 @@ playwright>=1.40.0
 
 # 旧版 Streamlit 演示界面（可选；仅在使用 app_web.py 时需要）
 streamlit>=1.28.0
+
+python-multipart
