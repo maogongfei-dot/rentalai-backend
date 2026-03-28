@@ -32,6 +32,16 @@
     return "£" + n + " /月";
   }
 
+  function hasSearchableGeo(data) {
+    var nf = data.normalized_filters || {};
+    var pq = data.parsed_query || {};
+    if (nf.postcode && String(nf.postcode).trim()) return true;
+    if (nf.area && String(nf.area).trim()) return true;
+    var loc = nf.location || pq.location;
+    if (loc && String(loc).trim() && /[A-Za-z]/.test(String(loc))) return true;
+    return false;
+  }
+
   /* ---------- P10-4 housing ---------- */
   function renderHousing(data) {
     var housingEl = document.getElementById("housing-mode");
@@ -39,10 +49,55 @@
     if (housingEl) housingEl.classList.remove("hidden");
     if (legacyEl) legacyEl.classList.add("hidden");
 
+    var geoOk = hasSearchableGeo(data);
+
+    var missEl = document.getElementById("housing-missing-location");
+    if (missEl) {
+      if (!geoOk) {
+        missEl.classList.remove("hidden");
+        missEl.innerHTML =
+          "<p><strong>Please add a location or postcode.</strong></p>" +
+          "<p class='hint'>请补充城市/地区或英国邮编后再搜索。</p>" +
+          (data.message
+            ? "<p class='hint'>" + escapeHtml(data.message) + "</p>"
+            : "");
+      } else {
+        missEl.classList.add("hidden");
+        missEl.innerHTML = "";
+      }
+    }
+
+    var ms0 = data.market_stats || {};
+    var td0 = data.top_deals || {};
+    var rows0 = td0.top_deals || [];
+    var emptyEl = document.getElementById("housing-empty-hint");
+    if (emptyEl) {
+      var noListings =
+        ms0.total_listings === 0 ||
+        ms0.total_listings === null ||
+        ms0.total_listings === undefined;
+      var noDeals = !rows0.length;
+      if (geoOk && data.success !== false && (noListings || noDeals)) {
+        emptyEl.classList.remove("hidden");
+        emptyEl.innerHTML =
+          "<p><strong>当前条件下未找到足够房源</strong></p>" +
+          "<p class='hint'>建议：扩大搜索区域、放宽预算、或放宽卧室/居室条件。</p>" +
+          "<p><a href='/'>返回首页重新输入</a></p>";
+      } else {
+        emptyEl.classList.add("hidden");
+        emptyEl.innerHTML = "";
+      }
+    }
+
     var banner = document.getElementById("housing-banner");
     if (banner) {
-      banner.textContent = data.message || "";
-      banner.style.display = data.message ? "block" : "none";
+      if (geoOk && data.message) {
+        banner.textContent = data.message;
+        banner.style.display = "block";
+      } else {
+        banner.textContent = "";
+        banner.style.display = "none";
+      }
     }
 
     var errBox = document.getElementById("housing-errors");
@@ -168,7 +223,13 @@
     var dealsEl = document.getElementById("housing-top-deals");
     if (dealsEl) {
       if (!top5.length) {
-        dealsEl.innerHTML = "<p class='hint'>暂无 Top deals 展示数据。</p>";
+        if (!geoOk) {
+          dealsEl.innerHTML =
+            "<p class='hint'>请先补充 <strong>location</strong> 或 <strong>postcode</strong> 后再检索。</p>";
+        } else {
+          dealsEl.innerHTML =
+            "<p class='hint'>暂无 Top deals。若上方已提示空结果，请放宽条件后重试。</p>";
+        }
       } else {
         dealsEl.innerHTML = top5
           .map(function (it) {

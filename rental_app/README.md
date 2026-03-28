@@ -122,7 +122,7 @@ streamlit run app_web.py
 
 ## 部署说明（Vercel 前端 + Render 后端）
 
-适用：**静态页**部署到 **Vercel**，**FastAPI** 部署到 **Render**；二者分域时浏览器会跨域调用 API（后端已配置宽松 CORS）。
+适用：**静态页**部署到 **Vercel**，**FastAPI** 部署到 **Render**；二者分域时浏览器会跨域调用 API。后端 CORS 由 **`ALLOWED_ORIGINS`** 配置（逗号分隔）；未设置时默认为 `*`（本地/开发便利），**生产请在 Render 控制台填入 Vercel 站点 origin**（见 `.env.example`）。
 
 ### 1. 前端（Vercel）
 
@@ -146,10 +146,10 @@ streamlit run app_web.py
 |----|-----|
 | Root Directory | `rental_app` |
 | Build | `pip install -r requirements.txt`（按需加 `&& playwright install chromium`） |
-| Start | `python run.py`（与 `Procfile` 一致） |
-| Health | `/health` |
+| Start | `python run.py`（与 `Procfile` 一致）；等价可直接 `uvicorn api_server:app --host 0.0.0.0 --port $PORT` |
+| Health | `GET /health` → JSON 含 `success`、`service`、`status`（见 `api_server.py`） |
 
-环境变量见 **`.env.example`**；平台会注入 **`PORT`**，`config.py` 已读取。
+环境变量见 **`.env.example`**；平台会注入 **`PORT`**，`config.py` 已读取。**生产必填建议**：`ALLOWED_ORIGINS`（前端公网 origin）；可选 `RENTALAI_DEBUG=0`。
 
 ### 3. 部署后如何测通
 

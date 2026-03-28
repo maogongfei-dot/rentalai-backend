@@ -57,6 +57,8 @@ from data.storage.records_query_service import (
 )
 from task_store import TaskStore
 
+from config import get_cors_origins
+
 logger = logging.getLogger("rentalai.api")
 logging.basicConfig(
     level=logging.INFO,
@@ -75,10 +77,11 @@ app = FastAPI(
 
 _WEB_PUBLIC_DIR = Path(__file__).resolve().parent / "web_public"
 
+_cors_origins, _cors_allow_credentials = get_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -259,8 +262,9 @@ def _append_high_safety_note(explain: dict[str, Any], prefs: dict[str, Any]) -> 
 @app.get("/health")
 def health():
     return {
+        "success": True,
+        "service": "rentalai-backend",
         "status": "ok",
-        "service": "rentalai-api",
         "api_version": "P2-Phase5",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

@@ -404,6 +404,34 @@ a {
   margin-bottom: 0.5rem;
 }
 
+/* P10-4-3：首页 loading / 结果页提示 */
+.ai-loading-panel {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.65rem;
+  background: #eef6ff;
+  border: 1px solid #b8d4f0;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  color: #1a3a5c;
+}
+.card-warn {
+  background: #fff8e6;
+  border-color: #f0d090;
+  color: #5c4a1a;
+}
+.card-warn strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+.empty-state-card {
+  background: #f7f9fc;
+  border-color: #cfd8e6;
+}
+.empty-state-card strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
 .page-header {
   margin-bottom: 0.35rem;
 }

@@ -43,3 +43,22 @@ def get_bind_port() -> int:
 
 def get_uvicorn_reload() -> bool:
     return os.environ.get("RENTALAI_RELOAD", "").strip().lower() in ("1", "true", "yes")
+
+
+def get_cors_origins() -> tuple[list[str], bool]:
+    """CORS allow_origins and whether credentials may be sent.
+
+    - **ALLOWED_ORIGINS** unset or empty: ``["*"]`` (dev-friendly; same as legacy behavior).
+    - Comma-separated explicit origins (e.g. ``https://app.vercel.app``): list those;
+      ``allow_credentials`` is True only for explicit non-wildcard lists.
+    - If ``*`` appears with other entries, wildcard wins (credentials off).
+    """
+    raw = (os.environ.get("ALLOWED_ORIGINS") or "").strip()
+    if not raw:
+        return (["*"], False)
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    if not parts:
+        return (["*"], False)
+    if any(p == "*" for p in parts):
+        return (["*"], False)
+    return (parts, True)

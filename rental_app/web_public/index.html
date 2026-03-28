@@ -27,6 +27,9 @@
         <div class="actions-row">
           <button type="button" id="ai-go">开始分析</button>
         </div>
+        <div id="ai-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
+          <span id="ai-loading-text">Analyzing market...</span>
+        </div>
         <p class="hint muted small-print">提示：Enter 提交 · Shift+Enter 换行</p>
         <p class="home-quick-links">
           <a href="/history">去历史记录</a>
@@ -34,11 +37,14 @@
           <a href="/compare">去房源对比</a>
         </p>
         <ul class="hint muted ai-examples" aria-label="示例">
+          <li>I want a 2-bed in Milton Keynes for 1000 to 1500</li>
+          <li>Show me cheaper 1-bed rentals near DE1 with images</li>
           <li>我想找 Milton Keynes 月租 1200 以内、通勤方便的一居室</li>
-          <li>我想租一个包 bill、离车站近、适合情侣住的房子</li>
-          <li>帮我看看这个房子值不值得租，预算 1500，最好安全一点</li>
         </ul>
         <div id="ai-err" class="err hidden" role="alert"></div>
+        <div id="ai-retry-row" class="actions-row hidden">
+          <button type="button" id="ai-retry">重试</button>
+        </div>
       </section>
 
       <!-- 如何使用（静态说明区） -->
