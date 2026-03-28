@@ -1,4 +1,8 @@
 (function () {
+  function apiUrl(path) {
+    return typeof window.rentalaiApiUrl === "function" ? window.rentalaiApiUrl(path) : path;
+  }
+
   var form = document.getElementById("register-form");
   var err = document.getElementById("register-err");
   if (!form) return;
@@ -11,7 +15,7 @@
     }
     var email = (document.getElementById("register-email") || {}).value || "";
     var password = (document.getElementById("register-password") || {}).value || "";
-    fetch("/auth/register", {
+    fetch(apiUrl("/auth/register"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: email.trim(), password: password }),

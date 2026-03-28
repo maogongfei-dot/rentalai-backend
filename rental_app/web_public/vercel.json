@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
   "rewrites": [
     { "source": "/login", "destination": "/login.html" },
     { "source": "/ai-result", "destination": "/ai_result.html" },

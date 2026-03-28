@@ -1,4 +1,8 @@
 (function (global) {
+  function apiUrl(path) {
+    return typeof global.rentalaiApiUrl === "function" ? global.rentalaiApiUrl(path) : path;
+  }
+
   var POLL_MS = 2500;
   var ANALYZE_COUNT_KEY = "rentalai_analyze_started_count";
 
@@ -70,7 +74,7 @@
     var max = 120;
     function step(i) {
       if (i >= max) return Promise.reject(new Error("poll timeout"));
-      return fetch("/tasks/" + encodeURIComponent(taskId), { headers: headers }).then(function (r) {
+      return fetch(apiUrl("/tasks/" + encodeURIComponent(taskId)), { headers: headers }).then(function (r) {
         if (r.status === 404) return Promise.reject(new Error("not found"));
         if (!r.ok) {
           return new Promise(function (resolve) {
@@ -121,7 +125,7 @@
     go.disabled = true;
     var headers = taskHeaders();
 
-    fetch("/tasks", {
+    fetch(apiUrl("/tasks"), {
       method: "POST",
       headers: headers,
       body: JSON.stringify(body),
@@ -172,7 +176,7 @@
       if (i >= max) {
         return Promise.reject(new Error("timeout"));
       }
-      return fetch("/tasks/" + encodeURIComponent(taskId), { headers: headers }).then(function (r) {
+      return fetch(apiUrl("/tasks/" + encodeURIComponent(taskId)), { headers: headers }).then(function (r) {
         if (r.status === 404) {
           return Promise.reject(new Error("task_not_found"));
         }

@@ -2,6 +2,10 @@
  * P10 Phase3 Step3 — /history list UI.
  */
 (function (global) {
+  function apiUrl(path) {
+    return typeof global.rentalaiApiUrl === "function" ? global.rentalaiApiUrl(path) : path;
+  }
+
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;")
@@ -83,7 +87,7 @@
 
     H.getToken()
       .then(function (token) {
-        return fetch("/records/ui-history?limit=50", {
+        return fetch(apiUrl("/records/ui-history?limit=50"), {
           headers: { Authorization: "Bearer " + token },
         });
       })

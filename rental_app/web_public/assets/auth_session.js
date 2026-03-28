@@ -3,6 +3,10 @@
  * P10 Phase7 — guest session header for tasks without blocking analysis.
  */
 (function (global) {
+  function apiUrl(path) {
+    return typeof global.rentalaiApiUrl === "function" ? global.rentalaiApiUrl(path) : path;
+  }
+
   var K = {
     bearer: "rentalai_bearer",
     userId: "rentalai_user_id",
@@ -111,7 +115,7 @@
     var t = getStoredToken();
     var p = Promise.resolve();
     if (t) {
-      p = fetch("/auth/logout", {
+      p = fetch(apiUrl("/auth/logout"), {
         method: "POST",
         headers: { Authorization: "Bearer " + t },
       }).catch(function () {});
@@ -150,7 +154,7 @@
   function backfillProfileFromServer() {
     var t = getStoredToken();
     if (!t) return;
-    fetch("/auth/me", { headers: { Authorization: "Bearer " + t } })
+    fetch(apiUrl("/auth/me"), { headers: { Authorization: "Bearer " + t } })
       .then(function (r) {
         if (r.status === 401) {
           clearSession();

@@ -128,17 +128,15 @@ streamlit run app_web.py
 
 | 项 | 值 |
 |----|-----|
-| 部署目录 | `rental_app/web_public`（仓库若根在 `rental_app` 则填 `web_public`） |
-| 构建 | 无需；无 `npm run build` |
-| 路由 | 使用 `web_public/vercel.json` 将 `/login`、`/ai-result`、`/history`、`/compare` 等重写到对应 `.html`，**避免刷新 404** |
+| 部署目录 | `rental_app/web_public`（仓库根若在上一级则选 `rental_app/web_public`） |
+| 构建 | **`npm install && npm run build`**（见 `web_public/package.json`；`build` 运行 `scripts/inject-api-base.mjs`，按环境变量写入各页 `<meta name="rentalai-api-base">`）。未设置 `RENTALAI_API_BASE` 时构建为 no-op，meta 保持空 = 同源。 |
+| 路由 | `web_public/vercel.json` 将 `/login`、`/ai-result` 等重写到对应 `.html`，**避免刷新 404** |
 
-**API 地址**：在 `web_public/index.html` 中设置
+**API 根地址（环境变量，推荐）**：在 Vercel Project → Environment Variables（**Build**）设置 **`RENTALAI_API_BASE`** = `https://你的-render-服务.onrender.com`（无尾部斜杠）。兼容别名：`VITE_RENTALAI_API_BASE`、`NEXT_PUBLIC_RENTALAI_API_BASE`、`VITE_API_BASE_URL`（见 `web_public/.env.example`）。
 
-`<meta name="rentalai-api-base" content="https://你的-render-服务.onrender.com">`
+也可在发布前手动编辑 HTML 中的 `<meta name="rentalai-api-base" content="...">`。
 
-（无尾部斜杠；留空则请求相对路径 `/api/ai-analyze`，仅在同源部署时可用。）
-
-脚本 `assets/api_config.js` 会读取该 meta 并写入 `window.RENTALAI_API_BASE`，`ai_home.js` 用其拼接 `POST .../api/ai-analyze`。
+`assets/api_config.js` 会设置 `window.RENTALAI_API_BASE` 与 **`window.rentalaiApiUrl(path)`**；`ai_home.js` 通过其请求 **`POST /api/ai/query`**（勿在业务脚本里写死后端域名）。
 
 ### 2. 后端（Render）
 
@@ -154,11 +152,21 @@ streamlit run app_web.py
 ### 3. 部署后如何测通
 
 1. 浏览器打开 Render 上的 `https://…/health`。
-2. 打开 Vercel 站点首页，确认已填 `rentalai-api-base`。
-3. 登录（本地假登录）→ 输入需求 → **开始分析** → 应进入结果页并看到推荐数据。
+2. 打开 Vercel 站点 `/`，确认已配置 API base（meta 或构建注入）。
+3. 输入含地区/邮编的英文需求 → **开始分析** → `/ai-result` 应展示 Query Summary、Market Summary、Top Deals、Recommendation Report。
+
+**书面清单**：**`docs/deployment_checklist.md`**。
+
+**命令行冒烟**（在 `rental_app` 目录，需可访问公网后端）：
+
+```bash
+# Windows PowerShell: $env:RENTALAI_API_BASE="https://..."
+# bash: export RENTALAI_API_BASE=https://...
+python scripts/smoke_test.py https://你的-render.onrender.com
+```
 
 更细的步骤与限制见 **`DEPLOYMENT_PLAN.md`**。  
-**按表执行上线**：**`LAUNCH_CHECKLIST.md`**（Vercel + Render 步骤、API 替换、检查清单、发布后测试顺序）。
+**按表执行上线**：**`LAUNCH_CHECKLIST.md`**。
 
 ---
 

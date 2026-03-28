@@ -2,6 +2,10 @@
  * P10 Phase3 Step3 — auto-save completed analysis to /records/ui-history (logged-in only).
  */
 (function (global) {
+  function apiUrl(path) {
+    return typeof global.rentalaiApiUrl === "function" ? global.rentalaiApiUrl(path) : path;
+  }
+
   var SAVE_KEY_PREFIX = "rentalai_ui_saved_task_";
 
   function getToken() {
@@ -75,7 +79,7 @@
           display_payload: dp || {},
           raw_task_snapshot: vm.raw_task_state || null,
         };
-        return fetch("/records/ui-history", {
+        return fetch(apiUrl("/records/ui-history"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

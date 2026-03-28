@@ -3,10 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- 部署到 Vercel 且 API 在 Render 时：填写后端根地址，无尾部斜杠，例如 https://xxx.onrender.com -->
+    <!-- 部署到 Vercel：npm run build 注入 meta；本地留空即同源 python run.py -->
+    <meta name="vite-rentalai-api-base" content="" />
     <meta name="rentalai-api-base" content="" />
     <title>RentalAI · AI 租房助手</title>
     <link rel="stylesheet" href="/assets/style.css" />
+    <script src="/assets/api_config.js"></script>
   </head>
   <body>
     <script src="/assets/auth_local.js"></script>
@@ -157,7 +159,6 @@
     <script src="/assets/auth_session.js"></script>
     <script src="/assets/history_shelf.js"></script>
     <script src="/assets/app.js"></script>
-    <script src="/assets/api_config.js"></script>
     <script src="/assets/ai_home.js"></script>
     <script>
       document.getElementById("go").onclick = function () {

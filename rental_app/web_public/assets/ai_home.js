@@ -76,18 +76,24 @@
     setBusy(true);
 
     var navigating = false;
-    var apiBase =
-      typeof window.RENTALAI_API_BASE === "string"
-        ? window.RENTALAI_API_BASE.replace(/\/$/, "")
-        : "";
+    var url =
+      typeof window.rentalaiApiUrl === "function"
+        ? window.rentalaiApiUrl("/api/ai/query")
+        : "/api/ai/query";
 
-    fetch(apiBase + "/api/ai/query", {
+    fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_text: q }),
     })
       .then(function (r) {
-        return r.json().then(function (body) {
+        return r.text().then(function (text) {
+          var body = {};
+          try {
+            body = text ? JSON.parse(text) : {};
+          } catch (e) {
+            throw new Error("服务器返回非 JSON（" + r.status + "）");
+          }
           if (!r.ok) {
             var msg =
               (body && (body.message || body.detail)) ||

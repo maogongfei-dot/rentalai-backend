@@ -459,7 +459,24 @@
     dataH = null;
   }
 
-  if (
+  if (dataH && dataH.success === false) {
+    var housingEl0 = document.getElementById("housing-mode");
+    var legacyEl0 = document.getElementById("legacy-mode");
+    if (housingEl0) housingEl0.classList.remove("hidden");
+    if (legacyEl0) legacyEl0.classList.add("hidden");
+    var errBox0 = document.getElementById("housing-errors");
+    if (errBox0) {
+      errBox0.classList.remove("hidden");
+      errBox0.innerHTML =
+        "<strong>分析未完成</strong><p>" +
+        escapeHtml(dataH.message || dataH.error || "请返回首页重试") +
+        "</p><p><a href='/'>返回首页</a></p>";
+    }
+    var miss0 = document.getElementById("housing-missing-location");
+    if (miss0) miss0.classList.add("hidden");
+    var empty0 = document.getElementById("housing-empty-hint");
+    if (empty0) empty0.classList.add("hidden");
+  } else if (
     dataH &&
     dataH.success !== false &&
     typeof dataH.user_text === "string" &&
