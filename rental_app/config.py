@@ -45,13 +45,28 @@ def get_uvicorn_reload() -> bool:
     return os.environ.get("RENTALAI_RELOAD", "").strip().lower() in ("1", "true", "yes")
 
 
+def _cors_default_origins() -> list[str]:
+    """Extra origins merged when ALLOWED_ORIGINS is a non-empty explicit list.
+
+    Covers local dev and common Render hostnames so a partial ALLOWED_ORIGINS (e.g. only Vercel)
+    does not block the Render-hosted UI or same-service hostname.
+    """
+    return [
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://rentalai-backend.onrender.com",
+    ]
+
+
 def get_cors_origins() -> tuple[list[str], bool]:
     """CORS allow_origins and whether credentials may be sent.
 
-    - **ALLOWED_ORIGINS** unset or empty: ``["*"]`` (dev-friendly; same as legacy behavior).
-    - Comma-separated explicit origins (e.g. ``https://app.vercel.app``): list those;
-      ``allow_credentials`` is True only for explicit non-wildcard lists.
-    - If ``*`` appears with other entries, wildcard wins (credentials off).
+    - **ALLOWED_ORIGINS** unset or empty: ``["*"]`` (open; no credentials).
+    - Comma-separated explicit origins: those hosts only, credentials on; by default we **merge**
+      :func:`_cors_default_origins` unless **ALLOWED_ORIGINS_STRICT=1**.
+    - If ``*`` appears in the list, wildcard wins (credentials off).
     """
     raw = (os.environ.get("ALLOWED_ORIGINS") or "").strip()
     if not raw:
@@ -61,4 +76,18 @@ def get_cors_origins() -> tuple[list[str], bool]:
         return (["*"], False)
     if any(p == "*" for p in parts):
         return (["*"], False)
+    strict = os.environ.get("ALLOWED_ORIGINS_STRICT", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if not strict:
+        for d in _cors_default_origins():
+            if d not in parts:
+                parts.append(d)
+        extra = (os.environ.get("RENTALAI_EXTRA_ALLOWED_ORIGINS") or "").strip()
+        for p in extra.split(","):
+            p = p.strip()
+            if p and p not in parts:
+                parts.append(p)
     return (parts, True)

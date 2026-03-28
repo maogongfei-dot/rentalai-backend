@@ -1,12 +1,21 @@
 /**
- * 公网前后端分离：API 根与静态页不同域时配置。
- * 运行时优先级：meta vite-rentalai-api-base（对应构建环境变量 VITE_RENTALAI_API_BASE）
- *   > meta rentalai-api-base > 已存在的 window.RENTALAI_API_BASE
- * 本地同源（python run.py）两 meta 留空即可。
+ * API 根地址：仅当前端与 FastAPI 不同域时在 meta 中填写（如 Vercel + Render）。
+ * 与当前页面同域（同一 Render Web Service 跑 python run.py）时：meta 留空 → 只用相对路径，无 CORS。
  *
- * 统一请求：window.rentalaiApiUrl("/api/ai/query")；勿在页面写死后端 URL。
+ * 优先级：meta vite-rentalai-api-base > meta rentalai-api-base > window.RENTALAI_API_BASE
+ * 若解析出的 base 与 location.origin 相同，则视为同源并清空 base（避免误配导致跨域）。
  */
 (function () {
+  function normalizeSameOrigin(b) {
+    var s = String(b || "").trim().replace(/\/$/, "");
+    if (!s) return "";
+    try {
+      var o = window.location.origin || "";
+      if (o && s === o) return "";
+    } catch (e) {}
+    return s;
+  }
+
   var base = "";
   try {
     var mv = document.querySelector('meta[name="vite-rentalai-api-base"]');
@@ -19,6 +28,7 @@
   if (!base && typeof window.RENTALAI_API_BASE === "string") {
     base = window.RENTALAI_API_BASE;
   }
+  base = normalizeSameOrigin(base);
   window.RENTALAI_API_BASE = String(base).replace(/\/$/, "");
 
   window.rentalaiApiUrl = function (path) {
