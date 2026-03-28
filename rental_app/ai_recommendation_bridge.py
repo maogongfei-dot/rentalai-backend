@@ -552,7 +552,7 @@ def run_ai_analyze_with_structured(
 ) -> dict[str, Any]:
     """
     已解析的 structured_query → 与 run_ai_analyze 相同候选池与排序（C4 多轮 merge 后复用）。
-    dataset=zoopla 时 structured_query 会传入 load_candidate_houses，驱动 Zoopla 抓取与 normalize。
+    dataset=zoopla|rightmove|market_combined 时 structured_query 传入 load_candidate_houses → 抓取 → cleaner → normalize。
     """
     structured = dict(structured) if structured else {}
 
@@ -564,13 +564,21 @@ def run_ai_analyze_with_structured(
     used_demo = False
     relaxed_city = False
 
-    # dataset 切换：统一从 load_candidate_houses 取 canonical → listing 行
+    # dataset 切换：统一从 load_candidate_houses 取 canonical → listing 行（zoopla/rightmove 与 SQLite 池共享排序）
     if dataset_key in ("demo", "realistic", "multi_source"):
         canon = load_candidate_houses(dataset_key)
         main_rows = canonical_records_to_listing_rows(canon)
     elif dataset_key == "zoopla":
-        # Phase D2：structured_query 传入 loader → fetch_zoopla_listings → clean/normalize
+        # Phase D2：fetch_zoopla → cleaner → normalize
         canon = load_candidate_houses("zoopla", structured_query=structured)
+        main_rows = canonical_records_to_listing_rows(canon)
+    elif dataset_key == "rightmove":
+        # Phase D5：fetch_rightmove → 同一套 cleaner → normalize
+        canon = load_candidate_houses("rightmove", structured_query=structured)
+        main_rows = canonical_records_to_listing_rows(canon)
+    elif dataset_key == "market_combined":
+        # 预留：zoopla + rightmove 合并去重后再推荐
+        canon = load_candidate_houses("market_combined", structured_query=structured)
         main_rows = canonical_records_to_listing_rows(canon)
     else:
         main_rows = _normalize_pool(_maybe_prepend_multisource(export_listings_as_dicts()))
@@ -588,6 +596,20 @@ def run_ai_analyze_with_structured(
     elif dataset_key == "zoopla":
         if filtered_main:
             sample_source = "dataset_zoopla"
+        elif pool:
+            sample_source = "auxiliary_merge"
+        else:
+            sample_source = None
+    elif dataset_key == "rightmove":
+        if filtered_main:
+            sample_source = "dataset_rightmove"
+        elif pool:
+            sample_source = "auxiliary_merge"
+        else:
+            sample_source = None
+    elif dataset_key == "market_combined":
+        if filtered_main:
+            sample_source = "dataset_market_combined"
         elif pool:
             sample_source = "auxiliary_merge"
         else:
@@ -629,22 +651,38 @@ def run_ai_analyze_with_structured(
         relaxed_city=relaxed_city,
         dataset_used=dataset_key,
     )
-    # Phase D2+D4：Zoopla 抓取模式与清洗统计写入 summary
-    if dataset_key == "zoopla":
+    # Phase D2+D4+D5：抓取模式与清洗统计写入 summary（Zoopla / Rightmove / market_combined）
+    if dataset_key in ("zoopla", "rightmove", "market_combined"):
         meta = get_last_candidate_load_meta()
         summ = out.setdefault("summary", {})
-        sm = meta.get("zoopla_source_mode")
-        if sm:
-            summ["source_mode"] = sm
+        if dataset_key == "zoopla":
+            sm = meta.get("zoopla_source_mode")
+            if sm:
+                summ["source_mode"] = sm
+            if sm == "zoopla_mock_fallback":
+                note = "Zoopla live fetch unavailable or empty; using built-in mock listings."
+                summ["note"] = (summ.get("note") + " " if summ.get("note") else "") + note
+            elif sm == "zoopla_realistic_fallback":
+                note = "Zoopla pool unavailable or empty after normalize; using realistic sample pool."
+                summ["note"] = (summ.get("note") + " " if summ.get("note") else "") + note
+        elif dataset_key == "rightmove":
+            sm = meta.get("rightmove_source_mode")
+            if sm:
+                summ["source_mode"] = sm
+            if sm == "rightmove_mock_fallback":
+                note = "Rightmove live fetch unavailable or empty; using built-in mock listings."
+                summ["note"] = (summ.get("note") + " " if summ.get("note") else "") + note
+            elif sm == "rightmove_realistic_fallback":
+                note = "Rightmove pool unavailable or empty after normalize; using realistic sample pool."
+                summ["note"] = (summ.get("note") + " " if summ.get("note") else "") + note
+        else:
+            summ["source_mode"] = {
+                "zoopla": meta.get("zoopla_source_mode"),
+                "rightmove": meta.get("rightmove_source_mode"),
+            }
         scs = meta.get("scrape_clean_stats")
         if isinstance(scs, dict) and scs:
             summ["scrape_clean_stats"] = scs
-        if sm == "zoopla_mock_fallback":
-            note = "Zoopla live fetch unavailable or empty; using built-in mock listings."
-            summ["note"] = (summ.get("note") + " " if summ.get("note") else "") + note
-        elif sm == "zoopla_realistic_fallback":
-            note = "Zoopla pool unavailable or empty after normalize; using realistic sample pool."
-            summ["note"] = (summ.get("note") + " " if summ.get("note") else "") + note
     return out
 
 
@@ -655,7 +693,7 @@ def run_ai_analyze(
     """
     单入口：原始 query → 解析 → 候选房源 → generate_ranking_api_response。
     Phase A5：dataset 为 demo|realistic|multi_source 时，候选池以对应本地样本为主（canonical 加载）；
-    Phase D2：dataset=zoopla 时走 fetch_zoopla_listings(structured_query) → normalize → ranking；
+    Phase D2/D5：dataset=zoopla|rightmove|market_combined 时走对应 fetch → cleaner → normalize → ranking；
     未传 dataset 时保持原行为（SQLite + 可选 multisource 前置 + 合并 + 回退）。
     """
     return run_ai_analyze_with_structured(
@@ -668,6 +706,11 @@ def run_ai_analyze(
 def run_ai_analyze_zoopla(raw_user_query: str) -> dict[str, Any]:
     """Phase D2：单测入口 — 固定 dataset=zoopla，跑完整推荐链路。"""
     return run_ai_analyze(raw_user_query, dataset="zoopla")
+
+
+def run_ai_analyze_rightmove(raw_user_query: str) -> dict[str, Any]:
+    """Phase D5：单测入口 — 固定 dataset=rightmove。"""
+    return run_ai_analyze(raw_user_query, dataset="rightmove")
 
 
 def run_ai_analyze_multiturn(

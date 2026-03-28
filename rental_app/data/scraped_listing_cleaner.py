@@ -1,7 +1,7 @@
 """
-Phase D4：抓取结果清洗与整理层（Zoopla / Playwright 等 raw records）。
+Phase D4/D5：抓取结果清洗与整理层（Zoopla、Rightmove、Playwright 等 raw records）。
 
-raw scraped records → clean_scraped_listings → normalize_house_records → recommendation-ready canonical。
+raw scraped records → clean_scraped_listings → normalize_house_record（逐条 source）→ recommendation-ready canonical。
 
 不编造业务事实，仅做去重、字段清洗、结构默认值与最低质量门槛。
 """
@@ -13,7 +13,7 @@ import logging
 import re
 from typing import Any
 
-from house_canonical import normalize_house_records
+from house_canonical import normalize_house_record
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +171,7 @@ def _first(d: dict[str, Any], *keys: str) -> Any:
     return None
 
 
-def enrich_scraped_listing_defaults(record: dict[str, Any], source: str = "zoopla") -> dict[str, Any]:
+def enrich_scraped_listing_defaults(record: dict[str, Any], source: str | None = "zoopla") -> dict[str, Any]:
     """
     仅补结构默认值，不编造房源事实。
     """
@@ -294,7 +294,7 @@ def _clean_scraped_fields(record: dict[str, Any]) -> dict[str, Any]:
     return r
 
 
-def clean_scraped_listings(records: list[dict[str, Any]], source: str = "zoopla") -> list[dict[str, Any]]:
+def clean_scraped_listings(records: list[dict[str, Any]], source: str | None = "zoopla") -> list[dict[str, Any]]:
     """
     抓取原始列表 → 默认值 → 字段清洗 → 质量过滤 → 去重（listing_id / URL / 标题+邮编+租金）。
 
@@ -361,7 +361,8 @@ def clean_scraped_listings(records: list[dict[str, Any]], source: str = "zoopla"
         "dropped_invalid": dropped_invalid,
     }
     logger.info(
-        "scraped_listing_cleaner: raw=%s cleaned=%s dropped=%s deduped=%s",
+        "scraped_listing_cleaner: source_default=%s raw=%s cleaned=%s dropped=%s deduped=%s",
+        source,
         raw_count,
         cleaned_count,
         dropped_count,
@@ -373,15 +374,24 @@ def clean_scraped_listings(records: list[dict[str, Any]], source: str = "zoopla"
 
 def prepare_scraped_listings_for_recommendation(
     records: list[dict[str, Any]],
-    source: str = "zoopla",
+    source: str | None = "zoopla",
 ) -> list[dict[str, Any]]:
     """
-    接入点：clean_scraped_listings → normalize_house_records → canonical，供推荐引擎使用。
+    接入点：clean_scraped_listings → normalize_house_record（逐条，行内 source 优先）→ canonical。
 
     与 ``clean_and_normalize_house_record`` 并列；本路径专用于抓取结果，含去重与抓取层清洗。
+    Zoopla / Rightmove / market_combined 共用；合并池传 ``source=None`` 且每行带 ``source``。
     """
     cleaned = clean_scraped_listings(records, source=source)
-    return normalize_house_records(cleaned, source=source)
+    out: list[dict[str, Any]] = []
+    for item in cleaned:
+        row_src = ""
+        if isinstance(item, dict) and isinstance(item.get("source"), str):
+            row_src = item.get("source", "").strip().lower()
+        fallback = source.strip().lower() if isinstance(source, str) and source.strip() else ""
+        norm_src = row_src or fallback or "unknown"
+        out.append(normalize_house_record(item, source=norm_src))
+    return out
 
 
 __all__ = [

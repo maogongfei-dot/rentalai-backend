@@ -379,7 +379,8 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
     Phase1：自然语言 → 规则解析 → Module5 排序 → Top 房源。
     请求体 JSON：`{ \"raw_user_query\": \"...\" }`（兼容顶层 `query`）。
     Phase A5：可选 `dataset`: demo | realistic | multi_source（指定时以对应本地样本为主候选池）。
-    Phase D2：可选 `dataset`: zoopla（structured_query 由解析器生成，经 fetch_zoopla_listings → 推荐）。
+    Phase D2：可选 `dataset`: zoopla（fetch_zoopla → cleaner → 推荐）。
+    Phase D5：可选 `dataset`: rightmove | market_combined（同上，Rightmove 或双源合并）。
     Phase C4：可选 `previous_structured_query`、`conversation_id` → 多轮 merge + 内存会话。
     """
     from ai_recommendation_bridge import (
@@ -407,6 +408,8 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
         "realistic",
         "multi_source",
         "zoopla",
+        "rightmove",
+        "market_combined",
     ):
         dataset = ds.strip().lower()
     prev_sq = body.get("previous_structured_query")
@@ -429,6 +432,68 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
         return JSONResponse(content=payload)
     except Exception as exc:
         logger.exception("ai-analyze failed")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "server_error", "message": str(exc)},
+        )
+
+
+@app.post("/api/market/combined")
+def api_market_combined(body: dict = Body(default_factory=dict)):
+    """
+    Phase D6：Zoopla + Rightmove 统一合并查询（去重、来源标记、排序）。
+    请求体可选：location, area, postcode, min_price, max_price, min_bedrooms, max_bedrooms, limit, sort_by。
+    """
+    from services.market_combined import get_combined_market_listings
+
+    if not isinstance(body, dict):
+        body = {}
+    try:
+        out = get_combined_market_listings(
+            location=body.get("location"),
+            area=body.get("area"),
+            postcode=body.get("postcode"),
+            min_price=body.get("min_price"),
+            max_price=body.get("max_price"),
+            min_bedrooms=body.get("min_bedrooms"),
+            max_bedrooms=body.get("max_bedrooms"),
+            limit=body.get("limit"),
+            sort_by=body.get("sort_by"),
+        )
+        return JSONResponse(content=out)
+    except Exception as exc:
+        logger.exception("market combined failed")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "server_error", "message": str(exc), "errors": {"_": str(exc)}},
+        )
+
+
+@app.post("/api/market/insight")
+def api_market_insight(body: dict = Body(default_factory=dict)):
+    """
+    Phase D7：合并房源 + 市场统计与轻量结论（复用 D6 ``get_combined_market_listings``）。
+    请求体与 ``/api/market/combined`` 相同可选字段。
+    """
+    from services.market_insight import get_market_insight
+
+    if not isinstance(body, dict):
+        body = {}
+    try:
+        out = get_market_insight(
+            location=body.get("location"),
+            area=body.get("area"),
+            postcode=body.get("postcode"),
+            min_price=body.get("min_price"),
+            max_price=body.get("max_price"),
+            min_bedrooms=body.get("min_bedrooms"),
+            max_bedrooms=body.get("max_bedrooms"),
+            limit=body.get("limit"),
+            sort_by=body.get("sort_by"),
+        )
+        return JSONResponse(content=out)
+    except Exception as exc:
+        logger.exception("market insight failed")
         return JSONResponse(
             status_code=500,
             content={"success": False, "error": "server_error", "message": str(exc)},
