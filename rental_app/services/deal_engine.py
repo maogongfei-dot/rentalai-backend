@@ -222,7 +222,162 @@ def rank_deals(
     }
 
 
+# --- Phase D8-3 / D8-4：风险与最终决策（规则版，可扩展）---
+
+# 风险标记（机器可读）；severity 用于聚合 risk_level
+_RISK_RULES: tuple[tuple[str, str], ...] = (
+    ("price_suspiciously_low", "high"),
+    ("listing_url_missing", "high"),
+    ("missing_location_identity", "medium"),
+    ("no_image", "medium"),
+    ("bedrooms_missing", "medium"),
+)
+
+_RISK_MESSAGES: dict[str, str] = {
+    "price_suspiciously_low": "Price is ~30%+ below the sample average — verify against scams or bad data.",
+    "listing_url_missing": "No listing URL — cannot trace source or open the original advert.",
+    "missing_location_identity": "No address and no postcode — hard to verify location.",
+    "no_image": "No property image in the feed — weaker confidence.",
+    "bedrooms_missing": "Bedroom count missing — harder to compare like-for-like.",
+}
+
+
+def _aggregate_risk_level(flags: list[str]) -> str:
+    sev: set[str] = set()
+    for code, level in _RISK_RULES:
+        if code in flags:
+            sev.add(level)
+    if "high" in sev:
+        return "high"
+    if "medium" in sev:
+        return "medium"
+    return "low"
+
+
+def analyze_listing_risks(listing: dict[str, Any], market_insight: dict[str, Any]) -> dict[str, Any]:
+    """
+    单房源风险标记与等级（low / medium / high）。无数据时安全返回空标记 + low。
+    """
+    if not isinstance(listing, dict):
+        listing = {}
+    if not isinstance(market_insight, dict):
+        market_insight = {}
+
+    flags: list[str] = []
+    stats = market_insight.get("stats") if isinstance(market_insight.get("stats"), dict) else {}
+
+    price = _f(listing.get("price_pcm"))
+    avg = _f(stats.get("average_price_pcm"))
+    if price is not None and price > 0 and avg is not None and avg > 0:
+        if price / avg <= 0.70:
+            flags.append("price_suspiciously_low")
+
+    addr_ok = bool((listing.get("address") or "").strip())
+    pc_ok = bool((listing.get("postcode") or "").strip())
+    if not addr_ok and not pc_ok:
+        flags.append("missing_location_identity")
+
+    if not (listing.get("image_url") or "").strip():
+        flags.append("no_image")
+
+    if _bed_key(listing) is None:
+        flags.append("bedrooms_missing")
+
+    if not (listing.get("listing_url") or "").strip():
+        flags.append("listing_url_missing")
+
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for f in flags:
+        if f not in seen:
+            seen.add(f)
+            ordered.append(f)
+
+    return {
+        "risk_flags": ordered,
+        "risk_level": _aggregate_risk_level(ordered),
+    }
+
+
+def build_deal_decision(listing: dict[str, Any], market_insight: dict[str, Any]) -> dict[str, Any]:
+    """
+    综合 deal 分与风险规则输出 DO / CAUTION / AVOID（无 LLM）。
+    """
+    if not isinstance(listing, dict):
+        listing = {}
+    if not isinstance(market_insight, dict):
+        market_insight = {}
+
+    calc = calculate_deal_score(listing, market_insight)
+    score = float(calc.get("deal_score") or 0.0)
+    risk_block = analyze_listing_risks(listing, market_insight)
+    risk_level = str(risk_block.get("risk_level") or "low")
+    rflags = list(risk_block.get("risk_flags") or [])
+
+    if risk_level == "high" or score < 60.0:
+        decision = "AVOID"
+    elif score >= 80.0 and risk_level == "low":
+        decision = "DO"
+    else:
+        decision = "CAUTION"
+
+    reasons: list[str] = []
+    if score >= 80:
+        reasons.append("Deal score is strong versus this sample.")
+    elif score >= 60:
+        reasons.append("Deal score is moderate — worth cross-checking details.")
+    else:
+        reasons.append("Deal score is weak versus this sample.")
+
+    if risk_level == "high":
+        reasons.append("Risk signals are elevated (fraud, missing source, or implausible price).")
+    elif risk_level == "medium":
+        reasons.append("Some listing fields are incomplete or weak for verification.")
+
+    risks_human = [_RISK_MESSAGES.get(c, c) for c in rflags]
+
+    summary_parts = [
+        f"Deal score {score:.0f}/100.",
+        f"Listing risk: {risk_level}.",
+    ]
+    if rflags:
+        summary_parts.append("Flags: " + ", ".join(rflags) + ".")
+    else:
+        summary_parts.append("No rule-based red flags.")
+    summary = " ".join(summary_parts)
+
+    if decision == "DO":
+        actions = [
+            "Shortlist for viewings and compare with a few same-bedroom listings nearby.",
+            "Confirm rent, bills, and deposit on the live portal before committing.",
+        ]
+    elif decision == "CAUTION":
+        actions = [
+            "Verify address/postcode and photos on the original site.",
+            "Cross-check price against the portal and similar ads.",
+        ]
+    else:
+        actions = [
+            "Do not rely on this row alone — find a verifiable listing URL or agent contact.",
+            "If the price looks too good, treat as suspicious until proven otherwise.",
+        ]
+
+    return {
+        "decision": decision,
+        "score": round(score, 2),
+        "summary": summary,
+        "reasons": reasons,
+        "risks": risks_human,
+        "action_suggestion": actions,
+        "risk_flags": rflags,
+        "risk_level": risk_level,
+        "score_breakdown": calc.get("score_breakdown") or {},
+    }
+
+
 __all__ = [
+    "analyze_listing_risks",
+    "build_deal_decision",
     "calculate_deal_score",
     "deal_tag_from_score",
     "rank_deals",

@@ -502,6 +502,123 @@ def api_market_insight(body: dict = Body(default_factory=dict)):
         )
 
 
+@app.post("/api/market/deals")
+@app.post("/market/deals")
+def api_market_deals(body: dict = Body(default_factory=dict)):
+    """
+    Phase D8：合并房源 → insight → rank_deals → 对 Top deals 附加 ``deal_decision``。
+    请求体：与 ``/api/market/combined`` 相同，另可选 ``top_n``（默认 10）。
+    返回：top_deals, market_summary, decision_overview。
+    """
+    from services.deal_engine import build_deal_decision, rank_deals
+    from services.market_insight import build_market_summary, get_market_insight
+
+    if not isinstance(body, dict):
+        body = {}
+    try:
+        insight = get_market_insight(
+            location=body.get("location"),
+            area=body.get("area"),
+            postcode=body.get("postcode"),
+            min_price=body.get("min_price"),
+            max_price=body.get("max_price"),
+            min_bedrooms=body.get("min_bedrooms"),
+            max_bedrooms=body.get("max_bedrooms"),
+            limit=body.get("limit"),
+            sort_by=body.get("sort_by"),
+        )
+        listings = insight.get("listings") or []
+        top_n = body.get("top_n", 10)
+        try:
+            top_n_int = max(1, int(top_n)) if top_n is not None else 10
+        except (TypeError, ValueError):
+            top_n_int = 10
+
+        ranked = rank_deals(listings, insight, top_n=top_n_int)
+        top_deals: list[dict] = []
+        for row in ranked["top_deals"]:
+            dec = build_deal_decision(row, insight)
+            top_deals.append({**row, "deal_decision": dec})
+
+        decision_counts = {"DO": 0, "CAUTION": 0, "AVOID": 0}
+        for row in top_deals:
+            d = (row.get("deal_decision") or {}).get("decision")
+            if d in decision_counts:
+                decision_counts[d] += 1
+
+        seen_rf: set[str] = set()
+        risk_flag_examples: list[str] = []
+        for row in top_deals:
+            for rf in (row.get("deal_decision") or {}).get("risk_flags") or []:
+                if rf not in seen_rf:
+                    seen_rf.add(rf)
+                    risk_flag_examples.append(rf)
+
+        decision_overview = {
+            "decision_counts": decision_counts,
+            "average_score_all": ranked["average_score"],
+            "score_distribution": ranked["score_distribution"],
+            "top_deal_scores": [float(r.get("deal_score") or 0) for r in top_deals[:5]],
+            "risk_flag_examples": risk_flag_examples,
+        }
+
+        out = {
+            "success": bool(insight.get("success", True)),
+            "location": insight.get("location"),
+            "query": insight.get("query"),
+            "top_deals": top_deals,
+            "market_summary": build_market_summary(insight),
+            "decision_overview": decision_overview,
+        }
+        return JSONResponse(content=out)
+    except Exception as exc:
+        logger.exception("market deals failed")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "server_error", "message": str(exc)},
+        )
+
+
+@app.post("/api/market/explain")
+@app.post("/market/explain")
+def api_market_explain(body: dict = Body(default_factory=dict)):
+    """
+    Phase D9：合并房源 → insight → rank_deals → top explanations → ``build_market_recommendation_report``。
+    请求体与 ``/api/market/combined`` 相同，另可选 ``top_n``（默认 10）。
+    返回：market_summary, top_deals, explanations, recommendation_report。
+    """
+    from services.explain_engine import build_market_explain_bundle
+
+    if not isinstance(body, dict):
+        body = {}
+    try:
+        top_n = body.get("top_n", 10)
+        try:
+            top_n_int = max(1, int(top_n)) if top_n is not None else 10
+        except (TypeError, ValueError):
+            top_n_int = 10
+
+        out = build_market_explain_bundle(
+            location=body.get("location"),
+            area=body.get("area"),
+            postcode=body.get("postcode"),
+            min_price=body.get("min_price"),
+            max_price=body.get("max_price"),
+            min_bedrooms=body.get("min_bedrooms"),
+            max_bedrooms=body.get("max_bedrooms"),
+            limit=body.get("limit"),
+            sort_by=body.get("sort_by"),
+            top_n=top_n_int,
+        )
+        return JSONResponse(content=out)
+    except Exception as exc:
+        logger.exception("market explain failed")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "server_error", "message": str(exc)},
+        )
+
+
 class ContractAnalyzeTextBody(BaseModel):
     """POST /api/contract/analyze-text — 纯文本合同风险扫描（rule-based）。"""
 
