@@ -57,6 +57,22 @@ def _empty_combined() -> dict[str, Any]:
     }
 
 
+def _market_stats_from_insight(insight: dict[str, Any]) -> dict[str, Any]:
+    """供前端结果页展示的扁平市场指标（与 ``market_summary`` 文案互补）。"""
+    stats = insight.get("stats") if isinstance(insight.get("stats"), dict) else {}
+    pb = insight.get("price_bands") if isinstance(insight.get("price_bands"), dict) else {}
+    ov = insight.get("overall_analysis") if isinstance(insight.get("overall_analysis"), dict) else {}
+    return {
+        "total_listings": stats.get("total_listings"),
+        "average_price_pcm": stats.get("average_price_pcm"),
+        "median_price_pcm": stats.get("median_price_pcm"),
+        "dominant_price_band": pb.get("dominant_price_band"),
+        "market_price_level": ov.get("market_price_level"),
+        "supply_level": ov.get("supply_level"),
+        "bedroom_focus": ov.get("bedroom_focus"),
+    }
+
+
 def run_housing_ai_query(user_text: str) -> dict[str, Any]:
     """
     解析用户话 → 标准化参数 → D6 拉取 →（可选过滤）→ D7 insight → D8 rank → D9 explain + report。
@@ -145,6 +161,7 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
             "parsed_query": parsed,
             "normalized_filters": normalized,
             "market_summary": build_market_summary(insight),
+            "market_stats": _market_stats_from_insight(insight),
             "top_deals": ranked,
             "explanations": explanations,
             "recommendation_report": report,
@@ -266,6 +283,7 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
         "parsed_query": parsed,
         "normalized_filters": normalized,
         "market_summary": ms,
+        "market_stats": _market_stats_from_insight(insight),
         "top_deals": ranked,
         "explanations": explanations,
         "recommendation_report": report,

@@ -1,5 +1,5 @@
 /**
- * Phase1 AI 首页：提交自然语言 → POST /api/ai-analyze → 跳转结果页（sessionStorage）
+ * P10-4：AI 首页 → POST /api/ai/query → sessionStorage ai_housing_query_last → /ai-result
  */
 (function () {
   var ta = document.getElementById("ai-query");
@@ -30,10 +30,10 @@
       typeof window.RENTALAI_API_BASE === "string"
         ? window.RENTALAI_API_BASE.replace(/\/$/, "")
         : "";
-    fetch(apiBase + "/api/ai-analyze", {
+    fetch(apiBase + "/api/ai/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw_user_query: q }),
+      body: JSON.stringify({ user_text: q }),
     })
       .then(function (r) {
         return r.json().then(function (body) {
@@ -45,7 +45,7 @@
       })
       .then(function (data) {
         try {
-          sessionStorage.setItem("ai_analyze_last", JSON.stringify(data));
+          sessionStorage.setItem("ai_housing_query_last", JSON.stringify(data));
         } catch (e) {
           showErr("无法保存结果，请检查浏览器是否禁用存储");
           return;

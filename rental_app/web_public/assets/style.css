@@ -376,6 +376,34 @@ a {
   max-width: 48rem;
 }
 
+/* P10-4：/api/ai/query 结果页滚动区 */
+.scroll-panel {
+  max-height: 22rem;
+  overflow: auto;
+}
+.deals-stack .deal-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: #fff;
+}
+.deal-headline {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.9rem;
+  color: #333;
+}
+.report-stack p {
+  margin: 0.5rem 0;
+}
+.small-print {
+  font-size: 0.88rem;
+}
+.kv-block .kv-list {
+  margin-bottom: 0.5rem;
+}
+
 .page-header {
   margin-bottom: 0.35rem;
 }
