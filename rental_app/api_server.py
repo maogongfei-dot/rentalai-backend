@@ -619,6 +619,35 @@ def api_market_explain(body: dict = Body(default_factory=dict)):
         )
 
 
+@app.post("/api/ai/query")
+@app.post("/ai/query")
+@app.post("/market/ask")
+def api_ai_query(body: dict = Body(default_factory=dict)):
+    """
+    Phase D10：自然语言房源查询编排（``run_housing_ai_query``）。
+    请求体：``{ "user_text": "..." }``，兼容 ``query`` 字段。
+    """
+    from services.chat_orchestrator import run_housing_ai_query
+
+    if not isinstance(body, dict):
+        body = {}
+    try:
+        ut = body.get("user_text") if body.get("user_text") is not None else body.get("query")
+        out = run_housing_ai_query(str(ut or ""))
+        return JSONResponse(content=out)
+    except Exception as exc:
+        logger.exception("ai query failed")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": "server_error",
+                "message": str(exc),
+                "errors": {"_": str(exc)},
+            },
+        )
+
+
 class ContractAnalyzeTextBody(BaseModel):
     """POST /api/contract/analyze-text — 纯文本合同风险扫描（rule-based）。"""
 

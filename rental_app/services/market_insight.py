@@ -398,6 +398,103 @@ def get_market_insight(
     }
 
 
+def build_insight_from_combined_listings(
+    combined: dict[str, Any],
+    listings: list[dict[str, Any]],
+    *,
+    location: str | None = None,
+    area: str | None = None,
+    postcode: str | None = None,
+    min_price: float | int | None = None,
+    max_price: float | int | None = None,
+    min_bedrooms: int | float | None = None,
+    max_bedrooms: int | float | None = None,
+    limit: int | None = None,
+    sort_by: str | None = None,
+) -> dict[str, Any]:
+    """
+    在已有 ``get_combined_market_listings`` 结果上，用给定 ``listings``（如二次过滤后）重算统计，
+    返回结构与 ``get_market_insight`` 一致。
+    """
+    listings = [x for x in listings if isinstance(x, dict)]
+    sources_used = list(combined.get("sources_used") or [])
+    errors = dict(combined.get("errors") or {})
+
+    query = {
+        "location": location,
+        "area": area,
+        "postcode": postcode,
+        "min_price": min_price,
+        "max_price": max_price,
+        "min_bedrooms": min_bedrooms,
+        "max_bedrooms": max_bedrooms,
+        "limit": limit,
+        "sort_by": sort_by,
+    }
+
+    if not listings:
+        empty_stats = {
+            "total_listings": 0,
+            "sources_used": list(sources_used),
+            "average_price_pcm": None,
+            "median_price_pcm": None,
+            "min_price_pcm": None,
+            "max_price_pcm": None,
+            "average_bedrooms": None,
+            "bedroom_distribution": {},
+            "property_type_distribution": {},
+            "postcode_distribution_top": [],
+            "furnished_distribution": {},
+            "listings_with_images": 0,
+            "listings_with_postcode": 0,
+            "listings_with_coordinates": 0,
+        }
+        return {
+            "success": True,
+            "message": "No listings in sample for this query.",
+            "location": combined.get("location"),
+            "query": query,
+            "combined_errors": errors,
+            "total_before_dedupe": combined.get("total_before_dedupe"),
+            "total_after_dedupe": combined.get("total_after_dedupe"),
+            "stats": empty_stats,
+            "price_bands": analyze_price_bands([]),
+            "bedroom_price_map": {},
+            "value_candidates": [],
+            "overall_analysis": {
+                "market_price_level": "medium",
+                "supply_level": "low",
+                "bedroom_focus": None,
+                "value_message": "No data to summarize.",
+            },
+            "listings": [],
+        }
+
+    stats = _build_basic_stats(listings, sources_used)
+    price_bands = analyze_price_bands(listings)
+    bed_map = analyze_bedroom_price_map(listings)
+    value_c = analyze_value_candidates(listings, top_n=5)
+    overall = _overall_analysis(stats, stats.get("bedroom_distribution") or {}, price_bands)
+
+    listings_out = [_clean_listing_for_json(x) for x in listings]
+
+    return {
+        "success": bool(combined.get("success", True)),
+        "message": "OK",
+        "location": combined.get("location"),
+        "query": query,
+        "combined_errors": errors,
+        "total_before_dedupe": combined.get("total_before_dedupe"),
+        "total_after_dedupe": combined.get("total_after_dedupe"),
+        "stats": stats,
+        "price_bands": price_bands,
+        "bedroom_price_map": bed_map,
+        "value_candidates": value_c,
+        "overall_analysis": overall,
+        "listings": listings_out,
+    }
+
+
 build_market_insight = get_market_insight
 
 
@@ -607,6 +704,7 @@ __all__ = [
     "analyze_bedroom_price_map",
     "analyze_price_bands",
     "analyze_value_candidates",
+    "build_insight_from_combined_listings",
     "build_market_commentary",
     "build_market_decision_snapshot",
     "build_market_insight",

@@ -24,6 +24,11 @@ from services.explain_engine import (
     build_market_recommendation_report,
     build_top_deals_explanations,
 )
+from services.chat_orchestrator import run_housing_ai_query
+from services.query_parser import (
+    normalize_search_filters,
+    parse_user_housing_query,
+)
 from services.market_insight import (
     analyze_bedroom_price_map,
     analyze_price_bands,
@@ -60,7 +65,10 @@ __all__ = [
     "get_combined_market_listings",
     "get_market_analysis_bundle",
     "get_market_insight",
+    "parse_user_housing_query",
+    "normalize_search_filters",
     "normalize_rightmove_listing",
     "normalize_zoopla_listing",
     "rank_deals",
+    "run_housing_ai_query",
 ]
