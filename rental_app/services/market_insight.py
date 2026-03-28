@@ -145,6 +145,7 @@ def analyze_value_candidates(listings: list[dict[str, Any]], *, top_n: int = 5) 
         ratio = b / p
         slim = {
             "title": L.get("title"),
+            "source_listing_id": L.get("source_listing_id"),
             "price_pcm": p,
             "bedrooms": b,
             "source": L.get("source"),
@@ -400,10 +401,230 @@ def get_market_insight(
 build_market_insight = get_market_insight
 
 
+def build_market_summary(insight_result: dict[str, Any]) -> dict[str, Any]:
+    """
+    将 ``get_market_insight`` 返回转成人读摘要（规则驱动，无 LLM）。
+    """
+    stats = insight_result.get("stats") or {}
+    price_bands = insight_result.get("price_bands") or {}
+    overall = insight_result.get("overall_analysis") or {}
+    value_c = insight_result.get("value_candidates") or []
+    loc = (insight_result.get("location") or "").strip() or "this search area"
+
+    n = int(stats.get("total_listings") or 0)
+    avg = _to_float(stats.get("average_price_pcm"))
+    med = _to_float(stats.get("median_price_pcm"))
+    bd = stats.get("bedroom_distribution") or {}
+    dom_band = price_bands.get("dominant_price_band")
+    m_level = str(overall.get("market_price_level") or "medium")
+    supply = str(overall.get("supply_level") or "low")
+    focus = overall.get("bedroom_focus")
+    with_pc = int(stats.get("listings_with_postcode") or 0)
+
+    key_findings: list[str] = []
+    risk_flags: list[str] = []
+
+    if n == 0:
+        return {
+            "summary_title": f"Market snapshot: {loc}",
+            "key_findings": ["No listings matched the current filters; widen location or budget."],
+            "price_summary": "No price data.",
+            "bedroom_summary": "No bedroom mix data.",
+            "supply_summary": "No supply sample.",
+            "value_summary": "No value candidates.",
+            "recommendation": "Relax price or area constraints, or retry later.",
+            "risk_flags": ["empty_sample"],
+            "next_step_suggestion": "Expand search radius, increase max price, or remove bedroom filters.",
+        }
+
+    # 价格偏高
+    if m_level == "high" or (avg is not None and avg >= 1700):
+        key_findings.append("Rents in this sample skew high versus typical UK shared-london bands.")
+        risk_flags.append("high_market_pcm")
+    elif m_level == "low":
+        key_findings.append("Observed pcm levels are relatively affordable in this sample.")
+
+    # 样本量
+    if n < 5:
+        key_findings.append("Very few listings — treat numbers as indicative only.")
+        risk_flags.append("small_sample")
+    elif n < 15:
+        key_findings.append("Modest sample size; conclusions are directional.")
+
+    # 主流卧室
+    if bd and focus is not None:
+        cnt = bd.get(str(focus), 0)
+        pct = round(100.0 * cnt / n, 1) if n else 0.0
+        key_findings.append(f"The most common bedroom count is {focus} ({pct}% of sample).")
+
+    # 性价比
+    if value_c:
+        key_findings.append(
+            "Some listings sit below the sample average pcm — worth shortlisting for value."
+        )
+
+    # 邮编缺失
+    if n > 0:
+        miss_pc = n - with_pc
+        miss_rate = miss_pc / n
+        if miss_rate > 0.35:
+            key_findings.append("A notable share of rows lack postcodes — address-level comparisons may be weaker.")
+            risk_flags.append("postcode_data_gaps")
+
+    price_summary = (
+        f"Average pcm ~{avg if avg is not None else 'n/a'}, median ~{med if med is not None else 'n/a'}; "
+        f"dominant band: {dom_band or 'n/a'}."
+    )
+    bedroom_summary = (
+        f"Bedroom mix: {bd if bd else 'n/a'}; typical focus: {focus or 'n/a'}."
+    )
+    supply_summary = (
+        f"{n} listings after merge/dedupe; supply level ({supply}) from sample size rules."
+    )
+    value_summary = (
+        f"{len(value_c)} below-average pcm candidates flagged for review."
+        if value_c
+        else "No below-average pcm candidates under current rules."
+    )
+
+    rec_parts = [
+        "Use median pcm as a budget anchor.",
+        "Cross-check any favourite on the agency site before committing.",
+    ]
+    if value_c:
+        rec_parts.insert(0, "Prioritise reviewing value-flagged listings that sit below the sample mean.")
+    if n < 10:
+        rec_parts.append("Broaden area or loosen filters to stabilise statistics.")
+
+    next_step = "Compare top picks on commute and bills; verify deposit and contract terms independently."
+    if n < 5:
+        next_step = "Widen search (adjacent postcodes or higher budget) to build a stronger market picture first."
+
+    return {
+        "summary_title": f"Market snapshot: {loc}",
+        "key_findings": key_findings or ["Sample processed; see stats for detail."],
+        "price_summary": price_summary,
+        "bedroom_summary": bedroom_summary,
+        "supply_summary": supply_summary,
+        "value_summary": value_summary,
+        "recommendation": " ".join(rec_parts),
+        "risk_flags": risk_flags,
+        "next_step_suggestion": next_step,
+    }
+
+
+def build_market_commentary(insight_result: dict[str, Any]) -> dict[str, Any]:
+    """别名，与 ``build_market_summary`` 相同。"""
+    return build_market_summary(insight_result)
+
+
+def build_market_decision_snapshot(insight_result: dict[str, Any]) -> dict[str, Any]:
+    """
+    短结论块，适合 Explain / UI 卡片（无 LLM）。
+    """
+    summ = build_market_summary(insight_result)
+    stats = insight_result.get("stats") or {}
+    value_c = insight_result.get("value_candidates") or []
+    n = int(stats.get("total_listings") or 0)
+    med = stats.get("median_price_pcm")
+    overall = insight_result.get("overall_analysis") or {}
+
+    if n == 0:
+        return {
+            "conclusion": "No listings to characterise this market slice.",
+            "reasons": ["Filters or availability returned an empty set."],
+            "warnings": summ.get("risk_flags") or [],
+            "top_value_listing_ids": [],
+            "top_value_listing_titles": [],
+        }
+
+    conclusion = (
+        f"Median pcm around {med if med is not None else 'n/a'}; "
+        f"{n} listings; market priced as {overall.get('market_price_level', 'medium')}."
+    )
+
+    reasons = [
+        summ.get("supply_summary", ""),
+        summ.get("price_summary", ""),
+    ]
+    reasons = [r for r in reasons if r]
+
+    warnings = list(summ.get("risk_flags") or [])
+
+    titles = [str(v.get("title") or "") for v in value_c if v.get("title")][:5]
+    ids = []
+    for v in value_c:
+        sid = v.get("source_listing_id")
+        if sid is not None and str(sid).strip():
+            ids.append(str(sid).strip())
+    ids = ids[:5]
+
+    return {
+        "conclusion": conclusion,
+        "reasons": reasons,
+        "warnings": warnings,
+        "top_value_listing_ids": ids,
+        "top_value_listing_titles": titles,
+    }
+
+
+def get_market_analysis_bundle(
+    *,
+    location: str | None = None,
+    area: str | None = None,
+    postcode: str | None = None,
+    min_price: float | int | None = None,
+    max_price: float | int | None = None,
+    min_bedrooms: int | float | None = None,
+    max_bedrooms: int | float | None = None,
+    limit: int | None = None,
+    sort_by: str | None = None,
+) -> dict[str, Any]:
+    """
+    D7-4：一次返回 insight 全文 + 摘要 + decision_snapshot（供 API 使用）。
+    """
+    insight = get_market_insight(
+        location=location,
+        area=area,
+        postcode=postcode,
+        min_price=min_price,
+        max_price=max_price,
+        min_bedrooms=min_bedrooms,
+        max_bedrooms=max_bedrooms,
+        limit=limit,
+        sort_by=sort_by,
+    )
+    return {
+        "success": bool(insight.get("success", True)),
+        "location": insight.get("location"),
+        "insight": insight,
+        "summary": build_market_summary(insight),
+        "decision_snapshot": build_market_decision_snapshot(insight),
+    }
+
+
 __all__ = [
     "analyze_bedroom_price_map",
     "analyze_price_bands",
     "analyze_value_candidates",
+    "build_market_commentary",
+    "build_market_decision_snapshot",
     "build_market_insight",
+    "build_market_summary",
+    "get_market_analysis_bundle",
     "get_market_insight",
 ]
+
+
+def _cli_main() -> None:
+    """调试：``python -m services.market_insight London`` — 打印 analysis bundle JSON。"""
+    import json
+    import sys
+
+    loc = (sys.argv[1] if len(sys.argv) > 1 else "London").strip()
+    bundle = get_market_analysis_bundle(location=loc, max_price=2500, limit=20, sort_by="price_asc")
+    print(json.dumps(bundle, indent=2, ensure_ascii=False, default=str))
+
+
+if __name__ == "__main__":
+    _cli_main()

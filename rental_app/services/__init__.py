@@ -11,26 +11,42 @@ from services.market_combined import (
     normalize_rightmove_listing,
     normalize_zoopla_listing,
 )
+from services.deal_engine import (
+    calculate_deal_score,
+    deal_tag_from_score,
+    rank_deals,
+)
 from services.market_insight import (
     analyze_bedroom_price_map,
     analyze_price_bands,
     analyze_value_candidates,
+    build_market_commentary,
+    build_market_decision_snapshot,
     build_market_insight,
+    build_market_summary,
+    get_market_analysis_bundle,
     get_market_insight,
 )
 
 __all__ = [
     "MarketListingUnified",
+    "calculate_deal_score",
     "analyze_bedroom_price_map",
     "analyze_price_bands",
     "analyze_value_candidates",
     "build_listing_dedupe_key",
+    "build_market_commentary",
+    "build_market_decision_snapshot",
     "build_market_insight",
+    "build_market_summary",
     "choose_better_listing",
+    "deal_tag_from_score",
     "dedupe_merge_by_key",
     "fetch_market_combined",
     "get_combined_market_listings",
+    "get_market_analysis_bundle",
     "get_market_insight",
     "normalize_rightmove_listing",
     "normalize_zoopla_listing",
+    "rank_deals",
 ]

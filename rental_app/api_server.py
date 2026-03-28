@@ -470,17 +470,19 @@ def api_market_combined(body: dict = Body(default_factory=dict)):
 
 
 @app.post("/api/market/insight")
+@app.post("/market/insight")
 def api_market_insight(body: dict = Body(default_factory=dict)):
     """
-    Phase D7：合并房源 + 市场统计与轻量结论（复用 D6 ``get_combined_market_listings``）。
+    Phase D7：合并房源 + 市场统计 + 摘要 + decision_snapshot（``get_market_analysis_bundle``）。
     请求体与 ``/api/market/combined`` 相同可选字段。
+    返回：success, location, insight, summary, decision_snapshot。
     """
-    from services.market_insight import get_market_insight
+    from services.market_insight import get_market_analysis_bundle
 
     if not isinstance(body, dict):
         body = {}
     try:
-        out = get_market_insight(
+        out = get_market_analysis_bundle(
             location=body.get("location"),
             area=body.get("area"),
             postcode=body.get("postcode"),
