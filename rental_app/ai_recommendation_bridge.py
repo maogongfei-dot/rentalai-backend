@@ -629,13 +629,16 @@ def run_ai_analyze_with_structured(
         relaxed_city=relaxed_city,
         dataset_used=dataset_key,
     )
-    # Phase D2：Zoopla 抓取模式（live / mock / realistic 回退）写入 summary，便于前端与调试
+    # Phase D2+D4：Zoopla 抓取模式与清洗统计写入 summary
     if dataset_key == "zoopla":
         meta = get_last_candidate_load_meta()
         summ = out.setdefault("summary", {})
         sm = meta.get("zoopla_source_mode")
         if sm:
             summ["source_mode"] = sm
+        scs = meta.get("scrape_clean_stats")
+        if isinstance(scs, dict) and scs:
+            summ["scrape_clean_stats"] = scs
         if sm == "zoopla_mock_fallback":
             note = "Zoopla live fetch unavailable or empty; using built-in mock listings."
             summ["note"] = (summ.get("note") + " " if summ.get("note") else "") + note

@@ -1,6 +1,7 @@
 """
 Phase A5：统一候选房源加载（canonical），供推荐引擎使用。
 Phase D2：dataset=zoopla 时经 fetch_zoopla_listings(structured_query) → clean/normalize。
+Phase D4：Zoopla 抓取结果先经 scraped_listing_cleaner（去重/清洗）再 normalize。
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ def load_candidate_houses(
     - demo / realistic：从 JSON 加载后逐条 clean_and_normalize（行内 source 优先）
     - multi_source：与 loader 一致，已为 canonical
     - imported：使用调用方传入的原始行（如 A4 导入前格式）
-    - zoopla：``fetch_zoopla_listings(structured_query)`` → clean_and_normalize（需传 structured_query）
+    - zoopla：``fetch_zoopla_listings`` → ``prepare_scraped_listings_for_recommendation``（D4 清洗去重）→ canonical
     """
     global _last_fetch_meta
 
@@ -53,8 +54,12 @@ def load_candidate_houses(
         raw = load_house_samples("realistic")
         return clean_and_normalize_house_records(raw, source=None)
 
-    # Phase D2：Zoopla HTTP 抓取 → canonical；失败时 scraper 内 mock，再空则 realistic
+    # Phase D2+D4：Zoopla 抓取 → D4 清洗去重 → normalize_house_records；失败时 mock / realistic
     if ds == "zoopla":
+        from data.scraped_listing_cleaner import (
+            get_last_scrape_clean_stats,
+            prepare_scraped_listings_for_recommendation,
+        )
         from scraper.zoopla_scraper import fetch_zoopla_listings, fetch_zoopla_listings_with_meta
 
         sq = dict(structured_query or {})
@@ -74,11 +79,14 @@ def load_candidate_houses(
             raw = load_house_samples("realistic")
             mode = "zoopla_realistic_fallback"
 
+        # 接入点：scraper → cleaner → normalize（canonical）
         _last_fetch_meta = {"zoopla_source_mode": mode, "dataset": "zoopla"}
-        out = clean_and_normalize_house_records(raw, source=None)
+        out = prepare_scraped_listings_for_recommendation(raw, source="zoopla")
+        _last_fetch_meta["scrape_clean_stats"] = get_last_scrape_clean_stats()
         if not out:
             _last_fetch_meta["zoopla_source_mode"] = "zoopla_realistic_fallback"
-            out = clean_and_normalize_house_records(load_house_samples("realistic"), source=None)
+            out = prepare_scraped_listings_for_recommendation(load_house_samples("realistic"), source="zoopla")
+            _last_fetch_meta["scrape_clean_stats"] = get_last_scrape_clean_stats()
         return out
 
     return []
