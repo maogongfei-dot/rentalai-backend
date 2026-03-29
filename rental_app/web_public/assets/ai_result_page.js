@@ -32,6 +32,118 @@
     return "£" + n + " /月";
   }
 
+  function safeListingUrl(u) {
+    if (!u || typeof u !== "string") return "";
+    u = u.trim();
+    return /^https?:\/\//i.test(u) ? u : "";
+  }
+
+  function tagBadgeHtml(tag) {
+    var t = String(tag || "").toLowerCase();
+    var cls = "tag-badge ";
+    var label;
+    if (t === "excellent" || t === "good") {
+      cls += "tag-badge--good";
+      label = "good";
+    } else if (t === "average") {
+      cls += "tag-badge--average";
+      label = "average";
+    } else if (t === "poor") {
+      cls += "tag-badge--avoid";
+      label = "avoid";
+    } else {
+      cls += "tag-badge--neutral";
+      label = t || "—";
+    }
+    return "<span class=\"" + cls + "\">" + escapeHtml(label) + "</span>";
+  }
+
+  function starScoreLine(score) {
+    var n = Number(score);
+    if (isNaN(n)) {
+      return "<span class=\"deal-score-line\"><span class=\"deal-score-star\" aria-hidden=\"true\">⭐</span> <span class=\"deal-score-value\">—</span></span>";
+    }
+    var s = n % 1 === 0 ? String(Math.round(n)) : (Math.round(n * 10) / 10).toFixed(1);
+    return (
+      "<span class=\"deal-score-line\"><span class=\"deal-score-star\" aria-hidden=\"true\">⭐</span> <span class=\"deal-score-value\">" +
+      escapeHtml(s) +
+      "</span></span>"
+    );
+  }
+
+  function decisionRowHtml(decision) {
+    var d = String(decision || "").trim().toUpperCase();
+    if (!d) {
+      return "";
+    }
+    var icon;
+    var rowCls;
+    var label;
+    if (d === "DO" || d === "RECOMMENDED") {
+      icon = "✅";
+      rowCls = "deal-decision-row deal-decision-row--good";
+      label = "GOOD";
+    } else if (d === "CAUTION") {
+      icon = "⚠️";
+      rowCls = "deal-decision-row deal-decision-row--caution";
+      label = "CAUTION";
+    } else if (d === "AVOID") {
+      icon = "⚠️";
+      rowCls = "deal-decision-row deal-decision-row--avoid";
+      label = "AVOID";
+    } else {
+      icon = "⚠️";
+      rowCls = "deal-decision-row deal-decision-row--caution";
+      label = d;
+    }
+    return (
+      "<div class=\"" +
+      rowCls +
+      "\" role=\"note\"><span class=\"deal-decision-icon\" aria-hidden=\"true\">" +
+      icon +
+      "</span> <span class=\"deal-decision-text\">" +
+      escapeHtml(label) +
+      "</span></div>"
+    );
+  }
+
+  function computeFinalVerdict(rep) {
+    var s =
+      ((rep.summary_sentence || "") +
+        " " +
+        (rep.overall_recommendation || "") +
+        " " +
+        ((rep.readable_sections && rep.readable_sections.worth_continuing) || ""))
+        .toLowerCase();
+    if (/worth continuing|several strong|promising leads|justify deeper|enough promising/.test(s)) {
+      return { label: "推荐", cls: "verdict-banner--positive" };
+    }
+    if (/several top-ranked rows still carry high|proceed carefully - many top rows|high listing risk/.test(s)) {
+      return { label: "不推荐", cls: "verdict-banner--negative" };
+    }
+    if (/no listings in sample|inconclusive yet|expand search|sample is very small|sample exists but no top deals/.test(s)) {
+      return { label: "谨慎", cls: "verdict-banner--caution" };
+    }
+    if (/mixed quality|moderately promising/.test(s)) {
+      return { label: "谨慎", cls: "verdict-banner--caution" };
+    }
+    return { label: "谨慎", cls: "verdict-banner--caution" };
+  }
+
+  function verdictBannerHtml(rep) {
+    var v = computeFinalVerdict(rep);
+    return (
+      "<div class=\"verdict-banner " +
+      escapeHtml(v.cls) +
+      "\" role=\"status\">" +
+      "<div class=\"verdict-banner-kicker\">最终结论</div>" +
+      "<div class=\"verdict-banner-text\">" +
+      escapeHtml(v.label) +
+      "</div>" +
+      "</div>"
+    );
+  }
+
   function hasSearchableGeo(data) {
     var nf = data.normalized_filters || {};
     var pq = data.parsed_query || {};
@@ -237,37 +349,40 @@
         dealsEl.innerHTML = top5
           .map(function (it) {
             var src = it.source || "";
-            var url = it.listing_url || "";
-            var link =
-              url && /^https?:\/\//i.test(url)
-                ? "<a href=\"" +
-                  escapeHtml(url) +
-                  "\" target=\"_blank\" rel=\"noopener noreferrer\">在平台查看</a>"
-                : "<span class='hint'>—</span>";
+            var href = safeListingUrl(it.listing_url || "");
+            var btn = href
+              ? "<a class=\"btn-deal-view\" href=\"" +
+                href.replace(/"/g, "&quot;") +
+                "\" target=\"_blank\" rel=\"noopener noreferrer\">查看房源</a>"
+              : "<span class=\"btn-deal-view btn-deal-view--disabled\" aria-disabled=\"true\">暂无链接</span>";
+            var decHtml = decisionRowHtml(it.decision);
             return (
-              "<div class='deal-card'>" +
-              "<strong>" +
+              "<article class=\"deal-card-modern\">" +
+              "<h3 class=\"deal-card-title\">" +
               escapeHtml(it.title || "—") +
-              "</strong><br/>" +
-              "<span class='hint'>" +
+              "</h3>" +
+              "<p class=\"deal-card-location\">" +
               escapeHtml(it.address || "—") +
-              "</span><br/>" +
-              "<span>价格 " +
+              "</p>" +
+              "<div class=\"deal-card-price\">" +
               fmtMoney(it.price_pcm) +
-              "</span> · <span>卧室 " +
-              escapeHtml(it.bedrooms != null ? it.bedrooms : "—") +
-              "</span><br/>" +
-              "<span>来源 " +
+              "</div>" +
+              "<div class=\"deal-card-score-row\">" +
+              starScoreLine(it.deal_score) +
+              "</div>" +
+              "<div class=\"deal-card-tags\">" +
+              tagBadgeHtml(it.deal_tag) +
+              "</div>" +
+              decHtml +
+              "<div class=\"deal-card-meta\">" +
+              "<span class=\"deal-card-source\">" +
               escapeHtml(src) +
-              "</span> · <span>deal_score " +
-              fmt(it.deal_score) +
-              "</span> · <span>标签 " +
-              escapeHtml(it.deal_tag || "—") +
-              "</span> · <span>建议 " +
-              escapeHtml(it.decision || "—") +
-              "</span><br/>" +
-              link +
-              "</div>"
+              "</span>" +
+              "</div>" +
+              "<div class=\"deal-card-actions\">" +
+              btn +
+              "</div>" +
+              "</article>"
             );
           })
           .join("");
@@ -292,24 +407,27 @@
         );
       }
       var rs = rep.readable_sections || {};
+      var banner = verdictBannerHtml(rep);
       if (rs.market_situation != null && String(rs.market_situation).trim() !== "") {
         rEl.innerHTML =
+          banner +
           section("市场情况", "<p>" + escapeHtml(rs.market_situation || "—") + "</p>") +
           section("是否值得继续看", "<p>" + escapeHtml(rs.worth_continuing || "—") + "</p>") +
           section("最值得关注的机会", ul(rs.top_opportunities || [])) +
           section("主要风险", ul(rs.main_risks || [])) +
           section("下一步建议", ul(rs.next_steps || [])) +
-          "<p class='hint muted small-print'>" +
+          "<p class='hint muted small-print report-summary-line'>" +
           escapeHtml(rep.summary_sentence || "") +
           "</p>";
       } else {
         rEl.innerHTML =
+          banner +
           section("市场情况", "<p>" + escapeHtml(rep.market_positioning || "—") + "</p>") +
           section("是否值得继续看", "<p>" + escapeHtml(rep.overall_recommendation || "—") + "</p>") +
           section("最值得关注的机会", ul(rep.best_opportunities)) +
           section("主要风险", ul(rep.main_risks)) +
           section("下一步建议", ul(rep.what_to_do_next)) +
-          "<p class='hint muted small-print'>" +
+          "<p class='hint muted small-print report-summary-line'>" +
           escapeHtml(rep.summary_sentence || "—") +
           "</p>";
       }
