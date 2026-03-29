@@ -9,12 +9,13 @@
   <body>
     <script src="/assets/auth_local.js"></script>
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
-    <main class="wrap wrap-wide result-wrap">
+    <main class="wrap wrap-wide result-wrap history-page">
       <p class="back-link"><a href="/ai-result">← 结果页</a> · <a href="/">首页</a></p>
       <header class="page-header">
         <h1>分析历史记录</h1>
+        <p class="hint muted history-page-lead">以下为已保存的搜索与分析快照，可随时回看或删除。</p>
       </header>
-      <div id="history-list"></div>
+      <div id="history-list" class="history-page-grid" aria-live="polite"></div>
     </main>
     <script src="/assets/history_local_page.js"></script>
   </body>

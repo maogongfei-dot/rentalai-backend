@@ -275,23 +275,87 @@ def _extract_prices(text: str) -> tuple[float | None, float | None, float | None
 def _extract_flags_and_keywords(text: str) -> tuple[dict[str, Any], list[str], str]:
     flags = {
         "cheap_preference": False,
+        "safety_preference": False,
+        "commute_preference": False,
+        "lifestyle_preference": False,
         "image_required": False,
         "furnished_preference": None,
     }
     keywords: list[str] = []
     t = text
+    tl = t.lower()
 
     cheap_hits = ("便宜", "性价比", "划算", "实惠", "cheap", "affordable", "value")
     for h in cheap_hits:
-        if h.lower() in t.lower():
+        if h.lower() in tl:
             flags["cheap_preference"] = True
+            if h not in keywords:
+                keywords.append(h)
+            break
+
+    safety_hits = (
+        "安全",
+        "治安",
+        "安静",
+        "靠谱",
+        "safe",
+        "safety",
+        "quiet",
+        "secure",
+        "crime",
+    )
+    for h in safety_hits:
+        if h.lower() in tl:
+            flags["safety_preference"] = True
+            if h not in keywords:
+                keywords.append(h)
+            break
+
+    commute_hits = (
+        "通勤",
+        "地铁",
+        "车站",
+        "上班",
+        "近铁",
+        "commute",
+        "station",
+        "tube",
+        "underground",
+        "rail",
+        "bus",
+        "near work",
+        "walking distance",
+    )
+    for h in commute_hits:
+        if h.lower() in tl:
+            flags["commute_preference"] = True
+            if h not in keywords:
+                keywords.append(h)
+            break
+
+    lifestyle_hits = (
+        "生活便利",
+        "超市",
+        "购物",
+        "便利",
+        "周边",
+        "lifestyle",
+        "amenities",
+        "shops",
+        "cafes",
+        "restaurant",
+        "gym",
+    )
+    for h in lifestyle_hits:
+        if h.lower() in tl:
+            flags["lifestyle_preference"] = True
             if h not in keywords:
                 keywords.append(h)
             break
 
     img_hits = ("最好有图", "有图", "图片", "照片", "带图", "image", "photo", "picture")
     for h in img_hits:
-        if h.lower() in t.lower():
+        if h.lower() in tl:
             flags["image_required"] = True
             break
 
@@ -396,6 +460,9 @@ def parse_user_housing_query(user_text: str) -> dict[str, Any]:
             "keywords": [],
             "flags": {
                 "cheap_preference": False,
+                "safety_preference": False,
+                "commute_preference": False,
+                "lifestyle_preference": False,
                 "image_required": False,
                 "furnished_preference": None,
             },
@@ -428,6 +495,9 @@ def parse_user_housing_query(user_text: str) -> dict[str, Any]:
         "keywords": keywords,
         "flags": {
             "cheap_preference": bool(flags["cheap_preference"]),
+            "safety_preference": bool(flags["safety_preference"]),
+            "commute_preference": bool(flags["commute_preference"]),
+            "lifestyle_preference": bool(flags["lifestyle_preference"]),
             "image_required": bool(flags["image_required"]),
             "furnished_preference": flags["furnished_preference"],
         },
@@ -460,6 +530,9 @@ def normalize_search_filters(parsed_query: dict[str, Any]) -> dict[str, Any]:
 
     flags_in = parsed_query.get("flags") if isinstance(parsed_query.get("flags"), dict) else {}
     cheap = bool(flags_in.get("cheap_preference"))
+    safety = bool(flags_in.get("safety_preference"))
+    commute = bool(flags_in.get("commute_preference"))
+    lifestyle = bool(flags_in.get("lifestyle_preference"))
     image_req = bool(flags_in.get("image_required"))
     furn = flags_in.get("furnished_preference")
     if furn is not None:
@@ -493,6 +566,9 @@ def normalize_search_filters(parsed_query: dict[str, Any]) -> dict[str, Any]:
         "limit": limit,
         "filters": {
             "cheap_preference": cheap,
+            "safety_preference": safety,
+            "commute_preference": commute,
+            "lifestyle_preference": lifestyle,
             "image_required": image_req,
             "furnished_preference": furn,
         },

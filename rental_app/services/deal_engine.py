@@ -21,6 +21,58 @@ _WEIGHTS: dict[str, float] = {
 }
 
 
+def scoring_weights_from_preferences(prefs: dict[str, Any] | None) -> dict[str, float]:
+    """
+    根据用户解析偏好调整四维权重（仍归一化为 1.0）。
+
+    - cheap：更看价格与卧室性价比
+    - safety：更看地址/邮编（location）与信息完整度
+    - commute：更看 location（通勤通常依赖明确地段）
+    - lifestyle：更看 completeness（周边与生活设施在数据侧主要体现为信息完整）
+    """
+    if not isinstance(prefs, dict):
+        prefs = {}
+    w = {k: float(v) for k, v in _WEIGHTS.items()}
+    if prefs.get("cheap_preference"):
+        w["price_vs_market"] += 0.12
+        w["bedroom_value"] += 0.08
+        w["completeness"] -= 0.06
+        w["location"] -= 0.06
+    if prefs.get("safety_preference"):
+        w["location"] += 0.10
+        w["completeness"] += 0.08
+        w["price_vs_market"] -= 0.05
+        w["bedroom_value"] -= 0.05
+    if prefs.get("commute_preference"):
+        w["location"] += 0.10
+        w["completeness"] += 0.04
+        w["price_vs_market"] -= 0.05
+        w["bedroom_value"] -= 0.05
+    if prefs.get("lifestyle_preference"):
+        w["completeness"] += 0.10
+        w["location"] += 0.06
+        w["price_vs_market"] -= 0.05
+        w["bedroom_value"] -= 0.05
+    total = sum(max(0.02, v) for v in w.values())
+    return {k: max(0.02, v) / total for k, v in w.items()}
+
+
+def get_scoring_weights(market_insight: dict[str, Any]) -> dict[str, float]:
+    """优先使用 insight 上预计算的 ``scoring_weights``，否则由 ``user_preferences`` 推导。"""
+    if isinstance(market_insight.get("scoring_weights"), dict):
+        sw = market_insight["scoring_weights"]
+        if all(k in sw for k in _WEIGHTS):
+            try:
+                raw = {k: float(sw[k]) for k in _WEIGHTS}
+                s = sum(raw.values())
+                if s > 0:
+                    return {k: raw[k] / s for k in raw}
+            except (TypeError, ValueError):
+                pass
+    prefs = market_insight.get("user_preferences") if isinstance(market_insight.get("user_preferences"), dict) else {}
+    return scoring_weights_from_preferences(prefs)
+
+
 def _f(v: Any) -> float | None:
     if v is None or isinstance(v, bool):
         return None
@@ -380,5 +432,7 @@ __all__ = [
     "build_deal_decision",
     "calculate_deal_score",
     "deal_tag_from_score",
+    "get_scoring_weights",
     "rank_deals",
+    "scoring_weights_from_preferences",
 ]

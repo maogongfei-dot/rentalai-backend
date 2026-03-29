@@ -590,6 +590,7 @@ def build_top_deals_explanations(
             "address": listing.get("address"),
             "price_pcm": listing.get("price_pcm"),
             "bedrooms": bed_display,
+            "image_url": listing.get("image_url"),
             "listing_url": listing.get("listing_url"),
             "star_rating": ex.get("star_rating"),
             "star_reasons": ex.get("star_reasons") or [],

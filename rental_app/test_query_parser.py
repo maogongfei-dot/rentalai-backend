@@ -43,6 +43,19 @@ def test_cheap_sort():
     assert n["sort_by"] == "price_asc"
 
 
+def test_preference_flags():
+    s = parse_user_housing_query("伦敦 2bed 要安全安静 通勤方便 生活便利")
+    f = s.get("flags") or {}
+    assert f.get("safety_preference") is True
+    assert f.get("commute_preference") is True
+    assert f.get("lifestyle_preference") is True
+    n = normalize_search_filters(s)
+    fl = n.get("filters") or {}
+    assert fl.get("safety_preference") is True
+    assert fl.get("commute_preference") is True
+    assert fl.get("lifestyle_preference") is True
+
+
 def test_empty_safe():
     p = parse_user_housing_query("")
     assert p["intent"] == "market_search"
@@ -54,6 +67,7 @@ if __name__ == "__main__":
     test_examples_from_spec()
     test_normalize_target_price_band()
     test_cheap_sort()
+    test_preference_flags()
     test_empty_safe()
     print("test_query_parser: all ok")
 

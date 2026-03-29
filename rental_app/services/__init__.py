@@ -17,6 +17,7 @@ from services.deal_engine import (
     calculate_deal_score,
     deal_tag_from_score,
     rank_deals,
+    scoring_weights_from_preferences,
 )
 from services.explain_engine import (
     build_listing_explanation,
@@ -73,4 +74,5 @@ __all__ = [
     "normalize_zoopla_listing",
     "rank_deals",
     "run_housing_ai_query",
+    "scoring_weights_from_preferences",
 ]

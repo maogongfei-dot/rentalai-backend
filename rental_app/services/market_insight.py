@@ -10,6 +10,8 @@ from collections import Counter
 from statistics import median
 from typing import Any
 
+from services.deal_engine import scoring_weights_from_preferences
+
 logger = logging.getLogger(__name__)
 
 
@@ -411,6 +413,7 @@ def build_insight_from_combined_listings(
     max_bedrooms: int | float | None = None,
     limit: int | None = None,
     sort_by: str | None = None,
+    user_preferences: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     在已有 ``get_combined_market_listings`` 结果上，用给定 ``listings``（如二次过滤后）重算统计，
@@ -431,6 +434,9 @@ def build_insight_from_combined_listings(
         "limit": limit,
         "sort_by": sort_by,
     }
+
+    up = user_preferences if isinstance(user_preferences, dict) else {}
+    weights = scoring_weights_from_preferences(up)
 
     if not listings:
         empty_stats = {
@@ -468,6 +474,8 @@ def build_insight_from_combined_listings(
                 "value_message": "No data to summarize.",
             },
             "listings": [],
+            "user_preferences": dict(up),
+            "scoring_weights": weights,
         }
 
     stats = _build_basic_stats(listings, sources_used)
@@ -492,6 +500,8 @@ def build_insight_from_combined_listings(
         "value_candidates": value_c,
         "overall_analysis": overall,
         "listings": listings_out,
+        "user_preferences": dict(up),
+        "scoring_weights": weights,
     }
 
 

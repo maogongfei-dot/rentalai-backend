@@ -18,6 +18,41 @@
     return d.innerHTML;
   }
 
+  function escapeAttr(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  var DEAL_CARD_PLACEHOLDER_SVG =
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect fill="#f1f5f9" width="640" height="400"/><path fill="#cbd5e1" d="M280 140h80v80h-80z"/><text x="320" y="280" text-anchor="middle" fill="#94a3b8" font-family="system-ui,sans-serif" font-size="15">暂无图片</text></svg>'
+    );
+
+  function dealCardMediaHtml(it) {
+    var href = safeListingUrl(it.listing_url || "");
+    var raw = it.image_url != null ? String(it.image_url).trim() : "";
+    var validImg = /^https?:\/\//i.test(raw);
+    var src = validImg ? raw : DEAL_CARD_PLACEHOLDER_SVG;
+    var img =
+      "<img class=\"deal-card-media-img\" src=\"" +
+      escapeAttr(src) +
+      "\" alt=\"\" loading=\"lazy\" decoding=\"async\" />";
+    if (href) {
+      return (
+        "<a class=\"deal-card-media deal-card-media--link\" href=\"" +
+        escapeAttr(href) +
+        "\" target=\"_blank\" rel=\"noopener noreferrer\" title=\"打开原房源\">" +
+        img +
+        "</a>"
+      );
+    }
+    return "<div class=\"deal-card-media deal-card-media--static\">" + img + "</div>";
+  }
+
   function fmt(v) {
     if (v === null || v === undefined) return "—";
     if (typeof v === "boolean") return v ? "是" : "否";
@@ -262,6 +297,13 @@
         pmin != null || pmax != null
           ? (pmin != null ? fmtMoney(pmin) : "—") + " – " + (pmax != null ? fmtMoney(pmax) : "—")
           : budgetStr;
+      var pf = pq.flags && typeof pq.flags === "object" ? pq.flags : {};
+      var prefParts = [];
+      if (pf.cheap_preference || fl.cheap_preference) prefParts.push("偏便宜");
+      if (pf.safety_preference || fl.safety_preference) prefParts.push("安全稳妥");
+      if (pf.commute_preference || fl.commute_preference) prefParts.push("通勤");
+      if (pf.lifestyle_preference || fl.lifestyle_preference) prefParts.push("生活便利");
+      var prefStr = prefParts.length ? prefParts.join("、") : "—";
       qEl.innerHTML =
         "<dl class='kv-list'>" +
         "<dt>原始输入</dt><dd>" +
@@ -278,6 +320,9 @@
         "</dd>" +
         "<dt>卧室数（解析）</dt><dd>" +
         escapeHtml(bedStr) +
+        "</dd>" +
+        "<dt>偏好（解析）</dt><dd>" +
+        escapeHtml(prefStr) +
         "</dd>" +
         "</dl>";
     }
@@ -348,6 +393,7 @@
               : "<span class=\"btn-deal-view btn-deal-view--disabled\" aria-disabled=\"true\">暂无链接</span>";
             return (
               "<article class=\"deal-card-modern deal-card-star\">" +
+              dealCardMediaHtml(it) +
               "<h3 class=\"deal-card-title\">" +
               escapeHtml(it.title || "—") +
               "</h3>" +

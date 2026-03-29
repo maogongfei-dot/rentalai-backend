@@ -552,6 +552,153 @@ select {
   margin: 10px 0;
 }
 
+/* —— 分析历史：卡片列表 —— */
+.history-page .history-page-lead {
+  margin-top: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.history-page-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+@media (min-width: 720px) {
+  .history-page-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1100px) {
+  .history-page-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.history-record-card {
+  border: 1px solid #e5e9f0;
+  border-radius: 12px;
+  padding: 1.25rem 1.35rem;
+  background: #fafbfd;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 100%;
+}
+
+.history-record-time {
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.history-record-conditions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.history-cond-row {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  align-items: start;
+}
+
+.history-cond-k {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.history-cond-v {
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.history-record-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.history-record-top-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0f172a;
+}
+
+.history-record-stars {
+  padding-top: 0.15rem;
+}
+
+.history-record-stars--na .hint {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.history-star-row {
+  margin-top: 0.2rem;
+}
+
+.history-record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.35rem;
+}
+
+.btn-history-primary {
+  display: inline-block;
+  text-align: center;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #fff;
+  background: #2563eb;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.btn-history-primary:hover {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.btn-history-danger {
+  display: inline-block;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #b91c1c;
+  background: #fff;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-history-danger:hover {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+
+.history-empty-hint {
+  grid-column: 1 / -1;
+}
+
 .local-user-name {
   font-size: 0.9rem;
 }
@@ -650,6 +797,36 @@ select {
   flex-direction: column;
   gap: 0.65rem;
   min-height: 100%;
+  overflow: hidden;
+}
+
+.deal-card-media {
+  display: block;
+  margin: -1.35rem -1.4rem 0.65rem -1.4rem;
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+  background: #e2e8f0;
+  aspect-ratio: 16 / 10;
+  min-height: 140px;
+  flex-shrink: 0;
+}
+
+.deal-card-media--link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  outline-offset: 2px;
+}
+
+.deal-card-media--static {
+  cursor: default;
+}
+
+.deal-card-media-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .deal-card-title {

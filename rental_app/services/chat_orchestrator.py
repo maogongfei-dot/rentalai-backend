@@ -17,6 +17,17 @@ from services.query_parser import normalize_search_filters, parse_user_housing_q
 logger = logging.getLogger(__name__)
 
 
+def _user_preferences_from_filters(filters_extra: dict[str, Any]) -> dict[str, bool]:
+    if not isinstance(filters_extra, dict):
+        return {}
+    return {
+        "cheap_preference": bool(filters_extra.get("cheap_preference")),
+        "safety_preference": bool(filters_extra.get("safety_preference")),
+        "commute_preference": bool(filters_extra.get("commute_preference")),
+        "lifestyle_preference": bool(filters_extra.get("lifestyle_preference")),
+    }
+
+
 def _has_searchable_geo(
     location: str | None,
     area: str | None,
@@ -99,6 +110,7 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
     area = normalized.get("area")
     pc = normalized.get("postcode")
     filters_extra = normalized.get("filters") if isinstance(normalized.get("filters"), dict) else {}
+    user_preferences = _user_preferences_from_filters(filters_extra)
     image_required = bool(filters_extra.get("image_required"))
     furnished_pref = filters_extra.get("furnished_preference")
     if furnished_pref is not None:
@@ -124,6 +136,7 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
             max_bedrooms=normalized.get("max_bedrooms"),
             limit=normalized.get("limit"),
             sort_by=normalized.get("sort_by"),
+            user_preferences=user_preferences,
         )
         try:
             ranked = rank_deals([], insight, top_n=top_n)
@@ -219,6 +232,7 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
             max_bedrooms=normalized.get("max_bedrooms"),
             limit=normalized.get("limit"),
             sort_by=normalized.get("sort_by"),
+            user_preferences=user_preferences,
         )
     except Exception as exc:
         logger.exception("build_insight_from_combined_listings failed")
@@ -235,6 +249,7 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
             max_bedrooms=normalized.get("max_bedrooms"),
             limit=normalized.get("limit"),
             sort_by=normalized.get("sort_by"),
+            user_preferences=user_preferences,
         )
 
     ranked: dict[str, Any]
