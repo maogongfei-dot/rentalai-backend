@@ -7,6 +7,7 @@ from services.deal_engine import rank_deals
 from services.explain_engine import (
     build_listing_explanation,
     build_market_recommendation_report,
+    build_star_final_verdict,
     build_top_deals_explanations,
 )
 
@@ -54,6 +55,9 @@ def test_build_listing_explanation_keys():
         "bedroom_position",
         "data_quality",
         "action_suggestion",
+        "star_rating",
+        "star_reasons",
+        "one_line_suggestion",
     }
     assert required <= set(out.keys())
     assert 2 <= len(out["action_suggestion"]) <= 4
@@ -89,7 +93,8 @@ def test_build_top_deals_explanations():
     assert bundle["count"] == 2
     assert len(bundle["items"]) == 2
     for it in bundle["items"]:
-        assert "headline" in it and "why_recommended" in it
+        assert "star_rating" in it and isinstance(it.get("star_reasons"), list)
+        assert 1.0 <= float(it["star_rating"]) <= 5.0
         json.dumps(it)
 
 
@@ -120,6 +125,7 @@ def test_recommendation_report_empty_listings():
     assert r["location"] == "Nowhere"
     assert "summary_sentence" in r
     assert "market_positioning" in r
+    assert "market_snapshot_zh" in r and r["market_snapshot_zh"]
     json.dumps(r)
 
 
@@ -150,6 +156,11 @@ def test_recommendation_report_with_ranked():
     assert r["overall_recommendation"]
     assert r["best_opportunities"]
     assert len(r["what_to_do_next"]) >= 3
+    assert r.get("market_snapshot_zh")
+    expl = build_top_deals_explanations(listings, ins, top_n=5, ranked_deals=ranked)
+    verdict = build_star_final_verdict(expl["items"], ranked["top_deals"], ins, "TestCity")
+    assert verdict["best_overall"] and verdict["best_overall"]["title"]
+    assert verdict["overall_advice"]
     json.dumps(r)
 
 
@@ -189,12 +200,12 @@ def _demo_synthetic_top3():
     expl = build_top_deals_explanations(listings, ins, top_n=3, ranked_deals=ranked)
     rep = build_market_recommendation_report("TestCity", ins, ranked)
 
-    print("--- Top 3: headline / decision / why_recommended ---")
+    print("--- Top 3: star / reasons ---")
     for it in expl["items"][:3]:
         print(f"  title={it.get('title')!r}")
-        print(f"    headline: {it.get('headline')}")
-        print(f"    decision: {it.get('decision')}")
-        print(f"    why_recommended: {it.get('why_recommended')}")
+        print(f"    star_rating: {it.get('star_rating')}")
+        print(f"    star_reasons: {it.get('star_reasons')}")
+        print(f"    one_line_suggestion: {it.get('one_line_suggestion')}")
     print("--- recommendation_report.summary_sentence ---")
     print(f"  {rep.get('summary_sentence')}")
 

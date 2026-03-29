@@ -22,6 +22,7 @@ from services.explain_engine import (
     build_listing_explanation,
     build_market_explain_bundle,
     build_market_recommendation_report,
+    build_star_final_verdict,
     build_top_deals_explanations,
 )
 from services.chat_orchestrator import run_housing_ai_query
@@ -57,6 +58,7 @@ __all__ = [
     "build_market_insight",
     "build_market_recommendation_report",
     "build_market_summary",
+    "build_star_final_verdict",
     "build_top_deals_explanations",
     "choose_better_listing",
     "deal_tag_from_score",

@@ -9,7 +9,7 @@ import re
 from typing import Any
 
 from services.deal_engine import rank_deals
-from services.explain_engine import build_market_recommendation_report, build_top_deals_explanations
+from services.explain_engine import build_market_recommendation_report, build_star_final_verdict, build_top_deals_explanations
 from services.market_insight import build_insight_from_combined_listings, build_market_summary
 from services.market_combined import get_combined_market_listings
 from services.query_parser import normalize_search_filters, parse_user_housing_query
@@ -152,7 +152,14 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
                 "main_risks": [],
                 "what_to_do_next": [],
                 "buyer_strategy": [],
+                "market_snapshot_zh": "请先在搜索里补充城市、邮编或区域，以便我们给出更贴切的方向。",
             }
+        report["star_final_verdict"] = build_star_final_verdict(
+            explanations.get("items") or [],
+            ranked.get("top_deals") or [],
+            insight,
+            str(loc or pc or area or insight.get("location") or ""),
+        )
 
         return {
             "success": True,
@@ -267,6 +274,7 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
             "main_risks": [],
             "what_to_do_next": [],
             "buyer_strategy": [],
+            "market_snapshot_zh": "暂时无法生成市场摘要，请稍后重试。",
             "readable_sections": {
                 "market_situation": "",
                 "worth_continuing": "",
@@ -275,6 +283,12 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
                 "next_steps": [],
             },
         }
+    report["star_final_verdict"] = build_star_final_verdict(
+        explanations.get("items") or [],
+        ranked.get("top_deals") or [],
+        insight,
+        str(loc_key or ""),
+    )
 
     try:
         ms = build_market_summary(insight)

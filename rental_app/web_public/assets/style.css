@@ -673,6 +673,125 @@ select {
   color: #0f172a;
 }
 
+.deals-intro {
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+
+.deal-card-beds {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.deal-card-stars {
+  margin-top: 0.15rem;
+}
+
+.star-rating-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.2rem;
+}
+
+.star-unit--full {
+  color: #f59e0b;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.star-unit--empty {
+  color: #cbd5e1;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.star-unit--half {
+  position: relative;
+  display: inline-block;
+  width: 1.15rem;
+  height: 1.15rem;
+  font-size: 1.2rem;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.star-unit--half::after {
+  content: "☆";
+  color: #cbd5e1;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.star-unit--half::before {
+  content: "★";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 50%;
+  overflow: hidden;
+  color: #f59e0b;
+  z-index: 1;
+}
+
+.star-rating-caption {
+  margin-left: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.deal-card-why-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-top: 0.35rem;
+}
+
+.reasons-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1.15rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.reasons-list li {
+  margin-bottom: 0.35rem;
+}
+
+.deal-card-whisper {
+  margin: 0.25rem 0 0;
+  font-size: 0.88rem;
+  color: #94a3b8;
+}
+
+.deal-card-tip {
+  margin-top: 0.45rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 10px;
+  background: #f1f5f9;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #1e293b;
+}
+
+.deal-card-tip-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.2rem;
+}
+
+.deal-card-tip-text {
+  display: block;
+}
+
 .deal-card-score-row {
   font-size: 0.95rem;
 }
@@ -826,6 +945,69 @@ select {
   background: #e2e8f0;
   color: #94a3b8;
   cursor: not-allowed;
+}
+
+.card-star-verdict {
+  border-style: solid;
+}
+
+.star-verdict-stack {
+  margin-top: 0.25rem;
+}
+
+.star-final-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.verdict-pick {
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e8ecf1;
+}
+
+.verdict-pick-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+
+.verdict-pick-title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.verdict-pick-body {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.verdict-overall {
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  border: 1px solid #bfdbfe;
+}
+
+.verdict-overall-text {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #1e3a5f;
+}
+
+.market-snapshot-narrative p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #334155;
 }
 
 .report-enhanced {

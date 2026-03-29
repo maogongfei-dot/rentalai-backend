@@ -38,107 +38,104 @@
     return /^https?:\/\//i.test(u) ? u : "";
   }
 
-  function tagBadgeHtml(tag) {
-    var t = String(tag || "").toLowerCase();
-    var cls = "tag-badge ";
-    var label;
-    if (t === "excellent" || t === "good") {
-      cls += "tag-badge--good";
-      label = "good";
-    } else if (t === "average") {
-      cls += "tag-badge--average";
-      label = "average";
-    } else if (t === "poor") {
-      cls += "tag-badge--avoid";
-      label = "avoid";
-    } else {
-      cls += "tag-badge--neutral";
-      label = t || "—";
+  function fmtBedrooms(b) {
+    if (b === null || b === undefined || b === "") {
+      return "—";
     }
-    return "<span class=\"" + cls + "\">" + escapeHtml(label) + "</span>";
+    return String(b) + " 间";
   }
 
-  function starScoreLine(score) {
-    var n = Number(score);
-    if (isNaN(n)) {
-      return "<span class=\"deal-score-line\"><span class=\"deal-score-star\" aria-hidden=\"true\">⭐</span> <span class=\"deal-score-value\">—</span></span>";
+  function starsHalfHtml(rating) {
+    var r = Number(rating);
+    if (isNaN(r) || r < 1) {
+      r = 1;
     }
-    var s = n % 1 === 0 ? String(Math.round(n)) : (Math.round(n * 10) / 10).toFixed(1);
+    if (r > 5) {
+      r = 5;
+    }
+    r = Math.round(r * 2) / 2;
+    var full = Math.floor(r);
+    var half = r - full >= 0.5 ? 1 : 0;
+    var empty = 5 - full - half;
+    var html =
+      "<div class=\"star-rating-row\" aria-label=\"" +
+      escapeHtml(String(r)) +
+      " 星，满分 5 星\">";
+    var i;
+    for (i = 0; i < full; i++) {
+      html += "<span class=\"star-unit star-unit--full\">★</span>";
+    }
+    if (half) {
+      html +=
+        "<span class=\"star-unit star-unit--half\" title=\"半星\" aria-hidden=\"true\"></span>";
+    }
+    for (i = 0; i < empty; i++) {
+      html += "<span class=\"star-unit star-unit--empty\">☆</span>";
+    }
+    html +=
+      "<span class=\"star-rating-caption\">" +
+      escapeHtml(String(r)) +
+      " / 5 星</span></div>";
+    return html;
+  }
+
+  function starReasonsHtml(reasons) {
+    if (!Array.isArray(reasons) || !reasons.length) {
+      return "<p class=\"deal-card-whisper\">暂无说明。</p>";
+    }
     return (
-      "<span class=\"deal-score-line\"><span class=\"deal-score-star\" aria-hidden=\"true\">⭐</span> <span class=\"deal-score-value\">" +
-      escapeHtml(s) +
-      "</span></span>"
+      "<ul class=\"reasons-list\">" +
+      reasons
+        .slice(0, 3)
+        .map(function (line) {
+          return "<li>" + escapeHtml(line) + "</li>";
+        })
+        .join("") +
+      "</ul>"
     );
   }
 
-  function decisionRowHtml(decision) {
-    var d = String(decision || "").trim().toUpperCase();
-    if (!d) {
-      return "";
-    }
-    var icon;
-    var rowCls;
-    var label;
-    if (d === "DO" || d === "RECOMMENDED") {
-      icon = "✅";
-      rowCls = "deal-decision-row deal-decision-row--good";
-      label = "GOOD";
-    } else if (d === "CAUTION") {
-      icon = "⚠️";
-      rowCls = "deal-decision-row deal-decision-row--caution";
-      label = "CAUTION";
-    } else if (d === "AVOID") {
-      icon = "⚠️";
-      rowCls = "deal-decision-row deal-decision-row--avoid";
-      label = "AVOID";
-    } else {
-      icon = "⚠️";
-      rowCls = "deal-decision-row deal-decision-row--caution";
-      label = d;
+  function verdictPickBlock(label, pick) {
+    if (!pick || !pick.title) {
+      return (
+        "<div class=\"verdict-pick\">" +
+        "<div class=\"verdict-pick-label\">" +
+        escapeHtml(label) +
+        "</div>" +
+        "<p class=\"verdict-pick-body hint\">暂无对应候选，可先完成一次有结果的搜索再回来看这里。</p>" +
+        "</div>"
+      );
     }
     return (
-      "<div class=\"" +
-      rowCls +
-      "\" role=\"note\"><span class=\"deal-decision-icon\" aria-hidden=\"true\">" +
-      icon +
-      "</span> <span class=\"deal-decision-text\">" +
+      "<div class=\"verdict-pick\">" +
+      "<div class=\"verdict-pick-label\">" +
       escapeHtml(label) +
-      "</span></div>"
+      "</div>" +
+      "<p class=\"verdict-pick-title\"><strong>" +
+      escapeHtml(pick.title) +
+      "</strong></p>" +
+      "<p class=\"verdict-pick-body\">" +
+      escapeHtml(pick.line || "") +
+      "</p>" +
+      "</div>"
     );
   }
 
-  function computeFinalVerdict(rep) {
-    var s =
-      ((rep.summary_sentence || "") +
-        " " +
-        (rep.overall_recommendation || "") +
-        " " +
-        ((rep.readable_sections && rep.readable_sections.worth_continuing) || ""))
-        .toLowerCase();
-    if (/worth continuing|several strong|promising leads|justify deeper|enough promising/.test(s)) {
-      return { label: "推荐", cls: "verdict-banner--positive" };
+  function renderStarFinalVerdictHtml(v) {
+    if (!v || typeof v !== "object") {
+      return "<p class=\"hint\">暂无结论。</p>";
     }
-    if (/several top-ranked rows still carry high|proceed carefully - many top rows|high listing risk/.test(s)) {
-      return { label: "不推荐", cls: "verdict-banner--negative" };
-    }
-    if (/no listings in sample|inconclusive yet|expand search|sample is very small|sample exists but no top deals/.test(s)) {
-      return { label: "谨慎", cls: "verdict-banner--caution" };
-    }
-    if (/mixed quality|moderately promising/.test(s)) {
-      return { label: "谨慎", cls: "verdict-banner--caution" };
-    }
-    return { label: "谨慎", cls: "verdict-banner--caution" };
-  }
-
-  function verdictBannerHtml(rep) {
-    var v = computeFinalVerdict(rep);
     return (
-      "<div class=\"verdict-banner " +
-      escapeHtml(v.cls) +
-      "\" role=\"status\">" +
-      "<div class=\"verdict-banner-kicker\">最终结论</div>" +
-      "<div class=\"verdict-banner-text\">" +
-      escapeHtml(v.label) +
+      "<div class=\"star-final-verdict\">" +
+      verdictPickBlock("综合最推荐", v.best_overall) +
+      verdictPickBlock("如果只看价格，优先看", v.best_for_price) +
+      verdictPickBlock("如果更看重环境/稳妥与信息完整", v.best_for_environment_safety) +
+      verdictPickBlock("如果更看重通勤与交通便利", v.best_for_transport) +
+      "<div class=\"verdict-overall\">" +
+      "<div class=\"verdict-pick-label\">总体建议</div>" +
+      "<p class=\"verdict-overall-text\">" +
+      escapeHtml(v.overall_advice || "—") +
+      "</p>" +
       "</div>" +
       "</div>"
     );
@@ -325,14 +322,10 @@
     var expl = data.explanations || {};
     var items = Array.isArray(expl.items) ? expl.items : [];
     var top5 = items.slice(0, 5);
-    var td = data.top_deals || {};
     var meta = document.getElementById("housing-deals-meta");
     if (meta) {
       meta.textContent =
-        "average_score: " +
-        fmt(td.average_score) +
-        " · items: " +
-        (expl.count != null ? expl.count : top5.length);
+        "以下为结合你本次搜索条件的选房建议，星级表示「有多值得优先看」，5 星最高；先看结论再看细节即可。";
     }
 
     var dealsEl = document.getElementById("housing-top-deals");
@@ -343,21 +336,19 @@
             "<p class='hint'>请先补充 <strong>location</strong> 或 <strong>postcode</strong> 后再检索。</p>";
         } else {
           dealsEl.innerHTML =
-            "<p class='hint'>暂无 Top deals。若上方已提示空结果，请放宽条件后重试。</p>";
+            "<p class='hint'>暂无推荐房源。若上方已提示空结果，请放宽条件后重试。</p>";
         }
       } else {
         dealsEl.innerHTML = top5
           .map(function (it) {
-            var src = it.source || "";
             var href = safeListingUrl(it.listing_url || "");
             var btn = href
               ? "<a class=\"btn-deal-view\" href=\"" +
                 href.replace(/"/g, "&quot;") +
                 "\" target=\"_blank\" rel=\"noopener noreferrer\">查看房源</a>"
               : "<span class=\"btn-deal-view btn-deal-view--disabled\" aria-disabled=\"true\">暂无链接</span>";
-            var decHtml = decisionRowHtml(it.decision);
             return (
-              "<article class=\"deal-card-modern\">" +
+              "<article class=\"deal-card-modern deal-card-star\">" +
               "<h3 class=\"deal-card-title\">" +
               escapeHtml(it.title || "—") +
               "</h3>" +
@@ -367,18 +358,19 @@
               "<div class=\"deal-card-price\">" +
               fmtMoney(it.price_pcm) +
               "</div>" +
-              "<div class=\"deal-card-score-row\">" +
-              starScoreLine(it.deal_score) +
+              "<p class=\"deal-card-beds\">卧室：" +
+              escapeHtml(fmtBedrooms(it.bedrooms)) +
+              "</p>" +
+              "<div class=\"deal-card-stars\">" +
+              starsHalfHtml(it.star_rating) +
               "</div>" +
-              "<div class=\"deal-card-tags\">" +
-              tagBadgeHtml(it.deal_tag) +
-              "</div>" +
-              decHtml +
-              "<div class=\"deal-card-meta\">" +
-              "<span class=\"deal-card-source\">" +
-              escapeHtml(src) +
-              "</span>" +
-              "</div>" +
+              "<div class=\"deal-card-why-title\">为什么是这个星级</div>" +
+              starReasonsHtml(it.star_reasons) +
+              "<div class=\"deal-card-tip\">" +
+              "<span class=\"deal-card-tip-label\">建议</span>" +
+              "<span class=\"deal-card-tip-text\">" +
+              escapeHtml(it.one_line_suggestion || "—") +
+              "</span></div>" +
               "<div class=\"deal-card-actions\">" +
               btn +
               "</div>" +
@@ -390,46 +382,21 @@
     }
 
     var rep = data.recommendation_report || {};
+    var vEl = document.getElementById("housing-star-verdict");
+    if (vEl) {
+      vEl.innerHTML = renderStarFinalVerdictHtml(rep.star_final_verdict);
+    }
+
     var rEl = document.getElementById("housing-report");
     if (rEl) {
-      function ul(arr) {
-        if (!Array.isArray(arr) || !arr.length) return "<p class='hint'>—</p>";
-        return "<ul class='bullet-list'>" + arr.map(function (x) { return "<li>" + escapeHtml(x) + "</li>"; }).join("") + "</ul>";
-      }
-      function section(title, bodyHtml) {
-        return (
-          "<section class='report-block card-inner'>" +
-          "<h3 class='subsection-title'>" +
-          escapeHtml(title) +
-          "</h3>" +
-          bodyHtml +
-          "</section>"
-        );
-      }
-      var rs = rep.readable_sections || {};
-      var banner = verdictBannerHtml(rep);
-      if (rs.market_situation != null && String(rs.market_situation).trim() !== "") {
+      var snap = rep.market_snapshot_zh;
+      if (snap && String(snap).trim()) {
         rEl.innerHTML =
-          banner +
-          section("市场情况", "<p>" + escapeHtml(rs.market_situation || "—") + "</p>") +
-          section("是否值得继续看", "<p>" + escapeHtml(rs.worth_continuing || "—") + "</p>") +
-          section("最值得关注的机会", ul(rs.top_opportunities || [])) +
-          section("主要风险", ul(rs.main_risks || [])) +
-          section("下一步建议", ul(rs.next_steps || [])) +
-          "<p class='hint muted small-print report-summary-line'>" +
-          escapeHtml(rep.summary_sentence || "") +
-          "</p>";
+          "<div class=\"market-snapshot-narrative\"><p>" +
+          escapeHtml(String(snap).trim()) +
+          "</p></div>";
       } else {
-        rEl.innerHTML =
-          banner +
-          section("市场情况", "<p>" + escapeHtml(rep.market_positioning || "—") + "</p>") +
-          section("是否值得继续看", "<p>" + escapeHtml(rep.overall_recommendation || "—") + "</p>") +
-          section("最值得关注的机会", ul(rep.best_opportunities)) +
-          section("主要风险", ul(rep.main_risks)) +
-          section("下一步建议", ul(rep.what_to_do_next)) +
-          "<p class='hint muted small-print report-summary-line'>" +
-          escapeHtml(rep.summary_sentence || "—") +
-          "</p>";
+        rEl.innerHTML = "<p class=\"hint\">暂无市场摘要。</p>";
       }
     }
   }
