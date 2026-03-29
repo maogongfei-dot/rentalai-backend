@@ -184,28 +184,61 @@ def _uniq_str(xs: list[str]) -> list[str]:
     return out
 
 
-def _compute_star_rating(deal_score: float, decision: str, risk_level: str) -> float:
+def _compute_star_rating(
+    listing: dict[str, Any],
+    market_insight: dict[str, Any],
+    deal_score: float,
+    decision: str,
+    risk_level: str,
+) -> float:
     """
-    将内部 deal 分（0–100）与决策/风险折叠为 1–5 星（步进 0.5），语义面向「是否值得优先看」。
+    用户向星级：默认 3 星（普通房源），按相对均价与信息完整度加减分；步进 0.5；封顶 5 星。
+
+    加分：月租低于样本均价 +1 星；完整度较高 +0.5 星。
+    减分：月租高于样本均价 −1 星；完整度偏低 −0.5 星。
+
+    一般不低于 2 星；仅当「特别差」（AVOID、或高风险、或 deal 分过低）时允许落到 1–2 星区间，避免满屏 1 星。
     """
     try:
         ds = float(deal_score)
     except (TypeError, ValueError):
         ds = 50.0
     ds = max(0.0, min(100.0, ds))
-    base = 1.0 + (ds / 100.0) * 4.0
+
     d = str(decision or "").strip().upper()
     rl = str(risk_level or "low").lower()
-    if d == "AVOID":
-        base = min(base, 2.0) - 0.5
-    elif d == "CAUTION":
-        base = min(base, 4.5) - 0.25
-    if rl == "high":
-        base = min(base, 2.5)
-    elif rl == "medium":
-        base -= 0.5
-    base = max(1.0, min(5.0, base))
-    return round(base * 2.0) / 2.0
+    star = 3.0
+
+    price = _to_float(listing.get("price_pcm"))
+    stats = market_insight.get("stats") if isinstance(market_insight.get("stats"), dict) else {}
+    avg = _to_float(stats.get("average_price_pcm"))
+    if price is not None and price > 0 and avg is not None and avg > 0:
+        if price < avg:
+            star += 1.0
+        elif price > avg:
+            star -= 1.0
+
+    calc = calculate_deal_score(listing, market_insight)
+    sb = calc.get("score_breakdown") if isinstance(calc.get("score_breakdown"), dict) else {}
+    cp = _to_float(sb.get("completeness"))
+    if cp is not None:
+        if cp >= 65.0:
+            star += 0.5
+        elif cp < 45.0:
+            star -= 0.5
+
+    star = min(5.0, star)
+
+    star = round(star * 2.0) / 2.0
+
+    especially_bad = d == "AVOID" or rl == "high" or ds < 40.0
+    if star < 2.0:
+        if especially_bad:
+            star = max(1.0, star)
+        else:
+            star = 2.0
+
+    return min(5.0, star)
 
 
 def _star_reasons_zh(
@@ -488,7 +521,7 @@ def build_listing_explanation(listing: dict[str, Any], market_insight: dict[str,
 
     actions = _action_suggestions_trim(list(dec.get("action_suggestion") or []), decision)
 
-    star_rating = _compute_star_rating(deal_score, decision, risk_level)
+    star_rating = _compute_star_rating(listing, market_insight, deal_score, decision, risk_level)
     star_reasons = _star_reasons_zh(listing, market_insight, deal_score, risk_level, decision)
     one_line_suggestion = _one_line_suggestion_zh(star_rating, decision)
 
