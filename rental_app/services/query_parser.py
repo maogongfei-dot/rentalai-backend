@@ -43,6 +43,34 @@ _EN_TITLE_PHRASE = re.compile(
     r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\b",
 )
 
+# 英国城市/地区：按名称长度降序，先匹配「Milton Keynes」再匹配短名，避免误取 Manchester / 单字 Milton
+_UK_CITIES_ORDERED: list[str] = [
+    "Milton Keynes",
+    "Greater London",
+    "London",
+    "Manchester",
+    "Birmingham",
+    "Liverpool",
+    "Leeds",
+    "Sheffield",
+    "Bristol",
+    "Edinburgh",
+    "Glasgow",
+    "Oxford",
+    "Cambridge",
+    "Reading",
+    "Brighton",
+    "Southampton",
+    "Nottingham",
+    "Leicester",
+    "Coventry",
+    "Cardiff",
+    "Belfast",
+    "Newcastle",
+    "Fulham",
+    "Croydon",
+]
+
 
 def _safe_str(v: Any) -> str:
     if v is None:
@@ -162,6 +190,13 @@ def _extract_bedrooms(text: str) -> tuple[int | None, int | None, str]:
             set_pair(n, n)
             t = t[: m.start()] + " " + t[m.end() :]
 
+    # 2-bed / 3-bed（连字符）
+    m = re.search(r"\b(\d)\s*[-]\s*bed(?:room)?s?\b", t, re.IGNORECASE)
+    if m:
+        n = int(m.group(1))
+        set_pair(n, n)
+        t = t[: m.start()] + " " + t[m.end() :]
+
     if min_b is not None and max_b is None:
         max_b = min_b
     if max_b is not None and min_b is None:
@@ -187,10 +222,11 @@ def _extract_prices(text: str) -> tuple[float | None, float | None, float | None
         except ValueError:
             return None
 
-    # X 到 Y
+    # X 到 Y / X to Y（英文）
     for m in re.finditer(
-        r"(\d{3,5})\s*(?:到|至|[-~])\s*(\d{3,5})",
+        r"(?:for\s+)?(\d{3,5})\s*(?:到|至|[-~]|to)\s*(\d{3,5})",
         t,
+        re.IGNORECASE,
     ):
         a, b = float(m.group(1)), float(m.group(2))
         lo, hi = min(a, b), max(a, b)
@@ -275,11 +311,21 @@ def _extract_location_name(text: str, raw_for_hints: str) -> tuple[str | None, s
     area: str | None = None
     location: str | None = None
 
-    for cn, en in _CN_PLACES.items():
-        if cn in t:
-            location = en
-            t = t.replace(cn, " ")
+    # 1) 优先匹配完整英国城市名（长名优先），避免「Milton」单独命中或混入其他城市结果
+    raw_scan = raw_h.strip()
+    for city in _UK_CITIES_ORDERED:
+        if len(city) < 3:
+            continue
+        if re.search(r"(?i)\b" + re.escape(city) + r"\b", raw_scan):
+            location = city
             break
+
+    if location is None:
+        for cn, en in _CN_PLACES.items():
+            if cn in t:
+                location = en
+                t = t.replace(cn, " ")
+                break
 
     if "伦敦" in raw_h or location == "London":
         if location is None:
@@ -294,7 +340,7 @@ def _extract_location_name(text: str, raw_for_hints: str) -> tuple[str | None, s
         phrase = m.group(1).strip()
         if len(phrase) < 3:
             continue
-        skip = {"I Want", "Help Me", "The", "And", "For"}
+        skip = {"I Want", "Help Me", "The", "And", "For", "Want", "Bed", "Rent"}
         if phrase in skip:
             continue
         if location is None:

@@ -365,6 +365,40 @@ def _build_scraper_query(
     return q
 
 
+def _listing_matches_search_location(
+    listing: dict[str, Any],
+    location: str | None,
+    area: str | None,
+) -> bool:
+    """丢弃明显不属于检索城市的房源（减少 Milton Keynes 结果里混入 Manchester 等）。"""
+    need = " ".join(
+        str(x).strip() for x in (location, area) if x and str(x).strip()
+    ).strip()
+    if not need:
+        return True
+    parts: list[str] = []
+    for k in ("address", "area_name", "title", "postcode", "summary"):
+        v = listing.get(k)
+        if v not in (None, ""):
+            parts.append(str(v))
+    pr = listing.get("provider_raw")
+    if isinstance(pr, dict):
+        for k in ("city", "town", "area", "region"):
+            v = pr.get(k)
+            if v not in (None, ""):
+                parts.append(str(v))
+    blob = " ".join(parts).lower()
+    need_l = need.lower()
+    if need_l in blob:
+        return True
+    tokens = [tok for tok in re.split(r"\s+", need_l) if len(tok) >= 3]
+    if len(tokens) >= 2:
+        return all(tok in blob for tok in tokens)
+    if len(tokens) == 1:
+        return tokens[0] in blob
+    return True
+
+
 def _filter_listings(
     listings: list[dict[str, Any]],
     q: dict[str, Any],
@@ -516,6 +550,12 @@ def fetch_market_combined(
             unified.append(normalize_rightmove_listing(row))
         except Exception as exc:
             logger.debug("market_combined: skip bad rightmove row: %s", exc)
+
+    unified = [
+        L
+        for L in unified
+        if _listing_matches_search_location(L, location, area)
+    ]
 
     unified = _filter_listings(unified, q)
     total_before = len(unified)

@@ -272,9 +272,6 @@ def build_top_deals_explanations(
         ex = build_listing_explanation(listing, market_insight)
 
         src = listing.get("source")
-        ms = listing.get("matched_sources")
-        if ms is not None and not isinstance(ms, list):
-            ms = None
 
         item: dict[str, Any] = {
             "title": ex.get("title") or _str(listing.get("title")) or "Listing",
@@ -282,18 +279,11 @@ def build_top_deals_explanations(
             "price_pcm": listing.get("price_pcm"),
             "bedrooms": listing.get("bedrooms"),
             "source": src,
-            "matched_sources": ms,
+            "listing_url": listing.get("listing_url"),
             "deal_score": ex.get("deal_score"),
             "deal_tag": ex.get("deal_tag"),
             "decision": ex.get("decision"),
             "headline": ex.get("headline"),
-            "why_recommended": ex.get("why_recommended"),
-            "why_not_recommended": ex.get("why_not_recommended"),
-            "risk_flags": ex.get("risk_flags"),
-            "price_position": ex.get("price_position"),
-            "bedroom_position": ex.get("bedroom_position"),
-            "data_quality": ex.get("data_quality"),
-            "action_suggestion": ex.get("action_suggestion"),
         }
         items.append(item)
 
@@ -352,21 +342,30 @@ def build_market_recommendation_report(
         ]
         if n_total >= 5:
             wtn.append("If listings exist but none rank, check for missing prices or broken merges.")
+        orec = (
+            "No listings in sample — widen the area, relax price/bed filters, or retry later before deciding."
+            if n_total == 0
+            else "Sample exists but no top deals to highlight — refine filters or increase limit."
+        )
+        bo = ["No top deals to compare yet — expand search to surface candidates."]
+        mr = ["Insufficient data in the top slice to summarise common risk patterns."]
+        summ = f"{loc}: inconclusive yet - expand search criteria before committing time to viewings."
         return {
             "location": loc,
             "market_positioning": market_positioning,
-            "overall_recommendation": (
-                "No listings in sample — widen the area, relax price/bed filters, or retry later before deciding."
-                if n_total == 0
-                else "Sample exists but no top deals to highlight — refine filters or increase limit."
-            ),
-            "best_opportunities": ["No top deals to compare yet — expand search to surface candidates."],
-            "main_risks": ["Insufficient data in the top slice to summarise common risk patterns."],
+            "overall_recommendation": orec,
+            "best_opportunities": bo,
+            "main_risks": mr,
             "what_to_do_next": wtn[:5],
             "buyer_strategy": buyer_strategy[:6],
-            "summary_sentence": (
-                f"{loc}: inconclusive yet - expand search criteria before committing time to viewings."
-            ),
+            "summary_sentence": summ,
+            "readable_sections": {
+                "market_situation": market_positioning,
+                "worth_continuing": orec,
+                "top_opportunities": bo,
+                "main_risks": mr,
+                "next_steps": wtn[:5],
+            },
         }
 
     tags = [str(x.get("deal_tag") or "") for x in top_deals]
@@ -475,6 +474,13 @@ def build_market_recommendation_report(
         "what_to_do_next": what_to_do_next[:5],
         "buyer_strategy": buyer_strategy[:6],
         "summary_sentence": summary_sentence,
+        "readable_sections": {
+            "market_situation": market_positioning,
+            "worth_continuing": overall_recommendation,
+            "top_opportunities": best_opportunities[:6],
+            "main_risks": main_risks[:8],
+            "next_steps": what_to_do_next[:5],
+        },
     }
 
 

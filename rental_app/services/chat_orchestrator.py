@@ -267,6 +267,13 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
             "main_risks": [],
             "what_to_do_next": [],
             "buyer_strategy": [],
+            "readable_sections": {
+                "market_situation": "",
+                "worth_continuing": "",
+                "top_opportunities": [],
+                "main_risks": [],
+                "next_steps": [],
+            },
         }
 
     try:

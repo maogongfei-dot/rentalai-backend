@@ -132,6 +132,28 @@
 
     var qEl = document.getElementById("housing-query-summary");
     if (qEl) {
+      var bedMin =
+        pq.min_bedrooms != null
+          ? pq.min_bedrooms
+          : nf.min_bedrooms != null
+            ? nf.min_bedrooms
+            : null;
+      var bedMax =
+        pq.max_bedrooms != null
+          ? pq.max_bedrooms
+          : nf.max_bedrooms != null
+            ? nf.max_bedrooms
+            : null;
+      var bedStr =
+        bedMin != null || bedMax != null
+          ? (bedMin != null ? bedMin : "—") + " – " + (bedMax != null ? bedMax : "—")
+          : "—";
+      var pmin = pq.min_price != null ? pq.min_price : nf.min_price;
+      var pmax = pq.max_price != null ? pq.max_price : nf.max_price;
+      var budgetParsed =
+        pmin != null || pmax != null
+          ? (pmin != null ? fmtMoney(pmin) : "—") + " – " + (pmax != null ? fmtMoney(pmax) : "—")
+          : budgetStr;
       qEl.innerHTML =
         "<dl class='kv-list'>" +
         "<dt>原始输入</dt><dd>" +
@@ -143,30 +165,11 @@
         "<dt>Postcode</dt><dd>" +
         escapeHtml(pq.postcode || nf.postcode || "—") +
         "</dd>" +
-        "<dt>预算</dt><dd>" +
-        budgetStr +
+        "<dt>预算区间（解析）</dt><dd>" +
+        escapeHtml(budgetParsed) +
         "</dd>" +
-        "<dt>Bedrooms</dt><dd>" +
-        escapeHtml(
-          pq.min_bedrooms != null || pq.max_bedrooms != null
-            ? (pq.min_bedrooms != null ? pq.min_bedrooms : "—") +
-                " – " +
-                (pq.max_bedrooms != null ? pq.max_bedrooms : "—")
-            : nf.min_bedrooms != null || nf.max_bedrooms != null
-              ? (nf.min_bedrooms != null ? nf.min_bedrooms : "—") +
-                " – " +
-                (nf.max_bedrooms != null ? nf.max_bedrooms : "—")
-              : "—"
-        ) +
-        "</dd>" +
-        "<dt>cheap_preference</dt><dd>" +
-        fmt(fl.cheap_preference) +
-        "</dd>" +
-        "<dt>image_required</dt><dd>" +
-        fmt(fl.image_required) +
-        "</dd>" +
-        "<dt>furnished_preference</dt><dd>" +
-        fmt(fl.furnished_preference) +
+        "<dt>卧室数（解析）</dt><dd>" +
+        escapeHtml(bedStr) +
         "</dd>" +
         "</dl>";
     }
@@ -234,11 +237,13 @@
         dealsEl.innerHTML = top5
           .map(function (it) {
             var src = it.source || "";
-            var msr = it.matched_sources;
-            var msrStr = "";
-            if (Array.isArray(msr) && msr.length) {
-              msrStr = JSON.stringify(msr);
-            }
+            var url = it.listing_url || "";
+            var link =
+              url && /^https?:\/\//i.test(url)
+                ? "<a href=\"" +
+                  escapeHtml(url) +
+                  "\" target=\"_blank\" rel=\"noopener noreferrer\">在平台查看</a>"
+                : "<span class='hint'>—</span>";
             return (
               "<div class='deal-card'>" +
               "<strong>" +
@@ -247,24 +252,21 @@
               "<span class='hint'>" +
               escapeHtml(it.address || "—") +
               "</span><br/>" +
+              "<span>价格 " +
               fmtMoney(it.price_pcm) +
-              " · " +
-              escapeHtml(it.bedrooms != null ? it.bedrooms + " bed" : "—") +
-              "<br/>" +
-              "source: " +
+              "</span> · <span>卧室 " +
+              escapeHtml(it.bedrooms != null ? it.bedrooms : "—") +
+              "</span><br/>" +
+              "<span>来源 " +
               escapeHtml(src) +
-              (msrStr ? " · matched: " + escapeHtml(msrStr) : "") +
-              "<br/>" +
-              "deal_score: " +
+              "</span> · <span>deal_score " +
               fmt(it.deal_score) +
-              " · tag: " +
+              "</span> · <span>标签 " +
               escapeHtml(it.deal_tag || "—") +
-              " · decision: " +
+              "</span> · <span>建议 " +
               escapeHtml(it.decision || "—") +
-              "<br/>" +
-              "<span class='deal-headline'>" +
-              escapeHtml(it.headline || "") +
-              "</span>" +
+              "</span><br/>" +
+              link +
               "</div>"
             );
           })
@@ -277,24 +279,40 @@
     if (rEl) {
       function ul(arr) {
         if (!Array.isArray(arr) || !arr.length) return "<p class='hint'>—</p>";
-        return "<ul>" + arr.map(function (x) { return "<li>" + escapeHtml(x) + "</li>"; }).join("") + "</ul>";
+        return "<ul class='bullet-list'>" + arr.map(function (x) { return "<li>" + escapeHtml(x) + "</li>"; }).join("") + "</ul>";
       }
-      rEl.innerHTML =
-        "<p><strong>market_positioning</strong><br/>" +
-        escapeHtml(rep.market_positioning || "—") +
-        "</p>" +
-        "<p><strong>overall_recommendation</strong><br/>" +
-        escapeHtml(rep.overall_recommendation || "—") +
-        "</p>" +
-        "<p><strong>best_opportunities</strong></p>" +
-        ul(rep.best_opportunities) +
-        "<p><strong>main_risks</strong></p>" +
-        ul(rep.main_risks) +
-        "<p><strong>what_to_do_next</strong></p>" +
-        ul(rep.what_to_do_next) +
-        "<p><strong>summary_sentence</strong><br/>" +
-        escapeHtml(rep.summary_sentence || "—") +
-        "</p>";
+      function section(title, bodyHtml) {
+        return (
+          "<section class='report-block card-inner'>" +
+          "<h3 class='subsection-title'>" +
+          escapeHtml(title) +
+          "</h3>" +
+          bodyHtml +
+          "</section>"
+        );
+      }
+      var rs = rep.readable_sections || {};
+      if (rs.market_situation != null && String(rs.market_situation).trim() !== "") {
+        rEl.innerHTML =
+          section("市场情况", "<p>" + escapeHtml(rs.market_situation || "—") + "</p>") +
+          section("是否值得继续看", "<p>" + escapeHtml(rs.worth_continuing || "—") + "</p>") +
+          section("最值得关注的机会", ul(rs.top_opportunities || [])) +
+          section("主要风险", ul(rs.main_risks || [])) +
+          section("下一步建议", ul(rs.next_steps || [])) +
+          "<p class='hint muted small-print'>" +
+          escapeHtml(rep.summary_sentence || "") +
+          "</p>";
+      } else {
+        rEl.innerHTML =
+          section("市场情况", "<p>" + escapeHtml(rep.market_positioning || "—") + "</p>") +
+          section("是否值得继续看", "<p>" + escapeHtml(rep.overall_recommendation || "—") + "</p>") +
+          section("最值得关注的机会", ul(rep.best_opportunities)) +
+          section("主要风险", ul(rep.main_risks)) +
+          section("下一步建议", ul(rep.what_to_do_next)) +
+          "<p class='hint muted small-print'>" +
+          escapeHtml(rep.summary_sentence || "—") +
+          "</p>";
+      }
     }
   }
 
