@@ -955,6 +955,11 @@ select {
   margin-top: 0.25rem;
 }
 
+.verdict-intro {
+  margin-bottom: 0.75rem;
+  line-height: 1.45;
+}
+
 .star-final-verdict {
   display: flex;
   flex-direction: column;

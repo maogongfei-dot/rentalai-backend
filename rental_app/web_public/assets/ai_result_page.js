@@ -127,12 +127,11 @@
     }
     return (
       "<div class=\"star-final-verdict\">" +
-      verdictPickBlock("综合最推荐", v.best_overall) +
-      verdictPickBlock("如果只看价格，优先看", v.best_for_price) +
-      verdictPickBlock("如果更看重环境/稳妥与信息完整", v.best_for_environment_safety) +
-      verdictPickBlock("如果更看重通勤与交通便利", v.best_for_transport) +
+      verdictPickBlock("最推荐的一套（星数高、租价也相对划算）", v.best_overall) +
+      verdictPickBlock("价格最友好的一套", v.best_for_price) +
+      verdictPickBlock("更稳妥的一套（资料更齐、更让人放心）", v.best_for_environment_safety) +
       "<div class=\"verdict-overall\">" +
-      "<div class=\"verdict-pick-label\">总体建议</div>" +
+      "<div class=\"verdict-pick-label\">一句话：还要不要继续看下去？</div>" +
       "<p class=\"verdict-overall-text\">" +
       escapeHtml(v.overall_advice || "—") +
       "</p>" +
