@@ -1,4 +1,5 @@
-# Module3 Phase4-1 文档读取依赖（PDF / DOCX 文本提取）
-# 安装：pip install -r requirements-docs.txt
+# 可选：与 `requirements.txt` 重复的文档读取依赖说明
+# 核心安装已包含 pypdf、python-docx；仅当需要单独补文档依赖时使用：
+#   pip install -r requirements-docs.txt
 pypdf>=4.0.0
 python-docx>=1.0.0

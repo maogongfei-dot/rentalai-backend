@@ -695,6 +695,14 @@ class ContractPhase3AnalyzeBody(BaseModel):
     monthly_rent: Optional[float] = Field(default=None)
     deposit_amount: Optional[float] = Field(default=None)
     fixed_term_months: Optional[int] = Field(default=None)
+    source_type: str = Field(
+        default="text",
+        description="text | txt | pdf | docx（预留；当前透传至 structured_analysis.meta）",
+    )
+    source_name: Optional[str] = Field(
+        default=None,
+        description="Optional file name or label for audit / UI",
+    )
 
 
 @app.post("/api/contract/phase3/analyze-text")
@@ -704,7 +712,7 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
 
     返回 ``result`` 为两层 + 展示层（与 CLI 默认展示一致）：
 
-    - ``structured_analysis``：第一层（summary / risks / missing_items / recommendations / detected_topics）
+    - ``structured_analysis``：第一层（summary / risks / missing_items / recommendations / detected_topics / meta）
     - ``explain``：第二层（overall_conclusion / key_risk_summary / missing_clause_summary / action_advice）
     - ``presentation``：产品化分段（sections / plain_text / decision_style 等），便于前端直接渲染
     """
@@ -726,6 +734,8 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
             monthly_rent=body.monthly_rent,
             deposit_amount=body.deposit_amount,
             fixed_term_months=body.fixed_term_months,
+            source_type=body.source_type,
+            source_name=body.source_name,
         )
         return {
             "ok": True,

@@ -13,6 +13,9 @@ pydantic>=2.0,<3
 # 合同 PDF 文本提取（Phase B5，文本层；非 OCR）
 pypdf>=4.0,<6
 
+# Phase 3 合同 DOCX 段落提取（contract_analysis.contract_document_reader）
+python-docx>=1.0.0,<2
+
 # HTTP 客户端（Streamlit 调 API、部分脚本）
 requests>=2.31.0
 

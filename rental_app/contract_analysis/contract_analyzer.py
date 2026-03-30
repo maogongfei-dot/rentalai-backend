@@ -4,9 +4,9 @@ Phase 3 合同分析：主分析入口（基础规则扫描 + 主题覆盖）。
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
-from .contract_models import ContractInput
+from .contract_models import ContractAnalysisResult, ContractInput, coerce_contract_source_type
 from .contract_rules import (
     detect_contract_topic_labels,
     evaluate_deposit_amount_risk,
@@ -26,6 +26,12 @@ def _dedupe_risks(risks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         seen.add(rid)
         out.append(r)
     return out
+
+
+def _meta_from_input(contract_input: ContractInput) -> dict[str, Any]:
+    """与 ``ContractInput`` 对齐的回显元数据（供 API / 前端展示来源）。"""
+    st = coerce_contract_source_type(contract_input.source_type)
+    return {"source_type": st, "source_name": contract_input.source_name}
 
 
 def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
@@ -159,20 +165,17 @@ def build_recommendations(
     return _uniq_preserve(recs)
 
 
-def analyze_contract_text(contract_input: ContractInput) -> dict[str, Any]:
+def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResult:
     """
     对合同文本做基础规则分析。
 
-    返回 dict 字段：
-    - summary: str
-    - risks: list[dict]（title / severity / reason，可能含 rule_id）
-    - missing_items: list[str]
-    - recommendations: list[str]
-    - detected_topics: list[str]（已覆盖主题的人类可读标签）
+    返回字段与 ``ContractAnalysisResult`` 一致：
+    - summary, risks, missing_items, recommendations, detected_topics
+    - meta: { source_type, source_name }（与 ``ContractInput`` 对应）
     """
     text = (contract_input.contract_text or "").strip()
     if not text:
-        return _normalize_analysis_output(
+        out = _normalize_analysis_output(
             {
                 "summary": "未提供合同文本，无法分析。",
                 "risks": [],
@@ -181,6 +184,8 @@ def analyze_contract_text(contract_input: ContractInput) -> dict[str, Any]:
                 "detected_topics": [],
             }
         )
+        out["meta"] = _meta_from_input(contract_input)
+        return out  # type: ignore[return-value]
 
     detected_topics = detect_contract_topics(text)
     risks = detect_contract_risks(text, contract_input)
@@ -188,7 +193,7 @@ def analyze_contract_text(contract_input: ContractInput) -> dict[str, Any]:
     recommendations = build_recommendations(risks, missing_items, detected_topics)
     summary = build_contract_summary(risks, missing_items, detected_topics)
 
-    return _normalize_analysis_output(
+    out = _normalize_analysis_output(
         {
             "summary": summary,
             "risks": risks,
@@ -197,3 +202,5 @@ def analyze_contract_text(contract_input: ContractInput) -> dict[str, Any]:
             "detected_topics": detected_topics,
         }
     )
+    out["meta"] = _meta_from_input(contract_input)
+    return cast(ContractAnalysisResult, out)

@@ -5,14 +5,26 @@ Phase 3：合同分析子模块（与项目根目录 ``contract_*.py`` 管线区
 from __future__ import annotations
 
 from .contract_analyzer import analyze_contract_text
+from .contract_document_reader import (
+    ContractReadOutcome,
+    extract_contract_text,
+    extract_contract_text_outcome,
+    read_contract_from_docx,
+    read_contract_from_pdf,
+    read_contract_from_txt,
+)
 from .contract_explainer import explain_contract_analysis, format_contract_analysis_output
 from .contract_models import (
+    ContractAnalysisMeta,
     ContractAnalysisResult,
     ContractExplainBundle,
+    ContractExplainResult,
     ContractInput,
     ContractPhase3PipelineResult,
     ContractPresentationBundle,
     ContractRiskItem,
+    ContractSourceType,
+    coerce_contract_source_type,
 )
 from .contract_rules import BASIC_CONTRACT_RISK_RULES
 from .demo_contract_samples import (
@@ -34,12 +46,22 @@ from .sample_contracts_data import (
 
 __all__ = [
     "BASIC_CONTRACT_RISK_RULES",
+    "ContractAnalysisMeta",
     "ContractAnalysisResult",
     "ContractExplainBundle",
+    "ContractExplainResult",
     "ContractInput",
     "ContractPhase3PipelineResult",
     "ContractPresentationBundle",
+    "ContractReadOutcome",
     "ContractRiskItem",
+    "ContractSourceType",
+    "coerce_contract_source_type",
+    "extract_contract_text",
+    "extract_contract_text_outcome",
+    "read_contract_from_docx",
+    "read_contract_from_pdf",
+    "read_contract_from_txt",
     "analyze_contract",
     "analyze_contract_text",
     "analyze_contract_with_explain",

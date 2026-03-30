@@ -77,6 +77,9 @@ def validate_contract_analysis_samples() -> None:
         assert isinstance(sa.get("missing_items"), list)
         assert isinstance(sa.get("recommendations"), list)
         assert isinstance(sa.get("detected_topics"), list)
+        meta = sa.get("meta")
+        assert isinstance(meta, dict)
+        assert meta.get("source_type") == "text"
         for k in ("overall_conclusion", "key_risk_summary", "missing_clause_summary"):
             assert isinstance(ex.get(k), str) and ex.get(k)
         adv = ex.get("action_advice")
