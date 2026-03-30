@@ -687,6 +687,54 @@ def api_contract_analyze_text(body: ContractAnalyzeTextBody = Body(...)):
         )
 
 
+class ContractPhase3AnalyzeBody(BaseModel):
+    """POST /api/contract/phase3/analyze-text — Phase 3 合同分析（contract_analysis 包）。"""
+
+    model_config = ConfigDict(extra="ignore")
+    contract_text: str = Field(default="", description="Full or partial tenancy contract text")
+    monthly_rent: Optional[float] = Field(default=None)
+    deposit_amount: Optional[float] = Field(default=None)
+    fixed_term_months: Optional[int] = Field(default=None)
+
+
+@app.post("/api/contract/phase3/analyze-text")
+def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)):
+    """
+    Phase 3 合同分析独立入口；与 ``/api/contract/analyze-text``（Phase B 管线）并存，不影响房源 MVP。
+    返回：``ok``、``engine``、``result``（含 summary / risks / missing_items / recommendations）。
+    """
+    from contract_analysis.service import analyze_contract
+
+    ct = (body.contract_text or "").strip()
+    if not ct:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "empty_contract_text",
+                "message": "contract_text is required and must be non-empty",
+            },
+        )
+    try:
+        result = analyze_contract(
+            contract_text=ct,
+            monthly_rent=body.monthly_rent,
+            deposit_amount=body.deposit_amount,
+            fixed_term_months=body.fixed_term_months,
+        )
+        return {
+            "ok": True,
+            "engine": "phase3_contract_analysis",
+            "result": result,
+        }
+    except Exception as exc:
+        logger.exception("contract phase3 analyze-text failed")
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": "server_error", "message": str(exc)},
+        )
+
+
 _CONTRACT_PDF_MAX_BYTES = max(1, int(os.environ.get("RENTALAI_CONTRACT_PDF_MAX_BYTES", str(15 * 1024 * 1024))))
 _CONTRACT_PREVIEW_CHARS = max(100, int(os.environ.get("RENTALAI_CONTRACT_PREVIEW_CHARS", "500")))
 
