@@ -21,6 +21,24 @@ from .contract_models import ContractSourceType, coerce_contract_source_type
 
 logger = logging.getLogger(__name__)
 
+# 用于测试/演示的最小单页 PDF（文本层；与 ``demo_document_reader`` 共用）
+MINIMAL_CONTRACT_PDF_TEXT_BYTES = b"""%PDF-1.4
+1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 65 >>stream
+BT /F1 18 Tf 72 720 Td (Rent 800 pcm deposit 5 weeks) Tj ET
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+xref
+0 6
+0000000000 65535 f 
+trailer<< /Size 6 /Root 1 0 R >>
+startxref
+400
+%%EOF"""
+
 
 class ContractReadOutcome(TypedDict, total=False):
     """文档读取结果：``text`` 为清洗后的正文；失败时 ``text`` 为空且 ``error`` 非空。"""
@@ -193,6 +211,11 @@ def _infer_source_type_from_suffix(path: Path) -> ContractSourceType:
     if suf == ".txt":
         return "txt"
     return "txt"
+
+
+def infer_contract_source_type_from_path(file_path: str | os.PathLike[str]) -> ContractSourceType:
+    """由扩展名推断 ``ContractSourceType``（未知扩展名视为 ``txt``，与 ``extract_contract_text_outcome`` 默认一致）。"""
+    return _infer_source_type_from_suffix(_as_path(file_path))
 
 
 def extract_contract_text_outcome(

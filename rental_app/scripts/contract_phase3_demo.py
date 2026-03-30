@@ -5,8 +5,12 @@ Phase 3 合同分析 CLI：默认输出「产品化」分段报告；``--json`` 
 用法（在 rental_app 目录下）::
 
     python scripts/contract_phase3_demo.py path/to/contract.txt
-    python scripts/contract_phase3_demo.py --json path/to/contract.txt
+    python scripts/contract_phase3_demo.py path/to/contract.pdf
+    python scripts/contract_phase3_demo.py --json path/to/contract.docx
     echo "Rent 800 pcm. Admin fee 200." | python scripts/contract_phase3_demo.py
+
+支持 ``.txt`` / ``.pdf`` / ``.docx``：走 ``analyze_contract_file_with_explain``；
+从 stdin 读取时仍为纯文本 ``analyze_contract_with_explain``。
 """
 
 from __future__ import annotations
@@ -21,10 +25,12 @@ def _root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def _load_text(path: str | None) -> str:
-    if path:
-        return Path(path).read_text(encoding="utf-8", errors="replace")
+def _load_stdin_text() -> str:
     return sys.stdin.read()
+
+
+def _is_doc_path(path: Path) -> bool:
+    return path.suffix.lower() in (".txt", ".pdf", ".docx")
 
 
 def main() -> None:
@@ -33,7 +39,7 @@ def main() -> None:
         "file",
         nargs="?",
         default=None,
-        help="合同文本文件路径；省略则从 stdin 读取",
+        help="合同文件路径（.txt / .pdf / .docx）或任意文本文件；省略则从 stdin 读取",
     )
     parser.add_argument(
         "--json",
@@ -46,10 +52,29 @@ def main() -> None:
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-    from contract_analysis.service import analyze_contract_with_explain
+    from contract_analysis.service import (
+        analyze_contract_file_with_explain,
+        analyze_contract_with_explain,
+    )
 
-    text = _load_text(args.file)
-    out = analyze_contract_with_explain(contract_text=text)
+    if args.file:
+        path = Path(args.file).expanduser()
+        if not path.is_file():
+            print(f"Error: file not found: {path}", file=sys.stderr)
+            sys.exit(1)
+        if _is_doc_path(path):
+            out = analyze_contract_file_with_explain(file_path=path)
+        else:
+            # 其它扩展名：按 UTF-8 文本读入（与旧行为兼容）
+            text = path.read_text(encoding="utf-8", errors="replace")
+            out = analyze_contract_with_explain(
+                contract_text=text,
+                source_type="txt",
+                source_name=path.name,
+            )
+    else:
+        text = _load_stdin_text()
+        out = analyze_contract_with_explain(contract_text=text)
 
     if args.json:
         print(json.dumps(out, ensure_ascii=False, indent=2, default=str))

@@ -1,0 +1,13 @@
+ASSURED SHORTHOLD TENANCY AGREEMENT — SAMPLE (Part 4 fixed files)
+
+This is a minimal demo contract text file for RentalAI document reader tests.
+
+1. Rent: The rent shall be £850 per calendar month, payable in advance on the 1st of each month.
+
+2. Deposit: A tenancy deposit of five weeks' rent shall be paid and protected in a government-approved scheme (DPS / TDS / MyDeposits). The landlord will provide prescribed information within 30 days.
+
+3. Notice: The landlord may give not less than two months' notice to end the tenancy after the fixed term; the tenant may give not less than one month's notice.
+
+4. Repairs: The landlord is responsible for structural repairs; the tenant must report defects promptly.
+
+5. Entry: The landlord or agent may enter for inspections with at least 24 hours' written notice except in genuine emergencies.

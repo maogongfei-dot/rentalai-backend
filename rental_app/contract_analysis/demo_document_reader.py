@@ -22,30 +22,13 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 from .contract_document_reader import (
+    MINIMAL_CONTRACT_PDF_TEXT_BYTES,
     ContractReadOutcome,
     extract_contract_text_outcome,
     read_contract_from_docx_outcome,
     read_contract_from_pdf_outcome,
     read_contract_from_txt_outcome,
 )
-
-# 经 pypdf 抽字验证的最小单页 PDF（文本层，非扫描）
-_MINIMAL_TEXT_LAYER_PDF = b"""%PDF-1.4
-1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
-2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
-3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
-4 0 obj<< /Length 65 >>stream
-BT /F1 18 Tf 72 720 Td (Rent 800 pcm deposit 5 weeks) Tj ET
-endstream
-endobj
-5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
-xref
-0 6
-0000000000 65535 f 
-trailer<< /Size 6 /Root 1 0 R >>
-startxref
-400
-%%EOF"""
 
 
 def _print_outcome(label: str, o: ContractReadOutcome) -> None:
@@ -72,7 +55,7 @@ def run_document_reader_smoke() -> None:
 
     # 2) PDF — 内存最小 PDF
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
-        f.write(_MINIMAL_TEXT_LAYER_PDF)
+        f.write(MINIMAL_CONTRACT_PDF_TEXT_BYTES)
         pdf_tmp = Path(f.name)
     try:
         print(f"\n2) PDF: temp {pdf_tmp}")
@@ -101,7 +84,7 @@ def run_document_reader_smoke() -> None:
 
     # 4) 统一入口
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
-        f.write(_MINIMAL_TEXT_LAYER_PDF)
+        f.write(MINIMAL_CONTRACT_PDF_TEXT_BYTES)
         pdf2 = Path(f.name)
     try:
         print(f"\n4) extract_contract_text_outcome (no source_type): {pdf2}")
