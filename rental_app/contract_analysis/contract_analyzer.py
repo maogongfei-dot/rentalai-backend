@@ -28,6 +28,31 @@ def _dedupe_risks(risks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
+    """保证输出字段类型稳定：risks / missing_items / recommendations / detected_topics 均为 list。"""
+    out = dict(data)
+    raw_risks = out.get("risks")
+    if not isinstance(raw_risks, list):
+        raw_risks = []
+    out["risks"] = [x for x in raw_risks if isinstance(x, dict)]
+    for key in ("missing_items", "recommendations", "detected_topics"):
+        v = out.get(key)
+        if not isinstance(v, list):
+            v = []
+        else:
+            v = [str(i).strip() for i in v if str(i).strip()]
+        out[key] = v
+    out["summary"] = str(out.get("summary") or "").strip()
+    return out
+
+
+def _missing_covers_notice_and_repair(missing_items: list[str]) -> bool:
+    """用于针对性建议：同时缺失通知期与维修主题。"""
+    has_n = any(("Notice" in m or "通知期" in m) for m in missing_items)
+    has_r = any(("Repair" in m or "Maintenance" in m or "维修" in m) for m in missing_items)
+    return has_n and has_r
+
+
 def _uniq_preserve(xs: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -106,6 +131,9 @@ def build_recommendations(
     ):
         recs.append("对进入权、通知期与解约程序有疑问时，建议对照当地现行租赁法规或咨询 Citizens Advice 类渠道。")
 
+    if "landlord_enter_anytime" in rule_ids or "access_no_notice_bad" in rule_ids:
+        recs.append("进入权条款应写明合理通知时间与紧急情况例外；若与口头承诺不一致，以书面条款为准。")
+
     if "tenant_all_repairs" in rule_ids:
         recs.append("结构性维修与房东法定义务通常不可通过合同全部转嫁给租客；建议请专业人士审阅维修条款范围。")
 
@@ -114,6 +142,9 @@ def build_recommendations(
 
     if "deposit_not_protected_text" in rule_ids:
         recs.append("若合同暗示押金未托管，签约前应要求书面澄清托管方案与证书。")
+
+    if _missing_covers_notice_and_repair(missing_items):
+        recs.append("正文若未同时写明通知期与维修责任，建议索取标准条款或让房东确认补充后再签署。")
 
     if len(missing_items) >= 6:
         recs.append("缺失主题较多时，可要求对方提供标准条款附录或修订后再签署。")
@@ -141,13 +172,15 @@ def analyze_contract_text(contract_input: ContractInput) -> dict[str, Any]:
     """
     text = (contract_input.contract_text or "").strip()
     if not text:
-        return {
-            "summary": "未提供合同文本，无法分析。",
-            "risks": [],
-            "missing_items": ["合同正文"],
-            "recommendations": ["请上传或粘贴完整合同文本后再试。"],
-            "detected_topics": [],
-        }
+        return _normalize_analysis_output(
+            {
+                "summary": "未提供合同文本，无法分析。",
+                "risks": [],
+                "missing_items": ["合同正文"],
+                "recommendations": ["请上传或粘贴完整合同文本后再试。"],
+                "detected_topics": [],
+            }
+        )
 
     detected_topics = detect_contract_topics(text)
     risks = detect_contract_risks(text, contract_input)
@@ -155,10 +188,12 @@ def analyze_contract_text(contract_input: ContractInput) -> dict[str, Any]:
     recommendations = build_recommendations(risks, missing_items, detected_topics)
     summary = build_contract_summary(risks, missing_items, detected_topics)
 
-    return {
-        "summary": summary,
-        "risks": risks,
-        "missing_items": missing_items,
-        "recommendations": recommendations,
-        "detected_topics": detected_topics,
-    }
+    return _normalize_analysis_output(
+        {
+            "summary": summary,
+            "risks": risks,
+            "missing_items": missing_items,
+            "recommendations": recommendations,
+            "detected_topics": detected_topics,
+        }
+    )

@@ -9,6 +9,35 @@ from __future__ import annotations
 from typing import Any
 
 
+def _as_risk_list(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    return [x for x in raw if isinstance(x, dict)]
+
+
+def _as_str_list(raw: Any) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    return [str(x).strip() for x in raw if str(x).strip()]
+
+
+def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
+    """保证 explain 四层字段始终存在且类型稳定。"""
+    adv = ex.get("action_advice")
+    if not isinstance(adv, list):
+        adv = []
+    adv = [str(a).strip() for a in adv if str(a).strip()]
+    while len(adv) < 3:
+        adv.append("保留合同终稿与沟通记录，便于日后核对。")
+    adv = adv[:5]
+    return {
+        "overall_conclusion": (str(ex.get("overall_conclusion") or "").strip() or "—"),
+        "key_risk_summary": (str(ex.get("key_risk_summary") or "").strip() or "—"),
+        "missing_clause_summary": (str(ex.get("missing_clause_summary") or "").strip() or "—"),
+        "action_advice": adv,
+    }
+
+
 def _severity_bucket(risks: list[dict[str, Any]]) -> tuple[int, int, int]:
     hi = md = lo = 0
     for r in risks:
@@ -128,31 +157,35 @@ def explain_contract_analysis(result: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(result, dict):
         result = {}
 
-    risks = [x for x in (result.get("risks") or []) if isinstance(x, dict)]
-    missing = [str(x).strip() for x in (result.get("missing_items") or []) if str(x).strip()]
-    recs = [str(x).strip() for x in (result.get("recommendations") or []) if str(x).strip()]
-    detected = [str(x).strip() for x in (result.get("detected_topics") or []) if str(x).strip()]
+    risks = _as_risk_list(result.get("risks"))
+    missing = _as_str_list(result.get("missing_items"))
+    recs = _as_str_list(result.get("recommendations"))
+    detected = _as_str_list(result.get("detected_topics"))
     summary_line = str(result.get("summary") or "")
 
     # 空合同 / 无正文
     if missing == ["合同正文"] or ("未提供合同" in summary_line and "无法分析" in summary_line):
-        return {
-            "overall_conclusion": "未提供有效合同正文，无法形成结论。",
-            "key_risk_summary": "暂无风险项可供说明。",
-            "missing_clause_summary": "请先上传或粘贴完整合同文本后再分析。",
-            "action_advice": [
-                "在租房平台或邮箱中下载带双方信息的合同终稿。",
-                "粘贴全文或导出为文本后再运行分析。",
-                "若只有扫描件，可先使用项目内 PDF 抽取流程获取文字。",
-            ],
-        }
+        return _normalize_explain_out(
+            {
+                "overall_conclusion": "未提供有效合同正文，无法形成结论。",
+                "key_risk_summary": "暂无风险项可供说明。",
+                "missing_clause_summary": "请先上传或粘贴完整合同文本后再分析。",
+                "action_advice": [
+                    "在租房平台或邮箱中下载带双方信息的合同终稿。",
+                    "粘贴全文或导出为文本后再运行分析。",
+                    "若只有扫描件，可先使用项目内 PDF 抽取流程获取文字。",
+                ],
+            }
+        )
 
-    return {
-        "overall_conclusion": _build_overall_conclusion(risks, missing),
-        "key_risk_summary": _build_key_risk_summary(risks),
-        "missing_clause_summary": _build_missing_clause_summary(missing, detected),
-        "action_advice": _build_action_advice(risks, missing, recs),
-    }
+    return _normalize_explain_out(
+        {
+            "overall_conclusion": _build_overall_conclusion(risks, missing),
+            "key_risk_summary": _build_key_risk_summary(risks),
+            "missing_clause_summary": _build_missing_clause_summary(missing, detected),
+            "action_advice": _build_action_advice(risks, missing, recs),
+        }
+    )
 
 
 # 与部分代码库命名习惯兼容（别名）
