@@ -701,9 +701,14 @@ class ContractPhase3AnalyzeBody(BaseModel):
 def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)):
     """
     Phase 3 合同分析独立入口；与 ``/api/contract/analyze-text``（Phase B 管线）并存，不影响房源 MVP。
-    返回：``ok``、``engine``、``result``（含 summary / risks / missing_items / recommendations）。
+
+    返回 ``result`` 为两层 + 展示层（与 CLI 默认展示一致）：
+
+    - ``structured_analysis``：第一层（summary / risks / missing_items / recommendations / detected_topics）
+    - ``explain``：第二层（overall_conclusion / key_risk_summary / missing_clause_summary / action_advice）
+    - ``presentation``：产品化分段（sections / plain_text / decision_style 等），便于前端直接渲染
     """
-    from contract_analysis.service import analyze_contract
+    from contract_analysis.service import analyze_contract_with_explain
 
     ct = (body.contract_text or "").strip()
     if not ct:
@@ -716,7 +721,7 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
             },
         )
     try:
-        result = analyze_contract(
+        result = analyze_contract_with_explain(
             contract_text=ct,
             monthly_rent=body.monthly_rent,
             deposit_amount=body.deposit_amount,
