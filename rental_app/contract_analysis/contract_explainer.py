@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from .contract_models import ContractExplainResult, HighlightedRiskClause
+from .contract_models import ContractExplainResult, HighlightedRiskClause, coerce_contract_risk_category
 
 
 def _as_risk_list(raw: Any) -> list[dict[str, Any]]:
@@ -30,15 +30,22 @@ def _normalize_highlighted_clauses(raw: Any) -> list[dict[str, Any]]:
     for item in raw:
         if not isinstance(item, dict):
             continue
-        out.append(
-            {
-                "risk_title": str(item.get("risk_title") or "").strip() or "—",
-                "severity": str(item.get("severity") or "").strip() or "—",
-                "matched_text": str(item.get("matched_text") or "").strip(),
-                "location_hint": str(item.get("location_hint") or "").strip(),
-                "short_advice": str(item.get("short_advice") or "").strip() or "—",
-            }
+        hrc = {
+            "risk_title": str(item.get("risk_title") or "").strip() or "—",
+            "severity": str(item.get("severity") or "").strip() or "—",
+            "matched_text": str(item.get("matched_text") or "").strip(),
+            "location_hint": str(item.get("location_hint") or "").strip(),
+            "short_advice": str(item.get("short_advice") or "").strip() or "—",
+        }
+        rcat = item.get("risk_category")
+        hrc["risk_category"] = coerce_contract_risk_category(
+            str(rcat).strip() if rcat is not None else None
         )
+        rcode = item.get("risk_code")
+        hrc["risk_code"] = (
+            str(rcode).strip() if rcode is not None and str(rcode).strip() else "general"
+        )
+        out.append(hrc)
     return out
 
 
@@ -98,6 +105,8 @@ def _build_highlighted_risk_clauses(risks: list[dict[str, Any]]) -> list[Highlig
     """结构化风险条款卡片（与结构化层 risks 顺序一致，最多 20 条。"""
     out: list[HighlightedRiskClause] = []
     for r in risks[:20]:
+        rc = r.get("risk_category")
+        rcode = r.get("risk_code")
         out.append(
             cast(
                 HighlightedRiskClause,
@@ -107,6 +116,14 @@ def _build_highlighted_risk_clauses(risks: list[dict[str, Any]]) -> list[Highlig
                     "matched_text": str(r.get("matched_text") or "").strip(),
                     "location_hint": str(r.get("location_hint") or "").strip(),
                     "short_advice": _short_advice_from_risk(r),
+                    "risk_category": coerce_contract_risk_category(
+                        str(rc).strip() if rc is not None else None
+                    ),
+                    "risk_code": (
+                        str(rcode).strip()
+                        if rcode is not None and str(rcode).strip()
+                        else str(r.get("rule_id") or "general").strip() or "general"
+                    ),
                 },
             )
         )

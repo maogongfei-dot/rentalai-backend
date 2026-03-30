@@ -106,6 +106,13 @@ def validate_contract_analysis_samples() -> None:
         assert isinstance(hrc, list)
         risks_n = len(sa.get("risks") or [])
         assert len(hrc) == min(risks_n, 20)
+        for r in sa.get("risks") or []:
+            assert isinstance(r, dict), label
+            assert str(r.get("risk_category") or "").strip(), label
+            assert str(r.get("risk_code") or "").strip(), label
+        for card in hrc:
+            assert str(card.get("risk_category") or "").strip(), label
+            assert str(card.get("risk_code") or "").strip(), label
         assert label
 
 
@@ -131,12 +138,16 @@ def validate_contract_localization_samples() -> None:
         for r in risks:
             assert isinstance(r, dict), label
             assert "matched_text" in r and isinstance(r.get("matched_text"), str), label
+            assert str(r.get("risk_category") or "").strip(), label
+            assert str(r.get("risk_code") or "").strip(), label
             rid = str(r.get("rule_id") or "")
             if rid != "deposit_amount_high":
                 assert str(r.get("matched_text") or "").strip(), f"{label}: {rid} empty matched_text"
         for card in hrc:
             assert isinstance(card, dict), label
             assert "matched_text" in card and isinstance(card.get("matched_text"), str), label
+            assert str(card.get("risk_category") or "").strip(), label
+            assert str(card.get("risk_code") or "").strip(), label
 
 
 def validate_contract_analysis_empty_risk_fallback() -> None:

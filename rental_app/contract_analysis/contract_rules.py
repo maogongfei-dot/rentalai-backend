@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .contract_models import coerce_contract_risk_category
+
 # --- 严重级别（与项目其它模块常见取值对齐）---
 SEVERITY_LOW = "low"
 SEVERITY_MEDIUM = "medium"
@@ -17,6 +19,19 @@ SEVERITY_HIGH = "high"
 
 # 五周租金折算为「月租」倍数：5 * (12/52) ≈ 1.1538
 _UK_FIVE_WEEKS_OF_MONTHLY_RENT = 60.0 / 52.0
+
+
+def _risk_classification_from_rule(rule: dict[str, Any]) -> tuple[str, str]:
+    """规则字典上的分类字段；缺省时 category→general、code→rule id。"""
+    rc = rule.get("risk_category")
+    cat = coerce_contract_risk_category(None if rc is None else str(rc).strip())
+    code_raw = rule.get("risk_code")
+    if code_raw is not None and str(code_raw).strip():
+        code = str(code_raw).strip()
+    else:
+        code = str(rule.get("id") or "").strip() or "general"
+    return cat, code
+
 
 # ---------------------------------------------------------------------------
 # Part 1：全局文本关键词风险（BASIC_CONTRACT_RISK_RULES，保持兼容）
@@ -36,6 +51,8 @@ BASIC_CONTRACT_RISK_RULES: list[dict[str, Any]] = [
         "title": "疑似不合理或模糊收费表述",
         "severity": SEVERITY_MEDIUM,
         "reason": "合同中出现与「可疑费用、隐藏收费」等相关的英文表述，建议逐项核对费用明细与合法性。",
+        "risk_category": "fees",
+        "risk_code": "fee_suspicious_generic",
     },
     {
         "id": "fee_penalty",
@@ -48,6 +65,8 @@ BASIC_CONTRACT_RISK_RULES: list[dict[str, Any]] = [
         "title": "违约金 / 滞纳金类条款",
         "severity": SEVERITY_MEDIUM,
         "reason": "出现 penalty、滞纳金等关键词，请确认金额上限、触发条件是否符合公平原则。",
+        "risk_category": "fees",
+        "risk_code": "fee_penalty",
     },
     {
         "id": "fee_non_refundable",
@@ -60,6 +79,8 @@ BASIC_CONTRACT_RISK_RULES: list[dict[str, Any]] = [
         "title": "不可退款收费",
         "severity": SEVERITY_HIGH,
         "reason": "出现「不可退款」类表述，需确认对应项目是否为法定允许范围（如部分行政费已受限）。",
+        "risk_category": "fees",
+        "risk_code": "fee_non_refundable",
     },
     {
         "id": "fee_admin_cleaning",
@@ -73,6 +94,8 @@ BASIC_CONTRACT_RISK_RULES: list[dict[str, Any]] = [
         "title": "行政费 / 清洁费等附加收费",
         "severity": SEVERITY_MEDIUM,
         "reason": "出现行政费、清洁费等关键词；英格兰对租户可收费用种类有限制，请核对是否重复或与押金混同。",
+        "risk_category": "fees",
+        "risk_code": "fee_admin_cleaning",
     },
     {
         "id": "landlord_enter_anytime",
@@ -87,6 +110,8 @@ BASIC_CONTRACT_RISK_RULES: list[dict[str, Any]] = [
         "title": "房东进入房屋的通知义务存疑",
         "severity": SEVERITY_HIGH,
         "reason": "条款可能削弱租客对安宁占有的合理预期；合法进入通常需合理通知（紧急情况除外）。",
+        "risk_category": "access",
+        "risk_code": "landlord_enter_anytime",
     },
     {
         "id": "tenant_all_repairs",
@@ -100,6 +125,8 @@ BASIC_CONTRACT_RISK_RULES: list[dict[str, Any]] = [
         "title": "维修责任可能全部推给租客",
         "severity": SEVERITY_HIGH,
         "reason": "结构性维修与房东义务在英国通常不可通过合同全部转嫁给租客；需核对具体措辞与范围。",
+        "risk_category": "repairs",
+        "risk_code": "tenant_all_repairs",
     },
     {
         "id": "no_notice_termination",
@@ -112,6 +139,8 @@ BASIC_CONTRACT_RISK_RULES: list[dict[str, Any]] = [
         "title": "通知期 / 解除条件对租客不利",
         "severity": SEVERITY_MEDIUM,
         "reason": "出现「无需通知即可终止」等表述，请核对是否违反最低通知期与程序要求。",
+        "risk_category": "termination",
+        "risk_code": "no_notice_termination",
     },
 ]
 
@@ -153,6 +182,8 @@ CONTRACT_CHECK_TOPICS: list[dict[str, Any]] = [
                 "title": "文本暗示押金可能未纳入保护计划",
                 "severity": SEVERITY_HIGH,
                 "reason": "若押金依法须托管，应明确计划名称与条款；请核对与房东/中介书面承诺是否一致。",
+                "risk_category": "deposit",
+                "risk_code": "deposit_not_protected_text",
             },
         ],
     },
@@ -215,6 +246,8 @@ CONTRACT_CHECK_TOPICS: list[dict[str, Any]] = [
                 "title": "涨租表述可能过于宽泛",
                 "severity": SEVERITY_HIGH,
                 "reason": "出现「随时涨租、无限涨租」等措辞时需特别警惕，应核对法定程序与最低通知要求。",
+                "risk_category": "rent_increase",
+                "risk_code": "rent_increase_unfair",
             },
         ],
     },
@@ -273,6 +306,8 @@ CONTRACT_CHECK_TOPICS: list[dict[str, Any]] = [
                 "title": "提前退租与费用/押金表述需核对",
                 "severity": SEVERITY_MEDIUM,
                 "reason": "若提前终止涉及高额费用或没收押金，请核对是否公平及是否与书面约定一致。",
+                "risk_category": "termination",
+                "risk_code": "early_termination_harsh",
             },
         ],
     },
@@ -314,6 +349,8 @@ CONTRACT_CHECK_TOPICS: list[dict[str, Any]] = [
                 "title": "宠物相关不可退款费用",
                 "severity": SEVERITY_MEDIUM,
                 "reason": "出现宠物不可退款费用时，请核对金额是否合理及是否与广告/沟通一致。",
+                "risk_category": "pets",
+                "risk_code": "pet_fee_harsh",
             },
         ],
     },
@@ -388,6 +425,8 @@ CONTRACT_CHECK_TOPICS: list[dict[str, Any]] = [
                 "title": "进入权条款可能对租客不利",
                 "severity": SEVERITY_HIGH,
                 "reason": "除紧急情况外，进入通常应给予合理通知；请与 BASIC 规则命中结果一并核对。",
+                "risk_category": "access",
+                "risk_code": "access_no_notice_bad",
             },
         ],
     },
@@ -485,6 +524,7 @@ def _annotate_regex_rule_hit(
     rid = str(rule.get("id") or "")
     raw_kw = m.group(0)
     mk = raw_kw if len(raw_kw) <= 200 else raw_kw[:197] + "…"
+    cat, code = _risk_classification_from_rule(rule)
     return {
         "rule_id": rid,
         "title": str(rule.get("title") or rid),
@@ -493,6 +533,8 @@ def _annotate_regex_rule_hit(
         "matched_text": _matched_snippet_line_or_window(contract_text, m),
         "matched_keyword": mk,
         "location_hint": _location_hint_for_match(contract_text, m),
+        "risk_category": cat,
+        "risk_code": code,
     }
 
 
@@ -640,6 +682,8 @@ def evaluate_deposit_amount_risk(
         "matched_text": "",
         "matched_keyword": "",
         "location_hint": "基于用户填写的押金与月租数值（非合同正文文本定位）",
+        "risk_category": "deposit",
+        "risk_code": "deposit_amount_high",
     }
 
 

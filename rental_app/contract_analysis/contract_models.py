@@ -14,6 +14,39 @@ from typing import Any, Literal, Optional, TypedDict, cast
 # text：粘贴或内存中的正文；txt：自 .txt 文件读取；pdf / docx：自对应文件抽取。
 ContractSourceType = Literal["text", "txt", "pdf", "docx"]
 
+# Phase 6：风险条款分类（与 ``contract_rules`` / ``highlighted_risk_clauses`` 对齐）
+ContractRiskCategory = Literal[
+    "deposit",
+    "fees",
+    "access",
+    "repairs",
+    "notice",
+    "rent_increase",
+    "termination",
+    "bills",
+    "pets",
+    "subletting",
+    "inventory",
+    "general",
+]
+
+_CONTRACT_RISK_CATEGORY_VALUES = frozenset(
+    {
+        "deposit",
+        "fees",
+        "access",
+        "repairs",
+        "notice",
+        "rent_increase",
+        "termination",
+        "bills",
+        "pets",
+        "subletting",
+        "inventory",
+        "general",
+    }
+)
+
 
 def coerce_contract_source_type(raw: str | None) -> ContractSourceType:
     """将 API / CLI 传入的字符串规范为 ``ContractSourceType``（未知值回退为 ``text``）。"""
@@ -21,6 +54,14 @@ def coerce_contract_source_type(raw: str | None) -> ContractSourceType:
     if r in ("text", "txt", "pdf", "docx"):
         return cast(ContractSourceType, r)
     return "text"
+
+
+def coerce_contract_risk_category(raw: str | None) -> str:
+    """将任意字符串规范为 ``ContractRiskCategory``；未知值回退为 ``general``。"""
+    r = (raw or "general").strip().lower()
+    if r in _CONTRACT_RISK_CATEGORY_VALUES:
+        return r
+    return "general"
 
 
 @dataclass
@@ -48,6 +89,7 @@ class ContractRiskItem(TypedDict, total=False):
 
     ``matched_text``：原文片段（整行或匹配点附近窗口）；``matched_keyword``：正则匹配字面；
     ``location_hint``：文本级提示（句序号/行号/near clause containing），无 PDF 页码。
+    ``risk_category`` / ``risk_code``：条款分类（见 ``ContractRiskCategory``）与稳定短码。
     """
 
     rule_id: str
@@ -57,6 +99,8 @@ class ContractRiskItem(TypedDict, total=False):
     matched_text: str
     matched_keyword: str
     location_hint: str
+    risk_category: str
+    risk_code: str
 
 
 class ContractAnalysisMeta(TypedDict, total=False):
@@ -85,6 +129,8 @@ class HighlightedRiskClause(TypedDict, total=False):
     matched_text: str
     location_hint: str
     short_advice: str
+    risk_category: str
+    risk_code: str
 
 
 class ContractExplainResult(TypedDict, total=False):

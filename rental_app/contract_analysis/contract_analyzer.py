@@ -6,7 +6,12 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from .contract_models import ContractAnalysisResult, ContractInput, coerce_contract_source_type
+from .contract_models import (
+    ContractAnalysisResult,
+    ContractInput,
+    coerce_contract_risk_category,
+    coerce_contract_source_type,
+)
 from .contract_rules import (
     detect_contract_topic_labels,
     evaluate_deposit_amount_risk,
@@ -44,6 +49,13 @@ def _normalize_risk_dict(r: dict[str, Any]) -> dict[str, Any]:
     ):
         v = rd.get(key)
         rd[key] = str(v).strip() if v is not None else default
+    rc = rd.get("risk_category")
+    rd["risk_category"] = coerce_contract_risk_category(str(rc).strip() if rc is not None else None)
+    rcode = rd.get("risk_code")
+    if rcode is None or not str(rcode).strip():
+        rd["risk_code"] = str(rd.get("rule_id") or "general").strip() or "general"
+    else:
+        rd["risk_code"] = str(rcode).strip()
     return rd
 
 

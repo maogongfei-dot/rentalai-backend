@@ -136,7 +136,7 @@ def build_contract_presentation(
     - plain_text：与 CLI 一致的完整可读文本
 
     ``sections`` 中 ``highlighted_risk_clauses`` 的 ``items`` 为 ``HighlightedRiskClause`` 字典列表，
-    每条含 risk_title / severity / matched_text / location_hint / short_advice。
+    每条含 risk_title / severity / matched_text / location_hint / short_advice / risk_category / risk_code。
     """
     ex = explain if isinstance(explain, dict) else {}
     sa = structured_analysis if isinstance(structured_analysis, dict) else {}
