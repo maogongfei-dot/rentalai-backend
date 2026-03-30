@@ -20,6 +20,9 @@ from .sample_contracts_data import (
     SAMPLE_CONTRACT_MISSING_NOTICE_REPAIR,
     SAMPLE_CONTRACT_SAFE,
     SAMPLE_CONTRACT_UNFAIR_ENTRY,
+    SAMPLE_LOC_HIDDEN_FEE,
+    SAMPLE_LOC_LANDLORD_ACCESS,
+    SAMPLE_LOC_TENANT_REPAIRS,
 )
 from .service import analyze_contract_with_explain
 
@@ -62,6 +65,21 @@ def _sample_specs() -> list[tuple[str, str, dict[str, Any]]]:
             SAMPLE_CONTRACT_HIDDEN_FEES_PENALTY,
             {"monthly_rent": 850.0, "deposit_amount": 850.0},
         ),
+        (
+            "sample_loc_hidden_fee",
+            SAMPLE_LOC_HIDDEN_FEE,
+            {"monthly_rent": 900.0, "deposit_amount": None},
+        ),
+        (
+            "sample_loc_landlord_access",
+            SAMPLE_LOC_LANDLORD_ACCESS,
+            {"monthly_rent": 950.0, "deposit_amount": None},
+        ),
+        (
+            "sample_loc_tenant_repairs",
+            SAMPLE_LOC_TENANT_REPAIRS,
+            {"monthly_rent": 880.0, "deposit_amount": None},
+        ),
     ]
 
 
@@ -84,12 +102,63 @@ def validate_contract_analysis_samples() -> None:
             assert isinstance(ex.get(k), str) and ex.get(k)
         adv = ex.get("action_advice")
         assert isinstance(adv, list) and len(adv) >= 3
+        hrc = ex.get("highlighted_risk_clauses")
+        assert isinstance(hrc, list)
+        risks_n = len(sa.get("risks") or [])
+        assert len(hrc) == min(risks_n, 20)
         assert label
+
+
+def validate_contract_localization_samples() -> None:
+    """
+    Part 5：定位样例专项校验 —— risks 与 highlighted_risk_clauses 对齐，且正则类风险带 matched_text。
+    """
+    loc_specs = (
+        ("sample_loc_hidden_fee", SAMPLE_LOC_HIDDEN_FEE, {"monthly_rent": 900.0, "deposit_amount": None}),
+        ("sample_loc_landlord_access", SAMPLE_LOC_LANDLORD_ACCESS, {"monthly_rent": 950.0, "deposit_amount": None}),
+        ("sample_loc_tenant_repairs", SAMPLE_LOC_TENANT_REPAIRS, {"monthly_rent": 880.0, "deposit_amount": None}),
+    )
+    for label, text, kwargs in loc_specs:
+        out = analyze_contract_with_explain(contract_text=text, **kwargs)
+        sa = out["structured_analysis"]
+        ex = out["explain"]
+        risks = sa.get("risks")
+        assert isinstance(risks, list), label
+        assert len(risks) >= 1, label
+        hrc = ex.get("highlighted_risk_clauses")
+        assert isinstance(hrc, list), label
+        assert len(hrc) == min(len(risks), 20), label
+        for r in risks:
+            assert isinstance(r, dict), label
+            assert "matched_text" in r and isinstance(r.get("matched_text"), str), label
+            rid = str(r.get("rule_id") or "")
+            if rid != "deposit_amount_high":
+                assert str(r.get("matched_text") or "").strip(), f"{label}: {rid} empty matched_text"
+        for card in hrc:
+            assert isinstance(card, dict), label
+            assert "matched_text" in card and isinstance(card.get("matched_text"), str), label
+
+
+def validate_contract_analysis_empty_risk_fallback() -> None:
+    """无规则命中时 risks / highlighted_risk_clauses 均为空 list。"""
+    out = analyze_contract_with_explain(
+        contract_text="This line contains only generic words like hello and world.",
+        monthly_rent=None,
+        deposit_amount=None,
+    )
+    sa = out["structured_analysis"]
+    ex = out["explain"]
+    assert isinstance(sa.get("risks"), list)
+    assert sa["risks"] == []
+    assert isinstance(ex.get("highlighted_risk_clauses"), list)
+    assert ex["highlighted_risk_clauses"] == []
 
 
 def test_contract_analysis_samples() -> None:
     """与项目 ``test_*.py`` 风格兼容：可直接被 pytest 收集。"""
     validate_contract_analysis_samples()
+    validate_contract_localization_samples()
+    validate_contract_analysis_empty_risk_fallback()
 
 
 def run_contract_analysis_demo() -> None:

@@ -34,13 +34,26 @@ def _meta_from_input(contract_input: ContractInput) -> dict[str, Any]:
     return {"source_type": st, "source_name": contract_input.source_name}
 
 
+def _normalize_risk_dict(r: dict[str, Any]) -> dict[str, Any]:
+    """每条 risk 含稳定字符串字段；无定位信息时安全降级为空串。"""
+    rd = dict(r)
+    for key, default in (
+        ("matched_text", ""),
+        ("matched_keyword", ""),
+        ("location_hint", ""),
+    ):
+        v = rd.get(key)
+        rd[key] = str(v).strip() if v is not None else default
+    return rd
+
+
 def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
     """保证输出字段类型稳定：risks / missing_items / recommendations / detected_topics 均为 list。"""
     out = dict(data)
     raw_risks = out.get("risks")
     if not isinstance(raw_risks, list):
         raw_risks = []
-    out["risks"] = [x for x in raw_risks if isinstance(x, dict)]
+    out["risks"] = [_normalize_risk_dict(x) for x in raw_risks if isinstance(x, dict)]
     for key in ("missing_items", "recommendations", "detected_topics"):
         v = out.get(key)
         if not isinstance(v, list):

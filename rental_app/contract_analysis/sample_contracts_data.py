@@ -24,3 +24,8 @@ SAMPLE_CONTRACT_DEPOSIT_HEAVY: str = _load_sample("sample_contract_deposit_heavy
 SAMPLE_CONTRACT_MISSING_NOTICE_REPAIR: str = _load_sample("sample_contract_missing_notice_repair.txt")
 SAMPLE_CONTRACT_UNFAIR_ENTRY: str = _load_sample("sample_contract_unfair_entry.txt")
 SAMPLE_CONTRACT_HIDDEN_FEES_PENALTY: str = _load_sample("sample_contract_hidden_fees_penalty.txt")
+
+# Part 5：条款定位专项样例（单句/段便于 matched_text 抽取）
+SAMPLE_LOC_HIDDEN_FEE: str = _load_sample("sample_loc_hidden_fee.txt")
+SAMPLE_LOC_LANDLORD_ACCESS: str = _load_sample("sample_loc_landlord_access.txt")
+SAMPLE_LOC_TENANT_REPAIRS: str = _load_sample("sample_loc_tenant_repairs.txt")

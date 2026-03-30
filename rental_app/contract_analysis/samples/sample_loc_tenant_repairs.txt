@@ -1,0 +1,11 @@
+LOCALIZATION SAMPLE — Tenant pays all repairs (Part 5)
+
+This sample is designed so rules can extract a clear matched_text for repair responsibility risks.
+
+1. Rent: Eight hundred and eighty pounds per calendar month.
+
+2. Condition: The tenant accepts the property as seen.
+
+3. Repairs and maintenance: The Tenant shall pay for all repairs to the property, including structural repairs, the roof, foundations, and the central heating system.
+
+4. The tenant responsible for all repairs and maintenance costs regardless of cause, except fire or flood solely affecting the building frame where statute requires otherwise.

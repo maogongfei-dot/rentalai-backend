@@ -77,6 +77,16 @@ class ContractAnalysisResult(TypedDict, total=False):
     meta: ContractAnalysisMeta
 
 
+class HighlightedRiskClause(TypedDict, total=False):
+    """单条「可定位风险条款」卡片（与 ``explain_contract_analysis`` 的 ``highlighted_risk_clauses`` 元素一致）。"""
+
+    risk_title: str
+    severity: str
+    matched_text: str
+    location_hint: str
+    short_advice: str
+
+
 class ContractExplainResult(TypedDict, total=False):
     """``explain_contract_analysis`` 输出（人话层）。"""
 
@@ -84,6 +94,7 @@ class ContractExplainResult(TypedDict, total=False):
     key_risk_summary: str
     missing_clause_summary: str
     action_advice: list[str]
+    highlighted_risk_clauses: list[HighlightedRiskClause]
 
 
 # 兼容旧名（Part 2 前使用 ContractExplainBundle）
@@ -95,9 +106,10 @@ class ContractPresentationSection(TypedDict, total=False):
 
     id: str
     title: str
+    title_en: str
     kind: str
     text: str
-    items: list[str]
+    items: list[Any]
 
 
 class ContractPresentationBundle(TypedDict, total=False):

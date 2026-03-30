@@ -103,6 +103,14 @@ def test_contract_document_readers() -> None:
             assert isinstance(ex.get(k), str) and (ex.get(k) or "").strip()
         adv = ex.get("action_advice")
         assert isinstance(adv, list) and len(adv) >= 3
+        hrc = ex.get("highlighted_risk_clauses")
+        assert isinstance(hrc, list)
+        risks_n = len(out["structured_analysis"].get("risks") or [])
+        assert len(hrc) == min(risks_n, 20)
+        for card in hrc:
+            assert isinstance(card, dict)
+            for key in ("risk_title", "severity", "short_advice"):
+                assert key in card
 
 
 if __name__ == "__main__":

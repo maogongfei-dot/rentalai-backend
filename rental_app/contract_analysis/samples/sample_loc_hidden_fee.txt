@@ -1,0 +1,11 @@
+LOCALIZATION SAMPLE — Hidden / mandatory fee (Part 5)
+
+This sample is designed so rules can extract a clear matched_text for fee-related risks.
+
+1. Rent: Nine hundred pounds per calendar month.
+
+2. Admin and extras: The tenant must pay mandatory fees of three hundred and fifty pounds per tenancy for administration and referencing, which are non-refundable.
+
+3. Further costs: The landlord may invoice undisclosed charges for additional services at any time during the term.
+
+4. Deposit: Five weeks' rent held in an approved scheme.

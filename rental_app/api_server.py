@@ -710,11 +710,15 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
     """
     Phase 3 合同分析独立入口；与 ``/api/contract/analyze-text``（Phase B 管线）并存，不影响房源 MVP。
 
-    返回 ``result`` 为两层 + 展示层（与 CLI 默认展示一致）：
+    返回 ``result`` 为两层 + 展示层（与 CLI ``plain_text`` 分段一致；JSON 可完整用于前端卡片）：
 
-    - ``structured_analysis``：第一层（summary / risks / missing_items / recommendations / detected_topics / meta）
-    - ``explain``：第二层（overall_conclusion / key_risk_summary / missing_clause_summary / action_advice）
-    - ``presentation``：产品化分段（sections / plain_text / decision_style 等），便于前端直接渲染
+    - ``structured_analysis``：summary / risks（含 ``matched_text``、``location_hint`` 等）/
+      missing_items / recommendations / detected_topics / meta
+    - ``explain``：overall_conclusion / key_risk_summary /
+      **highlighted_risk_clauses**（``risk_title`` / ``severity`` / ``matched_text`` /
+      ``location_hint`` / ``short_advice``）/
+      missing_clause_summary / action_advice
+    - ``presentation``：sections（含 ``title_en``、`kind=risk_clauses` 的条目列表）/ plain_text 等
     """
     from contract_analysis.service import analyze_contract_with_explain
 

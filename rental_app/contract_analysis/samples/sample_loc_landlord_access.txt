@@ -1,0 +1,11 @@
+LOCALIZATION SAMPLE — Landlord access without notice (Part 5)
+
+This sample is designed so rules can extract a clear matched_text for entry / access risks.
+
+1. Rent: Nine hundred and fifty pounds per calendar month.
+
+2. Quiet enjoyment: The tenant has quiet enjoyment subject to the following access terms.
+
+3. Inspection and access: The landlord may enter the premises at any time to carry out inspections, repairs, or viewings, and may access without notice when the landlord considers it necessary.
+
+4. The tenant shall not unreasonably withhold consent where the landlord may enter under clause 3, including entry without prior notice in an emergency.

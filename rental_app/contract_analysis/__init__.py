@@ -21,6 +21,7 @@ from .contract_models import (
     ContractAnalysisResult,
     ContractExplainBundle,
     ContractExplainResult,
+    HighlightedRiskClause,
     ContractInput,
     ContractPhase3PipelineResult,
     ContractPresentationBundle,
@@ -41,7 +42,9 @@ from .demo_contract_file_analysis import (
 from .demo_contract_samples import (
     run_contract_analysis_demo,
     test_contract_analysis_samples,
+    validate_contract_analysis_empty_risk_fallback,
     validate_contract_analysis_samples,
+    validate_contract_localization_samples,
 )
 from .presentation import build_contract_presentation, format_contract_analysis_cli_report
 from .service import (
@@ -59,6 +62,9 @@ from .sample_contracts_data import (
     SAMPLE_CONTRACT_MISSING_NOTICE_REPAIR,
     SAMPLE_CONTRACT_SAFE,
     SAMPLE_CONTRACT_UNFAIR_ENTRY,
+    SAMPLE_LOC_HIDDEN_FEE,
+    SAMPLE_LOC_LANDLORD_ACCESS,
+    SAMPLE_LOC_TENANT_REPAIRS,
 )
 
 __all__ = [
@@ -67,6 +73,7 @@ __all__ = [
     "ContractAnalysisResult",
     "ContractExplainBundle",
     "ContractExplainResult",
+    "HighlightedRiskClause",
     "ContractInput",
     "ContractPhase3PipelineResult",
     "ContractPresentationBundle",
@@ -102,8 +109,13 @@ __all__ = [
     "SAMPLE_CONTRACT_MISSING_NOTICE_REPAIR",
     "SAMPLE_CONTRACT_SAFE",
     "SAMPLE_CONTRACT_UNFAIR_ENTRY",
+    "SAMPLE_LOC_HIDDEN_FEE",
+    "SAMPLE_LOC_LANDLORD_ACCESS",
+    "SAMPLE_LOC_TENANT_REPAIRS",
     "test_contract_analysis_samples",
     "test_contract_document_readers",
+    "validate_contract_analysis_empty_risk_fallback",
     "validate_contract_analysis_samples",
     "validate_contract_file_analysis_demo",
+    "validate_contract_localization_samples",
 ]

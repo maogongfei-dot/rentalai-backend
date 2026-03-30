@@ -65,9 +65,9 @@ def analyze_contract_with_explain(
     """
     完整 Phase 3 输出（两层 + 展示层），形状见 ``ContractPhase3PipelineResult``：
 
-    - ``structured_analysis``：第一层（含 ``meta``）。
-    - ``explain``：第二层，人话说明。
-    - ``presentation``：产品化分段与 ``plain_text``。
+    - ``structured_analysis``：第一层（含 ``meta``、``risks[].matched_text`` 等）。
+    - ``explain``：第二层（含 ``highlighted_risk_clauses`` 卡片列表，与 CLI/API 展示对齐）。
+    - ``presentation``：``sections``（含 ``title_en``、``kind=risk_clauses`` 的 ``items``）与 ``plain_text``。
     """
     base = analyze_contract(
         contract_text=contract_text,

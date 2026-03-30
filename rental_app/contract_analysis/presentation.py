@@ -2,11 +2,15 @@
 Phase 3 合同分析：展示层 —— 将「结构化分析 + explain」整理为产品化输出（CLI 纯文本 / API 分段结构）。
 
 与房源侧 ``explain_engine`` 分段标题风格对齐：结论优先、条列清晰。
+Part 5：第二层 CLI 采用英文分段标题（Overall Conclusion / Key Risk Summary / …），与 API ``sections[].title_en`` 对齐。
 """
 
 from __future__ import annotations
 
 from typing import Any
+
+_CLI_SEP = "────────────────────────────"
+_HRC_CLI_MAX = 20
 
 
 def format_contract_analysis_cli_report(
@@ -15,6 +19,9 @@ def format_contract_analysis_cli_report(
 ) -> str:
     """
     生成适合终端阅读的纯文本报告（两层：结构化摘要 + 人话解读）。
+
+    第二层按固定顺序分段：Overall Conclusion → Key Risk Summary → Highlighted Risk Clauses
+    → Missing Clause Summary → Action Advice。
     """
     sa = structured_analysis if isinstance(structured_analysis, dict) else {}
     ex = explain if isinstance(explain, dict) else {}
@@ -22,12 +29,14 @@ def format_contract_analysis_cli_report(
     risks = sa.get("risks") or []
     topics = sa.get("detected_topics") or []
     missing = sa.get("missing_items") or []
+    hrc_raw = ex.get("highlighted_risk_clauses") or []
+    hrc: list[dict[str, Any]] = [x for x in hrc_raw if isinstance(x, dict)]
 
     lines: list[str] = [
         "===== RentalAI 合同分析 · Phase 3 =====",
         "",
         "【第一层】结构化分析",
-        "────────────────────────────",
+        _CLI_SEP,
         sa.get("summary") or "（无摘要）",
         "",
         f"· 规则命中风险：{len(risks)} 条",
@@ -36,7 +45,7 @@ def format_contract_analysis_cli_report(
         "",
     ]
     if isinstance(risks, list) and risks:
-        lines.append("· 风险条目（原文摘录 / 定位提示）")
+        lines.append("· 风险条目（规则层 · 原文摘录 / 定位提示）")
         for i, r in enumerate(risks[:8], start=1):
             if not isinstance(r, dict):
                 continue
@@ -47,26 +56,59 @@ def format_contract_analysis_cli_report(
                 mt = mt[:137] + "…"
             lines.append(f"  {i}. {title}")
             if mt:
-                lines.append(f"     摘录：{mt}")
+                lines.append(f"     matched_text: {mt}")
             if lh:
-                lines.append(f"     定位：{lh}")
+                lines.append(f"     location_hint: {lh}")
         if len(risks) > 8:
-            lines.append(f"  … 另有 {len(risks) - 8} 条见 JSON / API。")
+            lines.append(f"  … 另有 {len(risks) - 8} 条见 structured_analysis.risks / JSON。")
         lines.append("")
+
     lines.extend(
         [
-            "【第二层】人话解读",
-            "────────────────────────────",
-            "■ 总体结论",
+            "【第二层】人话解读（Explain）",
+            _CLI_SEP,
+            "",
+            "Overall Conclusion",
+            _CLI_SEP,
             ex.get("overall_conclusion") or "—",
             "",
-            "■ 核心风险摘要",
+            "Key Risk Summary",
+            _CLI_SEP,
             ex.get("key_risk_summary") or "—",
             "",
-            "■ 缺失条款摘要",
+            "Highlighted Risk Clauses",
+            _CLI_SEP,
+        ]
+    )
+    if hrc:
+        for i, card in enumerate(hrc[:_HRC_CLI_MAX], start=1):
+            rt = str(card.get("risk_title") or "").strip() or "—"
+            sev = str(card.get("severity") or "").strip() or "—"
+            mt = str(card.get("matched_text") or "").strip() or "—"
+            lh = str(card.get("location_hint") or "").strip() or "—"
+            sa_card = str(card.get("short_advice") or "").strip() or "—"
+            if len(mt) > 220:
+                mt = mt[:217] + "…"
+            lines.append(f"  [{i}] {rt}  [severity: {sev}]")
+            lines.append(f"      matched_text: {mt}")
+            lines.append(f"      location_hint: {lh}")
+            lines.append(f"      short_advice: {sa_card}")
+            lines.append("")
+        if len(hrc) > _HRC_CLI_MAX:
+            lines.append(f"  … {_HRC_CLI_MAX}+ 条见 explain.highlighted_risk_clauses（共 {len(hrc)} 条）。")
+            lines.append("")
+    else:
+        lines.append("  (none — no explain-level clause cards; see structured risks above if any.)")
+        lines.append("")
+
+    lines.extend(
+        [
+            "Missing Clause Summary",
+            _CLI_SEP,
             ex.get("missing_clause_summary") or "—",
             "",
-            "■ 建议下一步",
+            "Action Advice",
+            _CLI_SEP,
         ]
     )
     adv = ex.get("action_advice") or []
@@ -76,7 +118,7 @@ def format_contract_analysis_cli_report(
     else:
         lines.append("  —")
     lines.append("")
-    lines.append("────────────────────────────")
+    lines.append(_CLI_SEP)
     lines.append("说明：本报告由规则与关键词生成，不构成法律意见。")
     return "\n".join(lines)
 
@@ -90,34 +132,50 @@ def build_contract_presentation(
 
     返回字段：
     - product_title / phase / decision_style（与 RentalAI decision 块命名习惯对齐）
-    - sections：分段标题 + 文本或列表
+    - sections：分段标题 + ``title_en``（英文键名，便于 UI）+ kind / text 或 items
     - plain_text：与 CLI 一致的完整可读文本
+
+    ``sections`` 中 ``highlighted_risk_clauses`` 的 ``items`` 为 ``HighlightedRiskClause`` 字典列表，
+    每条含 risk_title / severity / matched_text / location_hint / short_advice。
     """
     ex = explain if isinstance(explain, dict) else {}
     sa = structured_analysis if isinstance(structured_analysis, dict) else {}
+
+    hrc_items = [x for x in (ex.get("highlighted_risk_clauses") or []) if isinstance(x, dict)]
 
     sections: list[dict[str, Any]] = [
         {
             "id": "overall_conclusion",
             "title": "总体结论",
+            "title_en": "Overall Conclusion",
             "kind": "text",
             "text": str(ex.get("overall_conclusion") or ""),
         },
         {
             "id": "key_risk_summary",
             "title": "核心风险摘要",
+            "title_en": "Key Risk Summary",
             "kind": "text",
             "text": str(ex.get("key_risk_summary") or ""),
         },
         {
+            "id": "highlighted_risk_clauses",
+            "title": "风险条款原文（可定位）",
+            "title_en": "Highlighted Risk Clauses",
+            "kind": "risk_clauses",
+            "items": hrc_items,
+        },
+        {
             "id": "missing_clause_summary",
             "title": "缺失条款摘要",
+            "title_en": "Missing Clause Summary",
             "kind": "text",
             "text": str(ex.get("missing_clause_summary") or ""),
         },
         {
             "id": "action_advice",
             "title": "建议下一步",
+            "title_en": "Action Advice",
             "kind": "bullets",
             "items": [str(x) for x in (ex.get("action_advice") or []) if str(x).strip()],
         },

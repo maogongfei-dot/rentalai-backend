@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from .contract_models import ContractExplainResult
+from .contract_models import ContractExplainResult, HighlightedRiskClause
 
 
 def _as_risk_list(raw: Any) -> list[dict[str, Any]]:
@@ -23,8 +23,27 @@ def _as_str_list(raw: Any) -> list[str]:
     return [str(x).strip() for x in raw if str(x).strip()]
 
 
+def _normalize_highlighted_clauses(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        out.append(
+            {
+                "risk_title": str(item.get("risk_title") or "").strip() or "—",
+                "severity": str(item.get("severity") or "").strip() or "—",
+                "matched_text": str(item.get("matched_text") or "").strip(),
+                "location_hint": str(item.get("location_hint") or "").strip(),
+                "short_advice": str(item.get("short_advice") or "").strip() or "—",
+            }
+        )
+    return out
+
+
 def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
-    """保证 explain 四层字段始终存在且类型稳定。"""
+    """保证 explain 字段齐全且类型稳定（含 ``highlighted_risk_clauses`` 卡片列表）。"""
     adv = ex.get("action_advice")
     if not isinstance(adv, list):
         adv = []
@@ -32,11 +51,13 @@ def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
     while len(adv) < 3:
         adv.append("保留合同终稿与沟通记录，便于日后核对。")
     adv = adv[:5]
+    hrc = _normalize_highlighted_clauses(ex.get("highlighted_risk_clauses"))
     return {
         "overall_conclusion": (str(ex.get("overall_conclusion") or "").strip() or "—"),
         "key_risk_summary": (str(ex.get("key_risk_summary") or "").strip() or "—"),
         "missing_clause_summary": (str(ex.get("missing_clause_summary") or "").strip() or "—"),
         "action_advice": adv,
+        "highlighted_risk_clauses": hrc,
     }
 
 
@@ -53,6 +74,45 @@ def _severity_bucket(risks: list[dict[str, Any]]) -> tuple[int, int, int]:
     return hi, md, lo
 
 
+def _has_locatable_risk_text(risks: list[dict[str, Any]]) -> bool:
+    return any(str(r.get("matched_text") or "").strip() for r in risks)
+
+
+def _short_advice_from_risk(risk: dict[str, Any]) -> str:
+    """从规则 reason 压缩为一条短建议（供卡片展示）。"""
+    t = str(risk.get("reason") or "").strip()
+    if not t:
+        return "请对照原文与出租方书面确认该条款含义。"
+    for sep in ("。", ".", ";", "；"):
+        if sep in t:
+            first = t.split(sep)[0].strip()
+            if len(first) >= 12:
+                t = first + ("。" if sep == "。" else "")
+                break
+    if len(t) > 160:
+        t = t[:157] + "…"
+    return t
+
+
+def _build_highlighted_risk_clauses(risks: list[dict[str, Any]]) -> list[HighlightedRiskClause]:
+    """结构化风险条款卡片（与结构化层 risks 顺序一致，最多 20 条。"""
+    out: list[HighlightedRiskClause] = []
+    for r in risks[:20]:
+        out.append(
+            cast(
+                HighlightedRiskClause,
+                {
+                    "risk_title": str(r.get("title") or r.get("rule_id") or "—").strip() or "—",
+                    "severity": str(r.get("severity") or "medium").strip().lower() or "medium",
+                    "matched_text": str(r.get("matched_text") or "").strip(),
+                    "location_hint": str(r.get("location_hint") or "").strip(),
+                    "short_advice": _short_advice_from_risk(r),
+                },
+            )
+        )
+    return out
+
+
 def _build_overall_conclusion(
     risks: list[dict[str, Any]],
     missing_items: list[str],
@@ -61,8 +121,14 @@ def _build_overall_conclusion(
     hi, md, _ = _severity_bucket(risks)
     n_risk = len(risks)
     n_miss = len(missing_items)
+    loc = _has_locatable_risk_text(risks)
 
     if hi >= 1:
+        if loc:
+            return (
+                "合同存在明显高风险内容；规则已在正文中定位到相关条款原文（见 highlighted_risk_clauses）。"
+                "建议逐条核对、要求书面澄清或寻求专业意见后再签署。"
+            )
         return "合同存在明显高风险内容，建议先修改或寻求专业确认。"
     if md >= 2 or n_risk >= 3:
         return "合同存在若干风险条款，建议谨慎签署。"
@@ -81,6 +147,13 @@ def _build_overall_conclusion(
 def _build_key_risk_summary(risks: list[dict[str, Any]]) -> str:
     if not risks:
         return "本次规则扫描未发现需要特别标注的高/中风险条款（仍不排除未覆盖的表述）。"
+    hi, _, _ = _severity_bucket(risks)
+    loc = _has_locatable_risk_text(risks)
+    prefix = ""
+    if hi >= 1 and loc:
+        prefix = "合同中已有明确可定位的高风险条款原文（逐条见下方「highlighted_risk_clauses」）。"
+    elif loc:
+        prefix = "下列风险均在合同中有原文定位提示，便于在纸质/PDF 中检索核对。"
     lines: list[str] = []
     for r in risks[:6]:
         title = str(r.get("title") or "风险项").strip()
@@ -94,7 +167,8 @@ def _build_key_risk_summary(risks: list[dict[str, Any]]) -> str:
     tail = ""
     if len(risks) > 6:
         tail = f" 另有 {len(risks) - 6} 条未逐条展开。"
-    return "核心风险点包括：" + "；".join(lines) + "。" + tail
+    body = "核心风险点包括：" + "；".join(lines) + "。" + tail
+    return (prefix + body) if prefix else body
 
 
 def _build_missing_clause_summary(
@@ -159,6 +233,7 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
     - key_risk_summary
     - missing_clause_summary
     - action_advice（3～5 条 str）
+    - highlighted_risk_clauses：可定位风险条款卡片列表（risk_title / severity / matched_text / …）
     """
     if not isinstance(result, dict):
         result = {}
@@ -183,10 +258,12 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
                         "粘贴全文或导出为文本后再运行分析。",
                         "若只有扫描件，可先使用项目内 PDF 抽取流程获取文字。",
                     ],
+                    "highlighted_risk_clauses": [],
                 }
             ),
         )
 
+    hrc = _build_highlighted_risk_clauses(risks)
     return cast(
         ContractExplainResult,
         _normalize_explain_out(
@@ -195,6 +272,7 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
                 "key_risk_summary": _build_key_risk_summary(risks),
                 "missing_clause_summary": _build_missing_clause_summary(missing, detected),
                 "action_advice": _build_action_advice(risks, missing, recs),
+                "highlighted_risk_clauses": hrc,
             }
         ),
     )
