@@ -34,19 +34,41 @@ def format_contract_analysis_cli_report(
         f"· 正文覆盖主题：{len(topics)} 类",
         f"· 未匹配主题项：{len(missing)} 类",
         "",
-        "【第二层】人话解读",
-        "────────────────────────────",
-        "■ 总体结论",
-        ex.get("overall_conclusion") or "—",
-        "",
-        "■ 核心风险摘要",
-        ex.get("key_risk_summary") or "—",
-        "",
-        "■ 缺失条款摘要",
-        ex.get("missing_clause_summary") or "—",
-        "",
-        "■ 建议下一步",
     ]
+    if isinstance(risks, list) and risks:
+        lines.append("· 风险条目（原文摘录 / 定位提示）")
+        for i, r in enumerate(risks[:8], start=1):
+            if not isinstance(r, dict):
+                continue
+            title = str(r.get("title") or "").strip() or "（未命名风险）"
+            mt = str(r.get("matched_text") or "").strip()
+            lh = str(r.get("location_hint") or "").strip()
+            if len(mt) > 140:
+                mt = mt[:137] + "…"
+            lines.append(f"  {i}. {title}")
+            if mt:
+                lines.append(f"     摘录：{mt}")
+            if lh:
+                lines.append(f"     定位：{lh}")
+        if len(risks) > 8:
+            lines.append(f"  … 另有 {len(risks) - 8} 条见 JSON / API。")
+        lines.append("")
+    lines.extend(
+        [
+            "【第二层】人话解读",
+            "────────────────────────────",
+            "■ 总体结论",
+            ex.get("overall_conclusion") or "—",
+            "",
+            "■ 核心风险摘要",
+            ex.get("key_risk_summary") or "—",
+            "",
+            "■ 缺失条款摘要",
+            ex.get("missing_clause_summary") or "—",
+            "",
+            "■ 建议下一步",
+        ]
+    )
     adv = ex.get("action_advice") or []
     if isinstance(adv, list) and adv:
         for i, a in enumerate(adv, start=1):

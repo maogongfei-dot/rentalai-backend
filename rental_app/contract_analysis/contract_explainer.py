@@ -86,7 +86,11 @@ def _build_key_risk_summary(risks: list[dict[str, Any]]) -> str:
         title = str(r.get("title") or "风险项").strip()
         sev = str(r.get("severity") or "").lower()
         sev_zh = {"high": "高", "medium": "中", "low": "低"}.get(sev, sev or "—")
-        lines.append(f"「{title}」（严重度：{sev_zh}）")
+        mt = str(r.get("matched_text") or "").strip()
+        if len(mt) > 72:
+            mt = mt[:69] + "…"
+        frag = f" — 原文摘录：{mt}" if mt else ""
+        lines.append(f"「{title}」（严重度：{sev_zh}）{frag}")
     tail = ""
     if len(risks) > 6:
         tail = f" 另有 {len(risks) - 6} 条未逐条展开。"

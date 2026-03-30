@@ -419,6 +419,94 @@ for _topic in CONTRACT_CHECK_TOPICS:
         _COMPILED_TOPIC_BAD.append((br, _compile_rule_patterns(br)))
 
 
+# ---------------------------------------------------------------------------
+# Part 1b：文本级风险定位（句子/行窗口，无 PDF 页码）
+# ---------------------------------------------------------------------------
+
+
+def split_contract_sentences(contract_text: str) -> list[str]:
+    """
+    轻量分句：多行合同时优先按行；否则按中英文句末标点切分。
+    """
+    t = (contract_text or "").strip()
+    if not t:
+        return []
+    if "\n" in t:
+        raw_lines = [ln.strip() for ln in t.splitlines() if ln.strip()]
+        if len(raw_lines) >= 2:
+            return raw_lines
+    parts = re.split(r"(?<=[.!?。！？])\s+", t)
+    out = [p.strip() for p in parts if p.strip()]
+    return out if out else [t]
+
+
+def _extract_context_window(contract_text: str, m: re.Match[str], radius: int = 130) -> str:
+    a = max(0, m.start() - radius)
+    b = min(len(contract_text), m.end() + radius)
+    snip = contract_text[a:b]
+    snip = re.sub(r"\s+", " ", snip).strip()
+    if len(snip) > 320:
+        snip = snip[:317] + "…"
+    return snip
+
+
+def _matched_snippet_line_or_window(contract_text: str, m: re.Match[str]) -> str:
+    """优先取匹配所在整行；过长则退回匹配点前后窗口。"""
+    ls = contract_text.rfind("\n", 0, m.start())
+    ls = 0 if ls < 0 else ls + 1
+    le = contract_text.find("\n", m.end())
+    le = len(contract_text) if le < 0 else le
+    line = contract_text[ls:le].strip()
+    line = re.sub(r"\s+", " ", line)
+    if len(line) <= 400:
+        return line
+    return _extract_context_window(contract_text, m)
+
+
+def _location_hint_for_match(contract_text: str, m: re.Match[str]) -> str:
+    line_no = contract_text.count("\n", 0, m.start()) + 1
+    kw = m.group(0)
+    ks = (kw[:72] + "…") if len(kw) > 72 else kw
+    sentences = split_contract_sentences(contract_text)
+    sent_idx = 1
+    needle = kw.lower()
+    for i, s in enumerate(sentences):
+        if needle and needle in s.lower():
+            sent_idx = i + 1
+            break
+    return f"matched sentence {sent_idx}; line ~{line_no}; near clause containing: {ks}"
+
+
+def _annotate_regex_rule_hit(
+    contract_text: str,
+    rule: dict[str, Any],
+    m: re.Match[str],
+) -> dict[str, Any]:
+    rid = str(rule.get("id") or "")
+    raw_kw = m.group(0)
+    mk = raw_kw if len(raw_kw) <= 200 else raw_kw[:197] + "…"
+    return {
+        "rule_id": rid,
+        "title": str(rule.get("title") or rid),
+        "severity": str(rule.get("severity") or SEVERITY_MEDIUM),
+        "reason": str(rule.get("reason") or ""),
+        "matched_text": _matched_snippet_line_or_window(contract_text, m),
+        "matched_keyword": mk,
+        "location_hint": _location_hint_for_match(contract_text, m),
+    }
+
+
+def _first_pattern_match(
+    contract_text: str,
+    patterns: list[re.Pattern[str]],
+) -> tuple[re.Pattern[str], re.Match[str]] | None:
+    for cre in patterns:
+        mmm = cre.search(contract_text)
+        if mmm:
+            return cre, mmm
+    return None
+
+
 def scan_text_keyword_risks(contract_text: str) -> list[dict[str, Any]]:
     """Part 1：根据 BASIC_CONTRACT_RISK_RULES 扫描正文。"""
     if not (contract_text or "").strip():
@@ -429,17 +517,11 @@ def scan_text_keyword_risks(contract_text: str) -> list[dict[str, Any]]:
         rid = str(rule.get("id") or "")
         if rid in seen_ids:
             continue
-        matched = any(cre.search(contract_text) for cre in patterns)
-        if matched:
+        fm = _first_pattern_match(contract_text, patterns)
+        if fm:
+            _, m = fm
             seen_ids.add(rid)
-            hits.append(
-                {
-                    "rule_id": rid,
-                    "title": str(rule.get("title") or rid),
-                    "severity": str(rule.get("severity") or SEVERITY_MEDIUM),
-                    "reason": str(rule.get("reason") or ""),
-                }
-            )
+            hits.append(_annotate_regex_rule_hit(contract_text, rule, m))
     return hits
 
 
@@ -453,16 +535,11 @@ def scan_topic_bad_pattern_risks(contract_text: str) -> list[dict[str, Any]]:
         rid = str(br.get("id") or "")
         if not rid or rid in seen:
             continue
-        if any(cre.search(contract_text) for cre in patterns):
+        fm = _first_pattern_match(contract_text, patterns)
+        if fm:
+            _, m = fm
             seen.add(rid)
-            hits.append(
-                {
-                    "rule_id": rid,
-                    "title": str(br.get("title") or rid),
-                    "severity": str(br.get("severity") or SEVERITY_MEDIUM),
-                    "reason": str(br.get("reason") or ""),
-                }
-            )
+            hits.append(_annotate_regex_rule_hit(contract_text, br, m))
     return hits
 
 
@@ -560,6 +637,9 @@ def evaluate_deposit_amount_risk(
             f"超过五周租金折算值（约 {cap:.0f}）逾 5%。"
             "英格兰对多数租约押金有上限，请核对当地现行规定与币种。"
         ),
+        "matched_text": "",
+        "matched_keyword": "",
+        "location_hint": "基于用户填写的押金与月租数值（非合同正文文本定位）",
     }
 
 

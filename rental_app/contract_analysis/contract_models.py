@@ -43,12 +43,20 @@ class ContractInput:
 
 
 class ContractRiskItem(TypedDict, total=False):
-    """单条风险（``ContractAnalysisResult.risks`` 元素）。"""
+    """
+    单条风险（``ContractAnalysisResult.risks`` 元素）。
+
+    ``matched_text``：原文片段（整行或匹配点附近窗口）；``matched_keyword``：正则匹配字面；
+    ``location_hint``：文本级提示（句序号/行号/near clause containing），无 PDF 页码。
+    """
 
     rule_id: str
     title: str
     severity: str
     reason: str
+    matched_text: str
+    matched_keyword: str
+    location_hint: str
 
 
 class ContractAnalysisMeta(TypedDict, total=False):
