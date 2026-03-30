@@ -9,6 +9,8 @@ from services.explain_engine import (
     build_market_recommendation_report,
     build_star_final_verdict,
     build_top_deals_explanations,
+    compose_market_analysis_display_zh,
+    generate_followup_questions,
 )
 
 
@@ -47,6 +49,7 @@ def test_build_listing_explanation_keys():
         "deal_score",
         "deal_tag",
         "decision",
+        "risk_level",
         "headline",
         "why_recommended",
         "why_not_recommended",
@@ -58,6 +61,8 @@ def test_build_listing_explanation_keys():
         "star_rating",
         "star_reasons",
         "one_line_suggestion",
+        "analysis_sections",
+        "formatted_analysis_zh",
     }
     assert required <= set(out.keys())
     assert 2 <= len(out["action_suggestion"]) <= 4
@@ -109,6 +114,21 @@ def test_build_top_deals_with_ranked_deals():
     assert b2["items"][0]["title"] == "A"
 
 
+def test_generate_followup_questions_dynamic_and_default():
+    q_high = generate_followup_questions(
+        {"final_score": 4.5, "price_score": 1.0, "risk_flag": True, "has_multiple_options": True}
+    )
+    assert any("中介" in x for x in q_high)
+    assert any("bill" in x for x in q_high)
+    assert any("砍价" in x for x in q_high)
+    assert any("合同" in x for x in q_high)
+    assert any("对比" in x for x in q_high)
+
+    q_default = generate_followup_questions({"final_score": 2.0, "price_score": 4.0, "risk_flag": False})
+    assert len(q_default) == 1
+    assert "继续筛选" in q_default[0]
+
+
 def test_recommendation_report_empty_listings():
     insight = {
         "location": "Nowhere",
@@ -157,11 +177,23 @@ def test_recommendation_report_with_ranked():
     assert r["best_opportunities"]
     assert len(r["what_to_do_next"]) >= 3
     assert r.get("market_snapshot_zh")
+    assert r.get("display_context") and r["display_context"].get("top_n") == 2
     expl = build_top_deals_explanations(listings, ins, top_n=5, ranked_deals=ranked)
     verdict = build_star_final_verdict(expl["items"], ranked["top_deals"], ins, "TestCity")
     assert verdict["best_overall"] and verdict["best_overall"]["title"]
     assert verdict["overall_advice"]
     json.dumps(r)
+
+    txt = compose_market_analysis_display_zh(
+        location="TestCity",
+        report=r,
+        explanations=expl,
+        star_final_verdict=verdict,
+        ranked_deals=ranked,
+        market_insight=ins,
+    )
+    assert "【结论】" in txt and "【原因】" in txt and "【建议】" in txt and "【下一步】" in txt
+    assert "最佳房源推荐" in txt
 
 
 def _demo_synthetic_top3():
@@ -214,6 +246,7 @@ if __name__ == "__main__":
     test_build_listing_explanation_keys()
     test_build_top_deals_explanations()
     test_build_top_deals_with_ranked_deals()
+    test_generate_followup_questions_dynamic_and_default()
     test_recommendation_report_empty_listings()
     test_recommendation_report_with_ranked()
     print("test_explain_engine: all ok")

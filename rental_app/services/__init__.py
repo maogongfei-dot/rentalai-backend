@@ -25,6 +25,9 @@ from services.explain_engine import (
     build_market_recommendation_report,
     build_star_final_verdict,
     build_top_deals_explanations,
+    compose_market_analysis_display_zh,
+    format_single_listing_analysis_zh,
+    generate_followup_questions,
 )
 from services.chat_orchestrator import run_housing_ai_query
 from services.query_parser import (
@@ -61,6 +64,9 @@ __all__ = [
     "build_market_summary",
     "build_star_final_verdict",
     "build_top_deals_explanations",
+    "compose_market_analysis_display_zh",
+    "format_single_listing_analysis_zh",
+    "generate_followup_questions",
     "choose_better_listing",
     "deal_tag_from_score",
     "dedupe_merge_by_key",

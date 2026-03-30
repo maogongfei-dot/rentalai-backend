@@ -308,6 +308,492 @@ def _one_line_suggestion_zh(star: float, decision: str) -> str:
     return "不太建议作为首选，除非你非常看重它的某一两个点。"
 
 
+def _overall_stance_zh(decision: str, risk_level: str) -> str:
+    """面向用户的总体结论：推荐 / 不推荐 / 谨慎选择（不涉及公式或字段名）。"""
+    d = str(decision or "").strip().upper()
+    rl = str(risk_level or "low").lower()
+    if d == "AVOID":
+        return "不推荐"
+    if rl == "high":
+        return "谨慎选择"
+    if d == "DO":
+        return "推荐"
+    return "谨慎选择"
+
+
+def _en_reason_line_to_zh(line: str) -> str | None:
+    """把英文 why 行压成一条口语中文（仅展示层）。"""
+    s = (line or "").strip()
+    if not s:
+        return None
+    low = s.lower()
+    if "below the sample average" in low or "below the sample" in low:
+        return "租金比这次搜到的均价更便宜一些。"
+    if "above the sample average" in low or "above the sample" in low:
+        return "租金比这次搜到的均价更高一些。"
+    if "cheaper than other" in low and "bed" in low:
+        return "和同卧室数的房源比，这套租金更划算。"
+    if "pricier than other" in low and "bed" in low:
+        return "和同卧室数的房源比，这套偏贵。"
+    if "postcode" in low and "missing" in low:
+        return "邮编缺失，地段和通勤要自己在原站多核对。"
+    if "no property image" in low or "no image" in low:
+        return "缺少实拍图，点进原站看清楚再决定。"
+    if "no listing url" in low or ("listing url" in low and "missing" in low):
+        return "缺少原广告链接，务必在平台上找到同一套再聊。"
+    if "bedroom count missing" in low or "bedrooms missing" in low:
+        return "卧室数量没写清，对比时要特别留意面积和房型。"
+    return None
+
+
+def _pick_plain_reasons_zh(ex: dict[str, Any], max_n: int = 5) -> list[str]:
+    """3–5 条人话理由：优先已有中文 star_reasons，再补英文 why 的口语翻译。"""
+    min_n, cap = 3, max(3, min(max_n, 5))
+    star_reasons = [str(x).strip() for x in (ex.get("star_reasons") or []) if str(x).strip()]
+    why_rec = [str(x).strip() for x in (ex.get("why_recommended") or []) if str(x).strip()]
+    out: list[str] = []
+    for x in star_reasons:
+        if x and x not in out:
+            out.append(x)
+        if len(out) >= cap:
+            return out[:cap]
+    for line in why_rec:
+        zh = _en_reason_line_to_zh(line)
+        if zh and zh not in out:
+            out.append(zh)
+        if len(out) >= cap:
+            break
+    one_line = str(ex.get("one_line_suggestion") or "").strip()
+    if one_line and one_line not in out and len(out) < cap:
+        out.append(one_line)
+    why_not = [str(x).strip() for x in (ex.get("why_not_recommended") or []) if str(x).strip()]
+    for line in why_not:
+        if len(out) >= cap:
+            break
+        zh = _en_reason_line_to_zh(line)
+        if zh and zh not in out:
+            out.append(zh)
+    while len(out) < min_n:
+        out.append("建议结合预算和通勤，把这套放进你的对比清单里再决定。")
+        if len(out) >= min_n:
+            break
+    return out[:cap]
+
+
+def _action_lines_zh_from_en(actions: list[str], decision: str) -> list[str]:
+    """把规则引擎的英文建议翻成可执行的中文短句（展示层）。"""
+    d = str(decision or "").strip().upper()
+    lines: list[str] = []
+    for raw in actions:
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        low = raw.lower()
+        if "shortlist" in low or "viewing" in low:
+            lines.append("挑两三套合适的，优先预约实地看房。")
+        elif "bills" in low or "deposit" in low or "portal" in low:
+            lines.append("在原广告页核对租金、押金，并问清水电费是否包在房租里。")
+        elif "address" in low or "postcode" in low or "photo" in low:
+            lines.append("用地图核对地址和邮编，并对照原站上的照片。")
+        elif "cross-check" in low or "price" in low:
+            lines.append("和同区域、同卧室数的房源比一比价格是否合理。")
+        elif "too good" in low or "suspicious" in low:
+            lines.append("如果价格低得离谱，先当心上当，核实来源再往下走。")
+        elif "verifiable" in low or "url" in low or "agent" in low:
+            lines.append("找到可核对的广告链接或中介联系方式，再考虑下一步。")
+        else:
+            lines.append("按原广告信息逐步核实，再决定是否联系中介或房东。")
+        if len(lines) >= 4:
+            break
+    base_extra = [
+        "主动联系中介或房东，问清入住时间与能否议价。",
+        "确认账单（bill）包哪些、不包哪些，避免入住后踩坑。",
+    ]
+    for b in base_extra:
+        if len(lines) >= 4:
+            break
+        if b not in lines:
+            lines.append(b)
+    if d == "AVOID" and not any("上当" in x or "核实" in x for x in lines):
+        lines.append("在信息补齐之前，先不要付定金或透露过多个人信息。")
+    return lines[:4] if lines else ["先在房源网站上把地址、租金和照片核对一遍，再联系对方。"]
+
+
+def _price_score_bucket_from_vs_market(pv: float | None) -> int | None:
+    """把 D8 的 price_vs_market（0–100）映射为 1–5 档；档越低表示相对样本越不占优（偏贵）。"""
+    if pv is None:
+        return None
+    try:
+        x = float(pv)
+    except (TypeError, ValueError):
+        return None
+    x = max(0.0, min(100.0, x))
+    # [0,20)→1 … [80,100]→5；1–2 档对应「价格偏高」侧（约 pv<40）
+    return max(1, min(5, int(x // 20) + 1))
+
+
+def generate_followup_questions(result: dict[str, Any]) -> list[str]:
+    """
+    根据房源/检索上下文生成【下一步】引导提问（展示层，不参与评分）。
+
+    ``result`` 约定字段（均可选）：
+    - ``final_score``: 综合分，单套场景下与星级一致（约 1–5）
+    - ``price_score``: 1–5，越低表示相对样本越偏贵
+    - ``risk_flag``: 是否存在值得关注的风险信号
+    - ``has_multiple_options``: 是否有多套可对比
+    """
+    questions: list[str] = []
+
+    fs = _to_float(result.get("final_score"))
+    if fs is None:
+        fs = 0.0
+
+    ps_raw = result.get("price_score")
+    ps_val: float | None
+    try:
+        ps_val = float(ps_raw) if ps_raw is not None else None
+    except (TypeError, ValueError):
+        ps_val = None
+
+    if fs >= 4:
+        questions.append("是否需要我帮你生成联系中介的话术？")
+        questions.append("是否需要我帮你确认这个房源的bill情况？")
+
+    if ps_val is not None and ps_val <= 2:
+        questions.append("是否需要我帮你判断这个价格是否可以砍价？")
+
+    if result.get("risk_flag"):
+        questions.append("是否需要我帮你检查这个房源的合同风险？")
+
+    if result.get("has_multiple_options"):
+        questions.append("是否需要我帮你对比其他房源？")
+
+    out = _uniq_str([q for q in questions if isinstance(q, str) and q.strip()])
+    if not out:
+        out.append("是否需要我帮你继续筛选更合适的房源？")
+    return out
+
+
+def _followup_result_from_listing_ex(ex: dict[str, Any]) -> dict[str, Any]:
+    """由 ``build_listing_explanation`` 产出块构造 ``generate_followup_questions`` 入参。"""
+    fs = _to_float(ex.get("star_rating"))
+    if fs is None:
+        fs = 0.0
+    sb = ex.get("score_breakdown") if isinstance(ex.get("score_breakdown"), dict) else {}
+    pv = _to_float(sb.get("price_vs_market"))
+    bucket = _price_score_bucket_from_vs_market(pv)
+    price_score = float(bucket) if bucket is not None else 3.0
+
+    rflags = ex.get("risk_flags") or []
+    rl = str(ex.get("risk_level") or "low").lower()
+    dec = str(ex.get("decision") or "").strip().upper()
+    risk_flag = bool(rflags) or rl in ("high", "medium") or dec == "AVOID"
+
+    return {
+        "final_score": fs,
+        "price_score": price_score,
+        "risk_flag": risk_flag,
+        "has_multiple_options": False,
+    }
+
+
+def _followup_result_for_market_bundle(
+    *,
+    items: list[dict[str, Any]],
+    best_title: str,
+    top_n: int,
+    high_risk_n: int,
+    ranked_deals: dict[str, Any] | None,
+    market_insight: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """多套结果：用「最佳房源」对应的星级与价格维度构造提问上下文。"""
+    top_rows = list(ranked_deals.get("top_deals") or []) if isinstance(ranked_deals, dict) else []
+    idx = 0
+    bt = _str(best_title)
+    for i, it in enumerate(items):
+        if _str(it.get("title")) == bt:
+            idx = i
+            break
+    fs = _to_float(items[idx].get("star_rating")) if idx < len(items) else None
+    if fs is None:
+        fs = 0.0
+
+    price_score = 3.0
+    if market_insight and idx < len(top_rows):
+        calc = calculate_deal_score(top_rows[idx], market_insight)
+        sb = calc.get("score_breakdown") if isinstance(calc.get("score_breakdown"), dict) else {}
+        pv = _to_float(sb.get("price_vs_market"))
+        b = _price_score_bucket_from_vs_market(pv)
+        if b is not None:
+            price_score = float(b)
+
+    risk_flag = high_risk_n > 0
+
+    return {
+        "final_score": fs,
+        "price_score": price_score,
+        "risk_flag": risk_flag,
+        "has_multiple_options": top_n >= 2,
+    }
+
+
+def _format_analysis_block_zh(
+    *,
+    conclusion_lines: list[str],
+    reasons: list[str],
+    suggestions: list[str],
+    questions: list[str],
+) -> str:
+    """统一四段式排版（结论 / 原因 / 建议 / 下一步提问）。"""
+    c_lines = [x.strip() for x in conclusion_lines if x and str(x).strip()]
+    r_lines = [x.strip() for x in reasons if x and str(x).strip()]
+    s_lines = [x.strip() for x in suggestions if x and str(x).strip()]
+    q_lines = [x.strip() for x in questions if x and str(x).strip()]
+
+    parts: list[str] = [
+        "===== 🏠 租房分析结果 =====",
+        "",
+        "【结论】",
+    ]
+    parts.extend(c_lines)
+    parts.extend(["", "【原因】"])
+    for b in r_lines:
+        parts.append(f"- {b}")
+    parts.extend(["", "【建议】"])
+    for b in s_lines:
+        parts.append(f"- {b}")
+    parts.extend(["", "【下一步】"])
+    for q in q_lines:
+        parts.append(f"👉 {q}")
+    return "\n".join(parts).rstrip() + "\n"
+
+
+def _choice_line_for_stance_zh(stance: str, title: str) -> str:
+    t = title or "该房源"
+    if stance == "不推荐":
+        return f"不建议优先选择：「{t}」"
+    if stance == "谨慎选择":
+        return f"谨慎考虑：「{t}」"
+    return f"建议选择：「{t}」"
+
+
+def format_single_listing_analysis_zh(ex: dict[str, Any]) -> str:
+    """单套房源：四段式展示（仅排版，不重新算分）。"""
+    if not isinstance(ex, dict):
+        ex = {}
+    title = _str(ex.get("title")) or "该房源"
+    decision = str(ex.get("decision") or "CAUTION")
+    risk_level = str(ex.get("risk_level") or "low")
+    stance = _overall_stance_zh(decision, risk_level)
+
+    conclusion_lines = [
+        f"总体：{stance}",
+        _choice_line_for_stance_zh(stance, title),
+    ]
+    reasons = _pick_plain_reasons_zh(ex, 5)
+    actions_en = list(ex.get("action_suggestion") or [])
+    suggestions = _action_lines_zh_from_en(actions_en, decision)
+    questions = generate_followup_questions(_followup_result_from_listing_ex(ex))
+    return _format_analysis_block_zh(
+        conclusion_lines=conclusion_lines,
+        reasons=reasons,
+        suggestions=suggestions,
+        questions=questions,
+    )
+
+
+def _market_overall_stance_zh(
+    top_n: int,
+    high_risk_n: int,
+    excellent_good: int,
+    n_total: int,
+) -> str:
+    """市场级总体：推荐 / 不推荐 / 谨慎选择。"""
+    if top_n <= 0:
+        return "谨慎选择"
+    if n_total < 3:
+        return "谨慎选择"
+    half = max(1, top_n // 2)
+    if high_risk_n >= half:
+        return "谨慎选择"
+    if excellent_good >= max(2, (top_n + 1) // 2):
+        return "推荐"
+    if excellent_good == 0 and high_risk_n == 0:
+        return "谨慎选择"
+    return "谨慎选择"
+
+
+def _en_bullet_to_zh_market(s: str) -> str:
+    low = (s or "").lower()
+    if "below the sample average" in low:
+        return "前几名里有多套租金低于本次样本均价，可以多关注性价比。"
+    if "bedroom-segment" in low or "segment average" in low:
+        return "有的套在同卧室数里比均价更划算，适合放进短名单。"
+    if "richer listing" in low or "details" in low:
+        return "前几名信息相对完整，方便你在网上先做一轮筛选。"
+    if "widen" in low or "broaden" in low or "expand" in low:
+        return "先把搜索范围或条件放宽一点，多攒几条再比较。"
+    if "scam" in low or "verify" in low and "price" in low:
+        return "若租金低得不寻常，务必在原站核实，谨防虚假信息。"
+    if "missing listing url" in low or "url" in low:
+        return "部分条目缺少原广告链接，点进平台找到同一套再联系。"
+    if "missing address" in low or "postcode" in low:
+        return "有些地址信息不全，用地图和邮编自己多核对一遍。"
+    if "no image" in low or "images" in low:
+        return "有的房源没图，一定要打开原广告看图再决定。"
+    if "bedroom count" in low:
+        return "有的卧室数没写清，对比时留意面积和房型描述。"
+    if "verify each" in low or "portal" in low:
+        return "每一套都建议在原租房网站上再确认一遍细节。"
+    return "结合预算和地段，把最顺眼的一两套先约出来实地看看。"
+
+
+def compose_market_analysis_display_zh(
+    *,
+    location: str,
+    report: dict[str, Any],
+    explanations: dict[str, Any],
+    star_final_verdict: dict[str, Any],
+    ranked_deals: dict[str, Any] | None = None,
+    market_insight: dict[str, Any] | None = None,
+) -> str:
+    """
+    多套/市场级：四段式展示。依赖 ``build_market_recommendation_report`` 写入的 ``display_context``，
+    以及 ``star_final_verdict``、``explanations``，不重复算分。
+    """
+    if not isinstance(report, dict):
+        report = {}
+    if not isinstance(explanations, dict):
+        explanations = {}
+    if not isinstance(star_final_verdict, dict):
+        star_final_verdict = {}
+
+    loc = (location or report.get("location") or "本区域").strip() or "本区域"
+    items = [x for x in (explanations.get("items") or []) if isinstance(x, dict)]
+
+    ctx = report.get("display_context") if isinstance(report.get("display_context"), dict) else {}
+    try:
+        top_n = int(ctx.get("top_n") if ctx.get("top_n") is not None else len(items))
+    except (TypeError, ValueError):
+        top_n = len(items)
+    try:
+        n_total = int(ctx.get("n_total") or 0)
+    except (TypeError, ValueError):
+        n_total = 0
+    try:
+        high_risk_n = int(ctx.get("high_risk_in_top") or 0)
+    except (TypeError, ValueError):
+        high_risk_n = 0
+    try:
+        excellent_good = int(ctx.get("excellent_good_in_top") or 0)
+    except (TypeError, ValueError):
+        excellent_good = 0
+
+    stance = _market_overall_stance_zh(top_n, high_risk_n, excellent_good, n_total)
+    if top_n == 0:
+        snap = str(report.get("market_snapshot_zh") or "").strip()
+        conclusion_lines = [
+            f"总体：{stance}",
+            f"搜索区域：{loc}",
+            "当前没有可重点展开的候选房源。",
+        ]
+        reasons = []
+        if snap:
+            reasons.append(snap[:200] + ("…" if len(snap) > 200 else ""))
+        reasons.extend(
+            [
+                "样本太少或条件偏严时，不适合急着下结论。",
+                "可以稍微放宽区域、预算或卧室数，再搜一轮。",
+            ]
+        )
+        reasons = reasons[:5]
+        suggestions = [
+            "调整筛选条件后重新搜索，把选择面做大一点。",
+            "有目标区域后，在常见租房网站上用地图模式浏览一圈。",
+            "看到合适的先收藏，再挑两三套集中联系。",
+        ]
+        empty_fu = {"final_score": 0.0, "price_score": 3.0, "risk_flag": False, "has_multiple_options": False}
+        return _format_analysis_block_zh(
+            conclusion_lines=conclusion_lines,
+            reasons=reasons,
+            suggestions=suggestions,
+            questions=generate_followup_questions(empty_fu),
+        )
+
+    bo = star_final_verdict.get("best_overall")
+    best_title = _str(bo.get("title")) if isinstance(bo, dict) else _str(items[0].get("title")) or "排序第一套"
+    best_line = (bo.get("line") if isinstance(bo, dict) else None) or (
+        f"综合星级和租金表现，「{best_title}」更值得优先深入了解。"
+    )
+
+    conclusion_lines = [
+        f"总体：{stance}",
+        f"最佳房源推荐：「{best_title}」",
+        f"为什么选它：{str(best_line).strip()}",
+    ]
+    if top_n >= 2:
+        conclusion_lines.append("多套对比时，请优先把精力放在上面这套上。")
+
+    reasons: list[str] = []
+    snap = str(report.get("market_snapshot_zh") or "").strip()
+    if snap:
+        reasons.append(snap.split("。")[0] + "。" if "。" in snap else snap[:120] + "…")
+    reasons.append(best_line)
+    for x in (report.get("best_opportunities") or [])[:2]:
+        if isinstance(x, str) and x.strip():
+            zh = _en_bullet_to_zh_market(x)
+            if zh not in reasons:
+                reasons.append(zh)
+    oa = str(star_final_verdict.get("overall_advice") or "").strip()
+    if oa and oa not in " ".join(reasons):
+        reasons.append(oa[:160] + ("…" if len(oa) > 160 else ""))
+    adv = str(report.get("overall_recommendation") or "")
+    if "caution" in adv.lower() or "verify" in adv.lower():
+        reasons.append("前几名里仍有个别信息需要你在原站核实，别跳过这一步。")
+    reasons = _uniq_str([r for r in reasons if r])[:5]
+    while len(reasons) < 3:
+        reasons.append("建议把星级高的当作优先约看对象，再决定是否出价。")
+        if len(reasons) >= 3:
+            break
+
+    suggestions: list[str] = []
+    for x in (report.get("what_to_do_next") or [])[:4]:
+        if not isinstance(x, str):
+            continue
+        low = x.lower()
+        if "compare" in low or "shortlist" in low:
+            suggestions.append("先收藏 3～5 套，按租金和地段排个优先级。")
+        elif "portal" in low or "open" in low:
+            suggestions.append("逐一点开原广告，核对照片、地址和是否还在招租。")
+        elif "map" in low or "commute" in low:
+            suggestions.append("把邮编放进地图里看一眼通勤和周边配套。")
+        elif "deposit" in low or "fees" in low or "cost" in low:
+            suggestions.append("向中介或房东问清押金、一次性费用和账单承担方式。")
+        elif "broaden" in low or "filter" in low:
+            suggestions.append("若可选太少，适当放宽条件再搜一轮。")
+    suggestions.extend(
+        [
+            "主动联系中介预约看房，并问清能否议价。",
+            "确认水电气网费是否包含在租金里，避免入住后扯皮。",
+        ]
+    )
+    suggestions = _uniq_str(suggestions)[:4]
+
+    fu = _followup_result_for_market_bundle(
+        items=items,
+        best_title=best_title,
+        top_n=top_n,
+        high_risk_n=high_risk_n,
+        ranked_deals=ranked_deals,
+        market_insight=market_insight,
+    )
+    return _format_analysis_block_zh(
+        conclusion_lines=conclusion_lines,
+        reasons=reasons[:5],
+        suggestions=suggestions,
+        questions=generate_followup_questions(fu),
+    )
+
+
 def _safety_env_proxy_score(listing: dict[str, Any], risk_level: str) -> float:
     """无外部治安数据：用信息完整度 + 规则风险近似「更稳妥」。"""
     rl = str(risk_level or "low").lower()
@@ -525,11 +1011,13 @@ def build_listing_explanation(listing: dict[str, Any], market_insight: dict[str,
     star_reasons = _star_reasons_zh(listing, market_insight, deal_score, risk_level, decision)
     one_line_suggestion = _one_line_suggestion_zh(star_rating, decision)
 
+    stance = _overall_stance_zh(decision, risk_level)
     out: dict[str, Any] = {
         "title": title,
         "deal_score": round(deal_score, 2),
         "deal_tag": deal_tag,
         "decision": decision,
+        "risk_level": risk_level,
         "headline": headline,
         "why_recommended": why_rec,
         "why_not_recommended": why_not,
@@ -542,6 +1030,18 @@ def build_listing_explanation(listing: dict[str, Any], market_insight: dict[str,
         "star_reasons": star_reasons,
         "one_line_suggestion": one_line_suggestion,
     }
+    out["score_breakdown"] = sb
+    rs = _pick_plain_reasons_zh(out, 5)
+    sg = _action_lines_zh_from_en(list(out.get("action_suggestion") or []), decision)
+    fq = generate_followup_questions(_followup_result_from_listing_ex(out))
+    out["analysis_sections"] = {
+        "stance": stance,
+        "choice_line": _choice_line_for_stance_zh(stance, title),
+        "reasons": rs,
+        "suggestions": sg,
+        "followup_questions": fq,
+    }
+    out["formatted_analysis_zh"] = format_single_listing_analysis_zh(out)
     return out
 
 
@@ -671,6 +1171,12 @@ def build_market_recommendation_report(
             "buyer_strategy": buyer_strategy[:6],
             "summary_sentence": summ,
             "market_snapshot_zh": _compose_market_snapshot_zh(loc, n_total, 0, orec),
+            "display_context": {
+                "top_n": 0,
+                "n_total": n_total,
+                "high_risk_in_top": 0,
+                "excellent_good_in_top": 0,
+            },
             "readable_sections": {
                 "market_situation": market_positioning,
                 "worth_continuing": orec,
@@ -787,6 +1293,12 @@ def build_market_recommendation_report(
         "buyer_strategy": buyer_strategy[:6],
         "summary_sentence": summary_sentence,
         "market_snapshot_zh": _compose_market_snapshot_zh(loc, n_total, top_n, overall_recommendation),
+        "display_context": {
+            "top_n": top_n,
+            "n_total": n_total,
+            "high_risk_in_top": high_risk_n,
+            "excellent_good_in_top": excellent_good,
+        },
         "readable_sections": {
             "market_situation": market_positioning,
             "worth_continuing": overall_recommendation,
@@ -847,6 +1359,14 @@ def build_market_explain_bundle(
         insight,
         str(loc_key or ""),
     )
+    report["formatted_analysis_zh"] = compose_market_analysis_display_zh(
+        location=str(loc_key or ""),
+        report=report,
+        explanations=explanations,
+        star_final_verdict=report["star_final_verdict"],
+        ranked_deals=ranked,
+        market_insight=insight,
+    )
 
     return {
         "success": bool(insight.get("success", True)),
@@ -865,6 +1385,9 @@ __all__ = [
     "build_market_recommendation_report",
     "build_star_final_verdict",
     "build_top_deals_explanations",
+    "compose_market_analysis_display_zh",
+    "format_single_listing_analysis_zh",
+    "generate_followup_questions",
 ]
 
 
@@ -879,6 +1402,8 @@ def _cli_main() -> None:
     print(json.dumps(rep, indent=2, ensure_ascii=False, default=str))
     print("--- summary_sentence ---")
     print(rep.get("summary_sentence", ""))
+    print("--- formatted_analysis_zh ---")
+    print(rep.get("formatted_analysis_zh", ""))
 
 
 if __name__ == "__main__":

@@ -9,7 +9,12 @@ import re
 from typing import Any
 
 from services.deal_engine import rank_deals
-from services.explain_engine import build_market_recommendation_report, build_star_final_verdict, build_top_deals_explanations
+from services.explain_engine import (
+    build_market_recommendation_report,
+    build_star_final_verdict,
+    build_top_deals_explanations,
+    compose_market_analysis_display_zh,
+)
 from services.market_insight import build_insight_from_combined_listings, build_market_summary
 from services.market_combined import get_combined_market_listings
 from services.query_parser import normalize_search_filters, parse_user_housing_query
@@ -166,12 +171,26 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
                 "what_to_do_next": [],
                 "buyer_strategy": [],
                 "market_snapshot_zh": "请先在搜索里补充城市、邮编或区域，以便我们给出更贴切的方向。",
+                "display_context": {
+                    "top_n": 0,
+                    "n_total": 0,
+                    "high_risk_in_top": 0,
+                    "excellent_good_in_top": 0,
+                },
             }
         report["star_final_verdict"] = build_star_final_verdict(
             explanations.get("items") or [],
             ranked.get("top_deals") or [],
             insight,
             str(loc or pc or area or insight.get("location") or ""),
+        )
+        report["formatted_analysis_zh"] = compose_market_analysis_display_zh(
+            location=str(loc or pc or area or insight.get("location") or ""),
+            report=report,
+            explanations=explanations,
+            star_final_verdict=report["star_final_verdict"],
+            ranked_deals=ranked,
+            market_insight=insight,
         )
 
         return {
@@ -290,6 +309,12 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
             "what_to_do_next": [],
             "buyer_strategy": [],
             "market_snapshot_zh": "暂时无法生成市场摘要，请稍后重试。",
+            "display_context": {
+                "top_n": 0,
+                "n_total": 0,
+                "high_risk_in_top": 0,
+                "excellent_good_in_top": 0,
+            },
             "readable_sections": {
                 "market_situation": "",
                 "worth_continuing": "",
@@ -303,6 +328,14 @@ def run_housing_ai_query(user_text: str) -> dict[str, Any]:
         ranked.get("top_deals") or [],
         insight,
         str(loc_key or ""),
+    )
+    report["formatted_analysis_zh"] = compose_market_analysis_display_zh(
+        location=str(loc_key or ""),
+        report=report,
+        explanations=explanations,
+        star_final_verdict=report["star_final_verdict"],
+        ranked_deals=ranked,
+        market_insight=insight,
     )
 
     try:
