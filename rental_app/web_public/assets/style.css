@@ -1518,6 +1518,25 @@ body.assistant-page-body {
 .assistant-intent-btn--primary:hover {
   filter: brightness(1.08);
 }
+.assistant-intent-unclear-tip {
+  margin: 0.35rem 0 0.5rem;
+  line-height: 1.5;
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+.assistant-intent-actions--unclear {
+  margin-top: 0.25rem;
+}
+.assistant-intent-actions--unclear .assistant-intent-btn {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  font-weight: 600;
+}
+.assistant-submit-btn {
+  font-weight: 600;
+}
 
 .analysis-history-page .analysis-history-block {
   margin-bottom: 0.85rem;

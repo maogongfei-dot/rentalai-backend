@@ -39,6 +39,12 @@
             aria-labelledby="contract-form-heading"
           >
             <h2 id="contract-form-heading" class="section-title">分析输入</h2>
+            <p
+              id="assistant-prefill-hint"
+              class="hint save-banner save-banner-ok hidden"
+              role="status"
+              aria-live="polite"
+            ></p>
 
             <fieldset class="contract-mode-fieldset">
               <legend class="field-label">输入模式</legend>
@@ -169,6 +175,7 @@
       </div>
     </main>
     <script src="/assets/analysis_history_store.js"></script>
+    <script src="/assets/assistant_prefill.js"></script>
     <script src="/assets/contract_analysis_api.js"></script>
     <script src="/assets/contract_analysis_demo.js"></script>
     <script src="/assets/contract_analysis_page.js"></script>

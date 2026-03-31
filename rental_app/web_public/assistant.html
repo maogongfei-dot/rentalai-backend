@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <!--
-  Phase 4 Round7：智能入口（/assistant）
-  草稿 sessionStorage rentalai_assistant_draft；本地关键词意图见 assets/assistant_intent.js
+  Phase 4 Round7 收口：/assistant 先说需求 → 本地 intent 分流 → 跳转预填（见 README「智能入口」）
 -->
 <html lang="zh-Hans">
   <head>
@@ -40,7 +39,9 @@
           placeholder="例如：我想在伦敦找两居室，预算每月 2000 镑以内… / 请帮我看看这份租约里的押金条款有没有坑…"
         ></textarea>
         <div class="actions-row">
-          <button type="button" id="assistant-submit">分析意图并继续</button>
+          <button type="button" id="assistant-submit" class="assistant-submit-btn">
+            分析意图并继续
+          </button>
         </div>
         <p id="assistant-msg" class="hint save-banner save-banner-ok hidden" role="status" aria-live="polite"></p>
         <div id="assistant-intent-panel" class="assistant-intent-panel hidden" aria-live="polite">

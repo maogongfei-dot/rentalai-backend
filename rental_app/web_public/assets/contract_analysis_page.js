@@ -184,22 +184,30 @@
     });
   setModePanels();
 
-  /** Phase 4 Round7：智能入口跳转后预填粘贴文本 */
+  /** Phase 4 Round7：智能入口一次性预填 #contract-text（见 assistant_prefill.js） */
   (function applyAssistantPrefillContract() {
     try {
-      var nav = sessionStorage.getItem("rentalai_assistant_navigate");
-      if (nav !== "contract") return;
-      var draft = sessionStorage.getItem("rentalai_assistant_draft");
+      var P = window.RentalAIAssistantPrefill;
+      if (!P || typeof P.consumeAssistantHandoff !== "function") return;
+      var handoff = P.consumeAssistantHandoff("contract");
+      if (!handoff) return;
       if (modeText) {
         modeText.checked = true;
         if (modeFile) modeFile.checked = false;
         setModePanels();
       }
-      if (draft && ta) {
-        ta.value = draft;
+      var raw = handoff.draft;
+      var text = raw != null ? String(raw).trim() : "";
+      if (text && ta) {
+        ta.value = raw;
         ta.focus();
       }
-      sessionStorage.removeItem("rentalai_assistant_navigate");
+      var hintEl = document.getElementById("assistant-prefill-hint");
+      if (hintEl && text) {
+        hintEl.textContent =
+          "已从「智能入口」带入描述，可编辑后点击「提交分析」（不会自动提交）。";
+        hintEl.classList.remove("hidden");
+      }
     } catch (e) {}
   })();
 

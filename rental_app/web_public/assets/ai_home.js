@@ -12,19 +12,27 @@
   var retryBtn = document.getElementById("ai-retry");
   if (!btn || !ta) return;
 
-  /** Phase 4 Round7：智能入口跳转后一次性预填 */
+  /** Phase 4 Round7：智能入口一次性预填 #ai-query（见 assistant_prefill.js） */
   (function applyAssistantPrefill() {
     try {
-      var nav = sessionStorage.getItem("rentalai_assistant_navigate");
-      if (nav !== "property") return;
-      var draft = sessionStorage.getItem("rentalai_assistant_draft");
-      if (draft) {
-        ta.value = draft;
+      var P = window.RentalAIAssistantPrefill;
+      if (!P || typeof P.consumeAssistantHandoff !== "function") return;
+      var handoff = P.consumeAssistantHandoff("property");
+      if (!handoff) return;
+      var raw = handoff.draft;
+      var text = raw != null ? String(raw).trim() : "";
+      if (text) {
+        ta.value = raw;
         ta.focus();
+        var hint = document.getElementById("assistant-prefill-hint");
+        if (hint) {
+          hint.textContent =
+            "已从「智能入口」带入描述，可编辑后点击「开始分析」（不会自动提交）。";
+          hint.classList.remove("hidden");
+        }
       }
-      sessionStorage.removeItem("rentalai_assistant_navigate");
       var h = document.getElementById("ai-rental-heading");
-      if (h) {
+      if (h && text) {
         h.scrollIntoView({ block: "start", behavior: "smooth" });
       }
     } catch (e) {}

@@ -1,6 +1,5 @@
 /**
- * Phase 4 Round7 Step3：智能入口 — 意图识别后自动跳转；unclear 时二选一
- * 草稿 / 导航标记：assistant_intent.js（sessionStorage）
+ * Phase 4 Round7：智能入口 — 本地 intent 分流、自动跳转、unclear 二选一（sessionStorage）
  */
 (function () {
   var AI = window.RentalAIAssistantIntent;
@@ -57,9 +56,17 @@
       label.textContent = "判断为：合同分析（contract_analysis）";
     } else {
       label.textContent =
-        "暂未明确偏向（unclear）。请二选一进入主流程，你的描述会一并带上。";
+        "暂未明确偏向（unclear）— 请任选一条主流程，描述会一并带上。";
     }
     panelBody.appendChild(label);
+
+    if (intent === AI.INTENT_UNCLEAR) {
+      var tip = document.createElement("p");
+      tip.className = "hint muted assistant-intent-unclear-tip";
+      tip.innerHTML =
+        "<strong>怎么选？</strong> 提到预算、区域、卧室、通勤等多为<strong>找房</strong>；提到押金、条款、租约、解约等多为<strong>审合同</strong>。也可直接点下方按钮。";
+      panelBody.appendChild(tip);
+    }
 
     var hint = document.createElement("p");
     hint.className = "hint assistant-intent-scores";
@@ -85,10 +92,12 @@
         go(AI.INTENT_PROPERTY);
       }));
     } else {
-      row.appendChild(mkBtn("去房源分析", false, function () {
+      row.className =
+        "assistant-intent-actions assistant-intent-actions--unclear";
+      row.appendChild(mkBtn("去房源分析", true, function () {
         go(AI.INTENT_PROPERTY);
       }));
-      row.appendChild(mkBtn("去合同分析", false, function () {
+      row.appendChild(mkBtn("去合同分析", true, function () {
         go(AI.INTENT_CONTRACT);
       }));
     }

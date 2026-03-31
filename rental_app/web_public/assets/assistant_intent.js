@@ -1,6 +1,6 @@
 /**
- * Phase 4 Round7 Step2：智能入口 — 本地关键词意图识别（无 AI / 无后端）
- * 导出：detectUserIntent、routeUserQuery
+ * Phase 4 Round7：智能入口 — 本地关键词意图识别（无 LLM / 无后端编排）
+ * 导出 detectUserIntent、routeUserQuery；与 assistant_prefill.js、assistant_page.js 配套。
  */
 (function (global) {
   /** @typedef {'property_analysis'|'contract_analysis'|'unclear'} AssistantIntent */
