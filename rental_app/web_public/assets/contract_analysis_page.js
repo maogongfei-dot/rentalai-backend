@@ -1,5 +1,6 @@
 /**
  * Phase 4 合同分析页：表单 UI + summary_view 分段展示（逻辑见 contract_analysis_api.js）。
+ * 主流程：粘贴文本 | 上传 .txt/.pdf/.docx；服务端 file_path 为开发项（localStorage +「开发者」开关或 ?dev=1）。
  */
 (function () {
   var CA = window.RentalAIContractAnalysis;
@@ -30,6 +31,10 @@
   var resultSection = document.getElementById("contract-state-result");
   var resultSourceEl = document.getElementById("contract-result-source");
   var resultBody = document.getElementById("contract-result-body");
+  var devBundle = document.getElementById("contract-dev-bundle");
+  var devToggle = document.getElementById("contract-dev-toggle");
+  var demoPathWrap = document.getElementById("contract-demo-path-wrap");
+  var DEV_LS_KEY = "rentalai_contract_analysis_dev";
 
   if (!btn || !ta) return;
 
@@ -100,10 +105,73 @@
     resultSourceEl.classList.remove("hidden");
   }
 
+  function syncDevBundleVisible() {
+    if (!devBundle) return;
+    var dev = false;
+    try {
+      dev = window.localStorage.getItem(DEV_LS_KEY) === "1";
+    } catch (e) {}
+    var fileMode = modeFile && modeFile.checked;
+    devBundle.classList.toggle("hidden", !(dev && fileMode));
+  }
+
+  function applyContractDevUi(show) {
+    if (demoPathWrap) {
+      demoPathWrap.classList.toggle("hidden", !show);
+      demoPathWrap.setAttribute("aria-hidden", show ? "false" : "true");
+    }
+    if (devToggle) {
+      devToggle.textContent = show
+        ? "开发者：隐藏服务端路径"
+        : "开发者：显示服务端路径（file_path）";
+    }
+    if (!show && filePathInput) filePathInput.value = "";
+    syncDevBundleVisible();
+  }
+
+  function initContractDevUi() {
+    try {
+      var q = new URLSearchParams(window.location.search || "");
+      if (q.get("dev") === "1") {
+        try {
+          window.localStorage.setItem(DEV_LS_KEY, "1");
+        } catch (e) {}
+        try {
+          var u = new URL(window.location.href);
+          u.searchParams.delete("dev");
+          window.history.replaceState({}, "", u.pathname + u.search + u.hash);
+        } catch (e2) {}
+      }
+    } catch (e3) {}
+    var show = false;
+    try {
+      show = window.localStorage.getItem(DEV_LS_KEY) === "1";
+    } catch (e4) {}
+    applyContractDevUi(show);
+  }
+
+  initContractDevUi();
+
+  if (devToggle) {
+    devToggle.addEventListener("click", function () {
+      var cur = false;
+      try {
+        cur = window.localStorage.getItem(DEV_LS_KEY) === "1";
+      } catch (e) {}
+      var next = !cur;
+      try {
+        if (next) window.localStorage.setItem(DEV_LS_KEY, "1");
+        else window.localStorage.removeItem(DEV_LS_KEY);
+      } catch (e2) {}
+      applyContractDevUi(next);
+    });
+  }
+
   function setModePanels() {
     var file = modeFile && modeFile.checked;
     if (panelText) panelText.classList.toggle("hidden", file);
     if (panelFile) panelFile.classList.toggle("hidden", !file);
+    syncDevBundleVisible();
   }
 
   if (modeText)
@@ -209,16 +277,31 @@
   function blockTitle(en, zh) {
     return (
       '<h3 class="contract-result-block-title">' +
+      '<span class="contract-result-block-en">' +
       escapeHtml(en) +
+      "</span>" +
       ' <span class="contract-result-block-sub">' +
       escapeHtml(zh) +
       "</span></h3>"
     );
   }
 
-  function wrapBlock(en, zh, inner) {
+  /**
+   * 单块结果卡片：外层 article + 标题区 + 内层 body（便于样式与后续扩展）。
+   * @param {string} slug data-contract-block 标识（英文 kebab）
+   */
+  function wrapBlock(slug, en, zh, inner) {
     return (
-      '<section class="contract-result-block">' + blockTitle(en, zh) + inner + "</section>"
+      '<article class="contract-result-card-block" data-contract-block="' +
+      escapeHtml(slug) +
+      '">' +
+      '<header class="contract-result-card-head">' +
+      blockTitle(en, zh) +
+      "</header>" +
+      '<div class="contract-result-card-body">' +
+      inner +
+      "</div>" +
+      "</article>"
     );
   }
 
@@ -238,20 +321,33 @@
     if (arr.length === 0) {
       return paragraphOrMuted("", "暂无分类汇总");
     }
-    var html = '<ul class="contract-result-list">';
+    var html = '<ul class="contract-result-rich-list contract-result-risk-cat-list">';
     for (var i = 0; i < arr.length; i++) {
       var it = arr[i] && typeof arr[i] === "object" ? arr[i] : {};
-      var cat = safeStr(it.category);
+      var cat = safeStr(it.category) || "（未命名类别）";
       var cnt = it.count != null ? safeStr(it.count) : "—";
       var hi = safeStr(it.highest_severity);
       var sum = safeStr(it.short_summary);
-      var line =
-        (cat || "（未命名类别）") +
-        " · 条数 " +
-        cnt +
-        (hi ? " · 最高 " + hi : "") +
-        (sum ? " — " + sum : "");
-      html += "<li>" + escapeHtml(line) + "</li>";
+      html += '<li class="contract-result-rich-item">';
+      html += '<div class="contract-result-rich-row">';
+      html += '<span class="contract-result-rich-title">' + escapeHtml(cat) + "</span>";
+      html += '<span class="contract-result-rich-meta">';
+      html +=
+        '<span class="contract-result-pill contract-result-pill--muted">条数 ' +
+        escapeHtml(cnt) +
+        "</span>";
+      if (hi) {
+        html +=
+          '<span class="contract-result-pill contract-result-pill--severity">' +
+          escapeHtml(hi) +
+          "</span>";
+      }
+      html += "</span></div>";
+      if (!isEmptyText(sum)) {
+        html +=
+          '<p class="contract-result-rich-note">' + escapeHtml(sum) + "</p>";
+      }
+      html += "</li>";
     }
     html += "</ul>";
     return html;
@@ -262,7 +358,7 @@
     if (arr.length === 0) {
       return paragraphOrMuted("", "暂无高亮风险条款");
     }
-    var html = "";
+    var html = '<div class="contract-result-subcard-stack">';
     for (var i = 0; i < arr.length; i++) {
       var it = arr[i] && typeof arr[i] === "object" ? arr[i] : {};
       var title = safeStr(it.risk_title) || "（无标题）";
@@ -271,31 +367,47 @@
       var mt = safeStr(it.matched_text);
       var adv = safeStr(it.short_advice);
       var loc = safeStr(it.location_hint);
-      html += '<div class="contract-result-card">';
+      html += '<article class="contract-result-subcard">';
+      html += '<div class="contract-result-subcard-head">';
       html += "<strong>" + escapeHtml(title) + "</strong>";
       if (sev || cat) {
-        html +=
-          '<p class="contract-result-kv">' +
-          escapeHtml([sev && "严重度: " + sev, cat && "类别: " + cat].filter(Boolean).join(" · ")) +
-          "</p>";
+        html += '<div class="contract-result-subcard-badges">';
+        if (sev) {
+          html +=
+            '<span class="contract-result-pill contract-result-pill--severity">' +
+            escapeHtml(sev) +
+            "</span>";
+        }
+        if (cat) {
+          html +=
+            '<span class="contract-result-pill contract-result-pill--muted">' +
+            escapeHtml(cat) +
+            "</span>";
+        }
+        html += "</div>";
       }
+      html += "</div>";
       if (!isEmptyText(mt)) {
         html +=
-          '<p class="contract-result-kv"><span class="hint">摘录：</span>' +
+          '<p class="contract-result-kv"><span class="contract-result-kv-label">摘录</span>' +
           escapeHtml(mt) +
           "</p>";
       }
       if (!isEmptyText(adv)) {
-        html += '<p class="contract-result-kv">' + escapeHtml(adv) + "</p>";
+        html +=
+          '<p class="contract-result-kv"><span class="contract-result-kv-label">建议</span>' +
+          escapeHtml(adv) +
+          "</p>";
       }
       if (!isEmptyText(loc)) {
         html +=
-          '<p class="contract-result-kv"><span class="hint">位置：</span>' +
+          '<p class="contract-result-kv"><span class="contract-result-kv-label">位置</span>' +
           escapeHtml(loc) +
           "</p>";
       }
-      html += "</div>";
+      html += "</article>";
     }
+    html += "</div>";
     return html;
   }
 
@@ -304,7 +416,7 @@
     if (arr.length === 0) {
       return paragraphOrMuted("", "暂无条款严重度条目");
     }
-    var html = "";
+    var html = '<div class="contract-result-subcard-stack">';
     for (var i = 0; i < arr.length; i++) {
       var it = arr[i] && typeof arr[i] === "object" ? arr[i] : {};
       var cid = safeStr(it.clause_id);
@@ -315,28 +427,33 @@
       var prev = safeStr(it.short_clause_preview);
       var titles = safeArray(it.linked_risk_titles);
       var titleLine = titles.length ? titles.join("；") : "";
-      html += '<div class="contract-result-card">';
+      html += '<article class="contract-result-subcard">';
+      html += '<div class="contract-result-subcard-head">';
       html +=
         "<strong>" +
         escapeHtml((cid || "条款") + (ctype ? " · " + ctype : "")) +
         "</strong>";
-      html +=
-        '<p class="contract-result-kv">' +
-        escapeHtml(
-          "强度分 " + score + " · 最高 " + (hi || "—") + " · 关联风险数 " + cnt
-        ) +
-        "</p>";
+      html += "</div>";
+      html += '<dl class="contract-result-dl">';
+      html += "<dt>强度分</dt><dd>" + escapeHtml(score) + "</dd>";
+      html += "<dt>最高严重度</dt><dd>" + escapeHtml(hi || "—") + "</dd>";
+      html += "<dt>关联风险数</dt><dd>" + escapeHtml(cnt) + "</dd>";
+      html += "</dl>";
       if (!isEmptyText(prev)) {
-        html += '<p class="contract-result-kv">' + escapeHtml(prev) + "</p>";
+        html +=
+          '<p class="contract-result-kv contract-result-kv--preview">' +
+          escapeHtml(prev) +
+          "</p>";
       }
       if (!isEmptyText(titleLine)) {
         html +=
-          '<p class="contract-result-kv"><span class="hint">关联风险：</span>' +
+          '<p class="contract-result-kv"><span class="contract-result-kv-label">关联风险</span>' +
           escapeHtml(titleLine) +
           "</p>";
       }
-      html += "</div>";
+      html += "</article>";
     }
+    html += "</div>";
     return html;
   }
 
@@ -356,31 +473,48 @@
     if (!hasAny) {
       return paragraphOrMuted("", "暂无完整性评估数据");
     }
-    var html = "";
+    var html = '<div class="contract-result-complete">';
     if (!isEmptyText(status) || score != null) {
-      var bits = [];
-      if (!isEmptyText(status)) bits.push("状态：" + status);
-      if (score != null) bits.push("分数：" + safeStr(score));
-      html +=
-        '<p class="contract-result-text">' + escapeHtml(bits.join(" · ")) + "</p>";
+      html += '<div class="contract-result-complete-top">';
+      if (!isEmptyText(status)) {
+        html +=
+          '<span class="contract-result-pill contract-result-pill--status">' +
+          escapeHtml(status) +
+          "</span>";
+      }
+      if (score != null) {
+        html +=
+          '<span class="contract-result-pill contract-result-pill--muted">完整性分 ' +
+          escapeHtml(safeStr(score)) +
+          "</span>";
+      }
+      html += "</div>";
     }
     if (!isEmptyText(shortSum)) {
-      html += paragraphOrMuted(shortSum, "");
+      html +=
+        '<p class="contract-result-text contract-result-complete-summary">' +
+        escapeHtml(shortSum) +
+        "</p>";
     }
     if (miss.length) {
-      html += '<p class="contract-result-kv hint">缺失核心项</p><ul class="contract-result-list">';
+      html += '<section class="contract-result-nested-section">';
+      html +=
+        '<h4 class="contract-result-h4">缺失核心项</h4><ul class="contract-result-list contract-result-list--spaced">';
       for (var i = 0; i < miss.length; i++) {
         html += "<li>" + escapeHtml(safeStr(miss[i])) + "</li>";
       }
-      html += "</ul>";
+      html += "</ul></section>";
     }
     if (unclear.length) {
-      html += '<p class="contract-result-kv hint">不明确项</p><ul class="contract-result-list">';
+      html += '<section class="contract-result-nested-section">';
+      html +=
+        '<h4 class="contract-result-h4">不明确项</h4><ul class="contract-result-list contract-result-list--spaced">';
       for (var j = 0; j < unclear.length; j++) {
         html += "<li>" + escapeHtml(safeStr(unclear[j])) + "</li>";
       }
-      html += "</ul>";
+      html += "</ul></section>";
     }
+    html += "</div>";
     return html;
   }
 
@@ -389,9 +523,15 @@
     if (arr.length === 0) {
       return paragraphOrMuted("", "暂无行动建议");
     }
-    var html = '<ol class="contract-result-list">';
+    var html = '<ol class="contract-result-action-list">';
     for (var i = 0; i < arr.length; i++) {
-      html += "<li>" + escapeHtml(safeStr(arr[i])) + "</li>";
+      html +=
+        '<li><span class="contract-result-action-index">' +
+        (i + 1) +
+        "</span>" +
+        '<span class="contract-result-action-text">' +
+        escapeHtml(safeStr(arr[i])) +
+        "</span></li>";
     }
     html += "</ol>";
     return html;
@@ -405,6 +545,7 @@
 
     parts.push(
       wrapBlock(
+        "overall-conclusion",
         "Overall Conclusion",
         "总体结论",
         paragraphOrMuted(sv.overall_conclusion, "暂无总体结论")
@@ -412,6 +553,7 @@
     );
     parts.push(
       wrapBlock(
+        "key-risk-summary",
         "Key Risk Summary",
         "核心风险摘要",
         paragraphOrMuted(sv.key_risk_summary, "暂无核心风险摘要")
@@ -419,6 +561,7 @@
     );
     parts.push(
       wrapBlock(
+        "risk-category-summary",
         "Risk Category Summary",
         "风险分类汇总",
         renderRiskCategorySummary(sv.risk_category_summary)
@@ -426,6 +569,7 @@
     );
     parts.push(
       wrapBlock(
+        "highlighted-risk-clauses",
         "Highlighted Risk Clauses",
         "高亮风险条款",
         renderHighlightedClauses(sv.highlighted_risk_clauses)
@@ -433,6 +577,7 @@
     );
     parts.push(
       wrapBlock(
+        "top-risky-clauses",
         "Top Risky Clauses",
         "优先关注条款",
         renderClauseSeverityOverview(sv.clause_severity_overview)
@@ -440,13 +585,19 @@
     );
     parts.push(
       wrapBlock(
+        "contract-completeness",
         "Contract Completeness Check",
         "合同完整性",
         renderCompletenessOverview(sv.contract_completeness_overview)
       )
     );
     parts.push(
-      wrapBlock("Action Advice", "行动建议", renderActionAdvice(sv.action_advice))
+      wrapBlock(
+        "action-advice",
+        "Action Advice",
+        "行动建议",
+        renderActionAdvice(sv.action_advice)
+      )
     );
 
     resultBody.innerHTML = parts.join("");

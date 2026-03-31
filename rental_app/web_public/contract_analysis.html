@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<!--
+  Phase 4 合同分析页（/contract-analysis）
+  主入口：① 粘贴文本 → POST /api/contract/analysis/text
+         ② 上传 .txt/.pdf/.docx → POST /api/contract/analysis/upload
+  开发用：服务端可读 file_path → POST /api/contract/analysis/file-path（默认隐藏；?dev=1 或页内「开发者」开关）
+  结果区：result.summary_view 七块（见 contract_analysis/README.md「Phase 4 网页交接说明」）
+-->
 <html lang="zh-Hans">
   <head>
     <meta charset="utf-8" />
@@ -7,123 +14,152 @@
     <link rel="stylesheet" href="/assets/style.css" />
     <script src="/assets/api_config.js"></script>
   </head>
-  <body>
+  <body class="contract-analysis-page-body">
     <script src="/assets/auth_local.js"></script>
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
-    <main class="wrap wrap-wide result-wrap">
+    <main class="wrap contract-analysis-main">
       <p class="back-link"><a href="/">← 首页</a></p>
-      <header class="page-header">
+      <header class="page-header contract-analysis-header">
         <h1>合同分析 <span class="hint muted" style="font-weight: normal">Contract Analysis</span></h1>
         <p class="hint muted">
-          文本模式粘贴正文；文件模式默认<strong>上传</strong> .txt / .pdf / .docx，由服务器解析；展开下方可填服务端路径（开发用）。
+          <strong>两种用法：</strong>选「粘贴文本」在下方粘贴合同全文；选「上传文件」选择本地合同由服务器解析（推荐）。
+          服务端磁盘路径仅作开发联调，默认隐藏（见表单底部「开发者」开关或 URL 参数 <code class="small-print">?dev=1</code>）。
         </p>
       </header>
 
-      <section class="card form-card" aria-labelledby="contract-form-heading">
-        <h2 id="contract-form-heading" class="section-title">分析输入</h2>
+      <div class="contract-analysis-layout">
+        <!-- 左栏：输入 -->
+        <div class="contract-analysis-input-column">
+          <section
+            class="card form-card contract-input-card"
+            aria-labelledby="contract-form-heading"
+          >
+            <h2 id="contract-form-heading" class="section-title">分析输入</h2>
 
-        <p class="hint small-print contract-demo-hint" aria-label="快捷测试">
-          <span>快捷测试：</span>
-          <button type="button" id="contract-demo-fill-text" class="contract-demo-btn">
-            填入示例文本
-          </button>
-          <span class="nav-sep">·</span>
-          <button type="button" id="contract-demo-fill-path" class="contract-demo-btn">
-            填入示例路径（文件模式）
-          </button>
-        </p>
+            <fieldset class="contract-mode-fieldset">
+              <legend class="field-label">输入模式</legend>
+              <div class="contract-mode-row" role="radiogroup" aria-label="输入模式">
+                <label>
+                  <input type="radio" name="contract_mode" id="contract-mode-text" value="text" checked />
+                  粘贴文本
+                </label>
+                <label>
+                  <input type="radio" name="contract_mode" id="contract-mode-file" value="file" />
+                  上传文件
+                </label>
+              </div>
+            </fieldset>
 
-        <fieldset class="contract-mode-fieldset">
-          <legend class="field-label">输入模式</legend>
-          <div class="contract-mode-row" role="radiogroup" aria-label="输入模式">
-            <label>
-              <input type="radio" name="contract_mode" id="contract-mode-text" value="text" checked />
-              文本（text）
-            </label>
-            <label>
-              <input type="radio" name="contract_mode" id="contract-mode-file" value="file" />
-              文件（file）
-            </label>
-          </div>
-        </fieldset>
+            <div id="contract-panel-text" class="contract-input-panel">
+              <label class="field-label" for="contract-text">contract_text</label>
+              <textarea
+                id="contract-text"
+                name="contract_text"
+                rows="12"
+                placeholder="在此粘贴合同全文…"
+              ></textarea>
+            </div>
 
-        <div id="contract-panel-text" class="contract-input-panel">
-          <label class="field-label" for="contract-text">contract_text</label>
-          <textarea
-            id="contract-text"
-            name="contract_text"
-            rows="12"
-            placeholder="在此粘贴合同全文…"
-          ></textarea>
-        </div>
+            <div id="contract-panel-file" class="contract-input-panel hidden">
+              <div class="form-section">
+                <h3 class="form-section-title">上传合同（推荐）</h3>
+                <p class="hint small-print">
+                  支持 .txt、.pdf、.docx；单文件默认上限 15 MB（前后端一致，可由环境变量
+                  RENTALAI_CONTRACT_UPLOAD_MAX_BYTES 调整）。点击「提交分析」将以 multipart 上传至服务器并分析。
+                </p>
+                <label class="field-label" for="contract-upload-file">选择文件</label>
+                <input
+                  type="file"
+                  id="contract-upload-file"
+                  name="contract_file"
+                  accept=".txt,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                />
+                <p class="hint muted small-print" id="contract-upload-file-hint" aria-live="polite"></p>
+              </div>
+            </div>
 
-        <div id="contract-panel-file" class="contract-input-panel hidden">
-          <div class="form-section">
-            <h3 class="form-section-title">上传合同（推荐）</h3>
-            <p class="hint small-print">
-              支持 .txt、.pdf、.docx；单文件默认上限 15 MB（前后端一致，可由环境变量
-              RENTALAI_CONTRACT_UPLOAD_MAX_BYTES 调整）。点击「提交分析」将以 multipart 上传至服务器并分析。
+            <div id="contract-dev-bundle" class="hidden">
+              <details class="form-section contract-dev-path-details" open>
+                <summary class="form-section-title">开发：服务端路径（非上传）</summary>
+                <p class="hint small-print">
+                  不经过浏览器上传，由 API 直接读服务器磁盘路径（须与 API 进程同机可读，如相对 rental_app 的 sample）。生产环境需额外鉴权与路径白名单，此处仅供本地联调。
+                </p>
+                <label class="field-label" for="contract-file-path">file_path</label>
+                <input
+                  type="text"
+                  id="contract-file-path"
+                  name="file_path"
+                  autocomplete="off"
+                  placeholder="例如 contract_analysis/samples/sample_contract.txt"
+                />
+              </details>
+            </div>
+
+            <p class="hint small-print contract-dev-footer">
+              <button type="button" id="contract-dev-toggle" class="contract-dev-toggle-btn">
+                开发者：显示服务端路径（file_path）
+              </button>
             </p>
-            <label class="field-label" for="contract-upload-file">选择文件</label>
-            <input
-              type="file"
-              id="contract-upload-file"
-              name="contract_file"
-              accept=".txt,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-            />
-            <p class="hint muted small-print" id="contract-upload-file-hint" aria-live="polite"></p>
+
+            <div class="contract-input-tools" aria-label="快捷示例">
+              <p class="hint small-print contract-demo-hint">
+                <span>快捷测试：</span>
+                <button type="button" id="contract-demo-fill-text" class="contract-demo-btn">
+                  填入示例文本
+                </button>
+                <span id="contract-demo-path-wrap" class="hidden" aria-hidden="true">
+                  <span class="nav-sep">·</span>
+                  <button type="button" id="contract-demo-fill-path" class="contract-demo-btn">
+                    填入示例路径（开发）
+                  </button>
+                </span>
+              </p>
+            </div>
+
+            <div class="contract-input-actions">
+              <div class="actions-row">
+                <button type="button" id="contract-submit">提交分析</button>
+              </div>
+              <div id="contract-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
+                <span id="contract-loading-text">分析中…</span>
+              </div>
+              <div id="contract-error" class="err contract-input-error hidden" role="alert"></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- 右栏：结果（空态 / 分析结果二选一展示） -->
+        <div class="contract-analysis-output-column" aria-label="分析结果区域">
+          <div class="contract-output-stack">
+            <section
+              id="contract-state-empty"
+              class="card empty-state-card contract-output-placeholder"
+              aria-labelledby="contract-empty-heading"
+            >
+              <strong id="contract-empty-heading">暂无分析结果</strong>
+              <p class="hint muted">提交后在此展示结论摘要（summary_view）。</p>
+            </section>
+
+            <section
+              id="contract-state-result"
+              class="card contract-result-panel contract-output-result hidden"
+              aria-live="polite"
+              aria-labelledby="contract-result-heading"
+            >
+              <h2 id="contract-result-heading" class="section-title">分析结果</h2>
+              <div class="contract-result-shell">
+                <p
+                  id="contract-result-source"
+                  class="hint muted small-print contract-result-source hidden"
+                  aria-live="polite"
+                ></p>
+                <div id="contract-result-body" class="contract-result-body"></div>
+              </div>
+            </section>
           </div>
-
-          <details class="form-section contract-dev-path-details">
-            <summary class="form-section-title">开发：服务端路径（可选）</summary>
-            <p class="hint small-print">
-              不经过上传，直接让 API 读取服务器磁盘路径（需与 API 进程同机可读，如相对 rental_app 的 sample）。
-            </p>
-            <label class="field-label" for="contract-file-path">file_path</label>
-            <input
-              type="text"
-              id="contract-file-path"
-              name="file_path"
-              autocomplete="off"
-              placeholder="例如 contract_analysis/samples/sample_contract.txt"
-            />
-          </details>
         </div>
-
-        <div class="actions-row">
-          <button type="button" id="contract-submit">提交分析</button>
-        </div>
-
-        <div id="contract-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
-          <span id="contract-loading-text">分析中…</span>
-        </div>
-        <div id="contract-error" class="err hidden" role="alert"></div>
-      </section>
-
-      <section
-        id="contract-state-empty"
-        class="card empty-state-card"
-        aria-labelledby="contract-empty-heading"
-      >
-        <strong id="contract-empty-heading">暂无分析结果</strong>
-        <p class="hint muted">提交后在此展示结论摘要（summary_view）。</p>
-      </section>
-
-      <section
-        id="contract-state-result"
-        class="card contract-result-panel hidden"
-        aria-live="polite"
-        aria-labelledby="contract-result-heading"
-      >
-        <h2 id="contract-result-heading" class="section-title">分析结果</h2>
-        <p
-          id="contract-result-source"
-          class="hint muted small-print contract-result-source hidden"
-          aria-live="polite"
-        ></p>
-        <div id="contract-result-body" class="contract-result-body"></div>
-      </section>
+      </div>
     </main>
     <script src="/assets/contract_analysis_api.js"></script>
     <script src="/assets/contract_analysis_demo.js"></script>
