@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!--
+  RentalAI 首页（Phase 4 第五轮收口）：统一入口，并列「房源分析 / 合同分析」两条主能力；
+  引导与互通见顶栏及各页。产品结构见 rental_app/README.md「产品结构（Phase 4 第五轮）」。
+-->
 <html lang="zh-Hans">
   <head>
     <meta charset="utf-8" />
@@ -12,9 +16,9 @@
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
     <main class="wrap wrap-wide">
-      <!-- Phase 4 Round5 Step3：主功能 + 最小产品引导（何时点左 / 何时点右） -->
+      <!-- Phase 4 Round5：主功能 + 最小产品引导（何时点左 / 何时点右）；h1 为页内首标题 -->
       <section class="card home-main-entries" aria-labelledby="main-entries-heading">
-        <h2 id="main-entries-heading" class="section-title">主功能</h2>
+        <h1 id="main-entries-heading" class="section-title">主功能</h1>
         <p class="hint home-main-entries-hook">该点哪个？看你现在卡在哪一步。</p>
         <ul class="home-entry-pick-list" aria-label="如何选择入口">
           <li>
@@ -63,9 +67,9 @@
         </div>
       </section>
 
-      <!-- P10-4：主入口 — 一句话需求 → POST /api/ai/query → /ai-result -->
+      <!-- P10-4：房源主能力 — 一句话需求 → POST /api/ai/query → /ai-result -->
       <section class="card form-card" aria-labelledby="ai-rental-heading">
-        <h1 id="ai-rental-heading" class="section-title">AI 租房助手 · 房源分析</h1>
+        <h2 id="ai-rental-heading" class="section-title">AI 租房助手 · 房源分析</h2>
         <p class="hint">用一句话描述需求，查看推荐、风险与决策建议。</p>
         <label class="field-label" for="ai-query">你的需求</label>
         <textarea
@@ -103,11 +107,12 @@
       <section class="card demo-how-to" aria-labelledby="how-to-heading">
         <h2 id="how-to-heading" class="section-title">如何使用</h2>
         <ol class="hint demo-how-to-list">
-          <li>输入一句租房需求</li>
+          <li>在上方「主功能」选好入口：左为房源分析，右为合同分析（可先读本页引导）</li>
+          <li>房源分析：输入一句租房需求并提交</li>
           <li>查看推荐结果和风险提示</li>
           <li>收藏想要的房源</li>
           <li>去历史记录和对比页继续决策</li>
-          <li>需要审合同时：打开「合同分析」上传或粘贴合同</li>
+          <li>审合同：从主功能右卡、顶栏或表单下「去合同分析」进入，上传或粘贴租约</li>
         </ol>
       </section>
 

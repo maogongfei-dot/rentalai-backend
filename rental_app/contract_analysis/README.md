@@ -176,6 +176,10 @@ print(r.status_code, r.json().get("ok"), list((r.json().get("result") or {}).key
 
 浏览器打开 **`http://127.0.0.1:8000/contract-analysis`**（与 API 同源）。主流程：**「粘贴文本」** + **「上传文件」**；点 **「填入示例文本」** 可快速灌入样例。**服务端路径**与 **「填入示例路径（开发）」** 需先打开页面底部 **「开发者：显示服务端路径」**（或 **`?dev=1`**），并切换到 **上传文件** 模式后在表单中出现。示例数据见 `web_public/assets/contract_analysis_demo.js`（与 `samples/sample_contract.txt` 对齐）。
 
+## 与 RentalAI 首页（Phase 4 第五轮）
+
+RentalAI 以 **首页 `/`** 为统一入口，并列 **房源分析** 与 **合同分析** 两条主能力；本页为合同侧入口（与顶栏「合同分析」、首页主功能右卡一致）。全局产品结构、互通与「尚未落地」项见 **`rental_app/README.md`**「产品结构（Phase 4 第五轮）」。
+
 ## 尚未做的增强（非 Phase 3 范围）
 
 - PDF **页码级**定位与复杂版式 **OCR**（含扫描件友好流程）。

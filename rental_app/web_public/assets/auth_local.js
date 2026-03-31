@@ -1,7 +1,7 @@
 /**
  * 本地假登录 v1：current_user 存 localStorage，无后端鉴权。
  * 页面登录检查：非 /login 且无 current_user 则跳转 /login。
- * Demo 收口：统一顶部导航（导航复用逻辑见 renderUnifiedNav）。
+ * Demo 收口：统一顶部导航（Phase 4 第五轮：首页 / 房源分析 / 合同分析并列主入口，见 renderUnifiedNav）。
  */
 (function (global) {
   var KEY = "current_user";
