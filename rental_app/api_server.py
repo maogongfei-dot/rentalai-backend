@@ -784,6 +784,150 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
         )
 
 
+class ContractAnalysisMetadata(BaseModel):
+    """可选元数据（合同分析文本/路径接口共用）。"""
+
+    model_config = ConfigDict(extra="ignore")
+    source_name: Optional[str] = Field(
+        default=None,
+        description="来源标签或原始文件名，写入 analysis_result.meta",
+    )
+    source_type: str = Field(
+        default="text",
+        description="text | txt | pdf | docx（写入 meta）",
+    )
+    monthly_rent: Optional[float] = Field(default=None)
+    deposit_amount: Optional[float] = Field(default=None)
+    fixed_term_months: Optional[int] = Field(default=None)
+
+
+class ContractAnalysisTextApiBody(BaseModel):
+    """POST /api/contract/analysis/text — Phase 4 最小合同文本分析。"""
+
+    model_config = ConfigDict(extra="ignore")
+    contract_text: str = Field(default="", description="合同正文（非空）")
+    metadata: Optional[ContractAnalysisMetadata] = Field(
+        default=None,
+        description="可选：source_name、source_type、月租/押金等",
+    )
+
+
+class ContractAnalysisFilePathApiBody(BaseModel):
+    """POST /api/contract/analysis/file-path — 服务端本地路径（.txt/.pdf/.docx），无 multipart 上传。"""
+
+    model_config = ConfigDict(extra="ignore")
+    file_path: str = Field(..., description="服务器可读的绝对路径，或相对于 rental_app 根目录的相对路径")
+    metadata: Optional[ContractAnalysisMetadata] = Field(
+        default=None,
+        description="可选：与文本接口相同；source_type 可被文件扩展名推断覆盖",
+    )
+
+
+def _contract_analysis_metadata_kwargs(meta: Optional[ContractAnalysisMetadata]) -> dict[str, Any]:
+    if meta is None:
+        return {}
+    return {k: v for k, v in meta.model_dump(exclude_none=True).items()}
+
+
+def _resolve_contract_file_path_for_api(raw: str) -> Path:
+    """相对路径相对于 api_server 所在目录（rental_app 根）解析。"""
+    p = Path(raw.strip())
+    base = Path(__file__).resolve().parent
+    if not p.is_absolute():
+        p = (base / p).resolve()
+    else:
+        p = p.resolve()
+    return p
+
+
+@app.post("/api/contract/analysis/text")
+def api_contract_analysis_text(body: ContractAnalysisTextApiBody = Body(...)):
+    """
+    Phase 4：合同文本分析（最小接口）。返回 ``result.analysis_result``、``result.explain_result``（及 ``presentation``）。
+
+    与 ``/api/contract/phase3/analyze-text`` 共用 ``contract_analysis_service``，本路由响应仅含门面键名（无 ``structured_analysis`` 旧别名）。
+    """
+    from contract_analysis_service import analyze_contract_text
+
+    ct = (body.contract_text or "").strip()
+    if not ct:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "empty_contract_text",
+                "message": "contract_text is required and must be non-empty",
+            },
+        )
+    try:
+        kw = _contract_analysis_metadata_kwargs(body.metadata)
+        facade = analyze_contract_text(contract_text=ct, **kw)
+        return {
+            "ok": True,
+            "engine": "contract_analysis_v1",
+            "result": {
+                "analysis_result": facade["analysis_result"],
+                "explain_result": facade["explain_result"],
+                "presentation": facade.get("presentation"),
+            },
+        }
+    except Exception as exc:
+        logger.exception("contract analysis/text failed")
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": "server_error", "message": str(exc)},
+        )
+
+
+@app.post("/api/contract/analysis/file-path")
+def api_contract_analysis_file_path(body: ContractAnalysisFilePathApiBody = Body(...)):
+    """
+    Phase 4：按**服务端本地路径**读取合同文件并分析（开发/受信环境）。生产需限制可访问目录。
+
+    返回键与 ``/api/contract/analysis/text`` 相同。
+    """
+    from contract_analysis_service import analyze_contract_file
+
+    raw_fp = (body.file_path or "").strip()
+    if not raw_fp:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "empty_file_path",
+                "message": "file_path is required",
+            },
+        )
+    path = _resolve_contract_file_path_for_api(raw_fp)
+    if not path.is_file():
+        return JSONResponse(
+            status_code=400,
+            content={
+                "ok": False,
+                "error": "file_not_found",
+                "message": f"Not a readable file: {path}",
+            },
+        )
+    try:
+        kw = _contract_analysis_metadata_kwargs(body.metadata)
+        facade = analyze_contract_file(file_path=path, **kw)
+        return {
+            "ok": True,
+            "engine": "contract_analysis_v1",
+            "result": {
+                "analysis_result": facade["analysis_result"],
+                "explain_result": facade["explain_result"],
+                "presentation": facade.get("presentation"),
+            },
+        }
+    except Exception as exc:
+        logger.exception("contract analysis/file-path failed")
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": "server_error", "message": str(exc)},
+        )
+
+
 _CONTRACT_PDF_MAX_BYTES = max(1, int(os.environ.get("RENTALAI_CONTRACT_PDF_MAX_BYTES", str(15 * 1024 * 1024))))
 _CONTRACT_PREVIEW_CHARS = max(100, int(os.environ.get("RENTALAI_CONTRACT_PREVIEW_CHARS", "500")))
 

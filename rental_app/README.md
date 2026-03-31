@@ -109,6 +109,8 @@ uvicorn api_server:app --host 127.0.0.1 --port 8000
 
 与房源推荐主流程独立，规则引擎在包 **`contract_analysis/`**。最小说明、输入输出、Phase 4 接入建议见 **`contract_analysis/README.md`**；HTTP 入口示例 **`POST /api/contract/phase3/analyze-text`**（另有 Phase B 管线 **`/api/contract/analyze-text`**，勿混淆）。
 
+**Phase 4 最小 HTTP**（`analysis_result` / `explain_result`）：先启动服务后执行 **`python scripts/contract_analysis_api_smoke.py`**，或见 **`contract_analysis/README.md`** 中 curl / requests 示例。
+
 ---
 
 ## 可选：Streamlit 旧界面

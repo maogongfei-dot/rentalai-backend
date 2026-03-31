@@ -70,8 +70,54 @@
 ## Phase 4 接入建议（最小）
 
 - **正式门面（推荐）**：仓库根 **`contract_analysis_service.py`** 提供 **`analyze_contract_text`** / **`analyze_contract_file`**，统一返回 **`analysis_result`**、**`explain_result`**、**`presentation`**（内部仍调用 ``contract_analysis.service``，不重复实现规则）。
-- **HTTP**：**`POST /api/contract/phase3/analyze-text`** 已经由门面组装 ``result``，并保留 ``structured_analysis`` / ``explain`` 旧键名兼容。
+- **HTTP（Phase 4 最小）**：**`POST /api/contract/analysis/text`**（正文 + 可选 ``metadata``）、**`POST /api/contract/analysis/file-path`**（服务端本地路径，无上传）。响应 ``result`` 仅含门面键名。
+- **HTTP（Phase 3 兼容）**：**`POST /api/contract/phase3/analyze-text`** 由门面组装 ``result``，并保留 ``structured_analysis`` / ``explain`` 旧键名。
 - **包内等价**：**`contract_analysis.service.analyze_contract_with_explain`** / **`entrypoints`** 与门面数据一致，仅键名不同（``structured_analysis`` vs ``analysis_result``）。
+
+## 本地测试合同分析接口（Phase 4 HTTP）
+
+前提：在 **`rental_app`** 目录启动 API：`python run.py`（默认 `http://127.0.0.1:8000`）。
+
+### 方式一：项目内脚本（推荐）
+
+```bash
+cd rental_app
+python scripts/contract_analysis_api_smoke.py
+```
+
+可选：`set RENTALAI_API_BASE=http://127.0.0.1:8000`（或其它部署地址）。
+
+### 方式二：curl
+
+**文本**（PowerShell 可将单引号改为双引号并转义内层引号）：
+
+```bash
+curl -s -X POST "http://127.0.0.1:8000/api/contract/analysis/text" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"contract_text\":\"Monthly rent 500 pcm. Deposit 500.\",\"metadata\":{\"source_name\":\"curl-test\"}}"
+```
+
+**文件路径**（相对 `rental_app` 根）：
+
+```bash
+curl -s -X POST "http://127.0.0.1:8000/api/contract/analysis/file-path" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"file_path\":\"contract_analysis/samples/sample_contract.txt\"}"
+```
+
+### 方式三：Python requests
+
+```python
+import requests
+r = requests.post(
+    "http://127.0.0.1:8000/api/contract/analysis/text",
+    json={"contract_text": "Rent 1 pcm.", "metadata": {"source_name": "py"}},
+    timeout=60,
+)
+print(r.status_code, r.json().get("ok"), list((r.json().get("result") or {}).keys()))
+```
+
+成功时 `result` 含 `analysis_result`、`explain_result`、`presentation`。
 
 ## 尚未做的增强（非 Phase 3 范围）
 
