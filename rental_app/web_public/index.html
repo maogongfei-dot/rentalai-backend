@@ -12,26 +12,53 @@
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
     <main class="wrap wrap-wide">
-      <!-- Phase 4 Round5：并列主入口（房源分析 / 合同分析） -->
+      <!-- Phase 4 Round5 Step3：主功能 + 最小产品引导（何时点左 / 何时点右） -->
       <section class="card home-main-entries" aria-labelledby="main-entries-heading">
         <h2 id="main-entries-heading" class="section-title">主功能</h2>
+        <p class="hint home-main-entries-hook">该点哪个？看你现在卡在哪一步。</p>
+        <ul class="home-entry-pick-list" aria-label="如何选择入口">
+          <li>
+            <strong>选房、比房</strong>：通勤、账单、性价比与推荐 → 点<strong>左</strong>「房源分析」
+          </li>
+          <li>
+            <strong>手上有租约</strong>：条款风险、费用问题、完整性 → 点<strong>右</strong>「合同分析」
+          </li>
+        </ul>
         <p class="hint muted small-print home-main-entries-lead">
-          选择一项进入完整流程；房源分析在下方表单，合同分析为独立页面。
+          两条路线同属 RentalAI，可先找房再签约，也可先审合同再决定租不租。
         </p>
-        <div class="home-entry-grid">
-          <a class="home-entry-card" href="#ai-rental-heading">
-            <h3 class="home-entry-card-title">
-              房源分析
-              <span class="home-entry-card-sub">Property Analysis</span>
-            </h3>
-            <p class="home-entry-card-desc">比较房源、评分、推荐</p>
+        <div class="home-entry-grid" role="list">
+          <a
+            class="home-entry-card home-entry-card--property"
+            href="#ai-rental-heading"
+            role="listitem"
+          >
+            <div class="home-entry-card-body">
+              <h3 class="home-entry-card-title">房源分析</h3>
+              <p class="home-entry-card-sub" lang="en">Property Analysis</p>
+              <p class="home-entry-card-desc">
+                一句需求找房；比价、评分与推荐，辅助选房决策。
+              </p>
+            </div>
+            <span class="home-entry-card-cta">
+              <span class="home-entry-card-cta-label">进入房源分析</span>
+            </span>
           </a>
-          <a class="home-entry-card" href="/contract-analysis">
-            <h3 class="home-entry-card-title">
-              合同分析
-              <span class="home-entry-card-sub">Contract Analysis</span>
-            </h3>
-            <p class="home-entry-card-desc">识别风险条款、完整性检查、建议</p>
+          <a
+            class="home-entry-card home-entry-card--contract"
+            href="/contract-analysis"
+            role="listitem"
+          >
+            <div class="home-entry-card-body">
+              <h3 class="home-entry-card-title">合同分析</h3>
+              <p class="home-entry-card-sub" lang="en">Contract Analysis</p>
+              <p class="home-entry-card-desc">
+                粘贴或上传租约；标风险、查费用与条款是否齐全。
+              </p>
+            </div>
+            <span class="home-entry-card-cta">
+              <span class="home-entry-card-cta-label">进入合同分析</span>
+            </span>
           </a>
         </div>
       </section>
@@ -54,7 +81,9 @@
           <span id="ai-loading-text">Analyzing market...</span>
         </div>
         <p class="hint muted small-print">提示：Enter 提交 · Shift+Enter 换行</p>
-        <p class="home-quick-links">
+        <p class="home-quick-links" aria-label="主流程与其它入口">
+          <a href="/contract-analysis">去合同分析</a>
+          <span class="nav-sep">·</span>
           <a href="/history">去历史记录</a>
           <span class="nav-sep">·</span>
           <a href="/compare">去房源对比</a>

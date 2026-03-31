@@ -94,7 +94,7 @@
 
 ### Phase 5 首页入口（并列主能力）
 
-- 首页 **`/`**（`web_public/index.html`）顶部 **「主功能」** 区为两张并列卡片：**房源分析**（`#ai-rental-heading`，滚动至一句话租房表单）与 **合同分析**（跳转 **`/contract-analysis`**）。
+- 首页 **`/`**（`web_public/index.html`）顶部 **「主功能」** 区为两张 **结构统一** 的并列卡片（`h3` 标题 + 英文副题 + 一行说明 + 底部同色 CTA）：**房源分析**（`#ai-rental-heading`）与 **合同分析**（`/contract-analysis`）。
 - 顶部导航（`auth_local.js` → `renderUnifiedNav`）仍保留 **合同分析** 链接，与卡片二选一即可。
 
 - **HTTP（Phase 3 兼容）**：**`POST /api/contract/phase3/analyze-text`** 由门面组装 ``result``，并保留 ``structured_analysis`` / ``explain`` 旧键名。

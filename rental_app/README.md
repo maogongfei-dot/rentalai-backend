@@ -96,6 +96,8 @@ uvicorn api_server:app --host 127.0.0.1 --port 8000
 | `/history-detail` | 单条历史详情（由列表「查看详情」写入 session 后进入） |
 | `/contract-analysis` | Phase 4 合同分析（`summary_view` 展示；见下「本地验证合同分析页」） |
 
+首页「主功能」区有简短引导：选房比房、通勤与账单/性价比 → 左卡；条款风险、费用与完整性 → 右卡。
+
 其他（Phase3/异步任务等）：`/result/{task_id}`、`/register` 等仍由服务端提供，详见 `api_server.py`。
 
 ### 本地验证合同分析页（Phase 4）
