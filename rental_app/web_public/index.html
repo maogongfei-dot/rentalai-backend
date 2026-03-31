@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
-  RentalAI 首页（Phase 4 第五轮收口）：统一入口，并列「房源分析 / 合同分析」两条主能力；
-  引导与互通见顶栏及各页。产品结构见 rental_app/README.md「产品结构（Phase 4 第五轮）」。
+  RentalAI 首页：双主入口（房源/合同）+ 分析历史 + Phase7「智能入口」/assistant。
+  产品结构见 rental_app/README.md。
 -->
 <html lang="zh-Hans">
   <head>
@@ -34,6 +34,10 @@
         <p class="hint small-print home-analysis-history-cta">
           <a href="/analysis-history">分析历史</a>
           <span class="hint muted"> · Recent Analyses — 房源与合同记录汇总入口</span>
+        </p>
+        <p class="hint small-print home-smart-entry-cta">
+          <a href="/assistant">智能入口</a>
+          <span class="hint muted"> · AI Assistant — Describe what you need，再选房源或合同流程</span>
         </p>
         <div class="home-entry-grid" role="list">
           <a
@@ -90,6 +94,8 @@
         </div>
         <p class="hint muted small-print">提示：Enter 提交 · Shift+Enter 换行</p>
         <p class="home-quick-links" aria-label="主流程与其它入口">
+          <a href="/assistant">智能入口</a>
+          <span class="nav-sep">·</span>
           <a href="/contract-analysis">去合同分析</a>
           <span class="nav-sep">·</span>
           <a href="/analysis-history">分析历史</a>
@@ -112,6 +118,7 @@
         <h2 id="how-to-heading" class="section-title">如何使用</h2>
         <ol class="hint demo-how-to-list">
           <li>在上方「主功能」选好入口：左为房源分析，右为合同分析（可先读本页引导）</li>
+          <li>可选：打开「智能入口」用自然语言写需求并保存草稿，再进入房源或合同流程</li>
           <li>房源分析：输入一句租房需求并提交</li>
           <li>查看推荐结果和风险提示</li>
           <li>收藏想要的房源</li>

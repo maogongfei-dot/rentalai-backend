@@ -1,7 +1,7 @@
 /**
  * 本地假登录 v1：current_user 存 localStorage，无后端鉴权。
  * 页面登录检查：非 /login 且无 current_user 则跳转 /login。
- * Demo 收口：统一顶部导航（Phase 4 第五轮：首页 / 房源分析 / 合同分析并列主入口，见 renderUnifiedNav）。
+ * Demo 收口：统一顶部导航（含 Phase 4 Round7「智能入口」/assistant，见 renderUnifiedNav）。
  */
 (function (global) {
   var KEY = "current_user";
@@ -44,7 +44,7 @@
     return d.innerHTML;
   }
 
-  /** 各业务页共用的顶部导航：首页 / 两条主流程 / 分析历史 / 对比 / 用户 / 退出 */
+  /** 各业务页共用的顶部导航：首页 / 智能入口 / 两条主流程 / 分析历史 / 对比 / 用户 / 退出 */
   function renderUnifiedNav() {
     var nav = document.getElementById("demo-unified-nav");
     if (!nav) return;
@@ -52,6 +52,8 @@
     var name = u ? escapeHtml(String(u.display_name || u.user_id || "用户")) : "—";
     nav.innerHTML =
       '<a href="/">首页</a>' +
+      '<span class="nav-sep">·</span>' +
+      '<a href="/assistant">智能入口</a>' +
       '<span class="nav-sep">·</span>' +
       '<a href="/#ai-rental-heading">房源分析</a>' +
       '<span class="nav-sep">·</span>' +

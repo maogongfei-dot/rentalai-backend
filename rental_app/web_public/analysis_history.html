@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-  Phase 4 Round6：统一「分析历史」页（本地最近摘要列表，Step3 展示收口）
-  数据：localStorage rentalai_unified_analysis_history_v1；全量手动保存见 /history
+  Phase 4 Round6 收口：统一「分析历史」页（/analysis-history）
+  - 本地：localStorage rentalai_unified_analysis_history_v1（房源 housing/legacy + 合同；含 detail_snapshot 可展开）
+  - 全量手动保存列表：/history · 说明见 rental_app/README.md「统一分析历史（Phase 4 第六轮）」
 -->
 <html lang="zh-Hans">
   <head>
@@ -34,8 +35,8 @@
         <h2 id="prop-history-heading" class="section-title">Property Analysis History</h2>
         <p class="hint muted analysis-history-block-sub">房源分析 · 最近自动摘要</p>
         <p class="hint muted small-print unified-history-block-links">
-          需要全量快照与「查看详情」请打开
-          <a href="/history">房源分析保存列表</a>
+          手动保存的全量快照与列表项详情：
+          <a href="/history">打开保存列表</a>
           · <a href="/#ai-rental-heading">新建房源分析</a>
         </p>
         <div

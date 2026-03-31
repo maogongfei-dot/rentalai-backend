@@ -1,6 +1,7 @@
 /**
  * Phase 4 Round6：统一本地「最近分析」记录（localStorage）
- * 含列表摘要 + detail_snapshot（供 /analysis-history 展开回看，不重新请求后端）
+ * 类型：property（housing / legacy）、contract；含 detail_snapshot 供 /analysis-history 展开回看。
+ * 未实现：云端同步、服务端持久化、跨设备；与 analysis_history 全量手动保存并存。
  */
 (function (global) {
   var STORAGE_KEY = "rentalai_unified_analysis_history_v1";

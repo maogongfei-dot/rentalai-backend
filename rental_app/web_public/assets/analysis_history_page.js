@@ -1,5 +1,5 @@
 /**
- * Phase 4 Round6 Step4：/analysis-history — 列表 + 本地 detail_snapshot 展开回看（不请求后端）
+ * Phase 4 Round6：/analysis-history — 统一历史列表 + 本地 detail_snapshot 展开回看（不请求后端）
  */
 (function () {
   var S = window.RentalAIAnalysisHistoryStore;
@@ -16,7 +16,13 @@
     try {
       var d = new Date(iso);
       if (isNaN(d.getTime())) return String(iso);
-      return d.toLocaleString();
+      return d.toLocaleString("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } catch (e) {
       return String(iso);
     }
@@ -330,12 +336,12 @@
     renderList(
       propEl,
       S.listByType("property"),
-      "完成一次房源需求分析并进入结果页后，将自动在此出现摘要，便于回看最近检索条件。"
+      "暂无记录。完成房源分析并进入结果页后，将自动在此出现摘要；展开「查看详情」可回看本地保存的结论与市场摘要。"
     );
     renderList(
       contractEl,
       S.listByType("contract"),
-      "在合同分析页提交成功后，将自动在此出现摘要，便于回看最近审阅结论。"
+      "暂无记录。合同分析提交成功后，将自动在此出现摘要；展开「查看详情」可回看结论、风险与完整性要点。"
     );
   }
 

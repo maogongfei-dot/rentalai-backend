@@ -1927,6 +1927,21 @@ def web_phase3_result(task_id: str):
     return FileResponse(page)
 
 
+@app.get("/assistant")
+def web_assistant_entry():
+    """Phase 4 Round7：聊天式统一入口骨架（静态 assistant.html）。"""
+    page = _WEB_PUBLIC_DIR / "assistant.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/assistant.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
 @app.get("/analysis-history")
 def web_analysis_history_hub():
     """Phase 4 Round6：统一分析历史入口页（骨架：房源 / 合同分区，静态 analysis_history.html）。"""

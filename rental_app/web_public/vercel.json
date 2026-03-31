@@ -5,6 +5,7 @@
     { "source": "/login", "destination": "/login.html" },
     { "source": "/ai-result", "destination": "/ai_result.html" },
     { "source": "/compare", "destination": "/compare.html" },
+    { "source": "/assistant", "destination": "/assistant.html" },
     { "source": "/contract-analysis", "destination": "/contract_analysis.html" },
     { "source": "/analysis-history", "destination": "/analysis_history.html" },
     { "source": "/history", "destination": "/history.html" },
