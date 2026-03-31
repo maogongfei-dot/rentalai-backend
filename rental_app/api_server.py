@@ -712,13 +712,19 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
 
     返回 ``result`` 为两层 + 展示层（与 CLI ``plain_text`` 分段一致；JSON 可完整用于前端卡片）：
 
-    - ``structured_analysis``：summary / risks（含 ``matched_text``、``location_hint`` 等）/
+    - ``structured_analysis``：summary / risks（含 ``matched_text``、``location_hint``、``risk_category`` 等）/
+      **risk_category_summary**（``category`` / ``count`` / ``highest_severity`` / ``short_summary``）/
+      **risk_category_groups**（``category`` / ``risks`` 完整列表）/
+      **clause_list**（条款级占位列表，``ContractClauseItem``；默认可为空）/
       missing_items / recommendations / detected_topics / meta
     - ``explain``：overall_conclusion / key_risk_summary /
+      与结构化层一致的 **risk_category_summary** / **risk_category_groups** /
       **highlighted_risk_clauses**（``risk_title`` / ``severity`` / ``matched_text`` /
-      ``location_hint`` / ``short_advice``）/
+      ``location_hint`` / ``short_advice`` / ``risk_category`` / ``risk_code``）/
       missing_clause_summary / action_advice
-    - ``presentation``：sections（含 ``title_en``、`kind=risk_clauses` 的条目列表）/ plain_text 等
+    - ``presentation``：sections 含 ``title_en``；含 ``kind=risk_category_summary``、
+      ``kind=risk_category_groups``（items 另附 ``risk_titles`` 便于列表展示）、
+      ``kind=risk_clauses`` 等；``plain_text`` 与 CLI 报告一致
     """
     from contract_analysis.service import analyze_contract_with_explain
 

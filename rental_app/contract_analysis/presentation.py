@@ -12,6 +12,62 @@ from typing import Any
 _CLI_SEP = "────────────────────────────"
 _HRC_CLI_MAX = 20
 
+# 与 ``contract_analyzer._RCS_SUMMARY_LABEL_ZH`` 一致（CLI / presentation 展示用）
+_CATEGORY_LABEL_ZH: dict[str, str] = {
+    "deposit": "押金与托管",
+    "fees": "费用与收费",
+    "access": "进入 / 查看权",
+    "repairs": "维修责任",
+    "notice": "通知期",
+    "rent_increase": "涨租",
+    "termination": "解约 / 终止",
+    "bills": "账单与 utilities",
+    "pets": "宠物政策",
+    "subletting": "转租",
+    "inventory": "房屋清单",
+    "general": "其他 / 未归类",
+}
+
+
+def _category_title_zh(code: str) -> str:
+    c = (code or "general").strip().lower()
+    return _CATEGORY_LABEL_ZH.get(c, c)
+
+
+def _risk_rows_from_explain_layers(
+    ex: dict[str, Any], sa: dict[str, Any], key: str
+) -> list[dict[str, Any]]:
+    raw = ex.get(key)
+    if not isinstance(raw, list) or not raw:
+        raw = sa.get(key)
+    if not isinstance(raw, list):
+        return []
+    return [x for x in raw if isinstance(x, dict)]
+
+
+def _risk_titles_from_group(group: dict[str, Any]) -> list[str]:
+    rs = group.get("risks")
+    if not isinstance(rs, list):
+        return []
+    out: list[str] = []
+    for r in rs:
+        if not isinstance(r, dict):
+            continue
+        t = str(r.get("title") or r.get("rule_id") or "").strip()
+        if t:
+            out.append(t)
+    return out
+
+
+def _enrich_risk_category_groups_for_api(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """在 presentation 的 section items 上附加 ``risk_titles``，便于前端无需再从 ``risks`` 拆解标题。"""
+    enriched: list[dict[str, Any]] = []
+    for g in items:
+        d = dict(g)
+        d["risk_titles"] = _risk_titles_from_group(g)
+        enriched.append(d)
+    return enriched
+
 
 def format_contract_analysis_cli_report(
     structured_analysis: dict[str, Any],
@@ -20,8 +76,8 @@ def format_contract_analysis_cli_report(
     """
     生成适合终端阅读的纯文本报告（两层：结构化摘要 + 人话解读）。
 
-    第二层按固定顺序分段：Overall Conclusion → Key Risk Summary → Highlighted Risk Clauses
-    → Missing Clause Summary → Action Advice。
+    第二层按固定顺序分段：Overall Conclusion → Key Risk Summary → Risk Category Summary →
+    Risk Category Groups → Highlighted Risk Clauses → Missing Clause Summary → Action Advice。
     """
     sa = structured_analysis if isinstance(structured_analysis, dict) else {}
     ex = explain if isinstance(explain, dict) else {}
@@ -76,6 +132,56 @@ def format_contract_analysis_cli_report(
             _CLI_SEP,
             ex.get("key_risk_summary") or "—",
             "",
+            "Risk Category Summary",
+            _CLI_SEP,
+        ]
+    )
+    rc_summary_rows = _risk_rows_from_explain_layers(ex, sa, "risk_category_summary")
+    if rc_summary_rows:
+        for row in rc_summary_rows:
+            cat = str(row.get("category") or "general").strip() or "general"
+            cat_zh = _category_title_zh(cat)
+            try:
+                cnt = int(row.get("count", 0))
+            except (TypeError, ValueError):
+                cnt = 0
+            hsev = str(row.get("highest_severity") or "—").strip() or "—"
+            summ = str(row.get("short_summary") or "").strip()
+            lines.append(f"  · {cat_zh} ({cat})")
+            lines.append(f"      count: {cnt}")
+            lines.append(f"      highest_severity: {hsev}")
+            if summ:
+                lines.append(f"      short_summary: {summ}")
+            lines.append("")
+    else:
+        lines.append("  (none — no risks or no category rollup.)")
+        lines.append("")
+
+    lines.extend(
+        [
+            "Risk Category Groups",
+            _CLI_SEP,
+        ]
+    )
+    rc_group_rows = _risk_rows_from_explain_layers(ex, sa, "risk_category_groups")
+    if rc_group_rows:
+        for g in rc_group_rows:
+            cat = str(g.get("category") or "general").strip() or "general"
+            cat_zh = _category_title_zh(cat)
+            titles = _risk_titles_from_group(g)
+            lines.append(f"  【{cat_zh}】 ({cat})")
+            if titles:
+                for t in titles:
+                    lines.append(f"    - {t}")
+            else:
+                lines.append("    - （无标题）")
+            lines.append("")
+    else:
+        lines.append("  (none — no risks grouped by type.)")
+        lines.append("")
+
+    lines.extend(
+        [
             "Highlighted Risk Clauses",
             _CLI_SEP,
         ]
@@ -135,13 +241,23 @@ def build_contract_presentation(
     - sections：分段标题 + ``title_en``（英文键名，便于 UI）+ kind / text 或 items
     - plain_text：与 CLI 一致的完整可读文本
 
-    ``sections`` 中 ``highlighted_risk_clauses`` 的 ``items`` 为 ``HighlightedRiskClause`` 字典列表，
+    ``sections`` 中 ``risk_category_summary`` 的 ``items`` 为汇总行（category / count /
+    highest_severity / short_summary）；``risk_category_groups`` 的 ``items`` 在每条上含原有
+    ``category``、``risks``，并附加 ``risk_titles``（标题列表，便于前端直接渲染）。
+    ``highlighted_risk_clauses`` 的 ``items`` 为 ``HighlightedRiskClause`` 字典列表，
     每条含 risk_title / severity / matched_text / location_hint / short_advice / risk_category / risk_code。
     """
     ex = explain if isinstance(explain, dict) else {}
     sa = structured_analysis if isinstance(structured_analysis, dict) else {}
 
     hrc_items = [x for x in (ex.get("highlighted_risk_clauses") or []) if isinstance(x, dict)]
+    rc_summary_items = [x for x in (ex.get("risk_category_summary") or []) if isinstance(x, dict)]
+    if not rc_summary_items:
+        rc_summary_items = [x for x in (sa.get("risk_category_summary") or []) if isinstance(x, dict)]
+    rc_group_items = [x for x in (ex.get("risk_category_groups") or []) if isinstance(x, dict)]
+    if not rc_group_items:
+        rc_group_items = [x for x in (sa.get("risk_category_groups") or []) if isinstance(x, dict)]
+    rc_group_items_api = _enrich_risk_category_groups_for_api(rc_group_items)
 
     sections: list[dict[str, Any]] = [
         {
@@ -157,6 +273,20 @@ def build_contract_presentation(
             "title_en": "Key Risk Summary",
             "kind": "text",
             "text": str(ex.get("key_risk_summary") or ""),
+        },
+        {
+            "id": "risk_category_summary",
+            "title": "风险类型汇总",
+            "title_en": "Risk Category Summary",
+            "kind": "risk_category_summary",
+            "items": rc_summary_items,
+        },
+        {
+            "id": "risk_category_groups",
+            "title": "风险类型分组",
+            "title_en": "Risk Category Groups",
+            "kind": "risk_category_groups",
+            "items": rc_group_items_api,
         },
         {
             "id": "highlighted_risk_clauses",

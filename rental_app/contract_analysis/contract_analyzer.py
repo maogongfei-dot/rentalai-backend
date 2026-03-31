@@ -9,9 +9,42 @@ from typing import Any, cast
 from .contract_models import (
     ContractAnalysisResult,
     ContractInput,
+    coerce_contract_clause_type,
     coerce_contract_risk_category,
     coerce_contract_source_type,
 )
+
+# 与 ``ContractRiskCategory`` 顺序一致，便于稳定排序（仅用于分组展示）
+_RCS_CATEGORY_ORDER: tuple[str, ...] = (
+    "deposit",
+    "fees",
+    "access",
+    "repairs",
+    "notice",
+    "rent_increase",
+    "termination",
+    "bills",
+    "pets",
+    "subletting",
+    "inventory",
+    "general",
+)
+_RCS_CATEGORY_ORDER_INDEX = {c: i for i, c in enumerate(_RCS_CATEGORY_ORDER)}
+
+_RCS_SUMMARY_LABEL_ZH: dict[str, str] = {
+    "deposit": "押金与托管",
+    "fees": "费用与收费",
+    "access": "进入 / 查看权",
+    "repairs": "维修责任",
+    "notice": "通知期",
+    "rent_increase": "涨租",
+    "termination": "解约 / 终止",
+    "bills": "账单与 utilities",
+    "pets": "宠物政策",
+    "subletting": "转租",
+    "inventory": "房屋清单",
+    "general": "其他 / 未归类",
+}
 from .contract_rules import (
     detect_contract_topic_labels,
     evaluate_deposit_amount_risk,
@@ -39,6 +72,72 @@ def _meta_from_input(contract_input: ContractInput) -> dict[str, Any]:
     return {"source_type": st, "source_name": contract_input.source_name}
 
 
+def _sort_category_key(category: str) -> tuple[int, str]:
+    return (_RCS_CATEGORY_ORDER_INDEX.get(category, 10_000), category)
+
+
+def _severity_rank_label(severity: str) -> tuple[int, str]:
+    s = str(severity or "medium").strip().lower()
+    rank = {"high": 2, "medium": 1, "low": 0}.get(s, 1)
+    label = s if s in ("high", "medium", "low") else "medium"
+    return rank, label
+
+
+def _highest_severity_in_risks(risks: list[dict[str, Any]]) -> str:
+    best_r, best_l = -1, "low"
+    for r in risks:
+        if not isinstance(r, dict):
+            continue
+        rr, lab = _severity_rank_label(str(r.get("severity") or ""))
+        if rr > best_r:
+            best_r, best_l = rr, lab
+    return best_l
+
+
+def group_risks_by_category(risks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    将已归一化的 ``risks`` 按 ``risk_category`` 分组；组内顺序与输入中首次出现顺序一致。
+    返回 ``[{ \"category\": str, \"risks\": list[dict] }, ...]``（稳定空列表当无风险）。
+    """
+    if not risks:
+        return []
+    buckets: dict[str, list[dict[str, Any]]] = {}
+    for r in risks:
+        if not isinstance(r, dict):
+            continue
+        cat = coerce_contract_risk_category(r.get("risk_category"))
+        buckets.setdefault(cat, []).append(r)
+    ordered = sorted(buckets.keys(), key=_sort_category_key)
+    return [{"category": c, "risks": buckets[c]} for c in ordered]
+
+
+def build_risk_category_summary(risks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    按类汇总：条数、最高严重度、短文案（中文）。
+    与 ``group_risks_by_category`` 的分类顺序一致。
+    """
+    groups = group_risks_by_category(risks)
+    out: list[dict[str, Any]] = []
+    for g in groups:
+        cat = str(g.get("category") or "general")
+        rs = g.get("risks") if isinstance(g.get("risks"), list) else []
+        rs = [x for x in rs if isinstance(x, dict)]
+        n = len(rs)
+        hi = _highest_severity_in_risks(rs)
+        sev_zh = {"high": "高", "medium": "中", "low": "低"}.get(hi, hi)
+        label = _RCS_SUMMARY_LABEL_ZH.get(cat, cat)
+        short_summary = f"{label}：共 {n} 条提示，本类最高严重度为「{sev_zh}」。"
+        out.append(
+            {
+                "category": cat,
+                "count": n,
+                "highest_severity": hi,
+                "short_summary": short_summary,
+            }
+        )
+    return out
+
+
 def _normalize_risk_dict(r: dict[str, Any]) -> dict[str, Any]:
     """每条 risk 含稳定字符串字段；无定位信息时安全降级为空串。"""
     rd = dict(r)
@@ -59,13 +158,36 @@ def _normalize_risk_dict(r: dict[str, Any]) -> dict[str, Any]:
     return rd
 
 
+def _normalize_clause_dict(c: dict[str, Any]) -> dict[str, Any]:
+    """条款级占位结构归一化（Part 7）；未知 ``clause_type`` 回退为 general。"""
+    d = dict(c)
+    d["clause_id"] = str(d.get("clause_id") or "").strip()
+    d["clause_text"] = str(d.get("clause_text") or "").strip()
+    ct = d.get("clause_type")
+    d["clause_type"] = coerce_contract_clause_type(str(ct).strip() if ct is not None else None)
+    mk = d.get("matched_keywords")
+    if not isinstance(mk, list):
+        mk = []
+    d["matched_keywords"] = [str(x).strip() for x in mk if str(x).strip()]
+    rf = d.get("risk_flags")
+    if not isinstance(rf, list):
+        rf = []
+    d["risk_flags"] = [str(x).strip() for x in rf if str(x).strip()]
+    d["location_hint"] = str(d.get("location_hint") or "").strip()
+    return d
+
+
 def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
-    """保证输出字段类型稳定：risks / missing_items / recommendations / detected_topics 均为 list。"""
+    """保证输出字段类型稳定：risks / clause_list / missing_items / recommendations / detected_topics 均为 list。"""
     out = dict(data)
     raw_risks = out.get("risks")
     if not isinstance(raw_risks, list):
         raw_risks = []
     out["risks"] = [_normalize_risk_dict(x) for x in raw_risks if isinstance(x, dict)]
+    raw_clauses = out.get("clause_list")
+    if not isinstance(raw_clauses, list):
+        raw_clauses = []
+    out["clause_list"] = [_normalize_clause_dict(x) for x in raw_clauses if isinstance(x, dict)]
     for key in ("missing_items", "recommendations", "detected_topics"):
         v = out.get(key)
         if not isinstance(v, list):
@@ -74,6 +196,8 @@ def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
             v = [str(i).strip() for i in v if str(i).strip()]
         out[key] = v
     out["summary"] = str(out.get("summary") or "").strip()
+    out["risk_category_groups"] = group_risks_by_category(out["risks"])
+    out["risk_category_summary"] = build_risk_category_summary(out["risks"])
     return out
 
 
@@ -195,7 +319,8 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     对合同文本做基础规则分析。
 
     返回字段与 ``ContractAnalysisResult`` 一致：
-    - summary, risks, missing_items, recommendations, detected_topics
+    - summary, risks, risk_category_groups, risk_category_summary, clause_list（条款级占位，默认可为空列表）
+    - missing_items, recommendations, detected_topics
     - meta: { source_type, source_name }（与 ``ContractInput`` 对应）
     """
     text = (contract_input.contract_text or "").strip()

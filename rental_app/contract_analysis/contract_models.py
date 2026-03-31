@@ -64,6 +64,48 @@ def coerce_contract_risk_category(raw: str | None) -> str:
     return "general"
 
 
+# Part 7：条款级结构（clause 切分 / clause_type 识别预留；与风险层 ``risk_category`` 独立）
+ContractClauseType = Literal[
+    "deposit",
+    "rent",
+    "notice",
+    "repairs",
+    "bills",
+    "access",
+    "termination",
+    "rent_increase",
+    "inventory",
+    "pets",
+    "subletting",
+    "general",
+]
+
+_CONTRACT_CLAUSE_TYPE_VALUES = frozenset(
+    {
+        "deposit",
+        "rent",
+        "notice",
+        "repairs",
+        "bills",
+        "access",
+        "termination",
+        "rent_increase",
+        "inventory",
+        "pets",
+        "subletting",
+        "general",
+    }
+)
+
+
+def coerce_contract_clause_type(raw: str | None) -> str:
+    """将任意字符串规范为 ``ContractClauseType``；未知值回退为 ``general``。"""
+    r = (raw or "general").strip().lower()
+    if r in _CONTRACT_CLAUSE_TYPE_VALUES:
+        return r
+    return "general"
+
+
 @dataclass
 class ContractInput:
     """
@@ -81,6 +123,22 @@ class ContractInput:
     fixed_term_months: Optional[int] = None
     source_type: ContractSourceType = "text"
     source_name: Optional[str] = None
+
+
+class ContractRiskCategoryGroup(TypedDict, total=False):
+    """按 ``risk_category`` 分组后的结构（``risks`` 为与结构化层相同的字典列表）。"""
+
+    category: str
+    risks: list[ContractRiskItem]
+
+
+class ContractRiskCategorySummaryItem(TypedDict, total=False):
+    """单类风险的汇总行（供 UI / explain 与第一层对齐）。"""
+
+    category: str
+    count: int
+    highest_severity: str
+    short_summary: str
 
 
 class ContractRiskItem(TypedDict, total=False):
@@ -103,6 +161,22 @@ class ContractRiskItem(TypedDict, total=False):
     risk_code: str
 
 
+class ContractClauseItem(TypedDict, total=False):
+    """
+    单条条款级记录（``ContractAnalysisResult.clause_list`` 元素）。
+
+    用于后续「条款切分 + clause_type 分类」；当前仅占位，分析器默认输出空列表。
+    ``clause_type`` 语义与 ``ContractClauseType`` 对齐；``risk_flags`` 为轻量标签（如 rule_id）。
+    """
+
+    clause_id: str
+    clause_text: str
+    clause_type: str
+    matched_keywords: list[str]
+    risk_flags: list[str]
+    location_hint: str
+
+
 class ContractAnalysisMeta(TypedDict, total=False):
     """随分析结果回显的来源信息（与 ``ContractInput`` 对应）。"""
 
@@ -115,6 +189,9 @@ class ContractAnalysisResult(TypedDict, total=False):
 
     summary: str
     risks: list[ContractRiskItem]
+    risk_category_groups: list[ContractRiskCategoryGroup]
+    risk_category_summary: list[ContractRiskCategorySummaryItem]
+    clause_list: list[ContractClauseItem]
     missing_items: list[str]
     recommendations: list[str]
     detected_topics: list[str]
@@ -141,6 +218,8 @@ class ContractExplainResult(TypedDict, total=False):
     missing_clause_summary: str
     action_advice: list[str]
     highlighted_risk_clauses: list[HighlightedRiskClause]
+    risk_category_groups: list[ContractRiskCategoryGroup]
+    risk_category_summary: list[ContractRiskCategorySummaryItem]
 
 
 # 兼容旧名（Part 2 前使用 ContractExplainBundle）

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from .contract_analyzer import build_risk_category_summary, group_risks_by_category
 from .contract_models import ContractExplainResult, HighlightedRiskClause, coerce_contract_risk_category
 
 
@@ -21,6 +22,51 @@ def _as_str_list(raw: Any) -> list[str]:
     if not isinstance(raw, list):
         return []
     return [str(x).strip() for x in raw if str(x).strip()]
+
+
+def _normalize_risk_category_groups(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        cat = coerce_contract_risk_category(item.get("category"))
+        rs = item.get("risks")
+        if not isinstance(rs, list):
+            rs = []
+        rs = [x for x in rs if isinstance(x, dict)]
+        out.append({"category": cat, "risks": rs})
+    return out
+
+
+def _normalize_risk_category_summary(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        cat = coerce_contract_risk_category(item.get("category"))
+        try:
+            count = int(item.get("count", 0))
+        except (TypeError, ValueError):
+            count = 0
+        hs_raw = str(item.get("highest_severity") or "low").strip().lower()
+        hs = hs_raw if hs_raw in ("high", "medium", "low") else "medium"
+        ss = str(item.get("short_summary") or "").strip()
+        if not ss:
+            sev_zh = {"high": "高", "medium": "中", "low": "低"}.get(hs, hs)
+            ss = f"{cat}：共 {count} 条，最高「{sev_zh}」。"
+        out.append(
+            {
+                "category": cat,
+                "count": count,
+                "highest_severity": hs,
+                "short_summary": ss,
+            }
+        )
+    return out
 
 
 def _normalize_highlighted_clauses(raw: Any) -> list[dict[str, Any]]:
@@ -50,7 +96,7 @@ def _normalize_highlighted_clauses(raw: Any) -> list[dict[str, Any]]:
 
 
 def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
-    """保证 explain 字段齐全且类型稳定（含 ``highlighted_risk_clauses`` 卡片列表）。"""
+    """保证 explain 字段齐全且类型稳定（含 ``highlighted_risk_clauses`` 与分类汇总）。"""
     adv = ex.get("action_advice")
     if not isinstance(adv, list):
         adv = []
@@ -59,12 +105,16 @@ def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
         adv.append("保留合同终稿与沟通记录，便于日后核对。")
     adv = adv[:5]
     hrc = _normalize_highlighted_clauses(ex.get("highlighted_risk_clauses"))
+    rcg = _normalize_risk_category_groups(ex.get("risk_category_groups"))
+    rcs = _normalize_risk_category_summary(ex.get("risk_category_summary"))
     return {
         "overall_conclusion": (str(ex.get("overall_conclusion") or "").strip() or "—"),
         "key_risk_summary": (str(ex.get("key_risk_summary") or "").strip() or "—"),
         "missing_clause_summary": (str(ex.get("missing_clause_summary") or "").strip() or "—"),
         "action_advice": adv,
         "highlighted_risk_clauses": hrc,
+        "risk_category_groups": rcg,
+        "risk_category_summary": rcs,
     }
 
 
@@ -251,6 +301,8 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
     - missing_clause_summary
     - action_advice（3～5 条 str）
     - highlighted_risk_clauses：可定位风险条款卡片列表（risk_title / severity / matched_text / …）
+    - risk_category_groups：按类分组后的 ``risks`` 列表（与结构化层引用一致）
+    - risk_category_summary：按类的 count / highest_severity / short_summary
     """
     if not isinstance(result, dict):
         result = {}
@@ -276,11 +328,20 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
                         "若只有扫描件，可先使用项目内 PDF 抽取流程获取文字。",
                     ],
                     "highlighted_risk_clauses": [],
+                    "risk_category_groups": [],
+                    "risk_category_summary": [],
                 }
             ),
         )
 
     hrc = _build_highlighted_risk_clauses(risks)
+    raw_groups = result.get("risk_category_groups")
+    raw_summary = result.get("risk_category_summary")
+    if not isinstance(raw_groups, list):
+        raw_groups = group_risks_by_category(risks)
+    if not isinstance(raw_summary, list):
+        raw_summary = build_risk_category_summary(risks)
+
     return cast(
         ContractExplainResult,
         _normalize_explain_out(
@@ -290,6 +351,8 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
                 "missing_clause_summary": _build_missing_clause_summary(missing, detected),
                 "action_advice": _build_action_advice(risks, missing, recs),
                 "highlighted_risk_clauses": hrc,
+                "risk_category_groups": raw_groups,
+                "risk_category_summary": raw_summary,
             }
         ),
     )

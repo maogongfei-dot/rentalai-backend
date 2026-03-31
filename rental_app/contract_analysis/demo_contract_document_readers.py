@@ -76,6 +76,9 @@ def run_contract_file_demo() -> None:
         print(f"  [meta] {sa.get('meta')}")
         print(f"  [explain] overall_conclusion: {_preview_line(ex.get('overall_conclusion') or '', 200)}")
         print(f"  [explain] key_risk_summary: {_preview_line(ex.get('key_risk_summary') or '', 200)}")
+        n_sum = len(ex.get("risk_category_summary") or [])
+        n_grp = len(ex.get("risk_category_groups") or [])
+        print(f"  [explain] risk_category_summary: {n_sum} row(s), risk_category_groups: {n_grp} group(s)")
         print()
 
     print("=== done ===")
@@ -99,13 +102,20 @@ def test_contract_document_readers() -> None:
         out = analyze_contract_file_with_explain(file_path=path)
         assert "structured_analysis" in out and "explain" in out
         ex = out["explain"]
+        sa = out["structured_analysis"]
         for k in ("overall_conclusion", "key_risk_summary", "missing_clause_summary"):
             assert isinstance(ex.get(k), str) and (ex.get(k) or "").strip()
+        assert isinstance(ex.get("risk_category_groups"), list)
+        assert isinstance(ex.get("risk_category_summary"), list)
+        assert isinstance(sa.get("clause_list"), list)
+        assert isinstance(sa.get("risk_category_groups"), list)
+        assert isinstance(sa.get("risk_category_summary"), list)
+        assert len(ex["risk_category_groups"]) == len(ex["risk_category_summary"])
         adv = ex.get("action_advice")
         assert isinstance(adv, list) and len(adv) >= 3
         hrc = ex.get("highlighted_risk_clauses")
         assert isinstance(hrc, list)
-        risks_n = len(out["structured_analysis"].get("risks") or [])
+        risks_n = len(sa.get("risks") or [])
         assert len(hrc) == min(risks_n, 20)
         for card in hrc:
             assert isinstance(card, dict)

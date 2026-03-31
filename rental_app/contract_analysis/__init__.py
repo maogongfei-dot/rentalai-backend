@@ -4,7 +4,11 @@ Phase 3：合同分析子模块（与项目根目录 ``contract_*.py`` 管线区
 
 from __future__ import annotations
 
-from .contract_analyzer import analyze_contract_text
+from .contract_analyzer import (
+    analyze_contract_text,
+    build_risk_category_summary,
+    group_risks_by_category,
+)
 from .contract_document_reader import (
     MINIMAL_CONTRACT_PDF_TEXT_BYTES,
     ContractReadOutcome,
@@ -19,15 +23,20 @@ from .contract_explainer import explain_contract_analysis, format_contract_analy
 from .contract_models import (
     ContractAnalysisMeta,
     ContractAnalysisResult,
+    ContractClauseItem,
+    ContractClauseType,
     ContractExplainBundle,
     ContractExplainResult,
     ContractRiskCategory,
+    ContractRiskCategoryGroup,
+    ContractRiskCategorySummaryItem,
     HighlightedRiskClause,
     ContractInput,
     ContractPhase3PipelineResult,
     ContractPresentationBundle,
     ContractRiskItem,
     ContractSourceType,
+    coerce_contract_clause_type,
     coerce_contract_risk_category,
     coerce_contract_source_type,
 )
@@ -46,6 +55,7 @@ from .demo_contract_samples import (
     test_contract_analysis_samples,
     validate_contract_analysis_empty_risk_fallback,
     validate_contract_analysis_samples,
+    validate_contract_category_samples,
     validate_contract_localization_samples,
 )
 from .presentation import build_contract_presentation, format_contract_analysis_cli_report
@@ -64,6 +74,10 @@ from .sample_contracts_data import (
     SAMPLE_CONTRACT_MISSING_NOTICE_REPAIR,
     SAMPLE_CONTRACT_SAFE,
     SAMPLE_CONTRACT_UNFAIR_ENTRY,
+    SAMPLE_CAT_ACCESS_NOTICE,
+    SAMPLE_CAT_DEPOSIT_ISSUE,
+    SAMPLE_CAT_HIDDEN_FEE,
+    SAMPLE_CAT_RENT_TERMINATION,
     SAMPLE_LOC_HIDDEN_FEE,
     SAMPLE_LOC_LANDLORD_ACCESS,
     SAMPLE_LOC_TENANT_REPAIRS,
@@ -83,6 +97,7 @@ __all__ = [
     "ContractRiskCategory",
     "ContractRiskItem",
     "ContractSourceType",
+    "coerce_contract_clause_type",
     "coerce_contract_risk_category",
     "coerce_contract_source_type",
     "MINIMAL_CONTRACT_PDF_TEXT_BYTES",
@@ -93,6 +108,7 @@ __all__ = [
     "read_contract_from_pdf",
     "read_contract_from_txt",
     "analyze_contract",
+    "build_risk_category_summary",
     "analyze_contract_file",
     "analyze_contract_file_with_explain",
     "analyze_contract_text",
@@ -102,6 +118,7 @@ __all__ = [
     "explain_contract_analysis",
     "format_contract_analysis_cli_report",
     "format_contract_analysis_output",
+    "group_risks_by_category",
     "run_contract_analysis_demo",
     "run_contract_file_analysis_demo",
     "run_contract_file_demo",
@@ -113,6 +130,10 @@ __all__ = [
     "SAMPLE_CONTRACT_MISSING_NOTICE_REPAIR",
     "SAMPLE_CONTRACT_SAFE",
     "SAMPLE_CONTRACT_UNFAIR_ENTRY",
+    "SAMPLE_CAT_ACCESS_NOTICE",
+    "SAMPLE_CAT_DEPOSIT_ISSUE",
+    "SAMPLE_CAT_HIDDEN_FEE",
+    "SAMPLE_CAT_RENT_TERMINATION",
     "SAMPLE_LOC_HIDDEN_FEE",
     "SAMPLE_LOC_LANDLORD_ACCESS",
     "SAMPLE_LOC_TENANT_REPAIRS",
@@ -120,6 +141,7 @@ __all__ = [
     "test_contract_document_readers",
     "validate_contract_analysis_empty_risk_fallback",
     "validate_contract_analysis_samples",
+    "validate_contract_category_samples",
     "validate_contract_file_analysis_demo",
     "validate_contract_localization_samples",
 ]
