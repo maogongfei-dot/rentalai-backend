@@ -65,7 +65,7 @@ def analyze_contract_with_explain(
     """
     完整 Phase 3 输出（两层 + 展示层），形状见 ``ContractPhase3PipelineResult``：
 
-    - ``structured_analysis``：第一层（含 ``meta``、``risks[].matched_text``、``clause_risk_map`` 等）。
+    - ``structured_analysis``：第一层（含 ``meta``、``risks[].matched_text``、``clause_risk_map``、``clause_severity_summary`` 等）。
     - ``explain``：第二层（含 ``highlighted_risk_clauses``、``clause_risk_overview`` 等，与 CLI/API 展示对齐）。
     - ``presentation``：``sections``（含 ``title_en``、``kind=risk_clauses`` 的 ``items``）与 ``plain_text``。
     """

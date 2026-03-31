@@ -64,6 +64,23 @@ def _assert_clause_risk_map_shape(sa: dict[str, Any], label: str) -> None:
         assert cid in clause_ids, f"{label}: clause_risk_map references unknown clause_id {cid!r}"
 
 
+def _assert_clause_severity_summary_shape(sa: dict[str, Any], label: str) -> None:
+    """Part 9：``clause_severity_summary`` 为 list，项字段类型稳定。"""
+    css = sa.get("clause_severity_summary")
+    assert isinstance(css, list), label
+    for item in css:
+        assert isinstance(item, dict), label
+        assert str(item.get("clause_id") or "").strip(), label
+        assert isinstance(item.get("clause_type"), str), label
+        assert isinstance(item.get("severity_score"), int), label
+        assert isinstance(item.get("highest_severity"), str), label
+        assert str(item.get("highest_severity") or "").strip() in ("high", "medium", "low"), label
+        assert isinstance(item.get("linked_risk_count"), int), label
+        assert isinstance(item.get("linked_risk_titles"), list), label
+        assert isinstance(item.get("short_clause_preview"), str), label
+        assert isinstance(item.get("location_hint"), str), label
+
+
 def _assert_clause_risk_overview_explain(ex: dict[str, Any], label: str) -> None:
     """Explain：``clause_risk_overview`` 为 list；非空时每块含 ``linked_risks`` 子项。"""
     cro = ex.get("clause_risk_overview")
@@ -283,6 +300,7 @@ def validate_contract_category_samples() -> None:
         assert isinstance(sa.get("risks"), list), label
         assert isinstance(sa.get("clause_list"), list), label
         _assert_clause_risk_map_shape(sa, label)
+        _assert_clause_severity_summary_shape(sa, label)
         assert isinstance(sa.get("risk_category_summary"), list), label
         assert isinstance(sa.get("risk_category_groups"), list), label
         assert isinstance(ex.get("risk_category_summary"), list), label
@@ -330,6 +348,7 @@ def validate_contract_clause_type_samples() -> None:
         ex = out["explain"]
         assert isinstance(sa.get("clause_list"), list), label
         _assert_clause_risk_map_shape(sa, label)
+        _assert_clause_severity_summary_shape(sa, label)
         assert isinstance(ex.get("clause_overview"), list), label
         _assert_clause_risk_overview_explain(ex, label)
         clauses = sa.get("clause_list") or []
@@ -372,6 +391,7 @@ def validate_contract_clause_risk_samples() -> None:
         assert isinstance(crm, list), label
         assert len(crm) >= 1, label
         _assert_clause_risk_map_shape(sa, label)
+        _assert_clause_severity_summary_shape(sa, label)
         titles_in_map = {str(x.get("risk_title") or "").strip() for x in crm if isinstance(x, dict)}
         assert exp_title in titles_in_map, f"{label}: expected title {exp_title!r} in {titles_in_map!r}"
         cro = ex.get("clause_risk_overview")
@@ -403,6 +423,7 @@ def validate_contract_analysis_samples() -> None:
         assert isinstance(sa.get("clause_list"), list), label
         assert len(sa.get("clause_list") or []) >= 1, label
         _assert_clause_risk_map_shape(sa, label)
+        _assert_clause_severity_summary_shape(sa, label)
         assert isinstance(sa.get("risk_category_groups"), list)
         assert isinstance(sa.get("risk_category_summary"), list)
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"])
@@ -476,6 +497,7 @@ def validate_contract_localization_samples() -> None:
         assert isinstance(sa.get("clause_list"), list), label
         assert len(sa.get("clause_list") or []) >= 1, label
         _assert_clause_risk_map_shape(sa, label)
+        _assert_clause_severity_summary_shape(sa, label)
         assert isinstance(sa.get("risk_category_groups"), list), label
         assert isinstance(sa.get("risk_category_summary"), list), label
         assert isinstance(ex.get("risk_category_groups"), list), label
@@ -510,6 +532,8 @@ def validate_contract_empty_contract_text_clause_list() -> None:
     assert sa.get("clause_list") == []
     assert isinstance(sa.get("clause_risk_map"), list)
     assert sa.get("clause_risk_map") == []
+    assert isinstance(sa.get("clause_severity_summary"), list)
+    assert sa.get("clause_severity_summary") == []
     assert isinstance(ex.get("clause_overview"), list)
     assert ex.get("clause_overview") == []
     assert isinstance(ex.get("clause_risk_overview"), list)
@@ -531,6 +555,8 @@ def validate_contract_analysis_empty_risk_fallback() -> None:
     assert len(sa["clause_list"]) >= 1
     assert isinstance(sa.get("clause_risk_map"), list)
     assert sa.get("clause_risk_map") == []
+    assert isinstance(sa.get("clause_severity_summary"), list)
+    assert sa.get("clause_severity_summary") == []
     assert isinstance(sa.get("risk_category_groups"), list)
     assert isinstance(sa.get("risk_category_summary"), list)
     assert sa.get("risk_category_groups") == []

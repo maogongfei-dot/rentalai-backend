@@ -347,8 +347,34 @@ def _normalize_clause_risk_link_dict(d: dict[str, Any]) -> dict[str, Any]:
     return x
 
 
+def _normalize_clause_severity_dict(d: dict[str, Any]) -> dict[str, Any]:
+    """Part 9：条款级强度汇总行归一化。"""
+    x = dict(d)
+    x["clause_id"] = str(x.get("clause_id") or "").strip()
+    x["clause_type"] = coerce_contract_clause_type(x.get("clause_type"))
+    try:
+        sc = int(x.get("severity_score", 0))
+    except (TypeError, ValueError):
+        sc = 0
+    x["severity_score"] = max(0, sc)
+    hs = str(x.get("highest_severity") or "medium").strip().lower()
+    x["highest_severity"] = hs if hs in ("high", "medium", "low") else "medium"
+    try:
+        n = int(x.get("linked_risk_count", 0))
+    except (TypeError, ValueError):
+        n = 0
+    x["linked_risk_count"] = max(0, n)
+    titles = x.get("linked_risk_titles")
+    if not isinstance(titles, list):
+        titles = []
+    x["linked_risk_titles"] = [str(t).strip() for t in titles if str(t).strip()]
+    x["short_clause_preview"] = str(x.get("short_clause_preview") or "").strip()
+    x["location_hint"] = str(x.get("location_hint") or "").strip()
+    return x
+
+
 def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
-    """保证输出字段类型稳定：risks / clause_list / clause_risk_map / missing_items 等均为 list。"""
+    """保证输出字段类型稳定：risks / clause_list / clause_risk_map / clause_severity_summary / missing_items 等均为 list。"""
     out = dict(data)
     raw_risks = out.get("risks")
     if not isinstance(raw_risks, list):
@@ -362,6 +388,10 @@ def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw_links, list):
         raw_links = []
     out["clause_risk_map"] = [_normalize_clause_risk_link_dict(x) for x in raw_links if isinstance(x, dict)]
+    raw_sev = out.get("clause_severity_summary")
+    if not isinstance(raw_sev, list):
+        raw_sev = []
+    out["clause_severity_summary"] = [_normalize_clause_severity_dict(x) for x in raw_sev if isinstance(x, dict)]
     for key in ("missing_items", "recommendations", "detected_topics"):
         v = out.get(key)
         if not isinstance(v, list):
@@ -520,6 +550,7 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     - summary, risks, risk_category_groups, risk_category_summary,
       clause_list（``parse_contract_clauses`` + ``annotate_clause_types``）
     - clause_risk_map：条款—风险联动列表（由 ``build_clause_risk_map`` 生成；见 ``ClauseRiskLinkItem``）
+    - clause_severity_summary：条款级风险强度汇总（当前可为空 list；见 ``ClauseSeverityItem``）
     - missing_items, recommendations, detected_topics
     - meta: { source_type, source_name }（与 ``ContractInput`` 对应）
     """

@@ -204,6 +204,26 @@ class ClauseRiskLinkItem(TypedDict, total=False):
     link_reason: str
 
 
+class ClauseSeverityItem(TypedDict, total=False):
+    """
+    单条条款级风险强度汇总（``ContractAnalysisResult.clause_severity_summary`` 元素）。
+
+    ``severity_score``：数值强度分（具体算法由后续 Part 9 规则填充；未知时可为 0）。
+    ``highest_severity``：本条条款关联风险中的最高严重度（high / medium / low）。
+    ``linked_risk_titles``：关联风险标题列表（与 ``clause_risk_map`` 对齐）。
+    ``location_hint``：条款级定位提示，可与 ``ContractClauseItem.location_hint`` 一致。
+    """
+
+    clause_id: str
+    clause_type: str
+    severity_score: int
+    highest_severity: str
+    linked_risk_count: int
+    linked_risk_titles: list[str]
+    short_clause_preview: str
+    location_hint: str
+
+
 class ContractAnalysisMeta(TypedDict, total=False):
     """随分析结果回显的来源信息（与 ``ContractInput`` 对应）。"""
 
@@ -220,6 +240,7 @@ class ContractAnalysisResult(TypedDict, total=False):
     risk_category_summary: list[ContractRiskCategorySummaryItem]
     clause_list: list[ContractClauseItem]
     clause_risk_map: list[ClauseRiskLinkItem]
+    clause_severity_summary: list[ClauseSeverityItem]
     missing_items: list[str]
     recommendations: list[str]
     detected_topics: list[str]
