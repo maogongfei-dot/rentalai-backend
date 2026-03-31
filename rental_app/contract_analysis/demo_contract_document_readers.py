@@ -109,6 +109,7 @@ def test_contract_document_readers() -> None:
         assert isinstance(ex.get("risk_category_summary"), list)
         assert isinstance(ex.get("clause_overview"), list)
         assert isinstance(sa.get("clause_list"), list)
+        assert isinstance(sa.get("clause_risk_map"), list)
         assert isinstance(sa.get("risk_category_groups"), list)
         assert isinstance(sa.get("risk_category_summary"), list)
         assert len(ex["risk_category_groups"]) == len(ex["risk_category_summary"])

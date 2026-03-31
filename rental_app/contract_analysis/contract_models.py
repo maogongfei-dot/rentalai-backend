@@ -187,6 +187,23 @@ class ContractClauseItem(TypedDict, total=False):
     location_hint: str
 
 
+class ClauseRiskLinkItem(TypedDict, total=False):
+    """
+    单条「条款—风险」联动记录（``ContractAnalysisResult.clause_risk_map`` 元素）。
+
+    与 ``ContractRiskItem`` 区分：显式绑定 ``clause_id``，并附 ``link_reason`` 说明关联依据（规则/重叠文本等）。
+    """
+
+    clause_id: str
+    risk_title: str
+    risk_category: str
+    severity: str
+    matched_keyword: str
+    matched_text: str
+    location_hint: str
+    link_reason: str
+
+
 class ContractAnalysisMeta(TypedDict, total=False):
     """随分析结果回显的来源信息（与 ``ContractInput`` 对应）。"""
 
@@ -202,6 +219,7 @@ class ContractAnalysisResult(TypedDict, total=False):
     risk_category_groups: list[ContractRiskCategoryGroup]
     risk_category_summary: list[ContractRiskCategorySummaryItem]
     clause_list: list[ContractClauseItem]
+    clause_risk_map: list[ClauseRiskLinkItem]
     missing_items: list[str]
     recommendations: list[str]
     detected_topics: list[str]

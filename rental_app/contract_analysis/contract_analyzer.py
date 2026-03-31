@@ -179,8 +179,28 @@ def _normalize_clause_dict(c: dict[str, Any]) -> dict[str, Any]:
     return d
 
 
+def _normalize_clause_risk_link_dict(d: dict[str, Any]) -> dict[str, Any]:
+    """Part 8：条款—风险联动行归一化；``severity`` 非标准值时回退为 medium。"""
+    x = dict(d)
+    for key, default in (
+        ("clause_id", ""),
+        ("risk_title", ""),
+        ("matched_keyword", ""),
+        ("matched_text", ""),
+        ("location_hint", ""),
+        ("link_reason", ""),
+    ):
+        v = x.get(key)
+        x[key] = str(v).strip() if v is not None else default
+    rc = x.get("risk_category")
+    x["risk_category"] = coerce_contract_risk_category(str(rc).strip() if rc is not None else None)
+    sev = str(x.get("severity") or "").strip().lower()
+    x["severity"] = sev if sev in ("high", "medium", "low") else "medium"
+    return x
+
+
 def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
-    """保证输出字段类型稳定：risks / clause_list / missing_items / recommendations / detected_topics 均为 list。"""
+    """保证输出字段类型稳定：risks / clause_list / clause_risk_map / missing_items 等均为 list。"""
     out = dict(data)
     raw_risks = out.get("risks")
     if not isinstance(raw_risks, list):
@@ -190,6 +210,10 @@ def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw_clauses, list):
         raw_clauses = []
     out["clause_list"] = [_normalize_clause_dict(x) for x in raw_clauses if isinstance(x, dict)]
+    raw_links = out.get("clause_risk_map")
+    if not isinstance(raw_links, list):
+        raw_links = []
+    out["clause_risk_map"] = [_normalize_clause_risk_link_dict(x) for x in raw_links if isinstance(x, dict)]
     for key in ("missing_items", "recommendations", "detected_topics"):
         v = out.get(key)
         if not isinstance(v, list):
@@ -347,6 +371,7 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     返回字段与 ``ContractAnalysisResult`` 一致：
     - summary, risks, risk_category_groups, risk_category_summary,
       clause_list（``parse_contract_clauses`` + ``annotate_clause_types``）
+    - clause_risk_map：条款—风险联动列表（当前可为空；结构见 ``ClauseRiskLinkItem``）
     - missing_items, recommendations, detected_topics
     - meta: { source_type, source_name }（与 ``ContractInput`` 对应）
     """

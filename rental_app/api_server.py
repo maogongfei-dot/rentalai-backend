@@ -716,6 +716,7 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
       **risk_category_summary**（``category`` / ``count`` / ``highest_severity`` / ``short_summary``）/
       **risk_category_groups**（``category`` / ``risks`` 完整列表）/
       **clause_list**（条款级占位列表，``ContractClauseItem``；默认可为空）/
+      **clause_risk_map**（条款—风险联动，``ClauseRiskLinkItem`` 列表；可为空但必须存在）/
       missing_items / recommendations / detected_topics / meta
     - ``explain``：overall_conclusion / key_risk_summary /
       **clause_overview**（``clause_id`` / ``clause_type`` / ``short_clause_preview`` / ``matched_keywords``）/

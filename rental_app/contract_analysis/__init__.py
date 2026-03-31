@@ -24,6 +24,7 @@ from .contract_document_reader import (
 )
 from .contract_explainer import explain_contract_analysis, format_contract_analysis_output
 from .contract_models import (
+    ClauseRiskLinkItem,
     ContractAnalysisMeta,
     ContractAnalysisResult,
     ContractClauseItem,
@@ -96,6 +97,7 @@ from .sample_contracts_data import (
 __all__ = [
     "BASIC_CONTRACT_RISK_RULES",
     "match_clause_type_from_text",
+    "ClauseRiskLinkItem",
     "ContractAnalysisMeta",
     "ContractAnalysisResult",
     "ContractClauseItem",
