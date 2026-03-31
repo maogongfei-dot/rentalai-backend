@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
-  RentalAI 首页：双主入口（房源/合同）+ 分析历史 + Phase7「智能入口」/assistant。
-  产品结构见 rental_app/README.md。
+  RentalAI 首页：双主入口（房源/合同）+ 分析历史 + Phase7「智能入口」+ Phase5 登录/注册入口。
+  未登录可访问本页与 /assistant；其它受保护路由见 auth_local.js。
 -->
 <html lang="zh-Hans">
   <head>
@@ -38,6 +38,12 @@
         <p class="hint small-print home-smart-entry-cta">
           <a href="/assistant">智能入口</a>
           <span class="hint muted"> · AI Assistant — Describe what you need，再选房源或合同流程</span>
+        </p>
+        <p id="home-auth-cta" class="hint small-print home-auth-cta">
+          <a href="/login">登录</a>
+          <span class="hint muted"> · </span>
+          <a href="/register">注册</a>
+          <span class="hint muted"> · 账户（Phase 5）</span>
         </p>
         <div class="home-entry-grid" role="list">
           <a
@@ -238,6 +244,13 @@
       document.getElementById("go").onclick = function () {
         window.RentalAIPhase3.startAnalyze();
       };
+    </script>
+    <script>
+      (function () {
+        var el = document.getElementById("home-auth-cta");
+        if (!el || !window.RentalAILocalAuth) return;
+        if (window.RentalAILocalAuth.getUser()) el.classList.add("hidden");
+      })();
     </script>
   </body>
 </html>

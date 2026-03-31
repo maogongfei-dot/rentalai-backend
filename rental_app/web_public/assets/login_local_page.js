@@ -3,6 +3,13 @@
  */
 (function () {
   try {
+    if (
+      localStorage.getItem("rentalai_bearer") &&
+      localStorage.getItem("rentalai_user_email")
+    ) {
+      window.location.replace("/");
+      return;
+    }
     var raw = localStorage.getItem("current_user");
     if (raw) {
       var o = JSON.parse(raw);

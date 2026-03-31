@@ -1,21 +1,35 @@
 /**
- * 本地假登录 v1：current_user 存 localStorage，无后端鉴权。
- * 页面登录检查：非 /login 且无 current_user 则跳转 /login。
- * Demo 收口：统一顶部导航（含 Phase 4 Round7「智能入口」/assistant，见 renderUnifiedNav）。
+ * 本地假登录 v1 + Phase 5 Step1：current_user 或 Bearer 会话（auth_session.js 键）视为已登录。
+ * 公开页：/、/login、/register、/assistant；其余路径无会话则跳转 /login。
+ * 统一顶栏：renderUnifiedNav（含「智能入口」、登录/注册入口）。
  */
 (function (global) {
   var KEY = "current_user";
+  var BEARER_KEY = "rentalai_bearer";
+  var EMAIL_KEY = "rentalai_user_email";
+  var UID_KEY = "rentalai_user_id";
 
   function getUser() {
     try {
       var raw = localStorage.getItem(KEY);
-      if (!raw) return null;
-      var o = JSON.parse(raw);
-      if (!o || !o.user_id) return null;
-      return o;
-    } catch (e) {
-      return null;
-    }
+      if (raw) {
+        var o = JSON.parse(raw);
+        if (o && o.user_id) return o;
+      }
+    } catch (e) {}
+    try {
+      var token = localStorage.getItem(BEARER_KEY);
+      var email = localStorage.getItem(EMAIL_KEY);
+      var uid = localStorage.getItem(UID_KEY);
+      if (token && (email || uid)) {
+        return {
+          user_id: uid || email || "session",
+          display_name: email || uid || "用户",
+          auth_bearer: true,
+        };
+      }
+    } catch (e2) {}
+    return null;
   }
 
   /** 收藏按用户隔离：fav_list_{user_id} */
@@ -27,7 +41,8 @@
 
   function requireLogin() {
     var path = (window.location.pathname || "").replace(/\/$/, "") || "/";
-    if (path === "/login") return;
+    var publicPaths = ["/", "/login", "/register", "/assistant"];
+    if (publicPaths.indexOf(path) !== -1) return;
     if (!getUser()) {
       window.location.replace("/login");
     }
@@ -35,6 +50,14 @@
 
   function logout() {
     localStorage.removeItem(KEY);
+    try {
+      localStorage.removeItem(BEARER_KEY);
+      localStorage.removeItem(EMAIL_KEY);
+      localStorage.removeItem(UID_KEY);
+    } catch (e) {}
+    if (global.RentalAIAuth && typeof global.RentalAIAuth.clearSession === "function") {
+      global.RentalAIAuth.clearSession();
+    }
     window.location.href = "/login";
   }
 
@@ -44,12 +67,31 @@
     return d.innerHTML;
   }
 
-  /** 各业务页共用的顶部导航：首页 / 智能入口 / 两条主流程 / 分析历史 / 对比 / 用户 / 退出 */
+  /** 各业务页共用的顶部导航：未登录时显示 登录/注册；已登录显示用户与退出 */
   function renderUnifiedNav() {
     var nav = document.getElementById("demo-unified-nav");
     if (!nav) return;
     var u = getUser();
-    var name = u ? escapeHtml(String(u.display_name || u.user_id || "用户")) : "—";
+    if (!u) {
+      nav.innerHTML =
+        '<a href="/">首页</a>' +
+        '<span class="nav-sep">·</span>' +
+        '<a href="/assistant">智能入口</a>' +
+        '<span class="nav-sep">·</span>' +
+        '<a href="/#ai-rental-heading">房源分析</a>' +
+        '<span class="nav-sep">·</span>' +
+        '<a href="/contract-analysis">合同分析</a>' +
+        '<span class="nav-sep">·</span>' +
+        '<a href="/analysis-history">分析历史</a>' +
+        '<span class="nav-sep">·</span>' +
+        '<a href="/compare">房源对比</a>' +
+        '<span class="nav-sep">·</span>' +
+        '<a href="/login">登录</a>' +
+        '<span class="nav-sep">·</span>' +
+        '<a href="/register">注册</a>';
+      return;
+    }
+    var name = escapeHtml(String(u.display_name || u.user_id || "用户"));
     nav.innerHTML =
       '<a href="/">首页</a>' +
       '<span class="nav-sep">·</span>' +
@@ -105,7 +147,13 @@
       }
       try {
         localStorage.removeItem(KEY);
+        localStorage.removeItem(BEARER_KEY);
+        localStorage.removeItem(EMAIL_KEY);
+        localStorage.removeItem(UID_KEY);
       } catch (e) {}
+      if (global.RentalAIAuth && typeof global.RentalAIAuth.clearSession === "function") {
+        global.RentalAIAuth.clearSession();
+      }
       window.location.href = "/login";
     });
   }

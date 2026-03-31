@@ -1,21 +1,67 @@
 <!DOCTYPE html>
+<!--
+  Phase 5 Step1：账户入口 — 邮箱/密码登录（POST /auth/login）+ 本地演示快速进入（current_user）
+-->
 <html lang="zh-Hans">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>登录 RentalAI</title>
+    <title>登录 · RentalAI</title>
     <link rel="stylesheet" href="/assets/style.css" />
+    <script src="/assets/api_config.js"></script>
   </head>
   <body>
-    <nav class="top-nav" aria-label="Main">
-      <span class="hint">RentalAI</span>
-    </nav>
+    <script src="/assets/auth_local.js"></script>
+    <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
+
     <main class="wrap narrow-wrap">
       <h1 class="section-title">登录 RentalAI</h1>
-      <p class="hint">本地演示账号，无需密码。</p>
+      <p class="hint">
+        使用邮箱与密码登录（服务端 <code>/auth/login</code>）；或继续使用下方「本地演示」无需密码。
+      </p>
 
-      <div class="card form-card">
-        <label class="field-label" for="local-login-input">用户名或邮箱</label>
+      <section class="card form-card" aria-labelledby="login-email-title">
+        <h2 id="login-email-title" class="section-title" style="font-size: 1.1rem">
+          邮箱登录
+        </h2>
+        <form id="login-form" class="auth-form" autocomplete="on">
+          <label class="field-label" for="login-email">邮箱</label>
+          <input
+            id="login-email"
+            name="email"
+            type="email"
+            required
+            autocomplete="username"
+            placeholder="you@example.com"
+          />
+
+          <label class="field-label" for="login-password">密码</label>
+          <input
+            id="login-password"
+            name="password"
+            type="password"
+            required
+            minlength="1"
+            autocomplete="current-password"
+          />
+
+          <p id="login-err" class="err hidden" role="alert"></p>
+
+          <div class="actions-row">
+            <button type="submit">登录</button>
+          </div>
+        </form>
+        <p class="hint small-print login-hint">
+          没有账号？<a href="/register">注册</a>
+        </p>
+      </section>
+
+      <section class="card form-card" aria-labelledby="login-demo-title">
+        <h2 id="login-demo-title" class="section-title" style="font-size: 1.1rem">
+          本地演示（无需密码）
+        </h2>
+        <p class="hint">仅写入本机 <code>current_user</code>，不调用登录 API。</p>
+        <label class="field-label" for="local-login-input">昵称或邮箱</label>
         <input
           id="local-login-input"
           type="text"
@@ -25,8 +71,11 @@
         <div class="actions-row">
           <button type="button" id="local-login-go">进入我的租房助手</button>
         </div>
-      </div>
+      </section>
     </main>
+
+    <script src="/assets/auth_session.js"></script>
+    <script src="/assets/login_page.js"></script>
     <script src="/assets/login_local_page.js"></script>
   </body>
 </html>

@@ -30,13 +30,16 @@
           var msg =
             x.body && x.body.message
               ? String(x.body.message)
-              : "Invalid email or password.";
+              : "邮箱或密码错误。";
           if (err) {
             err.textContent = msg;
             err.classList.remove("hidden");
           }
           return;
         }
+        try {
+          localStorage.removeItem("current_user");
+        } catch (e) {}
         if (window.RentalAIAuth && typeof window.RentalAIAuth.persistSession === "function") {
           window.RentalAIAuth.persistSession({
             token: x.body.token,
@@ -48,7 +51,7 @@
       })
       .catch(function () {
         if (err) {
-          err.textContent = "Invalid email or password.";
+          err.textContent = "无法连接服务器，请稍后重试。";
           err.classList.remove("hidden");
         }
       });
