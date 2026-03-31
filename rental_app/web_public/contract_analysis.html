@@ -15,34 +15,92 @@
       <p class="back-link"><a href="/">← 首页</a></p>
       <header class="page-header">
         <h1>合同分析 <span class="hint muted" style="font-weight: normal">Contract Analysis</span></h1>
-        <p class="hint muted">粘贴租约正文或选择本地合同文件（后续将接入分析 API）。</p>
+        <p class="hint muted">文本模式粘贴正文；文件模式支持服务端路径或本地 .txt（浏览器读取）。</p>
       </header>
 
-      <section class="card form-card" aria-labelledby="contract-paste-heading">
-        <h2 id="contract-paste-heading" class="section-title">粘贴合同文本</h2>
-        <p class="hint">将租约或合同全文粘贴到下方文本框。</p>
-        <label class="field-label" for="contract-text-paste">合同正文</label>
-        <textarea
-          id="contract-text-paste"
-          name="contract_text"
-          rows="12"
-          placeholder="在此粘贴合同全文（.txt 可直接粘贴；PDF/Word 可先导出为文本再粘贴）…"
-        ></textarea>
-        <div class="actions-row">
-          <button type="button" id="contract-analyze-placeholder" disabled title="分析接口将在后续步骤接入">
-            分析（即将接入）
-          </button>
+      <section class="card form-card" aria-labelledby="contract-form-heading">
+        <h2 id="contract-form-heading" class="section-title">分析输入</h2>
+
+        <fieldset class="contract-mode-fieldset">
+          <legend class="field-label">输入模式</legend>
+          <div class="contract-mode-row" role="radiogroup" aria-label="输入模式">
+            <label>
+              <input type="radio" name="contract_mode" id="contract-mode-text" value="text" checked />
+              文本（text）
+            </label>
+            <label>
+              <input type="radio" name="contract_mode" id="contract-mode-file" value="file" />
+              文件（file）
+            </label>
+          </div>
+        </fieldset>
+
+        <div id="contract-panel-text" class="contract-input-panel">
+          <label class="field-label" for="contract-text">contract_text</label>
+          <textarea
+            id="contract-text"
+            name="contract_text"
+            rows="12"
+            placeholder="在此粘贴合同全文…"
+          ></textarea>
         </div>
+
+        <div id="contract-panel-file" class="contract-input-panel hidden">
+          <div class="form-section">
+            <h3 class="form-section-title">服务端路径 file_path</h3>
+            <p class="hint small-print">仅当 API 与合同文件在同一机器可读路径时有效（如相对 rental_app 的 sample 路径）。</p>
+            <label class="field-label" for="contract-file-path">file_path</label>
+            <input
+              type="text"
+              id="contract-file-path"
+              name="file_path"
+              autocomplete="off"
+              placeholder="例如 contract_analysis/samples/sample_contract.txt"
+            />
+          </div>
+          <div class="form-section">
+            <h3 class="form-section-title">本地文件（可选）</h3>
+            <p class="hint small-print">选择 .txt 时由浏览器读取为文本再走文本分析；PDF/Word 请用上方路径或改用文本模式粘贴。</p>
+            <label class="field-label" for="contract-local-file">本地文件</label>
+            <input
+              type="file"
+              id="contract-local-file"
+              accept=".txt,text/plain"
+            />
+            <p class="hint muted small-print" id="contract-local-file-hint" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <div class="actions-row">
+          <button type="button" id="contract-submit">提交分析</button>
+        </div>
+
+        <div id="contract-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
+          <span id="contract-loading-text">分析中…</span>
+        </div>
+        <div id="contract-error" class="err hidden" role="alert"></div>
       </section>
 
-      <section class="card form-card" aria-labelledby="contract-file-heading">
-        <h2 id="contract-file-heading" class="section-title">上传 / 选择合同文件</h2>
-        <p class="hint">选择本地 .txt / .pdf / .docx（浏览器端选择；上传至服务器与解析将在后续步骤接入）。</p>
-        <label class="field-label" for="contract-file-input">合同文件</label>
-        <input type="file" id="contract-file-input" accept=".txt,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" />
-        <p class="hint muted small-print" id="contract-file-name" aria-live="polite"></p>
+      <section
+        id="contract-state-empty"
+        class="card empty-state-card"
+        aria-labelledby="contract-empty-heading"
+      >
+        <strong id="contract-empty-heading">暂无分析结果</strong>
+        <p class="hint muted">提交后在此展示结论摘要（summary_view）。</p>
+      </section>
+
+      <section
+        id="contract-state-result"
+        class="card contract-result-panel hidden"
+        aria-live="polite"
+        aria-labelledby="contract-result-heading"
+      >
+        <h2 id="contract-result-heading" class="section-title">分析结果</h2>
+        <div id="contract-result-body" class="contract-result-body"></div>
       </section>
     </main>
+    <script src="/assets/contract_analysis_api.js"></script>
     <script src="/assets/contract_analysis_page.js"></script>
   </body>
 </html>
