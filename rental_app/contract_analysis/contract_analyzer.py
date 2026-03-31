@@ -45,9 +45,11 @@ _RCS_SUMMARY_LABEL_ZH: dict[str, str] = {
     "inventory": "房屋清单",
     "general": "其他 / 未归类",
 }
+from .contract_clause_split import parse_contract_clauses
 from .contract_rules import (
     detect_contract_topic_labels,
     evaluate_deposit_amount_risk,
+    match_clause_type_from_text,
     scan_text_keyword_risks,
     scan_topic_bad_pattern_risks,
     scan_topic_missing_items,
@@ -220,6 +222,30 @@ def _uniq_preserve(xs: list[str]) -> list[str]:
     return out
 
 
+def detect_clause_type(clause_text: str) -> tuple[str, list[str]]:
+    """
+    对单条条款文本识别 ``clause_type`` 与命中的关键词（见 ``contract_rules.CLAUSE_TYPE_KEYWORDS``）。
+
+    返回 ``(clause_type, matched_keywords)``；与 ``match_clause_type_from_text`` 一致。
+    """
+    return match_clause_type_from_text(clause_text)
+
+
+def annotate_clause_types(clause_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    为 ``parse_contract_clauses`` 产出的条目写入 ``clause_type`` / ``matched_keywords``（就地更新）。
+    多主题时仅保留优先级最高的一类（见 ``CLAUSE_TYPE_DETECTION_ORDER``）。
+    """
+    for item in clause_list:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("clause_text") or "")
+        ct, kws = match_clause_type_from_text(text)
+        item["clause_type"] = ct
+        item["matched_keywords"] = kws
+    return clause_list
+
+
 def detect_contract_topics(contract_text: str) -> list[str]:
     """返回合同中已识别到的主题标签列表（人类可读）。"""
     return detect_contract_topic_labels(contract_text)
@@ -319,7 +345,8 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     对合同文本做基础规则分析。
 
     返回字段与 ``ContractAnalysisResult`` 一致：
-    - summary, risks, risk_category_groups, risk_category_summary, clause_list（条款级占位，默认可为空列表）
+    - summary, risks, risk_category_groups, risk_category_summary,
+      clause_list（``parse_contract_clauses`` + ``annotate_clause_types``）
     - missing_items, recommendations, detected_topics
     - meta: { source_type, source_name }（与 ``ContractInput`` 对应）
     """
@@ -342,11 +369,14 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     missing_items = detect_missing_items(text)
     recommendations = build_recommendations(risks, missing_items, detected_topics)
     summary = build_contract_summary(risks, missing_items, detected_topics)
+    clause_list = parse_contract_clauses(text)
+    clause_list = annotate_clause_types(clause_list)
 
     out = _normalize_analysis_output(
         {
             "summary": summary,
             "risks": risks,
+            "clause_list": clause_list,
             "missing_items": missing_items,
             "recommendations": recommendations,
             "detected_topics": detected_topics,

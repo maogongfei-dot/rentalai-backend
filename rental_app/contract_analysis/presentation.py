@@ -7,7 +7,10 @@ Part 5：第二层 CLI 采用英文分段标题（Overall Conclusion / Key Risk 
 
 from __future__ import annotations
 
+import re
 from typing import Any
+
+from .contract_models import coerce_contract_clause_type
 
 _CLI_SEP = "────────────────────────────"
 _HRC_CLI_MAX = 20
@@ -28,10 +31,59 @@ _CATEGORY_LABEL_ZH: dict[str, str] = {
     "general": "其他 / 未归类",
 }
 
+# explain ``clause_overview`` 的 clause_type 中文（与 ``ContractClauseType`` 对齐）
+_CLAUSE_TYPE_LABEL_ZH: dict[str, str] = {
+    "deposit": "押金",
+    "rent": "租金",
+    "notice": "通知",
+    "repairs": "维修",
+    "bills": "账单",
+    "access": "进入",
+    "termination": "解约",
+    "rent_increase": "涨租",
+    "inventory": "清单",
+    "pets": "宠物",
+    "subletting": "转租",
+    "general": "其他",
+}
+
 
 def _category_title_zh(code: str) -> str:
     c = (code or "general").strip().lower()
     return _CATEGORY_LABEL_ZH.get(c, c)
+
+
+def _clause_type_title_zh(code: str) -> str:
+    c = (code or "general").strip().lower()
+    return _CLAUSE_TYPE_LABEL_ZH.get(c, c)
+
+
+def _clause_overview_display_items(ex: dict[str, Any], sa: dict[str, Any]) -> list[dict[str, Any]]:
+    """Explain 的 ``clause_overview`` 优先；否则由结构化 ``clause_list`` 临时拼出（兼容旧调用）。"""
+    raw = ex.get("clause_overview")
+    if isinstance(raw, list) and raw:
+        return [x for x in raw if isinstance(x, dict)]
+    out: list[dict[str, Any]] = []
+    for c in sa.get("clause_list") or []:
+        if not isinstance(c, dict):
+            continue
+        txt = str(c.get("clause_text") or "").strip()
+        prev = re.sub(r"\s+", " ", txt)
+        if len(prev) > 120:
+            prev = prev[:119] + "…"
+        mk = c.get("matched_keywords")
+        if not isinstance(mk, list):
+            mk = []
+        mk = [str(x).strip() for x in mk if str(x).strip()]
+        out.append(
+            {
+                "clause_id": str(c.get("clause_id") or "").strip(),
+                "clause_type": coerce_contract_clause_type(c.get("clause_type")),
+                "short_clause_preview": prev or "—",
+                "matched_keywords": mk,
+            }
+        )
+    return out
 
 
 def _risk_rows_from_explain_layers(
@@ -76,8 +128,9 @@ def format_contract_analysis_cli_report(
     """
     生成适合终端阅读的纯文本报告（两层：结构化摘要 + 人话解读）。
 
-    第二层按固定顺序分段：Overall Conclusion → Key Risk Summary → Risk Category Summary →
-    Risk Category Groups → Highlighted Risk Clauses → Missing Clause Summary → Action Advice。
+    第二层按固定顺序分段：Overall Conclusion → Key Risk Summary → Clause Overview →
+    Risk Category Summary → Risk Category Groups → Highlighted Risk Clauses →
+    Missing Clause Summary → Action Advice。
     """
     sa = structured_analysis if isinstance(structured_analysis, dict) else {}
     ex = explain if isinstance(explain, dict) else {}
@@ -132,6 +185,36 @@ def format_contract_analysis_cli_report(
             _CLI_SEP,
             ex.get("key_risk_summary") or "—",
             "",
+            "Clause Overview",
+            _CLI_SEP,
+        ]
+    )
+    cov_items = _clause_overview_display_items(ex, sa)
+    if cov_items:
+        for row in cov_items[:50]:
+            cid = str(row.get("clause_id") or "—").strip() or "—"
+            ct = str(row.get("clause_type") or "general").strip() or "general"
+            ct_zh = _clause_type_title_zh(ct)
+            prev = str(row.get("short_clause_preview") or "").strip() or "—"
+            if len(prev) > 160:
+                prev = prev[:157] + "…"
+            kws = row.get("matched_keywords")
+            if not isinstance(kws, list):
+                kws = []
+            kw_s = ", ".join(str(x).strip() for x in kws if str(x).strip()) or "—"
+            lines.append(f"  [{cid}] {ct_zh} ({ct})")
+            lines.append(f"      preview: {prev}")
+            lines.append(f"      matched_keywords: {kw_s}")
+            lines.append("")
+        if len(cov_items) > 50:
+            lines.append(f"  … 另有 {len(cov_items) - 50} 条见 explain.clause_overview。")
+            lines.append("")
+    else:
+        lines.append("  (none — no clauses split from contract text.)")
+        lines.append("")
+
+    lines.extend(
+        [
             "Risk Category Summary",
             _CLI_SEP,
         ]
@@ -244,6 +327,7 @@ def build_contract_presentation(
     ``sections`` 中 ``risk_category_summary`` 的 ``items`` 为汇总行（category / count /
     highest_severity / short_summary）；``risk_category_groups`` 的 ``items`` 在每条上含原有
     ``category``、``risks``，并附加 ``risk_titles``（标题列表，便于前端直接渲染）。
+    ``clause_overview`` 的 ``items`` 含 clause_id / clause_type / short_clause_preview / matched_keywords。
     ``highlighted_risk_clauses`` 的 ``items`` 为 ``HighlightedRiskClause`` 字典列表，
     每条含 risk_title / severity / matched_text / location_hint / short_advice / risk_category / risk_code。
     """
@@ -251,6 +335,7 @@ def build_contract_presentation(
     sa = structured_analysis if isinstance(structured_analysis, dict) else {}
 
     hrc_items = [x for x in (ex.get("highlighted_risk_clauses") or []) if isinstance(x, dict)]
+    clause_overview_items = _clause_overview_display_items(ex, sa)
     rc_summary_items = [x for x in (ex.get("risk_category_summary") or []) if isinstance(x, dict)]
     if not rc_summary_items:
         rc_summary_items = [x for x in (sa.get("risk_category_summary") or []) if isinstance(x, dict)]
@@ -273,6 +358,13 @@ def build_contract_presentation(
             "title_en": "Key Risk Summary",
             "kind": "text",
             "text": str(ex.get("key_risk_summary") or ""),
+        },
+        {
+            "id": "clause_overview",
+            "title": "合同条款清单",
+            "title_en": "Clause Overview",
+            "kind": "clause_overview",
+            "items": clause_overview_items,
         },
         {
             "id": "risk_category_summary",

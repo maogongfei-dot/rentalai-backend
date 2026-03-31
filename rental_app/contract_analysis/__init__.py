@@ -6,9 +6,12 @@ from __future__ import annotations
 
 from .contract_analyzer import (
     analyze_contract_text,
+    annotate_clause_types,
     build_risk_category_summary,
+    detect_clause_type,
     group_risks_by_category,
 )
+from .contract_clause_split import parse_contract_clauses, split_contract_into_clauses
 from .contract_document_reader import (
     MINIMAL_CONTRACT_PDF_TEXT_BYTES,
     ContractReadOutcome,
@@ -24,6 +27,7 @@ from .contract_models import (
     ContractAnalysisMeta,
     ContractAnalysisResult,
     ContractClauseItem,
+    ContractClauseOverviewItem,
     ContractClauseType,
     ContractExplainBundle,
     ContractExplainResult,
@@ -55,6 +59,7 @@ from .demo_contract_samples import (
     test_contract_analysis_samples,
     validate_contract_analysis_empty_risk_fallback,
     validate_contract_analysis_samples,
+    validate_contract_empty_contract_text_clause_list,
     validate_contract_category_samples,
     validate_contract_localization_samples,
 )
@@ -85,8 +90,12 @@ from .sample_contracts_data import (
 
 __all__ = [
     "BASIC_CONTRACT_RISK_RULES",
+    "match_clause_type_from_text",
     "ContractAnalysisMeta",
     "ContractAnalysisResult",
+    "ContractClauseItem",
+    "ContractClauseOverviewItem",
+    "ContractClauseType",
     "ContractExplainBundle",
     "ContractExplainResult",
     "HighlightedRiskClause",
@@ -107,11 +116,13 @@ __all__ = [
     "read_contract_from_docx",
     "read_contract_from_pdf",
     "read_contract_from_txt",
+    "annotate_clause_types",
     "analyze_contract",
     "build_risk_category_summary",
     "analyze_contract_file",
     "analyze_contract_file_with_explain",
     "analyze_contract_text",
+    "detect_clause_type",
     "analyze_contract_with_explain",
     "build_contract_input_from_file",
     "build_contract_presentation",
@@ -119,7 +130,9 @@ __all__ = [
     "format_contract_analysis_cli_report",
     "format_contract_analysis_output",
     "group_risks_by_category",
+    "parse_contract_clauses",
     "run_contract_analysis_demo",
+    "split_contract_into_clauses",
     "run_contract_file_analysis_demo",
     "run_contract_file_demo",
     "sample_contract_paths",
@@ -140,6 +153,7 @@ __all__ = [
     "test_contract_analysis_samples",
     "test_contract_document_readers",
     "validate_contract_analysis_empty_risk_fallback",
+    "validate_contract_empty_contract_text_clause_list",
     "validate_contract_analysis_samples",
     "validate_contract_category_samples",
     "validate_contract_file_analysis_demo",

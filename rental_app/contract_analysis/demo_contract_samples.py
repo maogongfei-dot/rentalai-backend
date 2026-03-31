@@ -116,6 +116,14 @@ _CATEGORY_SAMPLES_EXPECT: dict[str, set[str]] = {
     "sample_cat_rent_termination": {"rent_increase", "termination"},
 }
 
+# Part 7：同上样例在 clause_list 中应覆盖的 clause_type（与风险层 fees 等可不完全同名）
+_CATEGORY_SAMPLES_CLAUSE_EXPECT: dict[str, set[str]] = {
+    "sample_cat_deposit_issue": {"deposit"},
+    "sample_cat_hidden_fee": {"bills"},
+    "sample_cat_access_notice": {"access"},
+    "sample_cat_rent_termination": {"rent_increase", "termination"},
+}
+
 
 def _category_specs() -> list[tuple[str, str, dict[str, Any]]]:
     """仅 Part 6 分类专项样例。"""
@@ -138,6 +146,7 @@ def validate_contract_category_samples() -> None:
         assert isinstance(sa.get("risk_category_groups"), list), label
         assert isinstance(ex.get("risk_category_summary"), list), label
         assert isinstance(ex.get("risk_category_groups"), list), label
+        assert isinstance(ex.get("clause_overview"), list), label
         assert isinstance(ex.get("highlighted_risk_clauses"), list), label
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"]), label
         assert len(ex["risk_category_groups"]) == len(ex["risk_category_summary"]), label
@@ -154,6 +163,15 @@ def validate_contract_category_samples() -> None:
         assert risk_cats == summ_cats, f"{label}: risks vs summary categories {risk_cats!r} vs {summ_cats!r}"
         expected = _CATEGORY_SAMPLES_EXPECT[label]
         assert expected <= risk_cats, f"{label}: expected {expected!r} got {risk_cats!r}"
+        cexp = _CATEGORY_SAMPLES_CLAUSE_EXPECT.get(label)
+        if cexp:
+            clause_types = {
+                str(c.get("clause_type") or "").strip()
+                for c in (sa.get("clause_list") or [])
+                if isinstance(c, dict)
+            }
+            clause_types.discard("")
+            assert cexp <= clause_types, f"{label}: clause_type set {clause_types!r} vs {cexp!r}"
         for r in risks:
             assert isinstance(r, dict), label
             assert str(r.get("risk_category") or "").strip(), label
@@ -175,6 +193,7 @@ def validate_contract_analysis_samples() -> None:
         assert isinstance(sa.get("recommendations"), list)
         assert isinstance(sa.get("detected_topics"), list)
         assert isinstance(sa.get("clause_list"), list), label
+        assert len(sa.get("clause_list") or []) >= 1, label
         assert isinstance(sa.get("risk_category_groups"), list)
         assert isinstance(sa.get("risk_category_summary"), list)
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"])
@@ -189,9 +208,11 @@ def validate_contract_analysis_samples() -> None:
         assert isinstance(hrc, list)
         assert isinstance(ex.get("risk_category_groups"), list)
         assert isinstance(ex.get("risk_category_summary"), list)
+        assert isinstance(ex.get("clause_overview"), list), label
         assert len(ex["risk_category_groups"]) == len(ex["risk_category_summary"])
         pres = out.get("presentation") or {}
         sec_ids = [s.get("id") for s in (pres.get("sections") or []) if isinstance(s, dict)]
+        assert "clause_overview" in sec_ids, label
         assert "risk_category_summary" in sec_ids, label
         assert "risk_category_groups" in sec_ids, label
         for s in pres.get("sections") or []:
@@ -229,10 +250,12 @@ def validate_contract_localization_samples() -> None:
         assert isinstance(risks, list), label
         assert len(risks) >= 1, label
         assert isinstance(sa.get("clause_list"), list), label
+        assert len(sa.get("clause_list") or []) >= 1, label
         assert isinstance(sa.get("risk_category_groups"), list), label
         assert isinstance(sa.get("risk_category_summary"), list), label
         assert isinstance(ex.get("risk_category_groups"), list), label
         assert isinstance(ex.get("risk_category_summary"), list), label
+        assert isinstance(ex.get("clause_overview"), list), label
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"]), label
         hrc = ex.get("highlighted_risk_clauses")
         assert isinstance(hrc, list), label
@@ -252,6 +275,17 @@ def validate_contract_localization_samples() -> None:
             assert str(card.get("risk_code") or "").strip(), label
 
 
+def validate_contract_empty_contract_text_clause_list() -> None:
+    """无正文时 ``clause_list`` 为空 list（与 ``risks`` 空分支一致）。"""
+    out = analyze_contract_with_explain(contract_text="   \n  ")
+    sa = out["structured_analysis"]
+    ex = out["explain"]
+    assert isinstance(sa.get("clause_list"), list)
+    assert sa.get("clause_list") == []
+    assert isinstance(ex.get("clause_overview"), list)
+    assert ex.get("clause_overview") == []
+
+
 def validate_contract_analysis_empty_risk_fallback() -> None:
     """无规则命中时 risks / highlighted_risk_clauses 均为空 list。"""
     out = analyze_contract_with_explain(
@@ -264,7 +298,7 @@ def validate_contract_analysis_empty_risk_fallback() -> None:
     assert isinstance(sa.get("risks"), list)
     assert sa["risks"] == []
     assert isinstance(sa.get("clause_list"), list)
-    assert sa.get("clause_list") == []
+    assert len(sa["clause_list"]) >= 1
     assert isinstance(sa.get("risk_category_groups"), list)
     assert isinstance(sa.get("risk_category_summary"), list)
     assert sa.get("risk_category_groups") == []
@@ -275,6 +309,8 @@ def validate_contract_analysis_empty_risk_fallback() -> None:
     assert isinstance(ex.get("risk_category_summary"), list)
     assert ex.get("risk_category_groups") == []
     assert ex.get("risk_category_summary") == []
+    assert isinstance(ex.get("clause_overview"), list)
+    assert len(ex["clause_overview"]) >= 1
 
 
 def test_contract_analysis_samples() -> None:
@@ -282,6 +318,7 @@ def test_contract_analysis_samples() -> None:
     validate_contract_analysis_samples()
     validate_contract_localization_samples()
     validate_contract_category_samples()
+    validate_contract_empty_contract_text_clause_list()
     validate_contract_analysis_empty_risk_fallback()
 
 
@@ -300,6 +337,16 @@ def run_contract_analysis_demo() -> None:
         print()
         print("【key_risk_summary】")
         print(ex.get("key_risk_summary", "—"))
+        print()
+        print("【clause_overview】")
+        for row in ex.get("clause_overview") or []:
+            if isinstance(row, dict):
+                print(
+                    f"  - {row.get('clause_id')} [{row.get('clause_type')}] "
+                    f"{row.get('short_clause_preview')} | keywords={row.get('matched_keywords')}"
+                )
+        if not (ex.get("clause_overview") or []):
+            print("  (none)")
         print()
         print("【risk_category_summary】")
         for row in ex.get("risk_category_summary") or []:

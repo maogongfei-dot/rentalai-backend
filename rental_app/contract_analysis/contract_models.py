@@ -161,12 +161,22 @@ class ContractRiskItem(TypedDict, total=False):
     risk_code: str
 
 
+class ContractClauseOverviewItem(TypedDict, total=False):
+    """Explain 层条款清单卡片（截断预览，便于前端列表）。"""
+
+    clause_id: str
+    clause_type: str
+    short_clause_preview: str
+    matched_keywords: list[str]
+
+
 class ContractClauseItem(TypedDict, total=False):
     """
     单条条款级记录（``ContractAnalysisResult.clause_list`` 元素）。
 
-    用于后续「条款切分 + clause_type 分类」；当前仅占位，分析器默认输出空列表。
-    ``clause_type`` 语义与 ``ContractClauseType`` 对齐；``risk_flags`` 为轻量标签（如 rule_id）。
+    ``clause_type``：见 ``ContractClauseType``，由 ``annotate_clause_types`` / ``match_clause_type_from_text`` 填写。
+    ``matched_keywords``：命中 ``contract_rules.CLAUSE_TYPE_KEYWORDS`` 中的关键词子串列表。
+    ``risk_flags`` 为轻量标签（如后续 rule_id 联动）。
     """
 
     clause_id: str
@@ -220,6 +230,7 @@ class ContractExplainResult(TypedDict, total=False):
     highlighted_risk_clauses: list[HighlightedRiskClause]
     risk_category_groups: list[ContractRiskCategoryGroup]
     risk_category_summary: list[ContractRiskCategorySummaryItem]
+    clause_overview: list[ContractClauseOverviewItem]
 
 
 # 兼容旧名（Part 2 前使用 ContractExplainBundle）

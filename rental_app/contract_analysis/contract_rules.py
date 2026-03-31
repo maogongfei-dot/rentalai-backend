@@ -20,6 +20,201 @@ SEVERITY_HIGH = "high"
 # 五周租金折算为「月租」倍数：5 * (12/52) ≈ 1.1538
 _UK_FIVE_WEEKS_OF_MONTHLY_RENT = 60.0 / 52.0
 
+# ---------------------------------------------------------------------------
+# Part 7：条款级 clause_type（子串匹配；按 CLAUSE_TYPE_DETECTION_ORDER 取第一个有命中的类型）
+# 与风险层 risk_category 独立；多主题并存时只保留优先级最高的一类。
+# ---------------------------------------------------------------------------
+
+CLAUSE_TYPE_DETECTION_ORDER: tuple[str, ...] = (
+    "deposit",
+    "rent_increase",
+    # bills 先于 rent：避免「late payment fee … if rent is late」先命中 ``rent`` 而非费用表述
+    "bills",
+    "rent",
+    "termination",
+    "notice",
+    "repairs",
+    "access",
+    "inventory",
+    "pets",
+    "subletting",
+)
+
+CLAUSE_TYPE_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "deposit": (
+        "tenancy deposit",
+        "holding deposit",
+        "deposit protection",
+        "deposit scheme",
+        "custodial scheme",
+        "deposit will not",
+        "押金不予托管",
+        "押金",
+        "托管",
+        "deposit",
+    ),
+    "rent_increase": (
+        "rent may be increased at any time",
+        "rent may be increased",
+        "increased at any time",
+        "rent increase",
+        "rent review",
+        "review of rent",
+        "increase in rent",
+        "annual increase",
+        "unlimited rent",
+        "涨租",
+        "租金上调",
+    ),
+    "rent": (
+        "monthly rent",
+        "monthly rental",
+        "rent payable",
+        "rental payment",
+        "per month",
+        "pcm",
+        "rent is",
+        "租金",
+        "月租",
+        "rent",
+    ),
+    "termination": (
+        "early termination",
+        "break clause",
+        "surrender of tenancy",
+        "terminate early",
+        "end the tenancy",
+        "terminate the tenancy",
+        "no notice required",
+        "without notice to terminate",
+        "immediate termination",
+        "提前终止",
+        "提前退租",
+        "termination",
+    ),
+    "notice": (
+        "notice period",
+        "period of notice",
+        "one month's notice",
+        "one month notice",
+        "two months notice",
+        "statutory notice",
+        "prior notice",
+        "通知期",
+        "提前通知",
+    ),
+    "repairs": (
+        "landlord's repairing",
+        "keep in repair",
+        "structural repair",
+        "maintenance",
+        "repairing",
+        "维修",
+        "repairs",
+        "repair",
+    ),
+    "bills": (
+        "council tax",
+        "utility bills",
+        "undisclosed charges",
+        "administrative fee",
+        "late payment fee",
+        "mandatory fee",
+        "utilities",
+        "bills included",
+        "bills excluded",
+        "water charges",
+        "electricity",
+        "包bill",
+        "水电",
+        "bills",
+    ),
+    "access": (
+        "right of entry",
+        "landlord may enter",
+        "enter the property",
+        "enter at any time",
+        "without notice",
+        "access",
+        "inspection",
+        "reasonable notice",
+        "查看房屋",
+        "进入",
+    ),
+    "inventory": (
+        "schedule of condition",
+        "check-in",
+        "check-out",
+        "check in",
+        "check out",
+        "inventory",
+        "房屋清单",
+        "交接",
+    ),
+    "pets": (
+        "pet deposit",
+        "pet fee",
+        "no pets",
+        "keeping animals",
+        "宠物",
+        "pets",
+        "pet",
+    ),
+    "subletting": (
+        "subletting",
+        "sub-let",
+        "sublet",
+        "assignment",
+        "part with possession",
+        "lodger",
+        "转租",
+        "分租",
+    ),
+}
+
+
+def _clause_keyword_hit(text_lower: str, kw: str) -> bool:
+    """含空格短语 / 中文用子串；英文单词用整词，避免 ``rent``→``parent``、``repair``→``disrepair`` 等误命中。"""
+    if not kw:
+        return False
+    if any("\u4e00" <= c <= "\u9fff" for c in kw):
+        return kw in text_lower
+    if " " in kw:
+        return kw in text_lower
+    if kw.isascii() and kw.isalpha() and len(kw) <= 6:
+        return bool(re.search(r"(?<![a-z])" + re.escape(kw) + r"(?![a-z])", text_lower))
+    return kw in text_lower
+
+
+def match_clause_type_from_text(clause_text: str) -> tuple[str, list[str]]:
+    """
+    对单条条款正文做子串匹配：按 ``CLAUSE_TYPE_DETECTION_ORDER`` 取第一个有关键词命中的类型；
+    ``matched_keywords`` 为该类型下所有命中的关键词（按在原文中首次出现位置排序）。
+    全无命中时返回 ``(\"general\", [])``。
+    """
+    t = (clause_text or "").strip()
+    if not t:
+        return ("general", [])
+    low = t.lower()
+    for ctype in CLAUSE_TYPE_DETECTION_ORDER:
+        kws = CLAUSE_TYPE_KEYWORDS.get(ctype, ())
+        if not kws:
+            continue
+        found: list[str] = []
+        for kw in sorted(kws, key=len, reverse=True):
+            if _clause_keyword_hit(low, kw):
+                found.append(kw)
+        if found:
+            found.sort(key=lambda k: low.find(k) if k in low else 10**9)
+            seen: set[str] = set()
+            ordered: list[str] = []
+            for k in found:
+                if k not in seen:
+                    seen.add(k)
+                    ordered.append(k)
+            return (ctype, ordered)
+    return ("general", [])
+
 
 def _risk_classification_from_rule(rule: dict[str, Any]) -> tuple[str, str]:
     """规则字典上的分类字段；缺省时 category→general、code→rule id。"""

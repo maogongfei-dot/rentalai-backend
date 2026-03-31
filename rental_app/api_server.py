@@ -718,11 +718,13 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
       **clause_list**（条款级占位列表，``ContractClauseItem``；默认可为空）/
       missing_items / recommendations / detected_topics / meta
     - ``explain``：overall_conclusion / key_risk_summary /
+      **clause_overview**（``clause_id`` / ``clause_type`` / ``short_clause_preview`` / ``matched_keywords``）/
       与结构化层一致的 **risk_category_summary** / **risk_category_groups** /
       **highlighted_risk_clauses**（``risk_title`` / ``severity`` / ``matched_text`` /
       ``location_hint`` / ``short_advice`` / ``risk_category`` / ``risk_code``）/
       missing_clause_summary / action_advice
-    - ``presentation``：sections 含 ``title_en``；含 ``kind=risk_category_summary``、
+    - ``presentation``：sections 含 ``title_en``；含 ``kind=clause_overview``、
+      ``kind=risk_category_summary``、
       ``kind=risk_category_groups``（items 另附 ``risk_titles`` 便于列表展示）、
       ``kind=risk_clauses`` 等；``plain_text`` 与 CLI 报告一致
     """
