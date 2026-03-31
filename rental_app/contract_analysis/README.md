@@ -2,6 +2,35 @@
 
 > 验收脚本：`python -m contract_analysis.phase3_acceptance` · 更细的字段清单见 `PHASE3_ACCEPTANCE.md`。
 
+## 模块结构（核心文件）
+
+| 文件 | 职责 |
+|------|------|
+| `contract_models.py` | TypedDict / 输入输出形状、coerce 函数 |
+| `contract_rules.py` | 风险规则、主题、完整性清单、`match_clause_type_from_text` |
+| `contract_analyzer.py` | 主分析：`analyze_contract_text(ContractInput)`、条款图、完整性 |
+| `contract_explainer.py` | `explain_contract_analysis`（人话层） |
+| `contract_document_reader.py` | txt / pdf / docx 抽取 |
+| `contract_clause_split.py` | 条款切分 |
+| `presentation.py` | CLI 报告、`build_contract_presentation` |
+| `service.py` | **推荐业务入口**：`analyze_contract*`、`build_contract_input_from_file` |
+| `entrypoints.py` | 与 `service`+`explainer`+`analyze_contract_text` 的**聚合导出**（无额外逻辑） |
+| `sample_contracts_data.py` + `samples/` | 内置样例正文 |
+| `demo_*.py`、`phase3_acceptance.py` | 演示与总验收 |
+
+## 推荐复用入口（Python）
+
+| 场景 | 函数 | 说明 |
+|------|------|------|
+| 完整三层（结构化 + explain + presentation） | `analyze_contract_with_explain` | **首选**；同 `service` 与 `entrypoints` |
+| 仅第一层 | `analyze_contract` | 等价于便捷封装后的 `analyze_contract_text` |
+| 低层 API | `analyze_contract_text` | 参数为 `ContractInput`（见 `contract_analyzer`） |
+| 文件路径 | `analyze_contract_file` / `analyze_contract_file_with_explain` | 先抽取再分析 |
+| 仅 explain | `explain_contract_analysis` | 入参为结构化 dict；一般由管线自动调用 |
+
+聚合导入：`from contract_analysis.entrypoints import analyze_contract_with_explain, ...`  
+包级导入：`from contract_analysis import analyze_contract_with_explain`（与上等价，符号更多）。
+
 ## 输入
 
 | 方式 | 说明 |
@@ -40,5 +69,13 @@
 
 ## Phase 4 接入建议（最小）
 
-- **优先**：在前端做 **上传 / 粘贴** → 调 **`POST /api/contract/phase3/analyze-text`**（已有），或后端增加 **multipart 上传** 抽文本后转同一入口；UI 直接消费 **`result.presentation.sections`** 与 **`explain`** 稳定字段。
-- **Python 侧首选复用入口**：**`contract_analysis.service.analyze_contract_with_explain`**（文件则用 **`analyze_contract_file_with_explain`**）。与 HTTP 层一致，便于单测与任务队列封装。
+- **正式门面（推荐）**：仓库根 **`contract_analysis_service.py`** 提供 **`analyze_contract_text`** / **`analyze_contract_file`**，统一返回 **`analysis_result`**、**`explain_result`**、**`presentation`**（内部仍调用 ``contract_analysis.service``，不重复实现规则）。
+- **HTTP**：**`POST /api/contract/phase3/analyze-text`** 已经由门面组装 ``result``，并保留 ``structured_analysis`` / ``explain`` 旧键名兼容。
+- **包内等价**：**`contract_analysis.service.analyze_contract_with_explain`** / **`entrypoints`** 与门面数据一致，仅键名不同（``structured_analysis`` vs ``analysis_result``）。
+
+## 尚未做的增强（非 Phase 3 范围）
+
+- PDF **页码级**定位与复杂版式 OCR。
+- **LLM** 合同解读或条款生成。
+- 专用 **multipart** Phase 3 路由（当前可先抽文本再调现有 API）。
+- 与房源主流程的**深度合并**（当前子模块独立可测）。

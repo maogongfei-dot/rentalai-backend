@@ -2,6 +2,7 @@
 Phase 3：合同分析子模块（与项目根目录 ``contract_*.py`` 管线区分，用于新阶段扩展）。
 
 最小开发说明与 Phase 4 接入建议见 ``contract_analysis/README.md``。
+聚合导入（薄封装）见 ``contract_analysis.entrypoints``。
 """
 
 from __future__ import annotations
@@ -64,6 +65,7 @@ from .contract_rules import (
     BASIC_CONTRACT_RISK_RULES,
     UK_RENTAL_COMPLETENESS_CHECKLIST,
     default_contract_completeness_result,
+    match_clause_type_from_text,
 )
 from .demo_contract_document_readers import (
     run_contract_file_demo,

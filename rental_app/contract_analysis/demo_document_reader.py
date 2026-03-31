@@ -1,5 +1,6 @@
 """
 本地快速验证：TXT / PDF / DOCX 文本提取（不跑完整合同规则）。
+完整分析 + explain 见 ``demo_contract_document_readers`` / ``service.analyze_contract_file_with_explain``。
 
 运行（在 ``rental_app`` 目录下）::
 

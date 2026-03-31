@@ -739,8 +739,11 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
       ``kind=risk_category_summary``、
       ``kind=risk_category_groups``（items 另附 ``risk_titles`` 便于列表展示）、
       ``kind=risk_clauses`` 等；``plain_text`` 与 CLI 报告一致
+
+    ``result`` 同时提供 Phase 4 门面键名（``analysis_result`` / ``explain_result``）与
+    旧键名（``structured_analysis`` / ``explain``），内容相同，便于新前端与旧调用兼容。
     """
-    from contract_analysis.service import analyze_contract_with_explain
+    from contract_analysis_service import analyze_contract_text
 
     ct = (body.contract_text or "").strip()
     if not ct:
@@ -753,7 +756,7 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
             },
         )
     try:
-        result = analyze_contract_with_explain(
+        facade = analyze_contract_text(
             contract_text=ct,
             monthly_rent=body.monthly_rent,
             deposit_amount=body.deposit_amount,
@@ -761,6 +764,13 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
             source_type=body.source_type,
             source_name=body.source_name,
         )
+        result = {
+            "analysis_result": facade["analysis_result"],
+            "explain_result": facade["explain_result"],
+            "presentation": facade.get("presentation"),
+            "structured_analysis": facade["analysis_result"],
+            "explain": facade["explain_result"],
+        }
         return {
             "ok": True,
             "engine": "phase3_contract_analysis",
