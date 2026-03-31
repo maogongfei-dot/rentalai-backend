@@ -946,6 +946,14 @@
           try {
             CA.saveLastContractAnalysisResult(data, sourceMeta);
           } catch (e) {}
+          try {
+            if (
+              window.RentalAIAnalysisHistoryStore &&
+              typeof window.RentalAIAnalysisHistoryStore.pushContractFromContractData === "function"
+            ) {
+              window.RentalAIAnalysisHistoryStore.pushContractFromContractData(data, sourceMeta);
+            }
+          } catch (eHist) {}
           renderSummary(data);
           renderSourceHint(sourceMeta);
           setLoading(false);

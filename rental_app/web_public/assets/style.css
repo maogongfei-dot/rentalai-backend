@@ -1451,6 +1451,51 @@ select {
   font-size: 0.95rem;
 }
 
+/* Phase 4 Round6 Step2：统一最近分析摘要列表 */
+.unified-history-mount {
+  margin-top: 0.5rem;
+}
+.unified-history-list {
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.unified-history-item {
+  margin-bottom: 0.5rem;
+  padding: 0.65rem 0.75rem;
+}
+.unified-history-item:last-child {
+  margin-bottom: 0;
+}
+.unified-history-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  align-items: baseline;
+  margin-bottom: 0.25rem;
+}
+.unified-history-title {
+  font-weight: 600;
+  color: #1e293b;
+}
+.unified-history-time {
+  font-size: 0.82rem;
+}
+.unified-history-snippet {
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+}
+.unified-history-preview {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: #334155;
+  line-height: 1.45;
+}
+.unified-history-empty {
+  margin: 0.25rem 0 0;
+}
+
 .demo-how-to {
   margin-top: 0.75rem;
 }

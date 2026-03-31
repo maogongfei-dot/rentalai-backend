@@ -444,6 +444,15 @@
         rEl.innerHTML = "<p class=\"hint\">暂无市场摘要。</p>";
       }
     }
+
+    try {
+      if (
+        window.RentalAIAnalysisHistoryStore &&
+        typeof window.RentalAIAnalysisHistoryStore.pushPropertyFromHousingData === "function"
+      ) {
+        window.RentalAIAnalysisHistoryStore.pushPropertyFromHousingData(data);
+      }
+    } catch (eHist) {}
   }
 
   /* ---------- Legacy ai-analyze ---------- */
@@ -514,6 +523,14 @@
 
     if (!recos.length) {
       if (recoEmpty) recoEmpty.classList.remove("hidden");
+      try {
+        if (
+          window.RentalAIAnalysisHistoryStore &&
+          typeof window.RentalAIAnalysisHistoryStore.pushPropertyFromLegacyData === "function"
+        ) {
+          window.RentalAIAnalysisHistoryStore.pushPropertyFromLegacyData(data);
+        }
+      } catch (eHistL) {}
       return;
     }
     if (recoEmpty) recoEmpty.classList.add("hidden");
@@ -596,6 +613,15 @@
         }
       }
     });
+
+    try {
+      if (
+        window.RentalAIAnalysisHistoryStore &&
+        typeof window.RentalAIAnalysisHistoryStore.pushPropertyFromLegacyData === "function"
+      ) {
+        window.RentalAIAnalysisHistoryStore.pushPropertyFromLegacyData(data);
+      }
+    } catch (eHistL2) {}
   }
 
   /* ---------- Load ---------- */
