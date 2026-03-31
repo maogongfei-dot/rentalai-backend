@@ -1927,6 +1927,21 @@ def web_phase3_result(task_id: str):
     return FileResponse(page)
 
 
+@app.get("/analysis-history")
+def web_analysis_history_hub():
+    """Phase 4 Round6：统一分析历史入口页（骨架：房源 / 合同分区，静态 analysis_history.html）。"""
+    page = _WEB_PUBLIC_DIR / "analysis_history.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/analysis_history.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
 @app.get("/history")
 def web_phase3_history():
     """分析历史列表（localStorage analysis_history，静态 history.html）。"""

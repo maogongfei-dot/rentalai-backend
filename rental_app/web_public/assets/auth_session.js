@@ -98,7 +98,7 @@
   }
 
   function guardHistoryLinks() {
-    document.querySelectorAll('a[href="/history"]').forEach(function (a) {
+    document.querySelectorAll('a[href="/history"], a[href="/analysis-history"]').forEach(function (a) {
       a.addEventListener("click", function (ev) {
         try {
           if (localStorage.getItem("current_user")) return;

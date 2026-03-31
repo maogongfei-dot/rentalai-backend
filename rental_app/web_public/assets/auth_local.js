@@ -44,7 +44,7 @@
     return d.innerHTML;
   }
 
-  /** 各业务页共用的顶部导航：首页 / 两条主流程 / 历史 / 对比 / 用户 / 退出 */
+  /** 各业务页共用的顶部导航：首页 / 两条主流程 / 分析历史 / 对比 / 用户 / 退出 */
   function renderUnifiedNav() {
     var nav = document.getElementById("demo-unified-nav");
     if (!nav) return;
@@ -57,7 +57,7 @@
       '<span class="nav-sep">·</span>' +
       '<a href="/contract-analysis">合同分析</a>' +
       '<span class="nav-sep">·</span>' +
-      '<a href="/history">历史记录</a>' +
+      '<a href="/analysis-history">分析历史</a>' +
       '<span class="nav-sep">·</span>' +
       '<a href="/compare">房源对比</a>' +
       '<span class="nav-sep">·</span>' +

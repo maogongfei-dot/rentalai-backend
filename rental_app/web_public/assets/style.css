@@ -1428,6 +1428,29 @@ select {
   font-size: 0.95rem;
 }
 
+/* Phase 4 Round6：统一分析历史入口页（骨架） */
+.home-analysis-history-cta {
+  margin: 0.35rem 0 0.5rem;
+  max-width: 42rem;
+  line-height: 1.45;
+}
+.home-analysis-history-cta a {
+  font-weight: 600;
+}
+.analysis-history-page .analysis-history-block {
+  margin-bottom: 0.85rem;
+}
+.analysis-history-page .analysis-history-block:last-of-type {
+  margin-bottom: 0;
+}
+.analysis-history-lead {
+  margin-top: 0.25rem;
+}
+.analysis-history-block-action {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+}
+
 .demo-how-to {
   margin-top: 0.75rem;
 }

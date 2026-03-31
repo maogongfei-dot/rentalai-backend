@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<!--
+  Phase 4 Round6 Step1：统一「分析历史」入口页（骨架）
+  房源列表仍见 /history；本页为双区块预留，后续接本地/服务端数据。
+-->
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>分析历史 · Analysis History · RentalAI</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <script src="/assets/auth_local.js"></script>
+    <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
+
+    <main class="wrap wrap-wide result-wrap analysis-history-page">
+      <p class="back-link main-flow-switch" aria-label="返回">
+        <a href="/">← 首页</a>
+      </p>
+
+      <header class="page-header">
+        <h1>分析历史 <span class="hint muted" style="font-weight: normal">Analysis History</span></h1>
+        <p class="hint muted analysis-history-lead">
+          统一入口：房源与合同的分析记录将在此分区展示（本页为骨架，数据后续接入）。
+        </p>
+      </header>
+
+      <section class="card analysis-history-block" aria-labelledby="prop-history-heading">
+        <h2 id="prop-history-heading" class="section-title">Property Analysis History</h2>
+        <p class="hint muted">房源分析 · 已保存快照（当前为本地列表页）</p>
+        <p class="analysis-history-block-action">
+          <a href="/history">打开房源分析历史列表</a>
+        </p>
+      </section>
+
+      <section class="card analysis-history-block" aria-labelledby="contract-history-heading">
+        <h2 id="contract-history-heading" class="section-title">Contract Analysis History</h2>
+        <p class="hint muted">合同分析 · 最近结果（预留）</p>
+        <p class="hint muted small-print">
+          当前请在合同分析页完成分析；本区将用于展示最近合同分析条目。
+        </p>
+        <p class="analysis-history-block-action">
+          <a href="/contract-analysis">前往合同分析</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
