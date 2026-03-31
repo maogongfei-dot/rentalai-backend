@@ -57,6 +57,8 @@
       '<span class="nav-sep">·</span>' +
       '<a href="/compare">房源对比</a>' +
       '<span class="nav-sep">·</span>' +
+      '<a href="/contract-analysis">合同分析</a>' +
+      '<span class="nav-sep">·</span>' +
       '<span class="local-user-name">当前用户：' +
       name +
       "</span>" +

@@ -1820,6 +1820,21 @@ def web_compare():
     return FileResponse(page)
 
 
+@app.get("/contract-analysis")
+def web_contract_analysis():
+    """Phase 4 — 合同分析（静态 HTML；粘贴文本 / 上传文件占位，后续接 API）。"""
+    page = _WEB_PUBLIC_DIR / "contract_analysis.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/contract_analysis.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
 @app.get("/")
 def web_phase3_home():
     """P10 Phase3 — minimal product homepage (static HTML)."""
