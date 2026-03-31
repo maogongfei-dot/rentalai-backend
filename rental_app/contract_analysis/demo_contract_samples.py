@@ -17,6 +17,10 @@ from .sample_contracts_data import (
     SAMPLE_CAT_DEPOSIT_ISSUE,
     SAMPLE_CAT_HIDDEN_FEE,
     SAMPLE_CAT_RENT_TERMINATION,
+    SAMPLE_CLAUSE_DEPOSIT_RENT,
+    SAMPLE_CLAUSE_NOTICE_TERMINATION,
+    SAMPLE_CLAUSE_PETS_SUBLETTING,
+    SAMPLE_CLAUSE_REPAIRS_BILLS,
     SAMPLE_CONTRACT_DEPOSIT_HEAVY,
     SAMPLE_CONTRACT_HIDDEN_FEES_PENALTY,
     SAMPLE_CONTRACT_HIGH_RISK,
@@ -105,6 +109,27 @@ def _sample_specs() -> list[tuple[str, str, dict[str, Any]]]:
             SAMPLE_CAT_RENT_TERMINATION,
             {"monthly_rent": 950.0, "deposit_amount": 950.0},
         ),
+        # Part 7：条款切分 + clause_type 多场景（编号条款、多类型）
+        (
+            "sample_clause_deposit_rent",
+            SAMPLE_CLAUSE_DEPOSIT_RENT,
+            {"monthly_rent": 950.0, "deposit_amount": 950.0},
+        ),
+        (
+            "sample_clause_notice_termination",
+            SAMPLE_CLAUSE_NOTICE_TERMINATION,
+            {"monthly_rent": 950.0, "deposit_amount": 950.0},
+        ),
+        (
+            "sample_clause_repairs_bills",
+            SAMPLE_CLAUSE_REPAIRS_BILLS,
+            {"monthly_rent": 950.0, "deposit_amount": 950.0},
+        ),
+        (
+            "sample_clause_pets_subletting",
+            SAMPLE_CLAUSE_PETS_SUBLETTING,
+            {"monthly_rent": 950.0, "deposit_amount": 950.0},
+        ),
     ]
 
 
@@ -123,6 +148,23 @@ _CATEGORY_SAMPLES_CLAUSE_EXPECT: dict[str, set[str]] = {
     "sample_cat_access_notice": {"access"},
     "sample_cat_rent_termination": {"rent_increase", "termination"},
 }
+
+# Part 7：clause_type 专项（存款+月租、通知+终止、维修+账单、宠物+转租）
+_CLAUSE_TYPE_SAMPLES_EXPECT: dict[str, set[str]] = {
+    "sample_clause_deposit_rent": {"deposit", "rent"},
+    "sample_clause_notice_termination": {"notice", "termination"},
+    "sample_clause_repairs_bills": {"repairs", "bills", "inventory"},
+    "sample_clause_pets_subletting": {"pets", "subletting"},
+}
+
+
+def _clause_type_specs() -> list[tuple[str, str, dict[str, Any]]]:
+    """Part 7 条款类型专项样例。"""
+    return [
+        (k, v, w)
+        for (k, v, w) in _sample_specs()
+        if k in _CLAUSE_TYPE_SAMPLES_EXPECT
+    ]
 
 
 def _category_specs() -> list[tuple[str, str, dict[str, Any]]]:
@@ -180,6 +222,35 @@ def validate_contract_category_samples() -> None:
                 assert isinstance(row.get("count"), int), label
 
 
+def validate_contract_clause_type_samples() -> None:
+    """Part 7：专项样例命中预期 clause_type，且 clause_list / clause_overview 字段稳定。"""
+    for label, text, kwargs in _clause_type_specs():
+        out = analyze_contract_with_explain(contract_text=text, **kwargs)
+        sa = out["structured_analysis"]
+        ex = out["explain"]
+        assert isinstance(sa.get("clause_list"), list), label
+        assert isinstance(ex.get("clause_overview"), list), label
+        clauses = sa.get("clause_list") or []
+        overview = ex.get("clause_overview") or []
+        assert len(clauses) >= 2, label
+        assert len(overview) == len(clauses), f"{label}: overview vs clauses {len(overview)} vs {len(clauses)}"
+        expected = _CLAUSE_TYPE_SAMPLES_EXPECT[label]
+        clause_types: set[str] = set()
+        for c in clauses:
+            assert isinstance(c, dict), label
+            assert str(c.get("clause_id") or "").strip(), label
+            ct = str(c.get("clause_type") or "").strip()
+            assert ct, label
+            assert isinstance(c.get("matched_keywords"), list), label
+            clause_types.add(ct)
+        for row in overview:
+            assert isinstance(row, dict), label
+            assert str(row.get("clause_id") or "").strip(), label
+            assert str(row.get("clause_type") or "").strip(), label
+            assert isinstance(row.get("matched_keywords"), list), label
+        assert expected <= clause_types, f"{label}: clause_type set {clause_types!r} vs {expected!r}"
+
+
 def validate_contract_analysis_samples() -> None:
     """断言各样例均能生成完整 explain 与稳定 list 字段（供 pytest 调用）。"""
     for label, text, kwargs in _sample_specs():
@@ -230,6 +301,19 @@ def validate_contract_analysis_samples() -> None:
         for card in hrc:
             assert str(card.get("risk_category") or "").strip(), label
             assert str(card.get("risk_code") or "").strip(), label
+        for c in sa.get("clause_list") or []:
+            assert isinstance(c, dict), label
+            assert str(c.get("clause_id") or "").strip(), label
+            assert isinstance(c.get("clause_type"), str) and str(c.get("clause_type") or "").strip(), label
+            assert isinstance(c.get("matched_keywords"), list), label
+        cov = ex.get("clause_overview") or []
+        assert isinstance(cov, list), label
+        assert len(cov) == len(sa.get("clause_list") or []), label
+        for row in cov:
+            assert isinstance(row, dict), label
+            assert str(row.get("clause_id") or "").strip(), label
+            assert isinstance(row.get("clause_type"), str) and str(row.get("clause_type") or "").strip(), label
+            assert isinstance(row.get("matched_keywords"), list), label
         assert label
 
 
@@ -318,6 +402,7 @@ def test_contract_analysis_samples() -> None:
     validate_contract_analysis_samples()
     validate_contract_localization_samples()
     validate_contract_category_samples()
+    validate_contract_clause_type_samples()
     validate_contract_empty_contract_text_clause_list()
     validate_contract_analysis_empty_risk_fallback()
 

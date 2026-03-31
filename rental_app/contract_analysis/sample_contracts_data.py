@@ -4,6 +4,8 @@ Phase 3：内置样例合同文本（从 ``contract_analysis/samples/*.txt`` 读
 若需修改样例，请直接编辑同目录下 .txt 文件。
 
 ``sample_cat_*.txt``：Part 6 分类标签与分组汇总测试用短样例。
+
+``sample_clause_*.txt``：Part 7 条款切分与 clause_type 多场景样例。
 """
 
 from __future__ import annotations
@@ -37,3 +39,9 @@ SAMPLE_CAT_DEPOSIT_ISSUE: str = _load_sample("sample_cat_deposit_issue.txt")
 SAMPLE_CAT_HIDDEN_FEE: str = _load_sample("sample_cat_hidden_fee.txt")
 SAMPLE_CAT_ACCESS_NOTICE: str = _load_sample("sample_cat_access_notice.txt")
 SAMPLE_CAT_RENT_TERMINATION: str = _load_sample("sample_cat_rent_termination.txt")
+
+# Part 7：条款切分 + clause_type 识别专项（多编号条款、多 clause_type）
+SAMPLE_CLAUSE_DEPOSIT_RENT: str = _load_sample("sample_clause_deposit_rent.txt")
+SAMPLE_CLAUSE_NOTICE_TERMINATION: str = _load_sample("sample_clause_notice_termination.txt")
+SAMPLE_CLAUSE_REPAIRS_BILLS: str = _load_sample("sample_clause_repairs_bills.txt")
+SAMPLE_CLAUSE_PETS_SUBLETTING: str = _load_sample("sample_clause_pets_subletting.txt")
