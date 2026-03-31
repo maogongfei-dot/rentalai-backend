@@ -1469,6 +1469,56 @@ body.assistant-page-body {
   margin: 0.5rem 0 0;
   font-size: 0.95rem;
 }
+
+/* Phase 4 Round7 Step2：智能入口意图面板 */
+.assistant-intent-panel {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #d0d8e2;
+  background: #f8fafc;
+}
+.assistant-intent-panel.hidden {
+  display: none;
+}
+.assistant-intent-label {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.45;
+}
+.assistant-intent-scores {
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+}
+.assistant-intent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.65rem;
+  align-items: center;
+}
+.assistant-intent-btn {
+  font: inherit;
+  cursor: pointer;
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid #94a3b8;
+  background: #fff;
+  color: #1e293b;
+}
+.assistant-intent-btn--primary {
+  border-color: #1e3a5f;
+  background: #1e3a5f;
+  color: #fff;
+  font-weight: 600;
+}
+.assistant-intent-btn:hover {
+  filter: brightness(0.97);
+}
+.assistant-intent-btn--primary:hover {
+  filter: brightness(1.08);
+}
+
 .analysis-history-page .analysis-history-block {
   margin-bottom: 0.85rem;
 }

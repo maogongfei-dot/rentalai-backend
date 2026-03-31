@@ -184,6 +184,25 @@
     });
   setModePanels();
 
+  /** Phase 4 Round7：智能入口跳转后预填粘贴文本 */
+  (function applyAssistantPrefillContract() {
+    try {
+      var nav = sessionStorage.getItem("rentalai_assistant_navigate");
+      if (nav !== "contract") return;
+      var draft = sessionStorage.getItem("rentalai_assistant_draft");
+      if (modeText) {
+        modeText.checked = true;
+        if (modeFile) modeFile.checked = false;
+        setModePanels();
+      }
+      if (draft && ta) {
+        ta.value = draft;
+        ta.focus();
+      }
+      sessionStorage.removeItem("rentalai_assistant_navigate");
+    } catch (e) {}
+  })();
+
   var Demo = window.RentalAIContractAnalysisDemo;
   var btnDemoText = document.getElementById("contract-demo-fill-text");
   var btnDemoPath = document.getElementById("contract-demo-fill-path");

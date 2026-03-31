@@ -12,6 +12,24 @@
   var retryBtn = document.getElementById("ai-retry");
   if (!btn || !ta) return;
 
+  /** Phase 4 Round7：智能入口跳转后一次性预填 */
+  (function applyAssistantPrefill() {
+    try {
+      var nav = sessionStorage.getItem("rentalai_assistant_navigate");
+      if (nav !== "property") return;
+      var draft = sessionStorage.getItem("rentalai_assistant_draft");
+      if (draft) {
+        ta.value = draft;
+        ta.focus();
+      }
+      sessionStorage.removeItem("rentalai_assistant_navigate");
+      var h = document.getElementById("ai-rental-heading");
+      if (h) {
+        h.scrollIntoView({ block: "start", behavior: "smooth" });
+      }
+    } catch (e) {}
+  })();
+
   var LOADING_MSGS = [
     "Analyzing market...",
     "Finding best deals...",

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
-  Phase 4 Round7 Step1：聊天式统一入口骨架（/assistant）
-  本步仅多行输入 + 保存草稿（sessionStorage）；意图识别与跳转见后续步骤。
+  Phase 4 Round7：智能入口（/assistant）
+  草稿 sessionStorage rentalai_assistant_draft；本地关键词意图见 assets/assistant_intent.js
 -->
 <html lang="zh-Hans">
   <head>
@@ -40,11 +40,14 @@
           placeholder="例如：我想在伦敦找两居室，预算每月 2000 镑以内… / 请帮我看看这份租约里的押金条款有没有坑…"
         ></textarea>
         <div class="actions-row">
-          <button type="button" id="assistant-submit">保存草稿并继续</button>
+          <button type="button" id="assistant-submit">分析意图并继续</button>
         </div>
         <p id="assistant-msg" class="hint save-banner save-banner-ok hidden" role="status" aria-live="polite"></p>
+        <div id="assistant-intent-panel" class="assistant-intent-panel hidden" aria-live="polite">
+          <div id="assistant-intent-body" class="assistant-intent-body"></div>
+        </div>
         <p class="hint muted small-print assistant-page-footnote">
-          本步为产品骨架：草稿保存在浏览器会话中。后续步骤将支持意图识别或把内容带到房源/合同表单。
+          识别为房源或合同时将<strong>自动跳转</strong>；未明确时在下方二选一。描述经 sessionStorage 带到目标页预填。
         </p>
         <p class="hint small-print assistant-page-links">
           <a href="/#ai-rental-heading">前往房源分析</a>
@@ -55,6 +58,7 @@
         </p>
       </section>
     </main>
+    <script src="/assets/assistant_intent.js"></script>
     <script src="/assets/assistant_page.js"></script>
   </body>
 </html>
