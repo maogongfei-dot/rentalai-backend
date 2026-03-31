@@ -249,9 +249,34 @@ def _normalize_highlighted_clauses(raw: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _default_explain_shell() -> dict[str, Any]:
+    """
+    Explain 层键全集与稳定默认值（与 ``ContractExplainResult`` 对齐）；
+    与调用方 dict 合并后由本模块归一化。
+    """
+    return {
+        "overall_conclusion": "—",
+        "key_risk_summary": "—",
+        "missing_clause_summary": "—",
+        "action_advice": [
+            "保留合同终稿与沟通记录，便于日后核对。",
+            "保留合同终稿与沟通记录，便于日后核对。",
+            "保留合同终稿与沟通记录，便于日后核对。",
+        ],
+        "highlighted_risk_clauses": [],
+        "risk_category_groups": [],
+        "risk_category_summary": [],
+        "clause_overview": [],
+        "clause_risk_overview": [],
+        "clause_severity_overview": [],
+        "contract_completeness_overview": _normalize_contract_completeness_overview({}),
+    }
+
+
 def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
     """保证 explain 字段齐全且类型稳定（含 ``highlighted_risk_clauses`` 与分类汇总）。"""
-    adv = ex.get("action_advice")
+    merged = {**_default_explain_shell(), **(ex if isinstance(ex, dict) else {})}
+    adv = merged.get("action_advice")
     if not isinstance(adv, list):
         adv = []
     adv = [str(a).strip() for a in adv if str(a).strip()]
@@ -266,9 +291,9 @@ def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
     cso = _normalize_clause_severity_overview(ex.get("clause_severity_overview"))
     ccomp = _normalize_contract_completeness_overview(ex.get("contract_completeness_overview"))
     return {
-        "overall_conclusion": (str(ex.get("overall_conclusion") or "").strip() or "—"),
-        "key_risk_summary": (str(ex.get("key_risk_summary") or "").strip() or "—"),
-        "missing_clause_summary": (str(ex.get("missing_clause_summary") or "").strip() or "—"),
+        "overall_conclusion": (str(merged.get("overall_conclusion") or "").strip() or "—"),
+        "key_risk_summary": (str(merged.get("key_risk_summary") or "").strip() or "—"),
+        "missing_clause_summary": (str(merged.get("missing_clause_summary") or "").strip() or "—"),
         "action_advice": adv,
         "highlighted_risk_clauses": hrc,
         "risk_category_groups": rcg,
@@ -611,6 +636,8 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
 
     入参 ``result`` 须包含（至少）：risks, missing_items, recommendations；
     可选：summary, detected_topics。
+
+    返回值经 ``_normalize_explain_out``：**以下字段始终存在且类型稳定**（list 永不为 ``None``）。
 
     返回字段：
     - overall_conclusion

@@ -48,6 +48,7 @@ from .contract_models import (
     HighlightedRiskClause,
     ContractInput,
     ContractPhase3PipelineResult,
+    default_contract_analysis_meta,
     ContractPresentationBundle,
     ContractRiskItem,
     ContractSourceType,
@@ -118,6 +119,10 @@ from .sample_contracts_data import (
     SAMPLE_SEVERITY_MEDIUM_FEE_CLAUSE,
     SAMPLE_SEVERITY_MIXED_CLAUSES,
     SAMPLE_SEVERITY_ONE_CLAUSE_MULTI_HIGH,
+    SAMPLE_COMPLETENESS_VERY_COMPLETE,
+    SAMPLE_COMPLETENESS_MISSING_NOTICE_REPAIR,
+    SAMPLE_COMPLETENESS_MISSING_DEPOSIT_ACCESS,
+    SAMPLE_COMPLETENESS_SHORT_INCOMPLETE,
 )
 
 __all__ = [
@@ -143,6 +148,7 @@ __all__ = [
     "HighlightedRiskClause",
     "ContractInput",
     "ContractPhase3PipelineResult",
+    "default_contract_analysis_meta",
     "ContractPresentationBundle",
     "ContractReadOutcome",
     "ContractRiskCategory",
@@ -209,6 +215,10 @@ __all__ = [
     "SAMPLE_SEVERITY_MEDIUM_FEE_CLAUSE",
     "SAMPLE_SEVERITY_MIXED_CLAUSES",
     "SAMPLE_SEVERITY_ONE_CLAUSE_MULTI_HIGH",
+    "SAMPLE_COMPLETENESS_VERY_COMPLETE",
+    "SAMPLE_COMPLETENESS_MISSING_NOTICE_REPAIR",
+    "SAMPLE_COMPLETENESS_MISSING_DEPOSIT_ACCESS",
+    "SAMPLE_COMPLETENESS_SHORT_INCOMPLETE",
     "test_contract_analysis_samples",
     "test_contract_document_readers",
     "validate_contract_analysis_empty_risk_fallback",

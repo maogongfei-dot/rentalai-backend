@@ -3,6 +3,17 @@ Phase 3 合同分析：输入与输出数据结构（TypedDict + dataclass，与
 
 下一阶段文档读取（PDF/DOCX/TXT）预留：``ContractInput.source_type`` / ``source_name``，
 分析结果通过 ``ContractAnalysisResult.meta`` 回显，便于审计与前端展示。
+
+**第一层（``ContractAnalysisResult``）运行时稳定键**（由 ``_normalize_analysis_output`` 保证类型与存在）：
+``summary``, ``risks``, ``missing_items``, ``recommendations``, ``detected_topics``,
+``clause_list``, ``clause_risk_map``, ``clause_severity_summary``, ``contract_completeness``,
+``risk_category_groups``, ``risk_category_summary``, ``meta``。
+
+**Explain（``ContractExplainResult``）运行时稳定键**（由 ``_normalize_explain_out`` 保证）：
+``overall_conclusion``, ``key_risk_summary``, ``missing_clause_summary``, ``action_advice``,
+``risk_category_summary``, ``risk_category_groups``, ``highlighted_risk_clauses``,
+``clause_overview``, ``clause_risk_overview``, ``clause_severity_overview``,
+``contract_completeness_overview``。
 """
 
 from __future__ import annotations
@@ -306,6 +317,14 @@ class ContractAnalysisMeta(TypedDict, total=False):
 
     source_type: str
     source_name: str | None
+
+
+def default_contract_analysis_meta() -> ContractAnalysisMeta:
+    """
+    第一层 ``meta`` 的稳定默认值（``analyze_contract_text`` 在归一化后总会写入；
+    供测试、API 兜底或与部分结果合并时使用）。
+    """
+    return {"source_type": "text", "source_name": None}
 
 
 class ContractAnalysisResult(TypedDict, total=False):

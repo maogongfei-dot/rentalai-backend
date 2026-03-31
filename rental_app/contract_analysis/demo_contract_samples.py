@@ -6,6 +6,8 @@ Phase 3 合同分析：样例合同演示与最小校验入口。
     python -m contract_analysis.demo_contract_samples
 
 或在代码中调用 ``run_contract_analysis_demo()``。
+
+Part 10 第 4 步：``sample_completeness_*.txt`` 四样例用于完整性检查收尾；期望见 ``_COMPLETENESS_FINALE_EXPECT``。
 """
 
 from __future__ import annotations
@@ -39,6 +41,10 @@ from .sample_contracts_data import (
     SAMPLE_SEVERITY_MEDIUM_FEE_CLAUSE,
     SAMPLE_SEVERITY_MIXED_CLAUSES,
     SAMPLE_SEVERITY_ONE_CLAUSE_MULTI_HIGH,
+    SAMPLE_COMPLETENESS_VERY_COMPLETE,
+    SAMPLE_COMPLETENESS_MISSING_NOTICE_REPAIR,
+    SAMPLE_COMPLETENESS_MISSING_DEPOSIT_ACCESS,
+    SAMPLE_COMPLETENESS_SHORT_INCOMPLETE,
 )
 from .contract_models import coerce_contract_completeness_overall_status
 from .service import analyze_contract_with_explain
@@ -118,6 +124,36 @@ def _assert_contract_completeness_shape(sa: dict[str, Any], label: str) -> None:
     assert isinstance(cc.get("unclear_items"), list), label
     assert isinstance(cc.get("summary"), str), label
     assert len(cc.get("checked_items") or []) == 10, label
+
+
+# Part 10 第 4 步：收尾样例期望（completeness_score 与 overall_status 与规则引擎对齐；短文本允许 ± 分漂移）
+_COMPLETENESS_FINALE_EXPECT: dict[str, tuple[int, int, str]] = {
+    "sample_completeness_very_complete": (100, 100, "complete"),
+    "sample_completeness_missing_notice_repair": (70, 70, "partially_complete"),
+    "sample_completeness_missing_deposit_access": (80, 80, "partially_complete"),
+    "sample_completeness_short_incomplete": (10, 20, "incomplete"),
+}
+
+
+def _assert_completeness_finale_expectations(sa: dict[str, Any], ex: dict[str, Any], label: str) -> None:
+    """Part 10 收尾：结构化层与 explain overview 分数/状态一致，列表字段稳定。"""
+    if label not in _COMPLETENESS_FINALE_EXPECT:
+        return
+    lo, hi, st = _COMPLETENESS_FINALE_EXPECT[label]
+    cc = sa.get("contract_completeness")
+    assert isinstance(cc, dict), label
+    cs = int(cc.get("completeness_score", 0))
+    assert lo <= cs <= hi, f"{label}: completeness_score {cs} not in [{lo},{hi}]"
+    assert str(cc.get("overall_status") or "").strip() == st, f"{label}: overall_status {cc.get('overall_status')} != {st}"
+    cco = ex.get("contract_completeness_overview")
+    assert isinstance(cco, dict), label
+    ccs = int(cco.get("completeness_score", 0))
+    assert lo <= ccs <= hi, f"{label}: contract_completeness_overview.completeness_score {ccs} not in [{lo},{hi}]"
+    assert str(cco.get("overall_status") or "").strip() == st, f"{label}: overview overall_status {cco.get('overall_status')} != {st}"
+    assert isinstance(cc.get("missing_core_items"), list), label
+    assert isinstance(cc.get("unclear_items"), list), label
+    assert isinstance(cco.get("missing_core_items"), list), label
+    assert isinstance(cco.get("unclear_items"), list), label
 
 
 def _assert_contract_completeness_overview_explain(ex: dict[str, Any], sa: dict[str, Any], label: str) -> None:
@@ -316,6 +352,27 @@ def _sample_specs() -> list[tuple[str, str, dict[str, Any]]]:
             "sample_clause_risk_tenant_repairs",
             SAMPLE_CLAUSE_RISK_TENANT_REPAIRS,
             {"monthly_rent": 880.0, "deposit_amount": 880.0},
+        ),
+        # Part 10：合同完整性检查收尾（completeness_score / overall_status 刻意分层）
+        (
+            "sample_completeness_very_complete",
+            SAMPLE_COMPLETENESS_VERY_COMPLETE,
+            {"monthly_rent": 950.0, "deposit_amount": 1095.0},
+        ),
+        (
+            "sample_completeness_missing_notice_repair",
+            SAMPLE_COMPLETENESS_MISSING_NOTICE_REPAIR,
+            {"monthly_rent": 1200.0, "deposit_amount": 1200.0},
+        ),
+        (
+            "sample_completeness_missing_deposit_access",
+            SAMPLE_COMPLETENESS_MISSING_DEPOSIT_ACCESS,
+            {"monthly_rent": 950.0, "deposit_amount": 1095.0},
+        ),
+        (
+            "sample_completeness_short_incomplete",
+            SAMPLE_COMPLETENESS_SHORT_INCOMPLETE,
+            {"monthly_rent": 500.0, "deposit_amount": 500.0},
         ),
     ]
 
@@ -599,6 +656,7 @@ def validate_contract_analysis_samples() -> None:
         _assert_clause_severity_summary_shape(sa, label)
         _assert_contract_completeness_shape(sa, label)
         _assert_contract_completeness_overview_explain(ex, sa, label)
+        _assert_completeness_finale_expectations(sa, ex, label)
         assert isinstance(sa.get("risk_category_groups"), list)
         assert isinstance(sa.get("risk_category_summary"), list)
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"])

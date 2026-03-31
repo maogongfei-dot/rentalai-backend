@@ -10,6 +10,8 @@ Phase 3：内置样例合同文本（从 ``contract_analysis/samples/*.txt`` 读
 ``sample_clause_risk_*.txt``：Part 8 条款—风险联动（clause_risk_map / clause_risk_overview）专项样例。
 
 ``sample_severity_*.txt``：Part 9 条款风险强度汇总（clause_severity_summary / clause_severity_overview）专项样例。
+
+``sample_completeness_*.txt``：Part 10 合同完整性检查（contract_completeness / contract_completeness_overview）收尾样例。
 """
 
 from __future__ import annotations
@@ -61,3 +63,9 @@ SAMPLE_SEVERITY_ONE_CLAUSE_MULTI_HIGH: str = _load_sample("sample_severity_one_c
 SAMPLE_SEVERITY_MIXED_CLAUSES: str = _load_sample("sample_severity_mixed_clauses.txt")
 SAMPLE_SEVERITY_MEDIUM_FEE_CLAUSE: str = _load_sample("sample_severity_medium_fee_clause.txt")
 SAMPLE_SEVERITY_LOW_INCOMPLETE_CLAUSE: str = _load_sample("sample_severity_low_incomplete_clause.txt")
+
+# Part 10：完整性检查专项（刻意拉开 completeness_score / overall_status）
+SAMPLE_COMPLETENESS_VERY_COMPLETE: str = _load_sample("sample_completeness_very_complete.txt")
+SAMPLE_COMPLETENESS_MISSING_NOTICE_REPAIR: str = _load_sample("sample_completeness_missing_notice_repair.txt")
+SAMPLE_COMPLETENESS_MISSING_DEPOSIT_ACCESS: str = _load_sample("sample_completeness_missing_deposit_access.txt")
+SAMPLE_COMPLETENESS_SHORT_INCOMPLETE: str = _load_sample("sample_completeness_short_incomplete.txt")

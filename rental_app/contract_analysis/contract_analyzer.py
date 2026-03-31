@@ -10,6 +10,7 @@ from typing import Any, cast
 from .contract_models import (
     ContractAnalysisResult,
     ContractInput,
+    default_contract_analysis_meta,
     coerce_contract_clause_type,
     coerce_contract_completeness_item_status,
     coerce_contract_completeness_overall_status,
@@ -146,15 +147,22 @@ def build_risk_category_summary(risks: list[dict[str, Any]]) -> list[dict[str, A
 
 
 def _normalize_risk_dict(r: dict[str, Any]) -> dict[str, Any]:
-    """每条 risk 含稳定字符串字段；无定位信息时安全降级为空串。"""
+    """每条 risk 含稳定字符串字段；与 ``ContractRiskItem`` 对齐，无定位信息时降级为空串。"""
     rd = dict(r)
     for key, default in (
+        ("rule_id", ""),
+        ("title", ""),
+        ("reason", ""),
         ("matched_text", ""),
         ("matched_keyword", ""),
         ("location_hint", ""),
     ):
         v = rd.get(key)
         rd[key] = str(v).strip() if v is not None else default
+    sev = str(rd.get("severity") or "").strip().lower()
+    rd["severity"] = sev if sev in ("high", "medium", "low") else "medium"
+    if not rd["title"] and rd["rule_id"]:
+        rd["title"] = rd["rule_id"]
     rc = rd.get("risk_category")
     rd["risk_category"] = coerce_contract_risk_category(str(rc).strip() if rc is not None else None)
     rcode = rd.get("risk_code")
@@ -485,6 +493,36 @@ def _normalize_contract_completeness_item_dict(d: dict[str, Any]) -> dict[str, A
     return x
 
 
+def _default_structured_analysis_shell() -> dict[str, Any]:
+    """
+    第一层输出的键全集与稳定默认值（与 ``ContractAnalysisResult`` 对齐）；
+    在 ``_normalize_analysis_output`` 开头与调用方合并，避免缺字段。
+    """
+    return {
+        "summary": "",
+        "risks": [],
+        "clause_list": [],
+        "clause_risk_map": [],
+        "clause_severity_summary": [],
+        "contract_completeness": default_contract_completeness_result(),
+        "missing_items": [],
+        "recommendations": [],
+        "detected_topics": [],
+    }
+
+
+def _normalize_meta_dict(raw: Any) -> dict[str, Any]:
+    """``meta`` 始终为 dict；``source_type`` 与 ``ContractInput`` 对齐。"""
+    base = default_contract_analysis_meta()
+    if not isinstance(raw, dict):
+        return dict(base)
+    st = coerce_contract_source_type(str(raw.get("source_type") or base["source_type"]))
+    sn = raw.get("source_name")
+    if sn is not None and str(sn).strip():
+        return {"source_type": st, "source_name": str(sn).strip()}
+    return {"source_type": st, "source_name": None}
+
+
 def _normalize_contract_completeness_dict(raw: Any) -> dict[str, Any]:
     """Part 10：``contract_completeness`` 与 ``default_contract_completeness_result`` 合并，字段稳定。"""
     base = default_contract_completeness_result()
@@ -514,7 +552,7 @@ def _normalize_contract_completeness_dict(raw: Any) -> dict[str, Any]:
 
 def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
     """保证输出字段类型稳定：risks / clause_list / clause_risk_map / clause_severity_summary / contract_completeness / missing_items 等均为 list。"""
-    out = dict(data)
+    out = {**_default_structured_analysis_shell(), **dict(data)}
     raw_risks = out.get("risks")
     if not isinstance(raw_risks, list):
         raw_risks = []
@@ -542,6 +580,7 @@ def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
     out["summary"] = str(out.get("summary") or "").strip()
     out["risk_category_groups"] = group_risks_by_category(out["risks"])
     out["risk_category_summary"] = build_risk_category_summary(out["risks"])
+    out["meta"] = _normalize_meta_dict(out.get("meta"))
     return out
 
 
@@ -811,14 +850,15 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     """
     对合同文本做基础规则分析。
 
-    返回字段与 ``ContractAnalysisResult`` 一致：
+    返回字段与 ``ContractAnalysisResult`` 一致；经 ``_normalize_analysis_output`` 后 **下列键始终存在**
+    （list 永不为 ``None``，``meta`` 始终为 dict）：
     - summary, risks, risk_category_groups, risk_category_summary,
       clause_list（``parse_contract_clauses`` + ``annotate_clause_types``）
     - clause_risk_map：条款—风险联动列表（由 ``build_clause_risk_map`` 生成；见 ``ClauseRiskLinkItem``）
     - clause_severity_summary：条款级风险强度汇总（``build_clause_severity_summary``；无联动则为空 list；见 ``ClauseSeverityItem``）
     - contract_completeness：合同完整性检查（``build_contract_completeness`` / ``ContractCompletenessResult``）
     - missing_items, recommendations, detected_topics
-    - meta: { source_type, source_name }（与 ``ContractInput`` 对应）
+    - meta: { source_type, source_name }（与 ``ContractInput`` 对应；归一化后再按 ``ContractInput`` 覆盖）
     """
     text = (contract_input.contract_text or "").strip()
     if not text:
@@ -826,6 +866,9 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
             {
                 "summary": "未提供合同文本，无法分析。",
                 "risks": [],
+                "clause_list": [],
+                "clause_risk_map": [],
+                "clause_severity_summary": [],
                 "missing_items": ["合同正文"],
                 "recommendations": ["请上传或粘贴完整合同文本后再试。"],
                 "detected_topics": [],
