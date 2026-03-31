@@ -1,6 +1,6 @@
 /**
- * Phase 4 Round6 Step2：统一本地「最近分析」记录（localStorage）
- * 与手动「保存到 analysis_history」全量快照并存；本模块为轻量摘要列表。
+ * Phase 4 Round6：统一本地「最近分析」记录（localStorage）
+ * 含列表摘要 + detail_snapshot（供 /analysis-history 展开回看，不重新请求后端）
  */
 (function (global) {
   var STORAGE_KEY = "rentalai_unified_analysis_history_v1";
@@ -87,6 +87,107 @@
     return truncate(String(loc) + " · " + budget, 160);
   }
 
+  var DETAIL_STR_MAX = 12000;
+
+  function clipStr(s, max) {
+    s = s == null ? "" : String(s);
+    max = max || DETAIL_STR_MAX;
+    if (s.length <= max) return s;
+    return s.slice(0, max - 1) + "…";
+  }
+
+  /** 合同：保存 summary_view 中回看所需字段 */
+  function buildContractDetailSnapshot(data) {
+    var res = (data && data.result) || {};
+    var sv = res.summary_view || {};
+    var cc = sv.contract_completeness_overview;
+    var ccOut = null;
+    if (cc && typeof cc === "object") {
+      ccOut = {
+        overall_status: clipStr(cc.overall_status, 500),
+        completeness_score: cc.completeness_score,
+        short_summary: clipStr(cc.short_summary, 4000),
+        missing_core_items: Array.isArray(cc.missing_core_items)
+          ? cc.missing_core_items.slice(0, 24).map(function (x) {
+              return clipStr(x, 800);
+            })
+          : [],
+        unclear_items: Array.isArray(cc.unclear_items)
+          ? cc.unclear_items.slice(0, 24).map(function (x) {
+              return clipStr(x, 800);
+            })
+          : [],
+      };
+    }
+    return {
+      overall_conclusion: clipStr(
+        typeof sv.overall_conclusion === "string" ? sv.overall_conclusion : "",
+        8000
+      ),
+      key_risk_summary: clipStr(
+        typeof sv.key_risk_summary === "string" ? sv.key_risk_summary : "",
+        8000
+      ),
+      contract_completeness_overview: ccOut,
+    };
+  }
+
+  /** 房源 housing：结论 / 市场摘要 / Top deals 星级 */
+  function buildPropertyHousingDetailSnapshot(data) {
+    var rep = data.recommendation_report || {};
+    var v = rep.star_final_verdict || {};
+    var td = (data.top_deals && data.top_deals.top_deals) || [];
+    var deals = [];
+    var i;
+    for (i = 0; i < Math.min(5, td.length); i++) {
+      var d = td[i] || {};
+      deals.push({
+        title: clipStr(d.title || d.address || "—", 300),
+        star_rating: d.star_rating,
+        one_line_suggestion: clipStr(d.one_line_suggestion || "", 500),
+      });
+    }
+    return {
+      variant: "housing",
+      market_snapshot_zh: clipStr(rep.market_snapshot_zh || "", 8000),
+      star_final_verdict: {
+        overall_advice: clipStr(v.overall_advice || "", 4000),
+        best_overall: v.best_overall && typeof v.best_overall === "object" ? v.best_overall : null,
+        best_for_price: v.best_for_price && typeof v.best_for_price === "object" ? v.best_for_price : null,
+        best_for_environment_safety:
+          v.best_for_environment_safety && typeof v.best_for_environment_safety === "object"
+            ? v.best_for_environment_safety
+            : null,
+      },
+      top_deals: deals,
+    };
+  }
+
+  /** 旧版 ai-analyze：推荐与决策摘要 */
+  function buildPropertyLegacyDetailSnapshot(data) {
+    var recos = data.recommendations || [];
+    var top = [];
+    var i;
+    for (i = 0; i < Math.min(5, recos.length); i++) {
+      var r = recos[i] || {};
+      top.push({
+        title: clipStr(r.title || r.house_label || "—", 300),
+        final_score: r.final_score,
+        decision: r.decision,
+        decision_reason: clipStr(r.decision_reason || "", 1500),
+      });
+    }
+    var sum = data.summary || {};
+    return {
+      variant: "legacy",
+      summary: {
+        total_candidates: sum.total_candidates,
+        top_count: sum.top_count,
+      },
+      recommendations_top: top,
+    };
+  }
+
   function housingPreview(data) {
     var rep = data.recommendation_report || {};
     var v = rep.star_final_verdict || {};
@@ -127,6 +228,7 @@
       created_at: new Date().toISOString(),
       summary_snippet: housingSnippet(data),
       result_preview: housingPreview(data),
+      detail_snapshot: buildPropertyHousingDetailSnapshot(data),
     };
     prepend(entry);
     return entry;
@@ -164,6 +266,7 @@
         160
       ),
       result_preview: truncate(preview, 200),
+      detail_snapshot: buildPropertyLegacyDetailSnapshot(data),
     };
     prepend(entry);
     return entry;
@@ -198,6 +301,7 @@
       created_at: new Date().toISOString(),
       summary_snippet: truncate(kr || oc || "合同分析完成", 160),
       result_preview: truncate(oc || kr || "—", 200),
+      detail_snapshot: buildContractDetailSnapshot(data),
     };
     prepend(entry);
     return entry;

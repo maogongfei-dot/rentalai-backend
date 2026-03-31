@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
-  Phase 4 Round6：统一「分析历史」入口页（Step1 骨架 + Step2 本地最近记录）
-  全量手动保存仍见 /history；本页展示 rentalai_unified_analysis_history_v1 轻量摘要。
+  Phase 4 Round6：统一「分析历史」页（本地最近摘要列表，Step3 展示收口）
+  数据：localStorage rentalai_unified_analysis_history_v1；全量手动保存见 /history
 -->
 <html lang="zh-Hans">
   <head>
@@ -10,7 +10,7 @@
     <title>分析历史 · Analysis History · RentalAI</title>
     <link rel="stylesheet" href="/assets/style.css" />
   </head>
-  <body>
+  <body class="analysis-history-page-body">
     <script src="/assets/auth_local.js"></script>
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
@@ -26,19 +26,42 @@
         </p>
       </header>
 
-      <section class="card analysis-history-block" aria-labelledby="prop-history-heading">
+      <section
+        class="card analysis-history-block"
+        aria-labelledby="prop-history-heading"
+        data-unified-history-section="property"
+      >
         <h2 id="prop-history-heading" class="section-title">Property Analysis History</h2>
-        <p class="hint muted">房源分析 · 最近摘要（自动）与 <a href="/history">完整保存列表</a></p>
-        <div id="unified-history-property-list" class="unified-history-mount" aria-live="polite"></div>
+        <p class="hint muted analysis-history-block-sub">房源分析 · 最近自动摘要</p>
+        <p class="hint muted small-print unified-history-block-links">
+          需要全量快照与「查看详情」请打开
+          <a href="/history">房源分析保存列表</a>
+          · <a href="/#ai-rental-heading">新建房源分析</a>
+        </p>
+        <div
+          id="unified-history-property-list"
+          class="unified-history-mount"
+          aria-live="polite"
+          aria-busy="false"
+        ></div>
       </section>
 
-      <section class="card analysis-history-block" aria-labelledby="contract-history-heading">
+      <section
+        class="card analysis-history-block"
+        aria-labelledby="contract-history-heading"
+        data-unified-history-section="contract"
+      >
         <h2 id="contract-history-heading" class="section-title">Contract Analysis History</h2>
-        <p class="hint muted">合同分析 · 最近摘要（自动）</p>
-        <p class="analysis-history-block-action">
+        <p class="hint muted analysis-history-block-sub">合同分析 · 最近自动摘要</p>
+        <p class="hint muted small-print unified-history-block-links">
           <a href="/contract-analysis">前往合同分析</a>
         </p>
-        <div id="unified-history-contract-list" class="unified-history-mount" aria-live="polite"></div>
+        <div
+          id="unified-history-contract-list"
+          class="unified-history-mount"
+          aria-live="polite"
+          aria-busy="false"
+        ></div>
       </section>
     </main>
     <script src="/assets/analysis_history_store.js"></script>

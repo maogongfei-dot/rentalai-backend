@@ -448,6 +448,9 @@ a {
 body.contract-analysis-page-body {
   max-width: min(100%, 70rem);
 }
+body.analysis-history-page-body {
+  max-width: min(100%, 52rem);
+}
 .contract-analysis-main {
   width: 100%;
 }
@@ -1450,19 +1453,39 @@ select {
   margin: 0.35rem 0 0;
   font-size: 0.95rem;
 }
+.analysis-history-block-sub {
+  margin: 0.15rem 0 0.5rem;
+}
+.unified-history-block-links {
+  margin: 0 0 0.6rem;
+  line-height: 1.45;
+}
 
-/* Phase 4 Round6 Step2：统一最近分析摘要列表 */
+/* Phase 4 Round6：统一最近分析摘要列表（复用 history-record-card） */
 .unified-history-mount {
+  margin-top: 0.35rem;
+}
+.unified-history-mount[data-unified-history-state="empty"] {
   margin-top: 0.5rem;
 }
-.unified-history-list {
+.unified-history-empty-state {
+  padding: 1rem 1.1rem;
+  margin: 0;
+}
+.unified-history-empty-state .unified-history-empty {
   margin: 0.35rem 0 0;
+  line-height: 1.5;
+}
+.unified-history-count {
+  margin: 0 0 0.6rem;
+}
+.unified-history-list {
+  margin: 0;
   padding: 0;
   list-style: none;
-}
-.unified-history-item {
-  margin-bottom: 0.5rem;
-  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 .unified-history-item:last-child {
   margin-bottom: 0;
@@ -1472,28 +1495,124 @@ select {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.35rem 0.75rem;
-  align-items: baseline;
-  margin-bottom: 0.25rem;
+  align-items: flex-start;
+  margin-bottom: 0.35rem;
 }
-.unified-history-title {
-  font-weight: 600;
-  color: #1e293b;
+.unified-history-item-head .history-record-top-title {
+  flex: 1 1 12rem;
+  margin: 0;
 }
-.unified-history-time {
-  font-size: 0.82rem;
+.unified-history-item-head .history-record-time {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.unified-history-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid #e8ecf1;
+  margin-top: 0.15rem;
+}
+.unified-history-field .history-record-label {
+  margin-bottom: 0.2rem;
+}
+.unified-history-field .history-cond-v {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 .unified-history-snippet {
-  margin: 0.2rem 0 0;
-  font-size: 0.9rem;
+  color: #334155;
 }
 .unified-history-preview {
-  margin: 0.35rem 0 0;
-  font-size: 0.88rem;
-  color: #334155;
-  line-height: 1.45;
+  color: #0f172a;
+  font-weight: 500;
 }
-.unified-history-empty {
+
+/* Phase 4 Round6 Step4：历史记录展开详情（本地 detail_snapshot） */
+.unified-history-details {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #e2e8f0;
+}
+.unified-history-details-summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #1e3a5f;
+  list-style: none;
+}
+.unified-history-details-summary::before {
+  content: "▸ ";
+  color: #64748b;
+  font-size: 0.85em;
+}
+.unified-history-details[open] > .unified-history-details-summary::before {
+  content: "▾ ";
+}
+.unified-history-details-summary::-webkit-details-marker {
+  display: none;
+}
+.unified-history-details[open] .unified-history-details-summary {
+  margin-bottom: 0.5rem;
+}
+.unified-history-details-body {
+  padding: 0.5rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.unified-history-detail-section {
+  margin-bottom: 0.85rem;
+}
+.unified-history-detail-section:last-child {
+  margin-bottom: 0;
+}
+.unified-history-detail-text {
   margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.unified-history-verdict-wrap .unified-history-verdict-pick {
+  margin-bottom: 0.5rem;
+}
+.unified-history-mini-deals {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+.unified-history-mini-deals li {
+  margin-bottom: 0.45rem;
+}
+.unified-history-mini-sug {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+}
+.unified-history-decision {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #475569;
+}
+.unified-history-subh {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #64748b;
+  margin: 0.5rem 0 0.25rem;
+}
+.unified-history-bullets {
+  margin: 0.15rem 0 0;
+  padding-left: 1.1rem;
+}
+.unified-history-bullets li {
+  margin-bottom: 0.2rem;
+}
+.unified-history-complete {
+  margin-top: 0.25rem;
+}
+.unified-history-complete-top {
+  margin: 0 0 0.35rem;
+}
+.unified-history-no-snapshot {
+  margin: 0;
 }
 
 .demo-how-to {
