@@ -94,8 +94,16 @@ uvicorn api_server:app --host 127.0.0.1 --port 8000
 | `/compare` | 收藏房源对比 |
 | `/history` | 已保存分析列表 |
 | `/history-detail` | 单条历史详情（由列表「查看详情」写入 session 后进入） |
+| `/contract-analysis` | Phase 4 合同分析（`summary_view` 展示；见下「本地验证合同分析页」） |
 
 其他（Phase3/异步任务等）：`/result/{task_id}`、`/register` 等仍由服务端提供，详见 `api_server.py`。
+
+### 本地验证合同分析页（Phase 4）
+
+1. 启动：`cd rental_app` → `python run.py`，浏览器打开 **http://127.0.0.1:8000/contract-analysis**（须已登录 Demo，与首页同源）。
+2. **文本流程**：点「**填入示例文本**」→「**提交分析**」→ 应出现 loading → 下方「分析结果」各块有内容；`sessionStorage` 键 `rentalai_contract_analysis_last` 可看到完整 JSON。
+3. **文件路径流程**：点「**填入示例路径（文件模式）**」→「**提交分析**」（路径指向仓库内 `contract_analysis/samples/sample_contract.txt`，仅当 API 进程工作目录能解析该相对路径时成功）。
+4. 命令行冒烟（仅后端 JSON）：`python scripts/contract_analysis_api_smoke.py`。
 
 ---
 
@@ -109,7 +117,7 @@ uvicorn api_server:app --host 127.0.0.1 --port 8000
 
 与房源推荐主流程独立，规则引擎在包 **`contract_analysis/`**。最小说明、输入输出、Phase 4 接入建议见 **`contract_analysis/README.md`**；HTTP 入口示例 **`POST /api/contract/phase3/analyze-text`**（另有 Phase B 管线 **`/api/contract/analyze-text`**，勿混淆）。
 
-**Phase 4 最小 HTTP**（`analysis_result` / `explain_result`）：先启动服务后执行 **`python scripts/contract_analysis_api_smoke.py`**，或见 **`contract_analysis/README.md`** 中 curl / requests 示例。
+**Phase 4 最小 HTTP**（`summary_view` + `raw_analysis`）：先启动服务后执行 **`python scripts/contract_analysis_api_smoke.py`**，或打开 **`/contract-analysis`** 用页面内「填入示例文本 / 示例路径」联调；详见上文「本地验证合同分析页」与 **`contract_analysis/README.md`**。
 
 ---
 

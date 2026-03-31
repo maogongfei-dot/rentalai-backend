@@ -119,6 +119,10 @@ print(r.status_code, r.json().get("ok"), list((r.json().get("result") or {}).key
 
 成功时 `result` 含 **`summary_view`**（至少含 `overall_conclusion`、`key_risk_summary`、`risk_category_summary`、`highlighted_risk_clauses`、`clause_severity_overview`、`contract_completeness_overview`、`action_advice`）与 **`raw_analysis`**（上述三门面数据的完整副本）。
 
+### 方式四：浏览器页面（联调）
+
+浏览器打开 **`http://127.0.0.1:8000/contract-analysis`**（与 API 同源）。表单上方有 **「填入示例文本」**、**「填入示例路径（文件模式）」**，再点 **提交分析**，可快速验证文本与文件路径两条流程；示例数据见 `web_public/assets/contract_analysis_demo.js`（与 `samples/sample_contract.txt` 对齐）。
+
 ## 尚未做的增强（非 Phase 3 范围）
 
 - PDF **页码级**定位与复杂版式 OCR。

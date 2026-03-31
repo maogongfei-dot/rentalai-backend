@@ -459,6 +459,18 @@ a {
   display: none;
 }
 
+.contract-demo-hint {
+  margin: 0 0 0.65rem;
+}
+.contract-demo-btn {
+  font-size: 0.92rem;
+  padding: 0.28rem 0.55rem;
+  width: auto;
+  background: #f0f4fa;
+  border: 1px solid #c8d4e8;
+  border-radius: 4px;
+}
+
 /* Phase 4 合同分析：summary_view 分段展示 */
 .contract-result-panel {
   margin-top: 0.75rem;

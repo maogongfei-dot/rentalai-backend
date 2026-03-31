@@ -44,6 +44,34 @@
     });
   setModePanels();
 
+  var Demo = window.RentalAIContractAnalysisDemo;
+  var btnDemoText = document.getElementById("contract-demo-fill-text");
+  var btnDemoPath = document.getElementById("contract-demo-fill-path");
+
+  function fillSampleText() {
+    if (!Demo) return;
+    if (modeText) modeText.checked = true;
+    setModePanels();
+    if (ta) ta.value = Demo.SAMPLE_CONTRACT_TEXT;
+    if (filePathInput) filePathInput.value = "";
+    if (localFile) localFile.value = "";
+    if (localHint) localHint.textContent = "";
+    setError("");
+  }
+
+  function fillSamplePath() {
+    if (!Demo) return;
+    if (modeFile) modeFile.checked = true;
+    setModePanels();
+    if (filePathInput) filePathInput.value = Demo.SAMPLE_FILE_PATH;
+    if (localFile) localFile.value = "";
+    if (localHint) localHint.textContent = "";
+    setError("");
+  }
+
+  if (btnDemoText && Demo) btnDemoText.addEventListener("click", fillSampleText);
+  if (btnDemoPath && Demo) btnDemoPath.addEventListener("click", fillSamplePath);
+
   if (localFile && localHint) {
     localFile.addEventListener("change", function () {
       var f = localFile.files && localFile.files[0];

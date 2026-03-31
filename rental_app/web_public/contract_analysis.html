@@ -21,6 +21,17 @@
       <section class="card form-card" aria-labelledby="contract-form-heading">
         <h2 id="contract-form-heading" class="section-title">分析输入</h2>
 
+        <p class="hint small-print contract-demo-hint" aria-label="快捷测试">
+          <span>快捷测试：</span>
+          <button type="button" id="contract-demo-fill-text" class="contract-demo-btn">
+            填入示例文本
+          </button>
+          <span class="nav-sep">·</span>
+          <button type="button" id="contract-demo-fill-path" class="contract-demo-btn">
+            填入示例路径（文件模式）
+          </button>
+        </p>
+
         <fieldset class="contract-mode-fieldset">
           <legend class="field-label">输入模式</legend>
           <div class="contract-mode-row" role="radiogroup" aria-label="输入模式">
@@ -101,6 +112,7 @@
       </section>
     </main>
     <script src="/assets/contract_analysis_api.js"></script>
+    <script src="/assets/contract_analysis_demo.js"></script>
     <script src="/assets/contract_analysis_page.js"></script>
   </body>
 </html>
