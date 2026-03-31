@@ -486,6 +486,56 @@ body.contract-analysis-page-body {
 .contract-output-placeholder {
   margin-bottom: 0;
 }
+.contract-analysis-output-column .contract-output-placeholder {
+  padding: 1.15rem 1.1rem;
+  min-height: 8.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px dashed #c5d0e0;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+.contract-analysis-output-column .contract-output-placeholder strong {
+  font-size: 1.05rem;
+  color: #334155;
+}
+.contract-analysis-output-column .contract-output-placeholder .hint {
+  line-height: 1.5;
+  max-width: 26rem;
+}
+
+.contract-analysis-actions-row {
+  margin-top: 0;
+}
+.contract-analysis-submit-btn {
+  padding: 0.5rem 1.2rem;
+  font-weight: 600;
+  background: #1e3a5f;
+  color: #fff;
+  border: 1px solid #152a45;
+  border-radius: 6px;
+}
+.contract-analysis-submit-btn:hover:not(:disabled) {
+  background: #2d4a6f;
+}
+.contract-analysis-submit-btn:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+.contract-analysis-submit-btn:disabled {
+  cursor: not-allowed;
+}
+
+.contract-input-card > .section-title {
+  margin-bottom: 0.75rem;
+}
+.contract-result-panel > .section-title {
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid #e8edf3;
+  margin-bottom: 0.65rem;
+}
+
 .contract-result-shell {
   display: flex;
   flex-direction: column;
@@ -667,10 +717,58 @@ body.contract-analysis-page-body {
   border: 1px solid #e2e8f0;
 }
 .contract-result-pill--severity {
-  background: #fff5f0;
-  color: #9a3412;
-  border: 1px solid #fed7aa;
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid #cbd5e1;
 }
+.contract-result-pill--sev-high {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  font-weight: 600;
+}
+.contract-result-pill--sev-medium {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  font-weight: 600;
+}
+.contract-result-pill--sev-low {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  font-weight: 600;
+}
+
+.contract-result-card-block--tier-high {
+  border-left: 4px solid #dc2626;
+}
+.contract-result-card-block--tier-medium {
+  border-left: 4px solid #d97706;
+}
+.contract-result-card-block--tier-low {
+  border-left: 4px solid #16a34a;
+}
+.contract-result-overall-badge-row {
+  margin: 0 0 0.55rem;
+}
+
+.contract-result-rich-item--sev-high {
+  border-left: 3px solid #ef4444;
+  padding-left: 0.5rem;
+  margin-left: -0.15rem;
+}
+.contract-result-rich-item--sev-medium {
+  border-left: 3px solid #f59e0b;
+  padding-left: 0.5rem;
+  margin-left: -0.15rem;
+}
+.contract-result-rich-item--sev-low {
+  border-left: 3px solid #22c55e;
+  padding-left: 0.5rem;
+  margin-left: -0.15rem;
+}
+
 .contract-result-pill--status {
   background: #eef6ff;
   color: #1e3a5f;
@@ -691,6 +789,21 @@ body.contract-analysis-page-body {
   border-radius: 6px;
   font-size: 0.92rem;
 }
+.contract-result-subcard--sev-high {
+  border-color: #fecaca;
+  background: #fffafa;
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+.contract-result-subcard--sev-medium {
+  border-color: #fde68a;
+  background: #fffefb;
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+.contract-result-subcard--sev-low {
+  border-color: #bbf7d0;
+  background: #fafff8;
+  box-shadow: inset 3px 0 0 #22c55e;
+}
 .contract-result-subcard-head {
   display: flex;
   flex-wrap: wrap;
@@ -708,6 +821,87 @@ body.contract-analysis-page-body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
+}
+
+/* Phase 4 Round4 Step4：条款摘录 / 严重度 / 完整性列表 — 预览 + details + 显示其余 */
+.contract-result-subcard-quick {
+  margin: 0.35rem 0 0.45rem;
+  padding: 0.45rem 0.5rem;
+  background: #fff;
+  border: 1px solid #e8edf3;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.contract-result-quick-line {
+  margin: 0.25rem 0 0;
+  color: #334155;
+  word-break: break-word;
+}
+.contract-result-quick-line:first-child {
+  margin-top: 0;
+}
+.contract-result-quick-label {
+  display: inline-block;
+  min-width: 2.5rem;
+  margin-right: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.contract-result-item-details {
+  margin-top: 0.45rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem 0.5rem;
+  background: #fafbfc;
+}
+.contract-result-expand-summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #1d4ed8;
+  list-style: none;
+}
+.contract-result-item-details .contract-result-expand-summary::-webkit-details-marker {
+  display: none;
+}
+.contract-result-expand-body {
+  margin-top: 0.45rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid #e8edf3;
+}
+.contract-result-expand-body .contract-result-kv:first-child {
+  margin-top: 0;
+}
+
+.contract-result-tiny-list {
+  margin: 0.2rem 0 0;
+  padding-left: 1.15rem;
+  font-size: 0.88rem;
+  color: #334155;
+}
+.contract-result-tiny-list li {
+  margin-bottom: 0.3rem;
+}
+
+.contract-result-more-host {
+  margin-top: 0.45rem;
+}
+.contract-result-more-btn {
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.86rem;
+  width: auto;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #334155;
+  cursor: pointer;
+}
+.contract-result-more-btn:hover {
+  background: #e2e8f0;
 }
 
 .contract-result-dl {
@@ -1107,6 +1301,63 @@ select {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem 0.5rem;
+}
+
+/* Phase 4 Round5：首页并列主入口（房源 / 合同） */
+.home-main-entries {
+  margin-bottom: 0.85rem;
+}
+.home-main-entries-lead {
+  margin: 0.15rem 0 0.5rem;
+}
+.home-entry-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 0.35rem;
+}
+@media (max-width: 640px) {
+  .home-entry-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.home-entry-card {
+  display: block;
+  padding: 1rem 1.1rem;
+  border: 1px solid #d0d8e2;
+  border-radius: 8px;
+  background: #fafbfc;
+  text-decoration: none;
+  color: inherit;
+  box-sizing: border-box;
+  border-left: 4px solid #1e3a5f;
+}
+.home-entry-card:last-child {
+  border-left-color: #0f766e;
+}
+.home-entry-card:hover {
+  background: #f1f5f9;
+  border-color: #b8c5d9;
+}
+.home-entry-card-title {
+  margin: 0 0 0.4rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a2332;
+  line-height: 1.35;
+}
+.home-entry-card-sub {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.82rem;
+  font-weight: normal;
+  color: #64748b;
+}
+.home-entry-card-desc {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #334155;
+  line-height: 1.45;
 }
 
 .home-quick-links {

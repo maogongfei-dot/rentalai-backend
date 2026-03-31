@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <!--
-  Phase 4 合同分析页（/contract-analysis）
-  主入口：① 粘贴文本 → POST /api/contract/analysis/text
-         ② 上传 .txt/.pdf/.docx → POST /api/contract/analysis/upload
-  开发用：服务端可读 file_path → POST /api/contract/analysis/file-path（默认隐藏；?dev=1 或页内「开发者」开关）
-  结果区：result.summary_view 七块（见 contract_analysis/README.md「Phase 4 网页交接说明」）
+  Phase 4 合同分析页（/contract-analysis）— 第四轮产品化可演示版
+  输入：粘贴文本（text）| 上传文件（upload，.txt/.pdf/.docx）| 开发 file_path
+  结果：双栏；summary_view 七卡片；风险等级视觉；条款/严重度预览+details+「显示其余」；完整性长列表折叠
+  说明：contract_analysis/README.md「Phase 4 第四轮：网页产品化展示」
 -->
 <html lang="zh-Hans">
   <head>
@@ -52,7 +51,7 @@
             </fieldset>
 
             <div id="contract-panel-text" class="contract-input-panel">
-              <label class="field-label" for="contract-text">contract_text</label>
+              <label class="field-label" for="contract-text">合同正文</label>
               <textarea
                 id="contract-text"
                 name="contract_text"
@@ -118,8 +117,10 @@
             </div>
 
             <div class="contract-input-actions">
-              <div class="actions-row">
-                <button type="button" id="contract-submit">提交分析</button>
+              <div class="actions-row contract-analysis-actions-row">
+                <button type="button" id="contract-submit" class="contract-analysis-submit-btn">
+                  提交分析
+                </button>
               </div>
               <div id="contract-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
                 <span id="contract-loading-text">分析中…</span>
@@ -138,7 +139,9 @@
               aria-labelledby="contract-empty-heading"
             >
               <strong id="contract-empty-heading">暂无分析结果</strong>
-              <p class="hint muted">提交后在此展示结论摘要（summary_view）。</p>
+              <p class="hint muted">
+                选择左侧输入方式并点击「提交分析」后，将在此展示七段摘要卡片（总体结论、风险与条款等）。
+              </p>
             </section>
 
             <section

@@ -12,9 +12,33 @@
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
     <main class="wrap wrap-wide">
+      <!-- Phase 4 Round5：并列主入口（房源分析 / 合同分析） -->
+      <section class="card home-main-entries" aria-labelledby="main-entries-heading">
+        <h2 id="main-entries-heading" class="section-title">主功能</h2>
+        <p class="hint muted small-print home-main-entries-lead">
+          选择一项进入完整流程；房源分析在下方表单，合同分析为独立页面。
+        </p>
+        <div class="home-entry-grid">
+          <a class="home-entry-card" href="#ai-rental-heading">
+            <h3 class="home-entry-card-title">
+              房源分析
+              <span class="home-entry-card-sub">Property Analysis</span>
+            </h3>
+            <p class="home-entry-card-desc">比较房源、评分、推荐</p>
+          </a>
+          <a class="home-entry-card" href="/contract-analysis">
+            <h3 class="home-entry-card-title">
+              合同分析
+              <span class="home-entry-card-sub">Contract Analysis</span>
+            </h3>
+            <p class="home-entry-card-desc">识别风险条款、完整性检查、建议</p>
+          </a>
+        </div>
+      </section>
+
       <!-- P10-4：主入口 — 一句话需求 → POST /api/ai/query → /ai-result -->
       <section class="card form-card" aria-labelledby="ai-rental-heading">
-        <h1 id="ai-rental-heading" class="section-title">AI 租房助手</h1>
+        <h1 id="ai-rental-heading" class="section-title">AI 租房助手 · 房源分析</h1>
         <p class="hint">用一句话描述需求，查看推荐、风险与决策建议。</p>
         <label class="field-label" for="ai-query">你的需求</label>
         <textarea
@@ -31,8 +55,6 @@
         </div>
         <p class="hint muted small-print">提示：Enter 提交 · Shift+Enter 换行</p>
         <p class="home-quick-links">
-          <a href="/contract-analysis">合同分析</a>
-          <span class="nav-sep">·</span>
           <a href="/history">去历史记录</a>
           <span class="nav-sep">·</span>
           <a href="/compare">去房源对比</a>
@@ -56,6 +78,7 @@
           <li>查看推荐结果和风险提示</li>
           <li>收藏想要的房源</li>
           <li>去历史记录和对比页继续决策</li>
+          <li>需要审合同时：打开「合同分析」上传或粘贴合同</li>
         </ol>
       </section>
 

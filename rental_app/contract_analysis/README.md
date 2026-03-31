@@ -80,6 +80,23 @@
 | **开发入口** | **服务端可读路径**（``/api/contract/analysis/file-path``）默认隐藏；页面底部「开发者：显示服务端路径」或首次访问 **`?dev=1`**（写入 localStorage 后去掉 query）后，在 **上传文件** 模式下显示 ``file_path`` 输入框；快捷「填入示例路径」亦仅在开发者模式下出现。 |
 | **首屏展示块** | ``result.summary_view`` 七段：**总体结论**、**核心风险摘要**、**风险分类汇总**、**高亮风险条款**、**优先关注条款（条款严重度）**、**合同完整性**、**行动建议**（与页面 ``contract_analysis_page.js`` 渲染顺序一致）。 |
 | **与包内能力对齐的限制** | **扫描版 PDF / 图片型 PDF** 无 OCR，抽字失败时分析可能为空或质量差；**规则与关键词为主**，不构成法律意见；**无 PDF 页码级定位**；复杂版式可能影响抽取。单文件上传默认约 **15 MB**（``RENTALAI_CONTRACT_UPLOAD_MAX_BYTES``）。 |
+
+### Phase 4 第四轮：网页产品化展示（可演示，当前）
+
+| 能力 | 说明 |
+|------|------|
+| **输入** | **粘贴文本**（JSON ``/api/contract/analysis/text``）与 **上传文件**（``.txt`` / ``.pdf`` / ``.docx`` → ``/api/contract/analysis/upload``）；开发用 **服务端路径** 见上表。 |
+| **布局** | 宽屏双栏（输入 / 结果），窄屏上下堆叠；结果区空态与七段卡片分区清晰。 |
+| **结果块** | ``summary_view`` 七段卡片：**总体结论**、**核心风险摘要**、**风险分类汇总**、**高亮风险条款**、**优先关注条款**、**合同完整性**、**行动建议**。 |
+| **风险视觉** | 高/中/低徽标与色条；总体结论文本倾向（启发式）；分类与条款卡片分级展示。 |
+| **可读性** | 条款摘录/位置预览 + ``<details>`` 全文；列表过长时「显示其余」；完整性长列表分段展开。 |
+| **仍未做的增强** | **PDF 页码级定位**、**扫描件 OCR**、**LLM 条款解读**、与房源/聊天式入口等产品化整合、打印与导出等。 |
+
+### Phase 5 首页入口（并列主能力）
+
+- 首页 **`/`**（`web_public/index.html`）顶部 **「主功能」** 区为两张并列卡片：**房源分析**（`#ai-rental-heading`，滚动至一句话租房表单）与 **合同分析**（跳转 **`/contract-analysis`**）。
+- 顶部导航（`auth_local.js` → `renderUnifiedNav`）仍保留 **合同分析** 链接，与卡片二选一即可。
+
 - **HTTP（Phase 3 兼容）**：**`POST /api/contract/phase3/analyze-text`** 由门面组装 ``result``，并保留 ``structured_analysis`` / ``explain`` 旧键名。
 - **包内等价**：**`contract_analysis.service.analyze_contract_with_explain`** / **`entrypoints`** 与门面数据一致，仅键名不同（``structured_analysis`` vs ``analysis_result``）。
 
@@ -163,6 +180,4 @@ print(r.status_code, r.json().get("ok"), list((r.json().get("result") or {}).key
 
 - PDF **页码级**定位与复杂版式 **OCR**（含扫描件友好流程）。
 - **LLM** 合同解读或条款生成。
-- 专用 **multipart** Phase 3 路由（当前可先抽文本再调现有 API；Phase 4 已提供 ``/api/contract/analysis/upload``）。
-- 与房源主流程的**深度合并**（当前子模块独立可测）。
-- 合同分析页 **UI  polish**（布局/空态/移动端）与 **首页产品化入口**（导航与文案统一）待后续迭代。
+- 与房源主流程的**深度合并**、**首页 / 聊天式入口**统一、结果**导出与打印**等（Phase 4 网页已具备可演示布局与交互，见「Phase 4 第四轮：网页产品化展示」）。

@@ -274,6 +274,84 @@
     return v && typeof v === "object" && !Array.isArray(v) ? v : {};
   }
 
+  /** 条款卡片默认露出条数；超出部分用「显示其余」展开（与 upload/text 无关，仅结果 DOM）。 */
+  var CONTRACT_RESULT_CLAUSE_BATCH = 3;
+  /** 每条内 <details> 默认展开前几条（便于扫读）。 */
+  var CONTRACT_RESULT_DETAILS_OPEN_FIRST = 2;
+  /** 完整性清单默认条数上限，超出折叠。 */
+  var CONTRACT_RESULT_COMPLETE_LIST_CAP = 6;
+
+  function truncatePreview(s, max) {
+    var t = safeStr(s).trim();
+    if (!t) return "";
+    if (t.length <= max) return t;
+    return t.slice(0, max) + "…";
+  }
+
+  /**
+   * 将 API / 文案中的严重度归一为 high | medium | low | ""（无法识别则空，安全回退）。
+   */
+  function normalizeSeverityTier(raw) {
+    var s = safeStr(raw).trim().toLowerCase();
+    if (!s) return "";
+    if (/高风险|严重|较高/.test(s) || /^高$/.test(s.trim())) return "high";
+    if (/中等|中风险|中度/.test(s) || /^中$/.test(s.trim())) return "medium";
+    if (/低风险|轻微|^低$/.test(s)) return "low";
+    if (/\b(high|critical|severe|major)\b/.test(s)) return "high";
+    if (/\b(medium|moderate|mid)\b/.test(s)) return "medium";
+    if (/\b(low|minor)\b/.test(s)) return "low";
+    return "";
+  }
+
+  function severityLabelZh(tier) {
+    if (tier === "high") return "高";
+    if (tier === "medium") return "中";
+    if (tier === "low") return "低";
+    return "";
+  }
+
+  /** 供 pill 使用的 class（无 tier 时用通用 severity 样式）。 */
+  function severityPillClass(tier) {
+    if (tier === "high") return "contract-result-pill contract-result-pill--sev-high";
+    if (tier === "medium") return "contract-result-pill contract-result-pill--sev-medium";
+    if (tier === "low") return "contract-result-pill contract-result-pill--sev-low";
+    return "contract-result-pill contract-result-pill--severity";
+  }
+
+  /** 总体结论文本中的风险倾向（无独立字段时的轻量启发，识别失败则空）。 */
+  function inferOverallConclusionTier(text) {
+    if (isEmptyText(text)) return "";
+    var s = safeStr(text);
+    var low = s.toLowerCase();
+    if (
+      /\b(high|critical|severe)\b/i.test(low) ||
+      /高风险|严重风险|较高风险|重大风险|风险较高|严重关切|风险严重/i.test(s)
+    ) {
+      return "high";
+    }
+    if (
+      /\b(medium|moderate)\b/i.test(low) ||
+      /中等风险|中风险|中度|风险中等/i.test(s)
+    ) {
+      return "medium";
+    }
+    if (
+      /\b(low|minor)\b/i.test(low) ||
+      /低风险|较低|轻微|风险较低|风险可控/i.test(s)
+    ) {
+      return "low";
+    }
+    return "";
+  }
+
+  function severitySortKey(raw) {
+    var t = normalizeSeverityTier(raw);
+    if (t === "high") return 0;
+    if (t === "medium") return 1;
+    if (t === "low") return 2;
+    return 3;
+  }
+
   function blockTitle(en, zh) {
     return (
       '<h3 class="contract-result-block-title">' +
@@ -289,12 +367,21 @@
   /**
    * 单块结果卡片：外层 article + 标题区 + 内层 body（便于样式与后续扩展）。
    * @param {string} slug data-contract-block 标识（英文 kebab）
+   * @param {object} [options] 可选：tier（high|medium|low）用于整卡左边框强调
    */
-  function wrapBlock(slug, en, zh, inner) {
+  function wrapBlock(slug, en, zh, inner, options) {
+    options = options || {};
+    var tier = options.tier || "";
+    var tierClass = tier ? " contract-result-card-block--tier-" + tier : "";
+    var tierAttr = tier ? ' data-severity-tier="' + escapeHtml(tier) + '"' : "";
     return (
-      '<article class="contract-result-card-block" data-contract-block="' +
+      '<article class="contract-result-card-block' +
+      tierClass +
+      '" data-contract-block="' +
       escapeHtml(slug) +
-      '">' +
+      '"' +
+      tierAttr +
+      ">" +
       '<header class="contract-result-card-head">' +
       blockTitle(en, zh) +
       "</header>" +
@@ -303,6 +390,29 @@
       "</div>" +
       "</article>"
     );
+  }
+
+  function renderOverallConclusionHtml(text, tierHint) {
+    var tier = tierHint != null ? tierHint : inferOverallConclusionTier(text);
+    if (isEmptyText(text)) {
+      return paragraphOrMuted("", "暂无总体结论");
+    }
+    var inner = "";
+    if (tier) {
+      inner += '<div class="contract-result-overall-badge-row">';
+      inner +=
+        '<span class="' +
+        severityPillClass(tier) +
+        '">' +
+        "风险倾向：" +
+        escapeHtml(severityLabelZh(tier)) +
+        "</span></div>";
+    }
+    inner +=
+      '<p class="contract-result-text">' +
+      escapeHtml(safeStr(text)).replace(/\n/g, "<br/>") +
+      "</p>";
+    return inner;
   }
 
   function paragraphOrMuted(text, mutedMsg) {
@@ -317,10 +427,16 @@
   }
 
   function renderRiskCategorySummary(items) {
-    var arr = safeArray(items);
+    var arr = safeArray(items).slice();
     if (arr.length === 0) {
       return paragraphOrMuted("", "暂无分类汇总");
     }
+    arr.sort(function (a, b) {
+      return (
+        severitySortKey(safeStr(a.highest_severity)) -
+        severitySortKey(safeStr(b.highest_severity))
+      );
+    });
     var html = '<ul class="contract-result-rich-list contract-result-risk-cat-list">';
     for (var i = 0; i < arr.length; i++) {
       var it = arr[i] && typeof arr[i] === "object" ? arr[i] : {};
@@ -328,7 +444,9 @@
       var cnt = it.count != null ? safeStr(it.count) : "—";
       var hi = safeStr(it.highest_severity);
       var sum = safeStr(it.short_summary);
-      html += '<li class="contract-result-rich-item">';
+      var hiTier = normalizeSeverityTier(hi);
+      var liExtra = hiTier ? " contract-result-rich-item--sev-" + hiTier : "";
+      html += '<li class="contract-result-rich-item' + liExtra + '">';
       html += '<div class="contract-result-rich-row">';
       html += '<span class="contract-result-rich-title">' + escapeHtml(cat) + "</span>";
       html += '<span class="contract-result-rich-meta">';
@@ -338,7 +456,11 @@
         "</span>";
       if (hi) {
         html +=
-          '<span class="contract-result-pill contract-result-pill--severity">' +
+          '<span class="' +
+          (hiTier ? severityPillClass(hiTier) : severityPillClass("")) +
+          '" title="' +
+          escapeHtml(hi) +
+          '">' +
           escapeHtml(hi) +
           "</span>";
       }
@@ -353,44 +475,74 @@
     return html;
   }
 
-  function renderHighlightedClauses(items) {
-    var arr = safeArray(items);
-    if (arr.length === 0) {
-      return paragraphOrMuted("", "暂无高亮风险条款");
-    }
-    var html = '<div class="contract-result-subcard-stack">';
-    for (var i = 0; i < arr.length; i++) {
-      var it = arr[i] && typeof arr[i] === "object" ? arr[i] : {};
-      var title = safeStr(it.risk_title) || "（无标题）";
-      var sev = safeStr(it.severity);
-      var cat = safeStr(it.risk_category);
-      var mt = safeStr(it.matched_text);
-      var adv = safeStr(it.short_advice);
-      var loc = safeStr(it.location_hint);
-      html += '<article class="contract-result-subcard">';
-      html += '<div class="contract-result-subcard-head">';
-      html += "<strong>" + escapeHtml(title) + "</strong>";
-      if (sev || cat) {
-        html += '<div class="contract-result-subcard-badges">';
-        if (sev) {
-          html +=
-            '<span class="contract-result-pill contract-result-pill--severity">' +
-            escapeHtml(sev) +
-            "</span>";
-        }
-        if (cat) {
-          html +=
-            '<span class="contract-result-pill contract-result-pill--muted">' +
-            escapeHtml(cat) +
-            "</span>";
-        }
-        html += "</div>";
+  function buildHighlightedArticle(it, idx) {
+    var title = safeStr(it.risk_title) || "（无标题）";
+    var sev = safeStr(it.severity);
+    var cat = safeStr(it.risk_category);
+    var mt = safeStr(it.matched_text);
+    var adv = safeStr(it.short_advice);
+    var loc = safeStr(it.location_hint);
+    var sevTier = normalizeSeverityTier(sev);
+    var subCls =
+      "contract-result-subcard" +
+      (sevTier ? " contract-result-subcard--sev-" + sevTier : "");
+    var html =
+      '<article class="' +
+      subCls +
+      '"' +
+      (sevTier ? ' data-severity-tier="' + escapeHtml(sevTier) + '"' : "") +
+      ">";
+    html += '<div class="contract-result-subcard-head">';
+    html += "<strong>" + escapeHtml(title) + "</strong>";
+    if (sev || cat) {
+      html += '<div class="contract-result-subcard-badges">';
+      if (sev) {
+        html +=
+          '<span class="' +
+          severityPillClass(sevTier) +
+          '">' +
+          escapeHtml(sev) +
+          "</span>";
+      }
+      if (cat) {
+        html +=
+          '<span class="contract-result-pill contract-result-pill--muted">' +
+          escapeHtml(cat) +
+          "</span>";
       }
       html += "</div>";
+    }
+    html += "</div>";
+    var hasQuick = !isEmptyText(mt) || !isEmptyText(loc);
+    var hasDetail = !isEmptyText(mt) || !isEmptyText(adv) || !isEmptyText(loc);
+    if (hasQuick) {
+      html += '<div class="contract-result-subcard-quick">';
       if (!isEmptyText(mt)) {
         html +=
-          '<p class="contract-result-kv"><span class="contract-result-kv-label">摘录</span>' +
-          escapeHtml(mt) +
+          '<p class="contract-result-quick-line"><span class="contract-result-quick-label">摘录</span>';
+        html += escapeHtml(truncatePreview(mt, 140)) + "</p>";
+      }
+      if (!isEmptyText(loc)) {
+        html +=
+          '<p class="contract-result-quick-line"><span class="contract-result-quick-label">位置</span>';
+        html += escapeHtml(truncatePreview(loc, 100)) + "</p>";
+      }
+      html += "</div>";
+    }
+    if (hasDetail) {
+      var openAttr =
+        idx < CONTRACT_RESULT_DETAILS_OPEN_FIRST ? " open" : "";
+      html +=
+        '<details class="contract-result-item-details"' +
+        openAttr +
+        ">";
+      html +=
+        '<summary class="contract-result-expand-summary">完整摘录、建议与位置</summary>';
+      html += '<div class="contract-result-expand-body">';
+      if (!isEmptyText(mt)) {
+        html +=
+          '<p class="contract-result-kv"><span class="contract-result-kv-label">摘录（全文）</span>' +
+          escapeHtml(mt).replace(/\n/g, "<br/>") +
           "</p>";
       }
       if (!isEmptyText(adv)) {
@@ -401,60 +553,235 @@
       }
       if (!isEmptyText(loc)) {
         html +=
-          '<p class="contract-result-kv"><span class="contract-result-kv-label">位置</span>' +
+          '<p class="contract-result-kv"><span class="contract-result-kv-label">位置（全文）</span>' +
           escapeHtml(loc) +
           "</p>";
       }
-      html += "</article>";
+      html += "</div></details>";
     }
-    html += "</div>";
+    html += "</article>";
     return html;
   }
 
-  function renderClauseSeverityOverview(items) {
-    var arr = safeArray(items);
+  function renderHighlightedClauses(items) {
+    var arr = safeArray(items).slice();
     if (arr.length === 0) {
-      return paragraphOrMuted("", "暂无条款严重度条目");
+      return paragraphOrMuted("", "暂无高亮风险条款");
     }
-    var html = '<div class="contract-result-subcard-stack">';
-    for (var i = 0; i < arr.length; i++) {
-      var it = arr[i] && typeof arr[i] === "object" ? arr[i] : {};
-      var cid = safeStr(it.clause_id);
-      var ctype = safeStr(it.clause_type);
-      var score = it.severity_score != null ? safeStr(it.severity_score) : "—";
-      var hi = safeStr(it.highest_severity);
-      var cnt = it.linked_risk_count != null ? safeStr(it.linked_risk_count) : "—";
-      var prev = safeStr(it.short_clause_preview);
-      var titles = safeArray(it.linked_risk_titles);
-      var titleLine = titles.length ? titles.join("；") : "";
-      html += '<article class="contract-result-subcard">';
-      html += '<div class="contract-result-subcard-head">';
+    arr.sort(function (a, b) {
+      return severitySortKey(safeStr(a.severity)) - severitySortKey(safeStr(b.severity));
+    });
+    var n = arr.length;
+    var batch = CONTRACT_RESULT_CLAUSE_BATCH;
+    if (n <= batch) {
+      var html0 = '<div class="contract-result-subcard-stack">';
+      for (var i = 0; i < n; i++) {
+        html0 += buildHighlightedArticle(
+          arr[i] && typeof arr[i] === "object" ? arr[i] : {},
+          i
+        );
+      }
+      html0 += "</div>";
+      return html0;
+    }
+    var html =
+      '<div class="contract-result-more-host"><div class="contract-result-subcard-stack">';
+    for (var j = 0; j < batch; j++) {
+      html += buildHighlightedArticle(
+        arr[j] && typeof arr[j] === "object" ? arr[j] : {},
+        j
+      );
+    }
+    html += '</div><div class="contract-result-more-wrap hidden">';
+    for (var k = batch; k < n; k++) {
+      html += buildHighlightedArticle(
+        arr[k] && typeof arr[k] === "object" ? arr[k] : {},
+        k
+      );
+    }
+    html += "</div>";
+    html +=
+      '<button type="button" class="contract-result-more-btn">显示其余 ' +
+      (n - batch) +
+      " 条</button></div>";
+    return html;
+  }
+
+  function buildClauseSeverityArticle(it, idx) {
+    var cid = safeStr(it.clause_id);
+    var ctype = safeStr(it.clause_type);
+    var score = it.severity_score != null ? safeStr(it.severity_score) : "—";
+    var hi = safeStr(it.highest_severity);
+    var cnt = it.linked_risk_count != null ? safeStr(it.linked_risk_count) : "—";
+    var prev = safeStr(it.short_clause_preview);
+    var titles = safeArray(it.linked_risk_titles);
+    var titleLine = titles.length ? titles.join("；") : "";
+    var hiTier = normalizeSeverityTier(hi);
+    var subCls =
+      "contract-result-subcard" +
+      (hiTier ? " contract-result-subcard--sev-" + hiTier : "");
+    var html =
+      '<article class="' +
+      subCls +
+      '"' +
+      (hiTier ? ' data-severity-tier="' + escapeHtml(hiTier) + '"' : "") +
+      ">";
+    html += '<div class="contract-result-subcard-head">';
+    html +=
+      "<strong>" +
+      escapeHtml((cid || "条款") + (ctype ? " · " + ctype : "")) +
+      "</strong>";
+    html += "</div>";
+    html += '<dl class="contract-result-dl">';
+    html += "<dt>强度分</dt><dd>" + escapeHtml(score) + "</dd>";
+    html += "<dt>最高严重度</dt><dd>";
+    if (hi) {
       html +=
-        "<strong>" +
-        escapeHtml((cid || "条款") + (ctype ? " · " + ctype : "")) +
-        "</strong>";
+        '<span class="' +
+        (hiTier ? severityPillClass(hiTier) : severityPillClass("")) +
+        '">' +
+        escapeHtml(hi) +
+        "</span>";
+    } else {
+      html += escapeHtml("—");
+    }
+    html += "</dd>";
+    html += "<dt>关联风险数</dt><dd>" + escapeHtml(cnt) + "</dd>";
+    html += "</dl>";
+    var hasQuick = !isEmptyText(prev) || titles.length > 0;
+    var hasExpand =
+      !isEmptyText(prev) || titles.length > 0 || !isEmptyText(titleLine);
+    if (hasQuick) {
+      html += '<div class="contract-result-subcard-quick">';
+      if (!isEmptyText(prev)) {
+        html +=
+          '<p class="contract-result-quick-line"><span class="contract-result-quick-label">条款预览</span>';
+        html += escapeHtml(truncatePreview(prev, 120)) + "</p>";
+      }
+      if (titles.length) {
+        html +=
+          '<p class="contract-result-quick-line"><span class="contract-result-quick-label">关联风险</span>';
+        html += escapeHtml(truncatePreview(titleLine, 100)) + "</p>";
+      }
       html += "</div>";
-      html += '<dl class="contract-result-dl">';
-      html += "<dt>强度分</dt><dd>" + escapeHtml(score) + "</dd>";
-      html += "<dt>最高严重度</dt><dd>" + escapeHtml(hi || "—") + "</dd>";
-      html += "<dt>关联风险数</dt><dd>" + escapeHtml(cnt) + "</dd>";
-      html += "</dl>";
+    }
+    if (hasExpand) {
+      var openAttr2 =
+        idx < CONTRACT_RESULT_DETAILS_OPEN_FIRST ? " open" : "";
+      html +=
+        '<details class="contract-result-item-details"' +
+        openAttr2 +
+        ">";
+      html +=
+        '<summary class="contract-result-expand-summary">完整预览与关联风险标题</summary>';
+      html += '<div class="contract-result-expand-body">';
       if (!isEmptyText(prev)) {
         html +=
           '<p class="contract-result-kv contract-result-kv--preview">' +
-          escapeHtml(prev) +
+          escapeHtml(prev).replace(/\n/g, "<br/>") +
           "</p>";
       }
-      if (!isEmptyText(titleLine)) {
+      if (titles.length) {
+        html += '<p class="contract-result-kv-label">关联风险标题</p><ul class="contract-result-tiny-list">';
+        for (var t = 0; t < titles.length; t++) {
+          html += "<li>" + escapeHtml(safeStr(titles[t])) + "</li>";
+        }
+        html += "</ul>";
+      } else if (!isEmptyText(titleLine)) {
         html +=
           '<p class="contract-result-kv"><span class="contract-result-kv-label">关联风险</span>' +
           escapeHtml(titleLine) +
           "</p>";
       }
-      html += "</article>";
+      html += "</div></details>";
     }
-    html += "</div>";
+    html += "</article>";
     return html;
+  }
+
+  function renderClauseSeverityOverview(items) {
+    var arr = safeArray(items).slice();
+    if (arr.length === 0) {
+      return paragraphOrMuted("", "暂无条款严重度条目");
+    }
+    arr.sort(function (a, b) {
+      var ka = severitySortKey(safeStr(a.highest_severity));
+      var kb = severitySortKey(safeStr(b.highest_severity));
+      if (ka !== kb) return ka - kb;
+      var sa = parseFloat(a.severity_score);
+      var sb = parseFloat(b.severity_score);
+      if (!isNaN(sa) && !isNaN(sb) && sa !== sb) return sb - sa;
+      return 0;
+    });
+    var n2 = arr.length;
+    var batch2 = CONTRACT_RESULT_CLAUSE_BATCH;
+    if (n2 <= batch2) {
+      var h = '<div class="contract-result-subcard-stack">';
+      for (var i = 0; i < n2; i++) {
+        h += buildClauseSeverityArticle(
+          arr[i] && typeof arr[i] === "object" ? arr[i] : {},
+          i
+        );
+      }
+      h += "</div>";
+      return h;
+    }
+    var html2 =
+      '<div class="contract-result-more-host"><div class="contract-result-subcard-stack">';
+    for (var j = 0; j < batch2; j++) {
+      html2 += buildClauseSeverityArticle(
+        arr[j] && typeof arr[j] === "object" ? arr[j] : {},
+        j
+      );
+    }
+    html2 += '</div><div class="contract-result-more-wrap hidden">';
+    for (var k = batch2; k < n2; k++) {
+      html2 += buildClauseSeverityArticle(
+        arr[k] && typeof arr[k] === "object" ? arr[k] : {},
+        k
+      );
+    }
+    html2 += "</div>";
+    html2 +=
+      '<button type="button" class="contract-result-more-btn">显示其余 ' +
+      (n2 - batch2) +
+      " 条</button></div>";
+    return html2;
+  }
+
+  function renderCompleteListSection(items, headingZh) {
+    var list = safeArray(items);
+    var cap = CONTRACT_RESULT_COMPLETE_LIST_CAP;
+    if (list.length === 0) return "";
+    var sec =
+      '<section class="contract-result-nested-section"><h4 class="contract-result-h4">' +
+      escapeHtml(headingZh) +
+      "</h4>";
+    if (list.length <= cap) {
+      sec += '<ul class="contract-result-list contract-result-list--spaced">';
+      for (var i = 0; i < list.length; i++) {
+        sec += "<li>" + escapeHtml(safeStr(list[i])) + "</li>";
+      }
+      sec += "</ul></section>";
+      return sec;
+    }
+    sec += '<ul class="contract-result-list contract-result-list--spaced">';
+    for (var j = 0; j < cap; j++) {
+      sec += "<li>" + escapeHtml(safeStr(list[j])) + "</li>";
+    }
+    sec += "</ul>";
+    sec += '<div class="contract-result-more-host">';
+    sec += '<div class="contract-result-more-wrap hidden"><ul class="contract-result-list contract-result-list--spaced">';
+    for (var k = cap; k < list.length; k++) {
+      sec += "<li>" + escapeHtml(safeStr(list[k])) + "</li>";
+    }
+    sec += "</ul></div>";
+    sec +=
+      '<button type="button" class="contract-result-more-btn">显示其余 ' +
+      (list.length - cap) +
+      " 项</button>";
+    sec += "</div></section>";
+    return sec;
   }
 
   function renderCompletenessOverview(o) {
@@ -497,22 +824,10 @@
         "</p>";
     }
     if (miss.length) {
-      html += '<section class="contract-result-nested-section">';
-      html +=
-        '<h4 class="contract-result-h4">缺失核心项</h4><ul class="contract-result-list contract-result-list--spaced">';
-      for (var i = 0; i < miss.length; i++) {
-        html += "<li>" + escapeHtml(safeStr(miss[i])) + "</li>";
-      }
-      html += "</ul></section>";
+      html += renderCompleteListSection(miss, "缺失核心项");
     }
     if (unclear.length) {
-      html += '<section class="contract-result-nested-section">';
-      html +=
-        '<h4 class="contract-result-h4">不明确项</h4><ul class="contract-result-list contract-result-list--spaced">';
-      for (var j = 0; j < unclear.length; j++) {
-        html += "<li>" + escapeHtml(safeStr(unclear[j])) + "</li>";
-      }
-      html += "</ul></section>";
+      html += renderCompleteListSection(unclear, "不明确项");
     }
     html += "</div>";
     return html;
@@ -543,12 +858,14 @@
     var sv = safeObject(res.summary_view);
     var parts = [];
 
+    var ocTier = inferOverallConclusionTier(sv.overall_conclusion);
     parts.push(
       wrapBlock(
         "overall-conclusion",
         "Overall Conclusion",
         "总体结论",
-        paragraphOrMuted(sv.overall_conclusion, "暂无总体结论")
+        renderOverallConclusionHtml(sv.overall_conclusion, ocTier),
+        { tier: ocTier }
       )
     );
     parts.push(
@@ -695,6 +1012,26 @@
 
     setError("请先选择要上传的合同文件，或展开「开发：服务端路径」填写 file_path。");
   });
+
+  function initContractResultMoreButtons() {
+    if (!resultBody) return;
+    if (resultBody.getAttribute("data-contract-more-bound") === "1") return;
+    resultBody.setAttribute("data-contract-more-bound", "1");
+    resultBody.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var btn = t.closest(".contract-result-more-btn");
+      if (!btn) return;
+      ev.preventDefault();
+      var host = btn.closest(".contract-result-more-host");
+      if (!host) return;
+      var wrap = host.querySelector(".contract-result-more-wrap");
+      if (wrap) wrap.classList.remove("hidden");
+      btn.style.display = "none";
+    });
+  }
+
+  initContractResultMoreButtons();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", tryRestoreLastResult);

@@ -89,7 +89,7 @@ uvicorn api_server:app --host 127.0.0.1 --port 8000
 | 路径 | 说明 |
 |------|------|
 | `/login` | 本地假登录 |
-| `/` | AI 输入首页（需已登录） |
+| `/` | 首页（需已登录）：**房源分析**（一句话需求表单）与 **合同分析**（入口卡片跳转 `/contract-analysis`）并列主入口 |
 | `/ai-result` | 需求解析与推荐结果 |
 | `/compare` | 收藏房源对比 |
 | `/history` | 已保存分析列表 |
@@ -118,7 +118,7 @@ uvicorn api_server:app --host 127.0.0.1 --port 8000
 
 与房源推荐主流程独立，规则引擎在包 **`contract_analysis/`**。最小说明、输入输出、Phase 4 接入建议见 **`contract_analysis/README.md`**；HTTP 入口示例 **`POST /api/contract/phase3/analyze-text`**（另有 Phase B 管线 **`/api/contract/analyze-text`**，勿混淆）。
 
-**Phase 4 最小 HTTP**（`summary_view` + `raw_analysis`）：先启动服务后执行 **`python scripts/contract_analysis_api_smoke.py`**，或打开 **`/contract-analysis`** 用页面内「填入示例文本 / 示例路径」联调；详见上文「本地验证合同分析页」与 **`contract_analysis/README.md`**。
+**Phase 4 最小 HTTP**（`summary_view` + `raw_analysis`）：先启动服务后执行 **`python scripts/contract_analysis_api_smoke.py`**，或打开 **`/contract-analysis`** 联调（双栏输入/结果、七段卡片、风险等级与条款展开等，见 **`contract_analysis/README.md`**「Phase 4 第四轮：网页产品化展示」）。
 
 ---
 
