@@ -1,0 +1,11 @@
+Part 9 — several clauses with mixed severities (numbered lines → multiple clauses).
+
+1. The monthly rent is £950 pcm. The tenancy deposit will not be protected by any scheme.
+
+2. The tenant agrees to pay undisclosed charges and a late payment fee if rent is late; mandatory fees apply.
+
+3. The landlord may enter the property at any time without prior notice for inspections.
+
+4. Keeping pets: a pet fee of £150 is non-refundable under the pet policy.
+
+5. Termination: the tenancy may end with no notice required for the landlord.

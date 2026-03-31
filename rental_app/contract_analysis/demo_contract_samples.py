@@ -35,6 +35,10 @@ from .sample_contracts_data import (
     SAMPLE_LOC_HIDDEN_FEE,
     SAMPLE_LOC_LANDLORD_ACCESS,
     SAMPLE_LOC_TENANT_REPAIRS,
+    SAMPLE_SEVERITY_LOW_INCOMPLETE_CLAUSE,
+    SAMPLE_SEVERITY_MEDIUM_FEE_CLAUSE,
+    SAMPLE_SEVERITY_MIXED_CLAUSES,
+    SAMPLE_SEVERITY_ONE_CLAUSE_MULTI_HIGH,
 )
 from .service import analyze_contract_with_explain
 
@@ -97,6 +101,34 @@ def _assert_clause_severity_summary_shape(sa: dict[str, Any], label: str) -> Non
         ]
         assert int(item.get("linked_risk_count") or 0) == len(links_for), label
         assert int(item.get("severity_score") or 0) == sum(_row_weight(x) for x in links_for), label
+
+
+def _assert_clause_severity_score_descending(sa: dict[str, Any], label: str) -> None:
+    """``clause_severity_summary`` 按 ``severity_score`` 降序（与 ``build_clause_severity_summary`` 一致）。"""
+    css = sa.get("clause_severity_summary")
+    assert isinstance(css, list), label
+    scores: list[int] = []
+    for x in css:
+        if isinstance(x, dict):
+            try:
+                scores.append(int(x.get("severity_score", 0)))
+            except (TypeError, ValueError):
+                scores.append(0)
+    assert scores == sorted(scores, reverse=True), f"{label}: severity_score 非降序 {scores!r}"
+
+
+def _assert_clause_severity_explain_aligned(sa: dict[str, Any], ex: dict[str, Any], label: str) -> None:
+    """explain.clause_severity_overview 与 structured clause_severity_summary 条数、clause_id 顺序一致。"""
+    css = sa.get("clause_severity_summary")
+    cso = ex.get("clause_severity_overview")
+    assert isinstance(css, list), label
+    assert isinstance(cso, list), label
+    assert len(css) == len(cso), f"{label}: len summary {len(css)} vs overview {len(cso)}"
+    for a, b in zip(css, cso):
+        if not isinstance(a, dict) or not isinstance(b, dict):
+            continue
+        assert str(a.get("clause_id") or "").strip() == str(b.get("clause_id") or "").strip(), label
+        assert int(a.get("severity_score") or 0) == int(b.get("severity_score") or 0), label
 
 
 def _assert_clause_severity_overview_explain(ex: dict[str, Any], label: str) -> None:
@@ -313,6 +345,73 @@ def _clause_type_specs() -> list[tuple[str, str, dict[str, Any]]]:
         for (k, v, w) in _sample_specs()
         if k in _CLAUSE_TYPE_SAMPLES_EXPECT
     ]
+
+
+def _severity_sample_specs() -> list[tuple[str, str, dict[str, Any]]]:
+    """Part 9：条款风险强度（clause_severity_summary / clause_severity_overview）专项样例。"""
+    return [
+        (
+            "sample_severity_one_clause_multi_high",
+            SAMPLE_SEVERITY_ONE_CLAUSE_MULTI_HIGH,
+            {"monthly_rent": 900.0, "deposit_amount": 900.0},
+        ),
+        (
+            "sample_severity_mixed_clauses",
+            SAMPLE_SEVERITY_MIXED_CLAUSES,
+            {"monthly_rent": 950.0, "deposit_amount": 950.0},
+        ),
+        (
+            "sample_severity_medium_fee_clause",
+            SAMPLE_SEVERITY_MEDIUM_FEE_CLAUSE,
+            {"monthly_rent": 880.0, "deposit_amount": 880.0},
+        ),
+        (
+            "sample_severity_low_incomplete_clause",
+            SAMPLE_SEVERITY_LOW_INCOMPLETE_CLAUSE,
+            {"monthly_rent": 850.0, "deposit_amount": 850.0},
+        ),
+    ]
+
+
+def validate_contract_severity_samples() -> None:
+    """
+    Part 9：``clause_severity_summary`` / ``clause_severity_overview`` 稳定存在、分值可预期、降序排序、与 explain 对齐。
+    """
+    for label, text, kwargs in _severity_sample_specs():
+        out = analyze_contract_with_explain(contract_text=text, **kwargs)
+        sa = out["structured_analysis"]
+        ex = out["explain"]
+        assert isinstance(sa.get("clause_severity_summary"), list), label
+        assert isinstance(ex.get("clause_severity_overview"), list), label
+        _assert_clause_severity_summary_shape(sa, label)
+        _assert_clause_severity_overview_explain(ex, label)
+        _assert_clause_severity_score_descending(sa, label)
+        _assert_clause_severity_explain_aligned(sa, ex, label)
+
+        css = sa.get("clause_severity_summary") or []
+        assert len(css) >= 1, f"{label}: clause_severity_summary 非空"
+
+        if label == "sample_severity_one_clause_multi_high":
+            assert len(css) == 1, label
+            row0 = css[0] if isinstance(css[0], dict) else {}
+            assert str(row0.get("clause_id") or "") == "clause_1", label
+            assert int(row0.get("severity_score") or 0) >= 15, label
+            assert int(row0.get("linked_risk_count") or 0) >= 5, label
+
+        elif label == "sample_severity_mixed_clauses":
+            assert len(css) >= 4, label
+            scores = [int(x.get("severity_score") or 0) for x in css if isinstance(x, dict)]
+            assert max(scores) - min(scores) >= 2, f"{label}: 分数未拉开 {scores!r}"
+
+        elif label == "sample_severity_medium_fee_clause":
+            assert len(css) == 1, label
+            r0 = css[0] if isinstance(css[0], dict) else {}
+            assert str(r0.get("highest_severity") or "") == "medium", label
+
+        elif label == "sample_severity_low_incomplete_clause":
+            assert len(css) == 1, label
+            r0 = css[0] if isinstance(css[0], dict) else {}
+            assert int(r0.get("severity_score") or 0) == 2, label
 
 
 def _category_specs() -> list[tuple[str, str, dict[str, Any]]]:
@@ -622,6 +721,7 @@ def test_contract_analysis_samples() -> None:
     validate_contract_category_samples()
     validate_contract_clause_type_samples()
     validate_contract_clause_risk_samples()
+    validate_contract_severity_samples()
     validate_contract_empty_contract_text_clause_list()
     validate_contract_analysis_empty_risk_fallback()
 

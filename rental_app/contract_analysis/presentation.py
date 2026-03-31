@@ -98,11 +98,40 @@ def _clause_severity_overview_display_items(ex: dict[str, Any], sa: dict[str, An
     """Explain 的 ``clause_severity_overview``；无 explain 时回退结构化 ``clause_severity_summary``。"""
     raw = ex.get("clause_severity_overview")
     if isinstance(raw, list) and raw:
-        return [x for x in raw if isinstance(x, dict)]
+        return [_normalize_clause_severity_item_for_api(x) for x in raw if isinstance(x, dict)]
     fallback = sa.get("clause_severity_summary")
     if isinstance(fallback, list) and fallback:
-        return [x for x in fallback if isinstance(x, dict)]
+        return [_normalize_clause_severity_item_for_api(x) for x in fallback if isinstance(x, dict)]
     return []
+
+
+def _normalize_clause_severity_item_for_api(row: dict[str, Any]) -> dict[str, Any]:
+    """主流程 / API 用：每条含稳定键，便于前端渲染 Top risky clauses 卡片。"""
+    try:
+        score = int(row.get("severity_score", 0))
+    except (TypeError, ValueError):
+        score = 0
+    try:
+        nlink = int(row.get("linked_risk_count", 0))
+    except (TypeError, ValueError):
+        nlink = 0
+    hs = str(row.get("highest_severity") or "medium").strip().lower()
+    if hs not in ("high", "medium", "low"):
+        hs = "medium"
+    titles = row.get("linked_risk_titles")
+    if not isinstance(titles, list):
+        titles = []
+    titles = [str(t).strip() for t in titles if str(t).strip()]
+    prev = str(row.get("short_clause_preview") or "").strip() or "—"
+    return {
+        "clause_id": str(row.get("clause_id") or "").strip(),
+        "clause_type": coerce_contract_clause_type(row.get("clause_type")),
+        "severity_score": max(0, score),
+        "highest_severity": hs,
+        "linked_risk_count": max(0, nlink),
+        "short_clause_preview": prev,
+        "linked_risk_titles": titles,
+    }
 
 
 def _risk_rows_from_explain_layers(
@@ -149,7 +178,7 @@ def format_contract_analysis_cli_report(
 
     第二层按固定顺序分段：Overall Conclusion → Key Risk Summary → Risk Category Summary →
     Risk Category Groups → Highlighted Risk Clauses → Clause Overview → Clause Risk Overview →
-    Missing Clause Summary → Action Advice。
+    Clause Severity Overview（Top Risky Clauses）→ Missing Clause Summary → Action Advice。
     """
     sa = structured_analysis if isinstance(structured_analysis, dict) else {}
     ex = explain if isinstance(explain, dict) else {}
@@ -159,6 +188,12 @@ def format_contract_analysis_cli_report(
     missing = sa.get("missing_items") or []
     hrc_raw = ex.get("highlighted_risk_clauses") or []
     hrc: list[dict[str, Any]] = [x for x in hrc_raw if isinstance(x, dict)]
+
+    crm = sa.get("clause_risk_map")
+    crm_n = len(crm) if isinstance(crm, list) else 0
+    css = sa.get("clause_severity_summary")
+    css_n = len(css) if isinstance(css, list) else 0
+    clauses_n = len(sa.get("clause_list") or []) if isinstance(sa.get("clause_list"), list) else 0
 
     lines: list[str] = [
         "===== RentalAI 合同分析 · Phase 3 =====",
@@ -170,6 +205,9 @@ def format_contract_analysis_cli_report(
         f"· 规则命中风险：{len(risks)} 条",
         f"· 正文覆盖主题：{len(topics)} 类",
         f"· 未匹配主题项：{len(missing)} 类",
+        f"· 切分条款条数：{clauses_n} 条",
+        f"· 条款—风险联动：{crm_n} 条（clause_risk_map）",
+        f"· 条款风险强度汇总：{css_n} 条（clause_severity_summary / Top risky clauses）",
         "",
     ]
     if isinstance(risks, list) and risks:

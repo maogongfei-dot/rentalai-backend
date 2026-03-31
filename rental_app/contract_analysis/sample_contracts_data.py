@@ -8,6 +8,8 @@ Phase 3：内置样例合同文本（从 ``contract_analysis/samples/*.txt`` 读
 ``sample_clause_*.txt``：Part 7 条款切分与 clause_type 多场景样例。
 
 ``sample_clause_risk_*.txt``：Part 8 条款—风险联动（clause_risk_map / clause_risk_overview）专项样例。
+
+``sample_severity_*.txt``：Part 9 条款风险强度汇总（clause_severity_summary / clause_severity_overview）专项样例。
 """
 
 from __future__ import annotations
@@ -53,3 +55,9 @@ SAMPLE_CLAUSE_RISK_DEPOSIT_HIGH: str = _load_sample("sample_clause_risk_deposit_
 SAMPLE_CLAUSE_RISK_HIDDEN_FEE: str = _load_sample("sample_clause_risk_hidden_fee.txt")
 SAMPLE_CLAUSE_RISK_ACCESS_NOTICE: str = _load_sample("sample_clause_risk_access_notice.txt")
 SAMPLE_CLAUSE_RISK_TENANT_REPAIRS: str = _load_sample("sample_clause_risk_tenant_repairs.txt")
+
+# Part 9：条款风险强度（clause_severity_summary / clause_severity_overview）专项
+SAMPLE_SEVERITY_ONE_CLAUSE_MULTI_HIGH: str = _load_sample("sample_severity_one_clause_multi_high.txt")
+SAMPLE_SEVERITY_MIXED_CLAUSES: str = _load_sample("sample_severity_mixed_clauses.txt")
+SAMPLE_SEVERITY_MEDIUM_FEE_CLAUSE: str = _load_sample("sample_severity_medium_fee_clause.txt")
+SAMPLE_SEVERITY_LOW_INCOMPLETE_CLAUSE: str = _load_sample("sample_severity_low_incomplete_clause.txt")

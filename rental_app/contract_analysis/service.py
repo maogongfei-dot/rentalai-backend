@@ -67,7 +67,7 @@ def analyze_contract_with_explain(
 
     - ``structured_analysis``：第一层（含 ``meta``、``risks[].matched_text``、``clause_risk_map``、``clause_severity_summary`` 等）。
     - ``explain``：第二层（含 ``highlighted_risk_clauses``、``clause_risk_overview``、``clause_severity_overview`` 等，与 CLI/API 展示对齐）。
-    - ``presentation``：``sections``（含 ``title_en``、``kind=risk_clauses`` 的 ``items``）与 ``plain_text``。
+    - ``presentation``：``sections``（含 ``kind=clause_severity_overview`` 的 ``items``、与 CLI 一致的 ``plain_text`` 等；``plain_text`` 含 Clause Severity Overview / Top Risky Clauses 分段）。
     """
     base = analyze_contract(
         contract_text=contract_text,

@@ -71,6 +71,7 @@ from .demo_contract_samples import (
     validate_contract_empty_contract_text_clause_list,
     validate_contract_category_samples,
     validate_contract_localization_samples,
+    validate_contract_severity_samples,
 )
 from .presentation import build_contract_presentation, format_contract_analysis_cli_report
 from .service import (
@@ -103,6 +104,10 @@ from .sample_contracts_data import (
     SAMPLE_LOC_HIDDEN_FEE,
     SAMPLE_LOC_LANDLORD_ACCESS,
     SAMPLE_LOC_TENANT_REPAIRS,
+    SAMPLE_SEVERITY_LOW_INCOMPLETE_CLAUSE,
+    SAMPLE_SEVERITY_MEDIUM_FEE_CLAUSE,
+    SAMPLE_SEVERITY_MIXED_CLAUSES,
+    SAMPLE_SEVERITY_ONE_CLAUSE_MULTI_HIGH,
 )
 
 __all__ = [
@@ -182,6 +187,10 @@ __all__ = [
     "SAMPLE_LOC_HIDDEN_FEE",
     "SAMPLE_LOC_LANDLORD_ACCESS",
     "SAMPLE_LOC_TENANT_REPAIRS",
+    "SAMPLE_SEVERITY_LOW_INCOMPLETE_CLAUSE",
+    "SAMPLE_SEVERITY_MEDIUM_FEE_CLAUSE",
+    "SAMPLE_SEVERITY_MIXED_CLAUSES",
+    "SAMPLE_SEVERITY_ONE_CLAUSE_MULTI_HIGH",
     "test_contract_analysis_samples",
     "test_contract_document_readers",
     "validate_contract_analysis_empty_risk_fallback",
@@ -192,4 +201,5 @@ __all__ = [
     "validate_contract_clause_type_samples",
     "validate_contract_file_analysis_demo",
     "validate_contract_localization_samples",
+    "validate_contract_severity_samples",
 ]
