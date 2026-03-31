@@ -35,6 +35,52 @@ from .sample_contracts_data import (
 from .service import analyze_contract_with_explain
 
 
+def _assert_clause_risk_map_shape(sa: dict[str, Any], label: str) -> None:
+    """Part 8：``clause_risk_map`` 为 list，项字段齐全且 ``clause_id`` 属于 ``clause_list``。"""
+    crm = sa.get("clause_risk_map")
+    assert isinstance(crm, list), label
+    clause_ids = {
+        str(c.get("clause_id") or "").strip()
+        for c in (sa.get("clause_list") or [])
+        if isinstance(c, dict)
+    }
+    risks_n = len(sa.get("risks") or [])
+    assert len(crm) <= risks_n, label
+    for row in crm:
+        assert isinstance(row, dict), label
+        assert str(row.get("clause_id") or "").strip(), label
+        assert str(row.get("risk_title") or "").strip(), label
+        assert str(row.get("risk_category") or "").strip(), label
+        assert str(row.get("severity") or "").strip(), label
+        assert isinstance(row.get("matched_keyword"), str), label
+        assert isinstance(row.get("matched_text"), str), label
+        assert isinstance(row.get("location_hint"), str), label
+        assert str(row.get("link_reason") or "").strip(), label
+        cid = str(row.get("clause_id") or "").strip()
+        assert cid in clause_ids, f"{label}: clause_risk_map references unknown clause_id {cid!r}"
+
+
+def _assert_clause_risk_overview_explain(ex: dict[str, Any], label: str) -> None:
+    """Explain：``clause_risk_overview`` 为 list；非空时每块含 ``linked_risks`` 子项。"""
+    cro = ex.get("clause_risk_overview")
+    assert isinstance(cro, list), label
+    for block in cro:
+        assert isinstance(block, dict), label
+        assert str(block.get("clause_id") or "").strip(), label
+        assert isinstance(block.get("clause_type"), str) and str(block.get("clause_type") or "").strip(), label
+        assert str(block.get("short_clause_preview") or "").strip(), label
+        lr = block.get("linked_risks")
+        assert isinstance(lr, list), label
+        assert len(lr) >= 1, label
+        for x in lr:
+            assert isinstance(x, dict), label
+            assert str(x.get("risk_title") or "").strip(), label
+            assert str(x.get("risk_category") or "").strip(), label
+            assert str(x.get("severity") or "").strip(), label
+            assert isinstance(x.get("matched_keyword"), str), label
+            assert str(x.get("short_reason") or "").strip(), label
+
+
 def _sample_specs() -> list[tuple[str, str, dict[str, Any]]]:
     """(标签, 全文, analyze_contract_with_explain 可选数值参数)"""
     return [
@@ -184,13 +230,13 @@ def validate_contract_category_samples() -> None:
         ex = out["explain"]
         assert isinstance(sa.get("risks"), list), label
         assert isinstance(sa.get("clause_list"), list), label
-        assert isinstance(sa.get("clause_risk_map"), list), label
-        assert sa.get("clause_risk_map") == [], label
+        _assert_clause_risk_map_shape(sa, label)
         assert isinstance(sa.get("risk_category_summary"), list), label
         assert isinstance(sa.get("risk_category_groups"), list), label
         assert isinstance(ex.get("risk_category_summary"), list), label
         assert isinstance(ex.get("risk_category_groups"), list), label
         assert isinstance(ex.get("clause_overview"), list), label
+        _assert_clause_risk_overview_explain(ex, label)
         assert isinstance(ex.get("highlighted_risk_clauses"), list), label
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"]), label
         assert len(ex["risk_category_groups"]) == len(ex["risk_category_summary"]), label
@@ -231,9 +277,9 @@ def validate_contract_clause_type_samples() -> None:
         sa = out["structured_analysis"]
         ex = out["explain"]
         assert isinstance(sa.get("clause_list"), list), label
-        assert isinstance(sa.get("clause_risk_map"), list), label
-        assert sa.get("clause_risk_map") == [], label
+        _assert_clause_risk_map_shape(sa, label)
         assert isinstance(ex.get("clause_overview"), list), label
+        _assert_clause_risk_overview_explain(ex, label)
         clauses = sa.get("clause_list") or []
         overview = ex.get("clause_overview") or []
         assert len(clauses) >= 2, label
@@ -269,8 +315,7 @@ def validate_contract_analysis_samples() -> None:
         assert isinstance(sa.get("detected_topics"), list)
         assert isinstance(sa.get("clause_list"), list), label
         assert len(sa.get("clause_list") or []) >= 1, label
-        assert isinstance(sa.get("clause_risk_map"), list), label
-        assert sa.get("clause_risk_map") == [], label
+        _assert_clause_risk_map_shape(sa, label)
         assert isinstance(sa.get("risk_category_groups"), list)
         assert isinstance(sa.get("risk_category_summary"), list)
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"])
@@ -286,6 +331,7 @@ def validate_contract_analysis_samples() -> None:
         assert isinstance(ex.get("risk_category_groups"), list)
         assert isinstance(ex.get("risk_category_summary"), list)
         assert isinstance(ex.get("clause_overview"), list), label
+        _assert_clause_risk_overview_explain(ex, label)
         assert len(ex["risk_category_groups"]) == len(ex["risk_category_summary"])
         pres = out.get("presentation") or {}
         sec_ids = [s.get("id") for s in (pres.get("sections") or []) if isinstance(s, dict)]
@@ -341,13 +387,13 @@ def validate_contract_localization_samples() -> None:
         assert len(risks) >= 1, label
         assert isinstance(sa.get("clause_list"), list), label
         assert len(sa.get("clause_list") or []) >= 1, label
-        assert isinstance(sa.get("clause_risk_map"), list), label
-        assert sa.get("clause_risk_map") == [], label
+        _assert_clause_risk_map_shape(sa, label)
         assert isinstance(sa.get("risk_category_groups"), list), label
         assert isinstance(sa.get("risk_category_summary"), list), label
         assert isinstance(ex.get("risk_category_groups"), list), label
         assert isinstance(ex.get("risk_category_summary"), list), label
         assert isinstance(ex.get("clause_overview"), list), label
+        _assert_clause_risk_overview_explain(ex, label)
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"]), label
         hrc = ex.get("highlighted_risk_clauses")
         assert isinstance(hrc, list), label
@@ -378,6 +424,8 @@ def validate_contract_empty_contract_text_clause_list() -> None:
     assert sa.get("clause_risk_map") == []
     assert isinstance(ex.get("clause_overview"), list)
     assert ex.get("clause_overview") == []
+    assert isinstance(ex.get("clause_risk_overview"), list)
+    assert ex.get("clause_risk_overview") == []
 
 
 def validate_contract_analysis_empty_risk_fallback() -> None:
@@ -406,6 +454,7 @@ def validate_contract_analysis_empty_risk_fallback() -> None:
     assert ex.get("risk_category_groups") == []
     assert ex.get("risk_category_summary") == []
     assert isinstance(ex.get("clause_overview"), list)
+    assert isinstance(ex.get("clause_risk_overview"), list)
     assert len(ex["clause_overview"]) >= 1
 
 
@@ -443,6 +492,24 @@ def run_contract_analysis_demo() -> None:
                     f"{row.get('short_clause_preview')} | keywords={row.get('matched_keywords')}"
                 )
         if not (ex.get("clause_overview") or []):
+            print("  (none)")
+        print()
+        print("【clause_risk_overview】")
+        for block in ex.get("clause_risk_overview") or []:
+            if isinstance(block, dict):
+                print(
+                    f"  · {block.get('clause_id')} [{block.get('clause_type')}] "
+                    f"{block.get('short_clause_preview')}"
+                )
+                for lr in block.get("linked_risks") or []:
+                    if isinstance(lr, dict):
+                        sr = str(lr.get("short_reason") or "")
+                        tail = (sr[:72] + "…") if len(sr) > 72 else sr
+                        print(
+                            f"      - {lr.get('risk_title')} [{lr.get('risk_category')}] "
+                            f"sev={lr.get('severity')} kw={lr.get('matched_keyword')!r} | {tail}"
+                        )
+        if not (ex.get("clause_risk_overview") or []):
             print("  (none)")
         print()
         print("【risk_category_summary】")

@@ -7,6 +7,7 @@ from __future__ import annotations
 from .contract_analyzer import (
     analyze_contract_text,
     annotate_clause_types,
+    build_clause_risk_map,
     build_risk_category_summary,
     detect_clause_type,
     group_risks_by_category,
@@ -25,6 +26,8 @@ from .contract_document_reader import (
 from .contract_explainer import explain_contract_analysis, format_contract_analysis_output
 from .contract_models import (
     ClauseRiskLinkItem,
+    ClauseRiskLinkedRiskBrief,
+    ClauseRiskOverviewItem,
     ContractAnalysisMeta,
     ContractAnalysisResult,
     ContractClauseItem,
@@ -98,6 +101,8 @@ __all__ = [
     "BASIC_CONTRACT_RISK_RULES",
     "match_clause_type_from_text",
     "ClauseRiskLinkItem",
+    "ClauseRiskLinkedRiskBrief",
+    "ClauseRiskOverviewItem",
     "ContractAnalysisMeta",
     "ContractAnalysisResult",
     "ContractClauseItem",
@@ -125,6 +130,7 @@ __all__ = [
     "read_contract_from_txt",
     "annotate_clause_types",
     "analyze_contract",
+    "build_clause_risk_map",
     "build_risk_category_summary",
     "analyze_contract_file",
     "analyze_contract_file_with_explain",

@@ -238,6 +238,25 @@ class HighlightedRiskClause(TypedDict, total=False):
     risk_code: str
 
 
+class ClauseRiskLinkedRiskBrief(TypedDict, total=False):
+    """Explain 层「某条款下挂接的风险」摘要（嵌于 ``clause_risk_overview``）。"""
+
+    risk_title: str
+    risk_category: str
+    severity: str
+    matched_keyword: str
+    short_reason: str
+
+
+class ClauseRiskOverviewItem(TypedDict, total=False):
+    """Explain 层条款—风险聚合卡片：一条条款 + 其关联的若干风险摘要。"""
+
+    clause_id: str
+    clause_type: str
+    short_clause_preview: str
+    linked_risks: list[ClauseRiskLinkedRiskBrief]
+
+
 class ContractExplainResult(TypedDict, total=False):
     """``explain_contract_analysis`` 输出（人话层）。"""
 
@@ -249,6 +268,7 @@ class ContractExplainResult(TypedDict, total=False):
     risk_category_groups: list[ContractRiskCategoryGroup]
     risk_category_summary: list[ContractRiskCategorySummaryItem]
     clause_overview: list[ContractClauseOverviewItem]
+    clause_risk_overview: list[ClauseRiskOverviewItem]
 
 
 # 兼容旧名（Part 2 前使用 ContractExplainBundle）

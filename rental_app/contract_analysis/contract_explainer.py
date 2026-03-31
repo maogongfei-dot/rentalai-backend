@@ -18,6 +18,9 @@ from .contract_models import (
 )
 
 _CLAUSE_PREVIEW_CHARS = 120
+_SHORT_REASON_CHARS = 120
+
+_RE_CLAUSE_ID_NUM = re.compile(r"^clause_(\d+)$", re.IGNORECASE)
 
 
 def _as_risk_list(raw: Any) -> list[dict[str, Any]]:
@@ -44,6 +47,36 @@ def _short_clause_preview(text: str, max_len: int = _CLAUSE_PREVIEW_CHARS) -> st
     if len(t) <= max_len:
         return t
     return t[: max_len - 1] + "…"
+
+
+def _clause_id_sort_key(clause_id: str) -> tuple[int, str]:
+    m = _RE_CLAUSE_ID_NUM.match((clause_id or "").strip())
+    return (int(m.group(1)), clause_id) if m else (10**9, clause_id)
+
+
+def _find_risk_for_link(link: dict[str, Any], risks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """用 title / matched_keyword / matched_text 与结构化 ``risks`` 对齐，便于取 ``reason``。"""
+    rt = str(link.get("risk_title") or "").strip()
+    mk = str(link.get("matched_keyword") or "").strip()
+    mt = str(link.get("matched_text") or "").strip()
+    for r in risks:
+        if not isinstance(r, dict):
+            continue
+        if str(r.get("title") or "").strip() != rt:
+            continue
+        if mk and str(r.get("matched_keyword") or "").strip() == mk:
+            return r
+        if mt and str(r.get("matched_text") or "").strip() == mt:
+            return r
+    for r in risks:
+        if isinstance(r, dict) and str(r.get("title") or "").strip() == rt:
+            return r
+    return None
+
+
+def _normalize_severity(raw: Any) -> str:
+    s = str(raw or "").strip().lower()
+    return s if s in ("high", "medium", "low") else "medium"
 
 
 def _build_clause_overview(clause_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -174,6 +207,7 @@ def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
     rcg = _normalize_risk_category_groups(ex.get("risk_category_groups"))
     rcs = _normalize_risk_category_summary(ex.get("risk_category_summary"))
     cov = _normalize_clause_overview(ex.get("clause_overview"))
+    cro = _normalize_clause_risk_overview(ex.get("clause_risk_overview"))
     return {
         "overall_conclusion": (str(ex.get("overall_conclusion") or "").strip() or "—"),
         "key_risk_summary": (str(ex.get("key_risk_summary") or "").strip() or "—"),
@@ -183,6 +217,7 @@ def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
         "risk_category_groups": rcg,
         "risk_category_summary": rcs,
         "clause_overview": cov,
+        "clause_risk_overview": cro,
     }
 
 
@@ -217,6 +252,116 @@ def _short_advice_from_risk(risk: dict[str, Any]) -> str:
     if len(t) > 160:
         t = t[:157] + "…"
     return t
+
+
+def _short_reason_for_linked_risk(link: dict[str, Any], risks: list[dict[str, Any]]) -> str:
+    r = _find_risk_for_link(link, risks)
+    if r is not None:
+        t = str(r.get("reason") or "").strip()
+        if not t:
+            t = _short_advice_from_risk(r)
+        t = re.sub(r"\s+", " ", t)
+        if len(t) > _SHORT_REASON_CHARS:
+            t = t[: _SHORT_REASON_CHARS - 1] + "…"
+        return t or "—"
+    lr = str(link.get("link_reason") or "").strip()
+    if len(lr) > _SHORT_REASON_CHARS:
+        lr = lr[: _SHORT_REASON_CHARS - 1] + "…"
+    return lr or "—"
+
+
+def _build_clause_risk_overview(
+    clause_list: list[dict[str, Any]],
+    clause_risk_map: list[dict[str, Any]],
+    risks: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    按 ``clause_id`` 聚合 ``clause_risk_map``，并挂上 ``clause_type`` 与短预览（与 ``clause_overview`` 同截断长度）。
+    无联动时返回空 list。
+    """
+    if not clause_risk_map:
+        return []
+    by_clause: dict[str, list[dict[str, Any]]] = {}
+    for link in clause_risk_map:
+        if not isinstance(link, dict):
+            continue
+        cid = str(link.get("clause_id") or "").strip()
+        if not cid:
+            continue
+        by_clause.setdefault(cid, []).append(link)
+
+    clause_by_id: dict[str, dict[str, Any]] = {}
+    for c in clause_list:
+        if not isinstance(c, dict):
+            continue
+        cid = str(c.get("clause_id") or "").strip()
+        if cid:
+            clause_by_id[cid] = c
+
+    out: list[dict[str, Any]] = []
+    for cid in sorted(by_clause.keys(), key=_clause_id_sort_key):
+        c = clause_by_id.get(cid) or {}
+        ct = coerce_contract_clause_type(c.get("clause_type"))
+        preview = _short_clause_preview(str(c.get("clause_text") or ""))
+        linked_risks: list[dict[str, Any]] = []
+        for link in by_clause[cid]:
+            linked_risks.append(
+                {
+                    "risk_title": str(link.get("risk_title") or "").strip() or "—",
+                    "risk_category": coerce_contract_risk_category(link.get("risk_category")),
+                    "severity": _normalize_severity(link.get("severity")),
+                    "matched_keyword": str(link.get("matched_keyword") or "").strip(),
+                    "short_reason": _short_reason_for_linked_risk(link, risks),
+                }
+            )
+        out.append(
+            {
+                "clause_id": cid,
+                "clause_type": ct,
+                "short_clause_preview": preview or "—",
+                "linked_risks": linked_risks,
+            }
+        )
+    return out
+
+
+def _normalize_clause_risk_overview(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        prev = str(item.get("short_clause_preview") or "").strip()
+        if not prev and item.get("clause_text"):
+            prev = _short_clause_preview(str(item.get("clause_text") or ""))
+        elif len(prev) > _CLAUSE_PREVIEW_CHARS + 5:
+            prev = _short_clause_preview(prev)
+        lr = item.get("linked_risks")
+        if not isinstance(lr, list):
+            lr = []
+        linked: list[dict[str, Any]] = []
+        for x in lr:
+            if not isinstance(x, dict):
+                continue
+            linked.append(
+                {
+                    "risk_title": str(x.get("risk_title") or "").strip() or "—",
+                    "risk_category": coerce_contract_risk_category(x.get("risk_category")),
+                    "severity": _normalize_severity(x.get("severity")),
+                    "matched_keyword": str(x.get("matched_keyword") or "").strip(),
+                    "short_reason": str(x.get("short_reason") or "").strip() or "—",
+                }
+            )
+        out.append(
+            {
+                "clause_id": str(item.get("clause_id") or "").strip(),
+                "clause_type": coerce_contract_clause_type(item.get("clause_type")),
+                "short_clause_preview": prev or "—",
+                "linked_risks": linked,
+            }
+        )
+    return out
 
 
 def _build_highlighted_risk_clauses(risks: list[dict[str, Any]]) -> list[HighlightedRiskClause]:
@@ -372,6 +517,7 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
     - risk_category_groups：按类分组后的 ``risks`` 列表（与结构化层引用一致）
     - risk_category_summary：按类的 count / highest_severity / short_summary
     - clause_overview：条款清单（clause_id / clause_type / short_clause_preview / matched_keywords）
+    - clause_risk_overview：按条款聚合的风险挂接（clause_id / clause_type / short_clause_preview / linked_risks）
     """
     if not isinstance(result, dict):
         result = {}
@@ -400,6 +546,7 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
                     "risk_category_groups": [],
                     "risk_category_summary": [],
                     "clause_overview": [],
+                    "clause_risk_overview": [],
                 }
             ),
         )
@@ -414,6 +561,8 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
 
     raw_clauses = _as_clause_list(result.get("clause_list"))
     clause_ov = _build_clause_overview(raw_clauses)
+    raw_crm = _as_clause_list(result.get("clause_risk_map"))
+    clause_risk_ov = _build_clause_risk_overview(raw_clauses, raw_crm, risks)
 
     return cast(
         ContractExplainResult,
@@ -427,6 +576,7 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
                 "risk_category_groups": raw_groups,
                 "risk_category_summary": raw_summary,
                 "clause_overview": clause_ov,
+                "clause_risk_overview": clause_risk_ov,
             }
         ),
     )

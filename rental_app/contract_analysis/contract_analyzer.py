@@ -4,6 +4,7 @@ Phase 3 合同分析：主分析入口（基础规则扫描 + 主题覆盖）。
 
 from __future__ import annotations
 
+import re
 from typing import Any, cast
 
 from .contract_models import (
@@ -177,6 +178,130 @@ def _normalize_clause_dict(c: dict[str, Any]) -> dict[str, Any]:
     d["risk_flags"] = [str(x).strip() for x in rf if str(x).strip()]
     d["location_hint"] = str(d.get("location_hint") or "").strip()
     return d
+
+
+_RE_LOC_SENTENCE = re.compile(r"matched sentence\s+(\d+)", re.IGNORECASE)
+_RE_CLAUSE_ID_NUM = re.compile(r"^clause_(\d+)$", re.IGNORECASE)
+
+
+def _normalize_ws(s: str) -> str:
+    return re.sub(r"\s+", " ", (s or "").strip())
+
+
+def _clause_index_from_id(clause_id: str) -> int | None:
+    m = _RE_CLAUSE_ID_NUM.match((clause_id or "").strip())
+    return int(m.group(1)) if m else None
+
+
+def _sentence_index_from_location_hint(location_hint: str) -> int | None:
+    m = _RE_LOC_SENTENCE.search(location_hint or "")
+    return int(m.group(1)) if m else None
+
+
+def _matched_text_overlaps_clause(clause_text: str, matched_text: str) -> bool:
+    """matched_text 与条款正文有明显重叠：整段包含，或取较短段的前缀子串包含。"""
+    ct = _normalize_ws(clause_text).lower()
+    mt = _normalize_ws(matched_text).lower()
+    if not mt or len(mt) < 3:
+        return False
+    if mt in ct:
+        return True
+    # 长窗口：取前 120 字符再试（避免切分导致整行未完全落入单条 clause）
+    chunk = mt[:120] if len(mt) > 120 else mt
+    return len(chunk) >= 8 and chunk in ct
+
+
+def _matched_keyword_in_clause(clause_text: str, matched_keyword: str) -> bool:
+    kw = (matched_keyword or "").strip()
+    if len(kw) < 2:
+        return False
+    return kw.lower() in _normalize_ws(clause_text).lower()
+
+
+def _location_hint_aligns_clause(location_hint: str, clause_id: str) -> bool:
+    """location_hint 中出现 clause_id，或「matched sentence N」与 clause_N 序号一致。"""
+    lh = (location_hint or "").strip()
+    cid = (clause_id or "").strip()
+    if not lh or not cid:
+        return False
+    if cid.lower() in lh.lower():
+        return True
+    si = _sentence_index_from_location_hint(lh)
+    ci = _clause_index_from_id(cid)
+    if si is not None and ci is not None and si == ci:
+        return True
+    return False
+
+
+def build_clause_risk_map(
+    clause_list: list[dict[str, Any]],
+    risks: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    将 ``risks`` 与 ``clause_list`` 做轻量联动（无 NLP）。
+
+    对每条 risk，按条款顺序找**第一条**满足以下任一条件的条款并生成一条记录（否则跳过该 risk）：
+
+    1. ``matched_text`` 与 ``clause_text`` 有明显子串重叠；
+    2. ``matched_keyword`` 出现在 ``clause_text`` 中；
+    3. ``location_hint`` 与 ``clause_id`` 可粗略对应（含 clause_id 子串，或 sentence 序号与 clause 序号一致）。
+
+    每项含 ``ClauseRiskLinkItem`` 字段；``link_reason`` 为固定英文短语便于前端与日志。
+    """
+    clauses = [c for c in clause_list if isinstance(c, dict)]
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for r in risks:
+        if not isinstance(r, dict):
+            continue
+        rule_id = str(r.get("rule_id") or "").strip()
+        if not rule_id:
+            continue
+        mt = str(r.get("matched_text") or "").strip()
+        mk = str(r.get("matched_keyword") or "").strip()
+        lh = str(r.get("location_hint") or "").strip()
+        title = str(r.get("title") or rule_id).strip()
+        sev = str(r.get("severity") or "medium").strip().lower()
+        if sev not in ("high", "medium", "low"):
+            sev = "medium"
+        rc = coerce_contract_risk_category(r.get("risk_category"))
+
+        for c in clauses:
+            cid = str(c.get("clause_id") or "").strip()
+            ctext = str(c.get("clause_text") or "")
+            if not cid or not ctext:
+                continue
+
+            link_reason = ""
+            if _matched_text_overlaps_clause(ctext, mt):
+                link_reason = "matched text overlaps with clause"
+            elif _matched_keyword_in_clause(ctext, mk):
+                link_reason = "matched keyword found in clause text"
+            elif _location_hint_aligns_clause(lh, cid):
+                link_reason = "location_hint aligns with clause id"
+            else:
+                continue
+
+            key = (cid, rule_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(
+                {
+                    "clause_id": cid,
+                    "risk_title": title,
+                    "risk_category": rc,
+                    "severity": sev,
+                    "matched_keyword": mk,
+                    "matched_text": mt,
+                    "location_hint": lh,
+                    "link_reason": link_reason,
+                }
+            )
+            break
+
+    return out
 
 
 def _normalize_clause_risk_link_dict(d: dict[str, Any]) -> dict[str, Any]:
@@ -371,7 +496,7 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     返回字段与 ``ContractAnalysisResult`` 一致：
     - summary, risks, risk_category_groups, risk_category_summary,
       clause_list（``parse_contract_clauses`` + ``annotate_clause_types``）
-    - clause_risk_map：条款—风险联动列表（当前可为空；结构见 ``ClauseRiskLinkItem``）
+    - clause_risk_map：条款—风险联动列表（由 ``build_clause_risk_map`` 生成；见 ``ClauseRiskLinkItem``）
     - missing_items, recommendations, detected_topics
     - meta: { source_type, source_name }（与 ``ContractInput`` 对应）
     """
@@ -396,12 +521,14 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     summary = build_contract_summary(risks, missing_items, detected_topics)
     clause_list = parse_contract_clauses(text)
     clause_list = annotate_clause_types(clause_list)
+    clause_risk_map = build_clause_risk_map(clause_list, risks)
 
     out = _normalize_analysis_output(
         {
             "summary": summary,
             "risks": risks,
             "clause_list": clause_list,
+            "clause_risk_map": clause_risk_map,
             "missing_items": missing_items,
             "recommendations": recommendations,
             "detected_topics": detected_topics,
