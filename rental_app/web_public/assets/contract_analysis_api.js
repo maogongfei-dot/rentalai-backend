@@ -7,6 +7,7 @@
  */
 (function (global) {
   var LAST_KEY = "rentalai_contract_analysis_last";
+  var META_KEY = "rentalai_contract_analysis_source";
 
   function apiUrl(path) {
     if (typeof global.rentalaiApiUrl === "function") {
@@ -34,6 +35,32 @@
     return j;
   }
 
+  /**
+   * 成功响应轻量归一化：保证 ``result.summary_view`` 与各字段存在，避免 text / upload / file-path
+   * 后端细微差异导致渲染端分支判断。
+   */
+  function normalizeContractAnalysisResponse(j) {
+    if (!j || typeof j !== "object") return j;
+    if (!j.result || typeof j.result !== "object") {
+      j.result = {};
+    }
+    var r = j.result;
+    if (!r.summary_view || typeof r.summary_view !== "object") {
+      r.summary_view = {};
+    }
+    var sv = r.summary_view;
+    if (typeof sv.overall_conclusion !== "string") sv.overall_conclusion = "";
+    if (typeof sv.key_risk_summary !== "string") sv.key_risk_summary = "";
+    if (!Array.isArray(sv.risk_category_summary)) sv.risk_category_summary = [];
+    if (!Array.isArray(sv.highlighted_risk_clauses)) sv.highlighted_risk_clauses = [];
+    if (!Array.isArray(sv.clause_severity_overview)) sv.clause_severity_overview = [];
+    if (!sv.contract_completeness_overview || typeof sv.contract_completeness_overview !== "object") {
+      sv.contract_completeness_overview = {};
+    }
+    if (!Array.isArray(sv.action_advice)) sv.action_advice = [];
+    return j;
+  }
+
   function postJson(path, body) {
     var url = apiUrl(path);
     return fetch(url, {
@@ -42,7 +69,7 @@
       body: JSON.stringify(body || {}),
     }).then(function (r) {
       return r.text().then(function (text) {
-        return parseJsonBody(r, text);
+        return normalizeContractAnalysisResponse(parseJsonBody(r, text));
       });
     });
   }
@@ -95,21 +122,38 @@
       body: fd,
     }).then(function (r) {
       return r.text().then(function (text) {
-        return parseJsonBody(r, text);
+        return normalizeContractAnalysisResponse(parseJsonBody(r, text));
       });
     });
   }
 
-  /** 将最近一次成功响应写入 sessionStorage，供刷新或后续页面读取 */
-  function saveLastContractAnalysisResult(payload) {
+  /**
+   * @param {object} payload 成功响应 JSON
+   * @param {object} [sourceMeta] 可选 ``{ kind: 'text'|'upload'|'path', label?: string }``，用于结果区来源提示与恢复
+   */
+  function saveLastContractAnalysisResult(payload, sourceMeta) {
     try {
       global.sessionStorage.setItem(LAST_KEY, JSON.stringify(payload));
+      if (sourceMeta && typeof sourceMeta === "object") {
+        global.sessionStorage.setItem(META_KEY, JSON.stringify(sourceMeta));
+      } else {
+        global.sessionStorage.removeItem(META_KEY);
+      }
     } catch (e) {}
   }
 
   function readLastContractAnalysisResult() {
     try {
       var raw = global.sessionStorage.getItem(LAST_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function readLastContractAnalysisSource() {
+    try {
+      var raw = global.sessionStorage.getItem(META_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch (e) {
       return null;
@@ -123,6 +167,8 @@
     analyzeContractUpload: analyzeContractUpload,
     saveLastContractAnalysisResult: saveLastContractAnalysisResult,
     readLastContractAnalysisResult: readLastContractAnalysisResult,
+    readLastContractAnalysisSource: readLastContractAnalysisSource,
     LAST_RESULT_STORAGE_KEY: LAST_KEY,
+    LAST_SOURCE_STORAGE_KEY: META_KEY,
   };
 })(window);

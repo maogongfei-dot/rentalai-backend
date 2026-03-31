@@ -28,9 +28,36 @@
   var errEl = document.getElementById("contract-error");
   var emptyEl = document.getElementById("contract-state-empty");
   var resultSection = document.getElementById("contract-state-result");
+  var resultSourceEl = document.getElementById("contract-result-source");
   var resultBody = document.getElementById("contract-result-body");
 
   if (!btn || !ta) return;
+
+  function renderSourceHint(meta) {
+    if (!resultSourceEl) return;
+    if (!meta || !meta.kind) {
+      resultSourceEl.classList.add("hidden");
+      resultSourceEl.textContent = "";
+      return;
+    }
+    var label = meta.label != null ? String(meta.label) : "";
+    var line = "";
+    if (meta.kind === "text") {
+      line = "当前来源：粘贴文本（pasted text）";
+    } else if (meta.kind === "upload") {
+      line =
+        "当前来源：上传文件（uploaded file）" +
+        (label ? " — " + label : "");
+    } else if (meta.kind === "path") {
+      line =
+        "当前来源：服务端路径（server file path）" +
+        (label ? " — " + label : "");
+    } else {
+      line = "当前来源：未知";
+    }
+    resultSourceEl.textContent = line;
+    resultSourceEl.classList.remove("hidden");
+  }
 
   function setModePanels() {
     var file = modeFile && modeFile.checked;
@@ -383,6 +410,9 @@
     var data = CA.readLastContractAnalysisResult();
     if (!data || data.ok !== true) return;
     renderSummary(data);
+    if (CA.readLastContractAnalysisSource) {
+      renderSourceHint(CA.readLastContractAnalysisSource());
+    }
     if (emptyEl) emptyEl.classList.add("hidden");
     if (resultSection) resultSection.classList.remove("hidden");
   }
@@ -391,16 +421,18 @@
     setError("");
     var isFile = modeFile && modeFile.checked;
 
-    function run(apiPromise, loadingMessage) {
+    function run(apiPromise, loadingMessage, sourceMeta) {
       setLoading(true, loadingMessage);
       setError("");
       if (resultBody) resultBody.innerHTML = "";
+      renderSourceHint(null);
       apiPromise
         .then(function (data) {
           try {
-            CA.saveLastContractAnalysisResult(data);
+            CA.saveLastContractAnalysisResult(data, sourceMeta);
           } catch (e) {}
           renderSummary(data);
+          renderSourceHint(sourceMeta);
           setLoading(false);
           if (emptyEl) emptyEl.classList.add("hidden");
           if (resultSection) resultSection.classList.remove("hidden");
@@ -425,7 +457,8 @@
           source_name: "contract-analysis-web",
           source_type: "text",
         }),
-        "分析中…"
+        "分析中…",
+        { kind: "text", label: "" }
       );
       return;
     }
@@ -438,7 +471,8 @@
         CA.analyzeContractUpload(up, {
           source_name: up.name || "upload",
         }),
-        "上传并分析中…"
+        "上传并分析中…",
+        { kind: "upload", label: up.name || "" }
       );
       return;
     }
@@ -448,7 +482,8 @@
         CA.analyzeContractFile(pathRaw, {
           source_name: "contract-analysis-web-path",
         }),
-        "分析中…"
+        "分析中…",
+        { kind: "path", label: pathRaw }
       );
       return;
     }

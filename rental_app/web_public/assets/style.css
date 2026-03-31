@@ -484,6 +484,9 @@ a {
   flex-direction: column;
   gap: 1rem;
 }
+.contract-result-source {
+  margin: 0 0 0.65rem;
+}
 .contract-result-block {
   margin: 0;
   padding: 0.75rem 0 0;
