@@ -54,28 +54,32 @@ async def analyze_contract_from_upload(
     """
     fn = (upload.filename or "").strip()
     if not fn:
-        raise ContractUploadError("empty_filename", "filename is required")
+        raise ContractUploadError("empty_filename", "缺少文件名，请重新选择文件。")
 
     suf = _suffix(fn)
     if suf not in ALLOWED_SUFFIXES:
         raise ContractUploadError(
             "unsupported_file_type",
-            f"only .txt, .pdf, .docx are allowed, got {suf or '(no extension)'}",
+            f"不支持的文件类型：仅支持 .txt、.pdf、.docx；当前为 {suf or '（无扩展名）'}。",
         )
 
     try:
         raw = await upload.read()
     except Exception as exc:
-        raise ContractUploadError("read_failed", str(exc)) from exc
+        raise ContractUploadError(
+            "read_failed",
+            f"读取上传文件失败：{exc}",
+        ) from exc
 
     if not raw:
-        raise ContractUploadError("empty_file", "uploaded file is empty")
+        raise ContractUploadError("empty_file", "上传的文件为空（0 字节），请选择有效合同文件。")
 
     max_b = contract_upload_max_bytes()
     if len(raw) > max_b:
+        mb = max_b / (1024 * 1024)
         raise ContractUploadError(
             "file_too_large",
-            f"file exceeds maximum size ({max_b} bytes)",
+            f"文件过大：单文件上限约 {mb:.0f} MB（{max_b} 字节），请压缩或拆分后再试。",
         )
 
     inferred = suf.lstrip(".")  # txt | pdf | docx

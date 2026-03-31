@@ -7,10 +7,13 @@ Phase 4：合同分析 HTTP 接口本地冒烟（需已启动 ``python run.py`` 
     python scripts/contract_analysis_api_smoke.py
 
 可选环境变量 ``RENTALAI_API_BASE``（默认 ``http://127.0.0.1:8000``），与前端构建注入习惯一致。
+
+本脚本会验证：文本接口、文件路径接口、**multipart 上传**（.txt / .pdf / .docx）及若干上传错误码（不支持的扩展名、空文件）。
 """
 
 from __future__ import annotations
 
+import io
 import os
 import sys
 from pathlib import Path
@@ -97,7 +100,69 @@ def main() -> int:
         return 1
 
     print()
-    print("Smoke OK.")
+
+    # 3) multipart 上传：txt / pdf / docx
+    url_up = f"{base}/api/contract/analysis/upload"
+    samples = [
+        ("sample_contract.txt", "text/plain"),
+        ("sample_contract.pdf", "application/pdf"),
+        ("sample_contract.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ]
+    for fname, mime in samples:
+        path = root / "contract_analysis" / "samples" / fname
+        if not path.is_file():
+            print(f"[3] SKIP upload {fname}: file missing", file=sys.stderr)
+            continue
+        with path.open("rb") as fh:
+            files = {"file": (fname, fh, mime)}
+            r3 = requests.post(url_up, files=files, timeout=120)
+        print(f"[3] POST /api/contract/analysis/upload ({fname}) -> HTTP {r3.status_code}")
+        if not r3.ok:
+            print(r3.text[:500])
+            return 1
+        data = r3.json()
+        if not data.get("ok"):
+            print(f"    ERROR: expected ok=true for {fname}", file=sys.stderr)
+            return 1
+        res = data.get("result") or {}
+        sv = res.get("summary_view") or {}
+        if not isinstance(sv.get("overall_conclusion"), str):
+            print(f"    ERROR: bad summary_view for {fname}", file=sys.stderr)
+            return 1
+        print(f"    ok={data.get('ok')} overall_conclusion (preview): {str(sv.get('overall_conclusion', ''))[:80]!r}")
+
+    print()
+
+    # 4) 上传错误：不支持的扩展名
+    files_bad = {"file": ("bad.exe", io.BytesIO(b"not a real exe"), "application/octet-stream")}
+    r4 = requests.post(url_up, files=files_bad, timeout=30)
+    print(f"[4] POST upload (bad.exe) expect 400 -> HTTP {r4.status_code}")
+    if r4.status_code != 400:
+        print(r4.text[:300])
+        return 1
+    j4 = r4.json()
+    if j4.get("error") != "unsupported_file_type":
+        print(f"    ERROR: expected unsupported_file_type, got {j4!r}", file=sys.stderr)
+        return 1
+    print(f"    error={j4.get('error')!r}")
+
+    print()
+
+    # 5) 上传错误：空文件
+    files_empty = {"file": ("empty.txt", io.BytesIO(b""), "text/plain")}
+    r5 = requests.post(url_up, files=files_empty, timeout=30)
+    print(f"[5] POST upload (empty.txt) expect 400 -> HTTP {r5.status_code}")
+    if r5.status_code != 400:
+        print(r5.text[:300])
+        return 1
+    j5 = r5.json()
+    if j5.get("error") != "empty_file":
+        print(f"    ERROR: expected empty_file, got {j5!r}", file=sys.stderr)
+        return 1
+    print(f"    error={j5.get('error')!r}")
+
+    print()
+    print("Smoke OK (text + file-path + multipart txt/pdf/docx + upload errors).")
     return 0
 
 

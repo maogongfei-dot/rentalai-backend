@@ -33,6 +33,47 @@
 
   if (!btn || !ta) return;
 
+  /** 与 ``contract_analysis_upload_handler.contract_upload_max_bytes`` 默认一致（15 MiB）。 */
+  var CONTRACT_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
+
+  function fileExtLower(name) {
+    var n = (name || "").trim();
+    var i = n.lastIndexOf(".");
+    return i >= 0 ? n.slice(i).toLowerCase() : "";
+  }
+
+  var ALLOWED_UPLOAD_EXT = new Set([".txt", ".pdf", ".docx"]);
+
+  function formatUploadSize(bytes) {
+    if (bytes == null || bytes < 0) return "";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  }
+
+  function validateUploadFile(file) {
+    if (!file || !file.name) {
+      return "请选择要上传的合同文件。";
+    }
+    var ext = fileExtLower(file.name);
+    if (!ALLOWED_UPLOAD_EXT.has(ext)) {
+      return "不支持的文件类型：仅支持 .txt、.pdf、.docx（当前：" + (ext || "无扩展名") + "）。";
+    }
+    if (file.size === 0) {
+      return "所选文件为空（0 字节），请换一份有效合同文件。";
+    }
+    if (file.size > CONTRACT_UPLOAD_MAX_BYTES) {
+      return (
+        "文件过大（" +
+        formatUploadSize(file.size) +
+        "），单文件上限为 " +
+        formatUploadSize(CONTRACT_UPLOAD_MAX_BYTES) +
+        "。请选择较小的文件或联系管理员调整上限。"
+      );
+    }
+    return "";
+  }
+
   function renderSourceHint(meta) {
     if (!resultSourceEl) return;
     if (!meta || !meta.kind) {
@@ -106,9 +147,15 @@
   if (uploadFile && uploadHint) {
     uploadFile.addEventListener("change", function () {
       var f = uploadFile.files && uploadFile.files[0];
-      uploadHint.textContent = f
-        ? "已选择：" + f.name + "（" + (f.type || "未知类型") + "）"
-        : "";
+      if (!f) {
+        uploadHint.textContent = "";
+        return;
+      }
+      var sizePart = f.size != null ? "，大小 " + formatUploadSize(f.size) : "";
+      var bad = validateUploadFile(f);
+      uploadHint.textContent = bad
+        ? "已选择：" + f.name + sizePart + " — " + bad
+        : "已选择：" + f.name + sizePart + "（" + (f.type || "未知类型") + "）";
     });
   }
 
@@ -467,6 +514,13 @@
     var up = uploadFile && uploadFile.files && uploadFile.files[0];
 
     if (up) {
+      var uploadErr = validateUploadFile(up);
+      if (uploadErr) {
+        setError(uploadErr);
+        if (emptyEl) emptyEl.classList.remove("hidden");
+        if (resultSection) resultSection.classList.add("hidden");
+        return;
+      }
       run(
         CA.analyzeContractUpload(up, {
           source_name: up.name || "upload",

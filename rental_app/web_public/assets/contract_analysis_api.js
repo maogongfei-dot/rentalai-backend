@@ -36,6 +36,42 @@
   }
 
   /**
+   * 上传接口：与 ``parseJsonBody`` 相同，但对已知 ``error`` 码补充中文说明（与后端 ``ContractUploadError`` 对齐）。
+   */
+  function uploadErrorMessageFromPayload(j, status) {
+    var code = j && j.error;
+    var msg = j && j.message != null ? String(j.message).trim() : "";
+    if (msg) return msg;
+    var byCode = {
+      unsupported_file_type: "不支持的文件类型：仅支持 .txt、.pdf、.docx。",
+      empty_file: "上传的文件为空，请选择包含合同内容的文件。",
+      empty_filename: "无法识别文件名，请重新选择文件。",
+      read_failed: "读取上传文件失败。",
+      file_too_large: "文件超过最大允许大小。",
+      invalid_metadata: "metadata 格式错误。",
+      analyze_failed: "合同分析失败。",
+    };
+    if (code && byCode[code]) return byCode[code];
+    return "上传失败（HTTP " + (status != null ? status : "?") + "）。";
+  }
+
+  function parseUploadJsonBody(r, text) {
+    var j = null;
+    try {
+      j = text ? JSON.parse(text) : {};
+    } catch (e) {
+      throw new Error("服务器返回非 JSON：" + (text || "").slice(0, 120));
+    }
+    if (!r.ok) {
+      throw new Error(uploadErrorMessageFromPayload(j, r.status));
+    }
+    if (j && j.ok === false) {
+      throw new Error(uploadErrorMessageFromPayload(j, r.status));
+    }
+    return j;
+  }
+
+  /**
    * 成功响应轻量归一化：保证 ``result.summary_view`` 与各字段存在，避免 text / upload / file-path
    * 后端细微差异导致渲染端分支判断。
    */
@@ -120,11 +156,18 @@
     return fetch(url, {
       method: "POST",
       body: fd,
-    }).then(function (r) {
-      return r.text().then(function (text) {
-        return normalizeContractAnalysisResponse(parseJsonBody(r, text));
+    })
+      .then(function (r) {
+        return r.text().then(function (text) {
+          return normalizeContractAnalysisResponse(parseUploadJsonBody(r, text));
+        });
+      })
+      .catch(function (e) {
+        if (e && e.name === "TypeError" && /fetch|Failed to fetch|NetworkError/i.test(String(e))) {
+          return Promise.reject(new Error("无法连接服务器，请确认 API 已启动且与页面同源。"));
+        }
+        return Promise.reject(e);
       });
-    });
   }
 
   /**

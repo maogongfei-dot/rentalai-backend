@@ -112,6 +112,26 @@ curl -s -X POST "http://127.0.0.1:8000/api/contract/analysis/upload" ^
   -F "file=@contract_analysis/samples/sample_contract.txt;type=text/plain"
 ```
 
+同一路径下另有 ``sample_contract.pdf``、``sample_contract.docx``（仓库内已提供），可替换 ``file=@…`` 分别验证 PDF / Word 上传解析。
+
+**本地一键联调（推荐）**：在 ``rental_app`` 目录启动 API 后执行：
+
+```bash
+python scripts/contract_analysis_api_smoke.py
+```
+
+脚本会依次请求文本分析、文件路径、**三次 multipart**（txt / pdf / docx），并校验「不支持的扩展名」「空文件」返回 HTTP 400 与对应 ``error`` 码。
+
+**手工用 curl 测三种格式**（需在 ``rental_app`` 根目录执行，路径按本仓库相对路径）：
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://127.0.0.1:8000/api/contract/analysis/upload" -F "file=@contract_analysis/samples/sample_contract.txt"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://127.0.0.1:8000/api/contract/analysis/upload" -F "file=@contract_analysis/samples/sample_contract.pdf"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://127.0.0.1:8000/api/contract/analysis/upload" -F "file=@contract_analysis/samples/sample_contract.docx"
+```
+
+成功时 HTTP 为 **200**，响应 JSON 中 ``ok: true``，且含 ``result.summary_view``。
+
 ### 方式三：Python requests
 
 ```python

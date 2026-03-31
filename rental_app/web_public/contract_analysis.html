@@ -62,7 +62,8 @@
           <div class="form-section">
             <h3 class="form-section-title">上传合同（推荐）</h3>
             <p class="hint small-print">
-              支持 .txt、.pdf、.docx；点击「提交分析」将以 multipart 上传至服务器并分析。
+              支持 .txt、.pdf、.docx；单文件默认上限 15 MB（前后端一致，可由环境变量
+              RENTALAI_CONTRACT_UPLOAD_MAX_BYTES 调整）。点击「提交分析」将以 multipart 上传至服务器并分析。
             </p>
             <label class="field-label" for="contract-upload-file">选择文件</label>
             <input
