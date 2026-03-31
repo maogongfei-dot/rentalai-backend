@@ -726,6 +726,7 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
       ``location_hint`` / ``short_advice`` / ``risk_category`` / ``risk_code``）/
       missing_clause_summary / action_advice
     - ``presentation``：sections 含 ``title_en``；含 ``kind=clause_overview``、
+      ``kind=clause_risk_overview``、
       ``kind=risk_category_summary``、
       ``kind=risk_category_groups``（items 另附 ``risk_titles`` 便于列表展示）、
       ``kind=risk_clauses`` 等；``plain_text`` 与 CLI 报告一致

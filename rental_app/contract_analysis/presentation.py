@@ -86,6 +86,14 @@ def _clause_overview_display_items(ex: dict[str, Any], sa: dict[str, Any]) -> li
     return out
 
 
+def _clause_risk_overview_display_items(ex: dict[str, Any], sa: dict[str, Any]) -> list[dict[str, Any]]:
+    """Explain 的 ``clause_risk_overview``；无 explain 时返回空（不自行拼装，避免与 explain 不一致）。"""
+    raw = ex.get("clause_risk_overview")
+    if isinstance(raw, list) and raw:
+        return [x for x in raw if isinstance(x, dict)]
+    return []
+
+
 def _risk_rows_from_explain_layers(
     ex: dict[str, Any], sa: dict[str, Any], key: str
 ) -> list[dict[str, Any]]:
@@ -128,8 +136,8 @@ def format_contract_analysis_cli_report(
     """
     生成适合终端阅读的纯文本报告（两层：结构化摘要 + 人话解读）。
 
-    第二层按固定顺序分段：Overall Conclusion → Key Risk Summary → Clause Overview →
-    Risk Category Summary → Risk Category Groups → Highlighted Risk Clauses →
+    第二层按固定顺序分段：Overall Conclusion → Key Risk Summary → Risk Category Summary →
+    Risk Category Groups → Highlighted Risk Clauses → Clause Overview → Clause Risk Overview →
     Missing Clause Summary → Action Advice。
     """
     sa = structured_analysis if isinstance(structured_analysis, dict) else {}
@@ -185,36 +193,6 @@ def format_contract_analysis_cli_report(
             _CLI_SEP,
             ex.get("key_risk_summary") or "—",
             "",
-            "Clause Overview",
-            _CLI_SEP,
-        ]
-    )
-    cov_items = _clause_overview_display_items(ex, sa)
-    if cov_items:
-        for row in cov_items[:50]:
-            cid = str(row.get("clause_id") or "—").strip() or "—"
-            ct = str(row.get("clause_type") or "general").strip() or "general"
-            ct_zh = _clause_type_title_zh(ct)
-            prev = str(row.get("short_clause_preview") or "").strip() or "—"
-            if len(prev) > 160:
-                prev = prev[:157] + "…"
-            kws = row.get("matched_keywords")
-            if not isinstance(kws, list):
-                kws = []
-            kw_s = ", ".join(str(x).strip() for x in kws if str(x).strip()) or "—"
-            lines.append(f"  [{cid}] {ct_zh} ({ct})")
-            lines.append(f"      preview: {prev}")
-            lines.append(f"      matched_keywords: {kw_s}")
-            lines.append("")
-        if len(cov_items) > 50:
-            lines.append(f"  … 另有 {len(cov_items) - 50} 条见 explain.clause_overview。")
-            lines.append("")
-    else:
-        lines.append("  (none — no clauses split from contract text.)")
-        lines.append("")
-
-    lines.extend(
-        [
             "Risk Category Summary",
             _CLI_SEP,
         ]
@@ -292,6 +270,81 @@ def format_contract_analysis_cli_report(
 
     lines.extend(
         [
+            "Clause Overview",
+            _CLI_SEP,
+        ]
+    )
+    cov_items = _clause_overview_display_items(ex, sa)
+    if cov_items:
+        for row in cov_items[:50]:
+            cid = str(row.get("clause_id") or "—").strip() or "—"
+            ct = str(row.get("clause_type") or "general").strip() or "general"
+            ct_zh = _clause_type_title_zh(ct)
+            prev = str(row.get("short_clause_preview") or "").strip() or "—"
+            if len(prev) > 160:
+                prev = prev[:157] + "…"
+            kws = row.get("matched_keywords")
+            if not isinstance(kws, list):
+                kws = []
+            kw_s = ", ".join(str(x).strip() for x in kws if str(x).strip()) or "—"
+            lines.append(f"  [{cid}] {ct_zh} ({ct})")
+            lines.append(f"      preview: {prev}")
+            lines.append(f"      matched_keywords: {kw_s}")
+            lines.append("")
+        if len(cov_items) > 50:
+            lines.append(f"  … 另有 {len(cov_items) - 50} 条见 explain.clause_overview。")
+            lines.append("")
+    else:
+        lines.append("  (none — no clauses split from contract text.)")
+        lines.append("")
+
+    lines.extend(
+        [
+            "Clause Risk Overview",
+            _CLI_SEP,
+        ]
+    )
+    cro_items = _clause_risk_overview_display_items(ex, sa)
+    if cro_items:
+        for block in cro_items[:40]:
+            cid = str(block.get("clause_id") or "—").strip() or "—"
+            ct = str(block.get("clause_type") or "general").strip() or "general"
+            ct_zh = _clause_type_title_zh(ct)
+            prev = str(block.get("short_clause_preview") or "").strip() or "—"
+            if len(prev) > 160:
+                prev = prev[:157] + "…"
+            lines.append(f"  [{cid}] {ct_zh} ({ct})")
+            lines.append(f"      preview: {prev}")
+            linked = block.get("linked_risks")
+            if not isinstance(linked, list):
+                linked = []
+            for lr in linked[:12]:
+                if not isinstance(lr, dict):
+                    continue
+                rt = str(lr.get("risk_title") or "").strip() or "—"
+                rcat = str(lr.get("risk_category") or "general").strip() or "general"
+                rcat_zh = _category_title_zh(rcat)
+                sev = str(lr.get("severity") or "—").strip() or "—"
+                mk = str(lr.get("matched_keyword") or "").strip()
+                sr = str(lr.get("short_reason") or "").strip()
+                if len(sr) > 100:
+                    sr = sr[:97] + "…"
+                lines.append(
+                    f"      · {rt}  [{rcat_zh} / {rcat}]  severity={sev}"
+                    + (f"  kw={mk}" if mk else "")
+                )
+                if sr:
+                    lines.append(f"        reason: {sr}")
+            lines.append("")
+        if len(cro_items) > 40:
+            lines.append(f"  … 另有 {len(cro_items) - 40} 条条款块见 explain.clause_risk_overview。")
+            lines.append("")
+    else:
+        lines.append("  (none — no clause–risk links; see structured_analysis.clause_risk_map if any.)")
+        lines.append("")
+
+    lines.extend(
+        [
             "Missing Clause Summary",
             _CLI_SEP,
             ex.get("missing_clause_summary") or "—",
@@ -328,6 +381,8 @@ def build_contract_presentation(
     highest_severity / short_summary）；``risk_category_groups`` 的 ``items`` 在每条上含原有
     ``category``、``risks``，并附加 ``risk_titles``（标题列表，便于前端直接渲染）。
     ``clause_overview`` 的 ``items`` 含 clause_id / clause_type / short_clause_preview / matched_keywords。
+    ``clause_risk_overview`` 的 ``items`` 与 explain 一致：clause_id / clause_type / short_clause_preview /
+    linked_risks（含 risk_title / risk_category / severity / matched_keyword / short_reason）。
     ``highlighted_risk_clauses`` 的 ``items`` 为 ``HighlightedRiskClause`` 字典列表，
     每条含 risk_title / severity / matched_text / location_hint / short_advice / risk_category / risk_code。
     """
@@ -336,6 +391,7 @@ def build_contract_presentation(
 
     hrc_items = [x for x in (ex.get("highlighted_risk_clauses") or []) if isinstance(x, dict)]
     clause_overview_items = _clause_overview_display_items(ex, sa)
+    clause_risk_overview_items = _clause_risk_overview_display_items(ex, sa)
     rc_summary_items = [x for x in (ex.get("risk_category_summary") or []) if isinstance(x, dict)]
     if not rc_summary_items:
         rc_summary_items = [x for x in (sa.get("risk_category_summary") or []) if isinstance(x, dict)]
@@ -360,13 +416,6 @@ def build_contract_presentation(
             "text": str(ex.get("key_risk_summary") or ""),
         },
         {
-            "id": "clause_overview",
-            "title": "合同条款清单",
-            "title_en": "Clause Overview",
-            "kind": "clause_overview",
-            "items": clause_overview_items,
-        },
-        {
             "id": "risk_category_summary",
             "title": "风险类型汇总",
             "title_en": "Risk Category Summary",
@@ -386,6 +435,20 @@ def build_contract_presentation(
             "title_en": "Highlighted Risk Clauses",
             "kind": "risk_clauses",
             "items": hrc_items,
+        },
+        {
+            "id": "clause_overview",
+            "title": "合同条款清单",
+            "title_en": "Clause Overview",
+            "kind": "clause_overview",
+            "items": clause_overview_items,
+        },
+        {
+            "id": "clause_risk_overview",
+            "title": "条款—风险关联",
+            "title_en": "Clause Risk Overview",
+            "kind": "clause_risk_overview",
+            "items": clause_risk_overview_items,
         },
         {
             "id": "missing_clause_summary",

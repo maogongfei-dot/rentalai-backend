@@ -6,6 +6,8 @@ Phase 3：内置样例合同文本（从 ``contract_analysis/samples/*.txt`` 读
 ``sample_cat_*.txt``：Part 6 分类标签与分组汇总测试用短样例。
 
 ``sample_clause_*.txt``：Part 7 条款切分与 clause_type 多场景样例。
+
+``sample_clause_risk_*.txt``：Part 8 条款—风险联动（clause_risk_map / clause_risk_overview）专项样例。
 """
 
 from __future__ import annotations
@@ -45,3 +47,9 @@ SAMPLE_CLAUSE_DEPOSIT_RENT: str = _load_sample("sample_clause_deposit_rent.txt")
 SAMPLE_CLAUSE_NOTICE_TERMINATION: str = _load_sample("sample_clause_notice_termination.txt")
 SAMPLE_CLAUSE_REPAIRS_BILLS: str = _load_sample("sample_clause_repairs_bills.txt")
 SAMPLE_CLAUSE_PETS_SUBLETTING: str = _load_sample("sample_clause_pets_subletting.txt")
+
+# Part 8：条款—风险联动专项（单条 clause 尽量对应单条风险规则）
+SAMPLE_CLAUSE_RISK_DEPOSIT_HIGH: str = _load_sample("sample_clause_risk_deposit_high.txt")
+SAMPLE_CLAUSE_RISK_HIDDEN_FEE: str = _load_sample("sample_clause_risk_hidden_fee.txt")
+SAMPLE_CLAUSE_RISK_ACCESS_NOTICE: str = _load_sample("sample_clause_risk_access_notice.txt")
+SAMPLE_CLAUSE_RISK_TENANT_REPAIRS: str = _load_sample("sample_clause_risk_tenant_repairs.txt")

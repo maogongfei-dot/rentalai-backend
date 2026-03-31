@@ -233,6 +233,27 @@ def _location_hint_aligns_clause(location_hint: str, clause_id: str) -> bool:
     return False
 
 
+def _numeric_deposit_risk_to_deposit_clause(
+    rule_id: str,
+    matched_text: str,
+    matched_keyword: str,
+    location_hint: str,
+    clause_text: str,
+) -> bool:
+    """
+    ``deposit_amount_high`` 仅有用户填写数值、无 ``matched_text`` 时，挂到含 deposit/押金 的条款上。
+    """
+    if rule_id != "deposit_amount_high":
+        return False
+    if (matched_text or "").strip() or (matched_keyword or "").strip():
+        return False
+    lh = (location_hint or "").strip()
+    if "用户填写" not in lh and "非合同正文" not in lh:
+        return False
+    low = (clause_text or "").lower()
+    return "deposit" in low or "押金" in (clause_text or "")
+
+
 def build_clause_risk_map(
     clause_list: list[dict[str, Any]],
     risks: list[dict[str, Any]],
@@ -280,6 +301,8 @@ def build_clause_risk_map(
                 link_reason = "matched keyword found in clause text"
             elif _location_hint_aligns_clause(lh, cid):
                 link_reason = "location_hint aligns with clause id"
+            elif _numeric_deposit_risk_to_deposit_clause(rule_id, mt, mk, lh, ctext):
+                link_reason = "numeric deposit risk matched to deposit-related clause"
             else:
                 continue
 

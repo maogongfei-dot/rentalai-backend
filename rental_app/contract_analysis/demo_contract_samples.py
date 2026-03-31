@@ -21,6 +21,10 @@ from .sample_contracts_data import (
     SAMPLE_CLAUSE_NOTICE_TERMINATION,
     SAMPLE_CLAUSE_PETS_SUBLETTING,
     SAMPLE_CLAUSE_REPAIRS_BILLS,
+    SAMPLE_CLAUSE_RISK_ACCESS_NOTICE,
+    SAMPLE_CLAUSE_RISK_DEPOSIT_HIGH,
+    SAMPLE_CLAUSE_RISK_HIDDEN_FEE,
+    SAMPLE_CLAUSE_RISK_TENANT_REPAIRS,
     SAMPLE_CONTRACT_DEPOSIT_HEAVY,
     SAMPLE_CONTRACT_HIDDEN_FEES_PENALTY,
     SAMPLE_CONTRACT_HIGH_RISK,
@@ -176,6 +180,27 @@ def _sample_specs() -> list[tuple[str, str, dict[str, Any]]]:
             SAMPLE_CLAUSE_PETS_SUBLETTING,
             {"monthly_rent": 950.0, "deposit_amount": 950.0},
         ),
+        # Part 8：条款—风险联动专项（clause_risk_map / clause_risk_overview）
+        (
+            "sample_clause_risk_deposit_high",
+            SAMPLE_CLAUSE_RISK_DEPOSIT_HIGH,
+            {"monthly_rent": 1000.0, "deposit_amount": 6000.0},
+        ),
+        (
+            "sample_clause_risk_hidden_fee",
+            SAMPLE_CLAUSE_RISK_HIDDEN_FEE,
+            {"monthly_rent": 950.0, "deposit_amount": 950.0},
+        ),
+        (
+            "sample_clause_risk_access_notice",
+            SAMPLE_CLAUSE_RISK_ACCESS_NOTICE,
+            {"monthly_rent": 950.0, "deposit_amount": 950.0},
+        ),
+        (
+            "sample_clause_risk_tenant_repairs",
+            SAMPLE_CLAUSE_RISK_TENANT_REPAIRS,
+            {"monthly_rent": 880.0, "deposit_amount": 880.0},
+        ),
     ]
 
 
@@ -202,6 +227,33 @@ _CLAUSE_TYPE_SAMPLES_EXPECT: dict[str, set[str]] = {
     "sample_clause_repairs_bills": {"repairs", "bills", "inventory"},
     "sample_clause_pets_subletting": {"pets", "subletting"},
 }
+
+# Part 8：clause-risk 专项样例应命中的 rule_id（与 ``clause_risk_map`` 中 risk_title 对应）
+_CLAUSE_RISK_SAMPLES_EXPECT_RULE: dict[str, str] = {
+    "sample_clause_risk_deposit_high": "deposit_amount_high",
+    "sample_clause_risk_hidden_fee": "fee_suspicious_generic",
+    "sample_clause_risk_access_notice": "landlord_enter_anytime",
+    "sample_clause_risk_tenant_repairs": "tenant_all_repairs",
+}
+
+
+def _risk_title_for_rule_id(risks: list[Any], rule_id: str) -> str:
+    rid = (rule_id or "").strip()
+    for r in risks:
+        if not isinstance(r, dict):
+            continue
+        if str(r.get("rule_id") or "").strip() == rid:
+            return str(r.get("title") or "").strip()
+    return ""
+
+
+def _clause_risk_specs() -> list[tuple[str, str, dict[str, Any]]]:
+    """Part 8 条款—风险联动专项样例。"""
+    return [
+        (k, v, w)
+        for (k, v, w) in _sample_specs()
+        if k in _CLAUSE_RISK_SAMPLES_EXPECT_RULE
+    ]
 
 
 def _clause_type_specs() -> list[tuple[str, str, dict[str, Any]]]:
@@ -301,6 +353,41 @@ def validate_contract_clause_type_samples() -> None:
         assert expected <= clause_types, f"{label}: clause_type set {clause_types!r} vs {expected!r}"
 
 
+def validate_contract_clause_risk_samples() -> None:
+    """Part 8：条款—风险联动专项样例命中预期 rule，且 ``clause_risk_map`` / ``clause_risk_overview`` 非空且结构稳定。"""
+    for label, text, kwargs in _clause_risk_specs():
+        out = analyze_contract_with_explain(contract_text=text, **kwargs)
+        sa = out["structured_analysis"]
+        ex = out["explain"]
+        expected_rid = _CLAUSE_RISK_SAMPLES_EXPECT_RULE[label]
+        risks = sa.get("risks") or []
+        assert any(
+            str(r.get("rule_id") or "").strip() == expected_rid
+            for r in risks
+            if isinstance(r, dict)
+        ), label
+        exp_title = _risk_title_for_rule_id(risks, expected_rid)
+        assert exp_title, label
+        crm = sa.get("clause_risk_map")
+        assert isinstance(crm, list), label
+        assert len(crm) >= 1, label
+        _assert_clause_risk_map_shape(sa, label)
+        titles_in_map = {str(x.get("risk_title") or "").strip() for x in crm if isinstance(x, dict)}
+        assert exp_title in titles_in_map, f"{label}: expected title {exp_title!r} in {titles_in_map!r}"
+        cro = ex.get("clause_risk_overview")
+        assert isinstance(cro, list), label
+        assert len(cro) >= 1, label
+        _assert_clause_risk_overview_explain(ex, label)
+        for block in cro:
+            if not isinstance(block, dict):
+                continue
+            lr = block.get("linked_risks")
+            assert isinstance(lr, list), label
+            for x in lr:
+                if isinstance(x, dict):
+                    assert isinstance(x.get("matched_keyword"), str), label
+
+
 def validate_contract_analysis_samples() -> None:
     """断言各样例均能生成完整 explain 与稳定 list 字段（供 pytest 调用）。"""
     for label, text, kwargs in _sample_specs():
@@ -336,6 +423,7 @@ def validate_contract_analysis_samples() -> None:
         pres = out.get("presentation") or {}
         sec_ids = [s.get("id") for s in (pres.get("sections") or []) if isinstance(s, dict)]
         assert "clause_overview" in sec_ids, label
+        assert "clause_risk_overview" in sec_ids, label
         assert "risk_category_summary" in sec_ids, label
         assert "risk_category_groups" in sec_ids, label
         for s in pres.get("sections") or []:
@@ -464,6 +552,7 @@ def test_contract_analysis_samples() -> None:
     validate_contract_localization_samples()
     validate_contract_category_samples()
     validate_contract_clause_type_samples()
+    validate_contract_clause_risk_samples()
     validate_contract_empty_contract_text_clause_list()
     validate_contract_analysis_empty_risk_fallback()
 

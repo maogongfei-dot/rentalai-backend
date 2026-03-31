@@ -8,6 +8,7 @@ from contract_analysis.demo_contract_samples import (
     validate_contract_analysis_empty_risk_fallback,
     validate_contract_analysis_samples,
     validate_contract_category_samples,
+    validate_contract_clause_risk_samples,
     validate_contract_clause_type_samples,
     validate_contract_empty_contract_text_clause_list,
     validate_contract_localization_samples,
@@ -32,6 +33,10 @@ def test_phase3_category_samples():
 
 def test_phase3_clause_type_samples():
     validate_contract_clause_type_samples()
+
+
+def test_phase3_clause_risk_samples():
+    validate_contract_clause_risk_samples()
 
 
 def test_phase3_empty_contract_text_clause_list():
