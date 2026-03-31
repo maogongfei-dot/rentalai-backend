@@ -65,9 +65,19 @@ def _assert_clause_risk_map_shape(sa: dict[str, Any], label: str) -> None:
 
 
 def _assert_clause_severity_summary_shape(sa: dict[str, Any], label: str) -> None:
-    """Part 9：``clause_severity_summary`` 为 list，项字段类型稳定。"""
+    """Part 9：``clause_severity_summary`` 为 list，项字段类型稳定；与 ``clause_risk_map`` 计数/分值一致。"""
     css = sa.get("clause_severity_summary")
     assert isinstance(css, list), label
+    crm = sa.get("clause_risk_map")
+    crm_list = crm if isinstance(crm, list) else []
+    _w = {"high": 3, "medium": 2, "low": 1}
+
+    def _row_weight(row: dict[str, Any]) -> int:
+        s = str(row.get("severity") or "medium").strip().lower()
+        if s not in ("high", "medium", "low"):
+            s = "medium"
+        return _w[s]
+
     for item in css:
         assert isinstance(item, dict), label
         assert str(item.get("clause_id") or "").strip(), label
@@ -79,6 +89,29 @@ def _assert_clause_severity_summary_shape(sa: dict[str, Any], label: str) -> Non
         assert isinstance(item.get("linked_risk_titles"), list), label
         assert isinstance(item.get("short_clause_preview"), str), label
         assert isinstance(item.get("location_hint"), str), label
+        cid = str(item.get("clause_id") or "").strip()
+        links_for = [
+            r
+            for r in crm_list
+            if isinstance(r, dict) and str(r.get("clause_id") or "").strip() == cid
+        ]
+        assert int(item.get("linked_risk_count") or 0) == len(links_for), label
+        assert int(item.get("severity_score") or 0) == sum(_row_weight(x) for x in links_for), label
+
+
+def _assert_clause_severity_overview_explain(ex: dict[str, Any], label: str) -> None:
+    """Explain：``clause_severity_overview`` 为稳定 list；项字段与 Top risky clauses 卡片对齐。"""
+    cso = ex.get("clause_severity_overview")
+    assert isinstance(cso, list), label
+    for row in cso:
+        assert isinstance(row, dict), label
+        assert str(row.get("clause_id") or "").strip(), label
+        assert isinstance(row.get("clause_type"), str) and str(row.get("clause_type") or "").strip(), label
+        assert isinstance(row.get("severity_score"), int), label
+        assert str(row.get("highest_severity") or "").strip() in ("high", "medium", "low"), label
+        assert isinstance(row.get("linked_risk_count"), int), label
+        assert str(row.get("short_clause_preview") or "").strip(), label
+        assert isinstance(row.get("linked_risk_titles"), list), label
 
 
 def _assert_clause_risk_overview_explain(ex: dict[str, Any], label: str) -> None:
@@ -307,6 +340,7 @@ def validate_contract_category_samples() -> None:
         assert isinstance(ex.get("risk_category_groups"), list), label
         assert isinstance(ex.get("clause_overview"), list), label
         _assert_clause_risk_overview_explain(ex, label)
+        _assert_clause_severity_overview_explain(ex, label)
         assert isinstance(ex.get("highlighted_risk_clauses"), list), label
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"]), label
         assert len(ex["risk_category_groups"]) == len(ex["risk_category_summary"]), label
@@ -351,6 +385,7 @@ def validate_contract_clause_type_samples() -> None:
         _assert_clause_severity_summary_shape(sa, label)
         assert isinstance(ex.get("clause_overview"), list), label
         _assert_clause_risk_overview_explain(ex, label)
+        _assert_clause_severity_overview_explain(ex, label)
         clauses = sa.get("clause_list") or []
         overview = ex.get("clause_overview") or []
         assert len(clauses) >= 2, label
@@ -398,6 +433,7 @@ def validate_contract_clause_risk_samples() -> None:
         assert isinstance(cro, list), label
         assert len(cro) >= 1, label
         _assert_clause_risk_overview_explain(ex, label)
+        _assert_clause_severity_overview_explain(ex, label)
         for block in cro:
             if not isinstance(block, dict):
                 continue
@@ -440,11 +476,13 @@ def validate_contract_analysis_samples() -> None:
         assert isinstance(ex.get("risk_category_summary"), list)
         assert isinstance(ex.get("clause_overview"), list), label
         _assert_clause_risk_overview_explain(ex, label)
+        _assert_clause_severity_overview_explain(ex, label)
         assert len(ex["risk_category_groups"]) == len(ex["risk_category_summary"])
         pres = out.get("presentation") or {}
         sec_ids = [s.get("id") for s in (pres.get("sections") or []) if isinstance(s, dict)]
         assert "clause_overview" in sec_ids, label
         assert "clause_risk_overview" in sec_ids, label
+        assert "clause_severity_overview" in sec_ids, label
         assert "risk_category_summary" in sec_ids, label
         assert "risk_category_groups" in sec_ids, label
         for s in pres.get("sections") or []:
@@ -504,6 +542,7 @@ def validate_contract_localization_samples() -> None:
         assert isinstance(ex.get("risk_category_summary"), list), label
         assert isinstance(ex.get("clause_overview"), list), label
         _assert_clause_risk_overview_explain(ex, label)
+        _assert_clause_severity_overview_explain(ex, label)
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"]), label
         hrc = ex.get("highlighted_risk_clauses")
         assert isinstance(hrc, list), label
@@ -538,6 +577,8 @@ def validate_contract_empty_contract_text_clause_list() -> None:
     assert ex.get("clause_overview") == []
     assert isinstance(ex.get("clause_risk_overview"), list)
     assert ex.get("clause_risk_overview") == []
+    assert isinstance(ex.get("clause_severity_overview"), list)
+    assert ex.get("clause_severity_overview") == []
 
 
 def validate_contract_analysis_empty_risk_fallback() -> None:
@@ -569,6 +610,8 @@ def validate_contract_analysis_empty_risk_fallback() -> None:
     assert ex.get("risk_category_summary") == []
     assert isinstance(ex.get("clause_overview"), list)
     assert isinstance(ex.get("clause_risk_overview"), list)
+    assert isinstance(ex.get("clause_severity_overview"), list)
+    assert ex.get("clause_severity_overview") == []
     assert len(ex["clause_overview"]) >= 1
 
 
@@ -625,6 +668,20 @@ def run_contract_analysis_demo() -> None:
                             f"sev={lr.get('severity')} kw={lr.get('matched_keyword')!r} | {tail}"
                         )
         if not (ex.get("clause_risk_overview") or []):
+            print("  (none)")
+        print()
+        print("【clause_severity_overview】")
+        for row in ex.get("clause_severity_overview") or []:
+            if isinstance(row, dict):
+                titles = row.get("linked_risk_titles") or []
+                ts = "; ".join(str(t) for t in titles if str(t).strip()) or "—"
+                print(
+                    f"  · {row.get('clause_id')} [{row.get('clause_type')}] "
+                    f"score={row.get('severity_score')} highest={row.get('highest_severity')} "
+                    f"n={row.get('linked_risk_count')} | {row.get('short_clause_preview')}"
+                )
+                print(f"      titles: {ts}")
+        if not (ex.get("clause_severity_overview") or []):
             print("  (none)")
         print()
         print("【risk_category_summary】")

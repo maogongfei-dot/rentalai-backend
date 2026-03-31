@@ -722,12 +722,14 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
     - ``explain``：overall_conclusion / key_risk_summary /
       **clause_overview**（``clause_id`` / ``clause_type`` / ``short_clause_preview`` / ``matched_keywords``）/
       **clause_risk_overview**（按条款聚合：``clause_id`` / ``clause_type`` / ``short_clause_preview`` / ``linked_risks``）/
+      **clause_severity_overview**（优先关注条款：``clause_id`` / ``clause_type`` / ``severity_score`` / ``highest_severity`` / ``linked_risk_count`` / ``short_clause_preview`` / ``linked_risk_titles``；与 ``clause_severity_summary`` 对齐）/
       与结构化层一致的 **risk_category_summary** / **risk_category_groups** /
       **highlighted_risk_clauses**（``risk_title`` / ``severity`` / ``matched_text`` /
       ``location_hint`` / ``short_advice`` / ``risk_category`` / ``risk_code``）/
       missing_clause_summary / action_advice
     - ``presentation``：sections 含 ``title_en``；含 ``kind=clause_overview``、
       ``kind=clause_risk_overview``、
+      ``kind=clause_severity_overview``、
       ``kind=risk_category_summary``、
       ``kind=risk_category_groups``（items 另附 ``risk_titles`` 便于列表展示）、
       ``kind=risk_clauses`` 等；``plain_text`` 与 CLI 报告一致

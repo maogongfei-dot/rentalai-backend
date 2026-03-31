@@ -327,6 +327,100 @@ def build_clause_risk_map(
     return out
 
 
+# Part 9：条款级强度分 — 每条关联 risk 按严重度加权后求和（high=3, medium=2, low=1）
+_CLAUSE_SEVERITY_WEIGHT: dict[str, int] = {"high": 3, "medium": 2, "low": 1}
+
+
+def _short_clause_preview(text: str, max_len: int = 120) -> str:
+    """将条款正文压成短预览（与 ``contract_explainer._short_clause_preview`` 行为一致，避免循环导入）。"""
+    t = re.sub(r"\s+", " ", (text or "").strip())
+    if len(t) <= max_len:
+        return t
+    return t[: max_len - 1] + "…"
+
+
+def _clause_severity_weight(severity: str) -> int:
+    s = str(severity or "medium").strip().lower()
+    if s not in ("high", "medium", "low"):
+        s = "medium"
+    return _CLAUSE_SEVERITY_WEIGHT.get(s, 2)
+
+
+def build_clause_severity_summary(
+    clause_list: list[dict[str, Any]],
+    clause_risk_map: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    由 ``clause_list`` 与 ``clause_risk_map`` 生成条款级风险强度汇总（无 NLP）。
+
+    - 仅包含在 ``clause_risk_map`` 中至少出现一次的 ``clause_id``（无关联风险的条款不进入列表）。
+    - ``severity_score``：对该条款下每条联动 risk 的权重求和（high=3 / medium=2 / low=1）。
+    - ``highest_severity``：关联 risk 中最高严重度。
+    - ``linked_risk_titles``：按 ``clause_risk_map`` 中首次出现顺序去重。
+    - 结果按 ``severity_score`` 降序；同分按 ``clause_id`` 序号升序以稳定排序。
+    """
+    clauses = [c for c in clause_list if isinstance(c, dict)]
+    by_id: dict[str, dict[str, Any]] = {}
+    for c in clauses:
+        cid = str(c.get("clause_id") or "").strip()
+        if cid:
+            by_id[cid] = c
+
+    links_by_clause: dict[str, list[dict[str, Any]]] = {}
+    for link in clause_risk_map:
+        if not isinstance(link, dict):
+            continue
+        cid = str(link.get("clause_id") or "").strip()
+        if not cid:
+            continue
+        links_by_clause.setdefault(cid, []).append(link)
+
+    out: list[dict[str, Any]] = []
+    for cid, links in links_by_clause.items():
+        if not links:
+            continue
+        c = by_id.get(cid)
+        clause_type = coerce_contract_clause_type(c.get("clause_type") if c else None)
+        ctext = str(c.get("clause_text") or "") if c else ""
+        loc = str(c.get("location_hint") or "").strip() if c else ""
+
+        score = 0
+        titles: list[str] = []
+        for lk in links:
+            sev = str(lk.get("severity") or "medium").strip().lower()
+            if sev not in ("high", "medium", "low"):
+                sev = "medium"
+            score += _clause_severity_weight(sev)
+            rt = str(lk.get("risk_title") or "").strip()
+            if rt and rt not in titles:
+                titles.append(rt)
+
+        hi = _highest_severity_in_risks(links)
+
+        out.append(
+            {
+                "clause_id": cid,
+                "clause_type": clause_type,
+                "severity_score": score,
+                "highest_severity": hi,
+                "linked_risk_count": len(links),
+                "linked_risk_titles": titles,
+                "short_clause_preview": _short_clause_preview(ctext),
+                "location_hint": loc,
+            }
+        )
+
+    def _sort_key(item: dict[str, Any]) -> tuple[int, tuple[int, str]]:
+        sc = int(item.get("severity_score") or 0)
+        cid = str(item.get("clause_id") or "")
+        ci = _clause_index_from_id(cid)
+        idx = ci if ci is not None else 10**9
+        return (-sc, (idx, cid))
+
+    out.sort(key=_sort_key)
+    return out
+
+
 def _normalize_clause_risk_link_dict(d: dict[str, Any]) -> dict[str, Any]:
     """Part 8：条款—风险联动行归一化；``severity`` 非标准值时回退为 medium。"""
     x = dict(d)
@@ -550,7 +644,7 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     - summary, risks, risk_category_groups, risk_category_summary,
       clause_list（``parse_contract_clauses`` + ``annotate_clause_types``）
     - clause_risk_map：条款—风险联动列表（由 ``build_clause_risk_map`` 生成；见 ``ClauseRiskLinkItem``）
-    - clause_severity_summary：条款级风险强度汇总（当前可为空 list；见 ``ClauseSeverityItem``）
+    - clause_severity_summary：条款级风险强度汇总（``build_clause_severity_summary``；无联动则为空 list；见 ``ClauseSeverityItem``）
     - missing_items, recommendations, detected_topics
     - meta: { source_type, source_name }（与 ``ContractInput`` 对应）
     """
@@ -576,6 +670,7 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     clause_list = parse_contract_clauses(text)
     clause_list = annotate_clause_types(clause_list)
     clause_risk_map = build_clause_risk_map(clause_list, risks)
+    clause_severity_summary = build_clause_severity_summary(clause_list, clause_risk_map)
 
     out = _normalize_analysis_output(
         {
@@ -583,6 +678,7 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
             "risks": risks,
             "clause_list": clause_list,
             "clause_risk_map": clause_risk_map,
+            "clause_severity_summary": clause_severity_summary,
             "missing_items": missing_items,
             "recommendations": recommendations,
             "detected_topics": detected_topics,

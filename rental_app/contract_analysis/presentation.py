@@ -94,6 +94,17 @@ def _clause_risk_overview_display_items(ex: dict[str, Any], sa: dict[str, Any]) 
     return []
 
 
+def _clause_severity_overview_display_items(ex: dict[str, Any], sa: dict[str, Any]) -> list[dict[str, Any]]:
+    """Explain 的 ``clause_severity_overview``；无 explain 时回退结构化 ``clause_severity_summary``。"""
+    raw = ex.get("clause_severity_overview")
+    if isinstance(raw, list) and raw:
+        return [x for x in raw if isinstance(x, dict)]
+    fallback = sa.get("clause_severity_summary")
+    if isinstance(fallback, list) and fallback:
+        return [x for x in fallback if isinstance(x, dict)]
+    return []
+
+
 def _risk_rows_from_explain_layers(
     ex: dict[str, Any], sa: dict[str, Any], key: str
 ) -> list[dict[str, Any]]:
@@ -345,6 +356,49 @@ def format_contract_analysis_cli_report(
 
     lines.extend(
         [
+            "Clause Severity Overview (Top risky clauses)",
+            _CLI_SEP,
+        ]
+    )
+    csev_items = _clause_severity_overview_display_items(ex, sa)
+    if csev_items:
+        for row in csev_items[:40]:
+            cid = str(row.get("clause_id") or "—").strip() or "—"
+            ct = str(row.get("clause_type") or "general").strip() or "general"
+            ct_zh = _clause_type_title_zh(ct)
+            try:
+                score = int(row.get("severity_score", 0))
+            except (TypeError, ValueError):
+                score = 0
+            hs = str(row.get("highest_severity") or "—").strip() or "—"
+            try:
+                nlink = int(row.get("linked_risk_count", 0))
+            except (TypeError, ValueError):
+                nlink = 0
+            prev = str(row.get("short_clause_preview") or "").strip() or "—"
+            if len(prev) > 160:
+                prev = prev[:157] + "…"
+            titles = row.get("linked_risk_titles")
+            if not isinstance(titles, list):
+                titles = []
+            title_s = "; ".join(str(t).strip() for t in titles if str(t).strip()) or "—"
+            lines.append(
+                f"  [{cid}] {ct_zh} ({ct})  score={score}  highest={hs}  linked={nlink}"
+            )
+            lines.append(f"      preview: {prev}")
+            lines.append(f"      linked_risk_titles: {title_s}")
+            lines.append("")
+        if len(csev_items) > 40:
+            lines.append(
+                f"  … 另有 {len(csev_items) - 40} 条见 explain.clause_severity_overview。"
+            )
+            lines.append("")
+    else:
+        lines.append("  (none — no clause severity rollup; no linked clause risks.)")
+        lines.append("")
+
+    lines.extend(
+        [
             "Missing Clause Summary",
             _CLI_SEP,
             ex.get("missing_clause_summary") or "—",
@@ -383,6 +437,8 @@ def build_contract_presentation(
     ``clause_overview`` 的 ``items`` 含 clause_id / clause_type / short_clause_preview / matched_keywords。
     ``clause_risk_overview`` 的 ``items`` 与 explain 一致：clause_id / clause_type / short_clause_preview /
     linked_risks（含 risk_title / risk_category / severity / matched_keyword / short_reason）。
+    ``clause_severity_overview`` 的 ``items`` 与 explain 一致：clause_id / clause_type / severity_score /
+    highest_severity / linked_risk_count / short_clause_preview / linked_risk_titles。
     ``highlighted_risk_clauses`` 的 ``items`` 为 ``HighlightedRiskClause`` 字典列表，
     每条含 risk_title / severity / matched_text / location_hint / short_advice / risk_category / risk_code。
     """
@@ -392,6 +448,7 @@ def build_contract_presentation(
     hrc_items = [x for x in (ex.get("highlighted_risk_clauses") or []) if isinstance(x, dict)]
     clause_overview_items = _clause_overview_display_items(ex, sa)
     clause_risk_overview_items = _clause_risk_overview_display_items(ex, sa)
+    clause_severity_overview_items = _clause_severity_overview_display_items(ex, sa)
     rc_summary_items = [x for x in (ex.get("risk_category_summary") or []) if isinstance(x, dict)]
     if not rc_summary_items:
         rc_summary_items = [x for x in (sa.get("risk_category_summary") or []) if isinstance(x, dict)]
@@ -449,6 +506,13 @@ def build_contract_presentation(
             "title_en": "Clause Risk Overview",
             "kind": "clause_risk_overview",
             "items": clause_risk_overview_items,
+        },
+        {
+            "id": "clause_severity_overview",
+            "title": "优先关注条款（风险强度）",
+            "title_en": "Top Risky Clauses",
+            "kind": "clause_severity_overview",
+            "items": clause_severity_overview_items,
         },
         {
             "id": "missing_clause_summary",

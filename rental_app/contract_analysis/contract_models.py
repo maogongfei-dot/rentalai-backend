@@ -208,7 +208,7 @@ class ClauseSeverityItem(TypedDict, total=False):
     """
     单条条款级风险强度汇总（``ContractAnalysisResult.clause_severity_summary`` 元素）。
 
-    ``severity_score``：数值强度分（具体算法由后续 Part 9 规则填充；未知时可为 0）。
+    ``severity_score``：条款级强度分，为关联每条 risk 的权重之和（high=3 / medium=2 / low=1）。
     ``highest_severity``：本条条款关联风险中的最高严重度（high / medium / low）。
     ``linked_risk_titles``：关联风险标题列表（与 ``clause_risk_map`` 对齐）。
     ``location_hint``：条款级定位提示，可与 ``ContractClauseItem.location_hint`` 一致。
@@ -278,6 +278,22 @@ class ClauseRiskOverviewItem(TypedDict, total=False):
     linked_risks: list[ClauseRiskLinkedRiskBrief]
 
 
+class ClauseSeverityOverviewItem(TypedDict, total=False):
+    """
+    Explain 层「优先关注条款」卡片（与结构化 ``clause_severity_summary`` 对齐，供 Top risky clauses）。
+
+    字段与第一层汇总一致，便于前端直接渲染；无关联风险时 explain 为稳定空 list。
+    """
+
+    clause_id: str
+    clause_type: str
+    severity_score: int
+    highest_severity: str
+    linked_risk_count: int
+    short_clause_preview: str
+    linked_risk_titles: list[str]
+
+
 class ContractExplainResult(TypedDict, total=False):
     """``explain_contract_analysis`` 输出（人话层）。"""
 
@@ -290,6 +306,7 @@ class ContractExplainResult(TypedDict, total=False):
     risk_category_summary: list[ContractRiskCategorySummaryItem]
     clause_overview: list[ContractClauseOverviewItem]
     clause_risk_overview: list[ClauseRiskOverviewItem]
+    clause_severity_overview: list[ClauseSeverityOverviewItem]
 
 
 # 兼容旧名（Part 2 前使用 ContractExplainBundle）

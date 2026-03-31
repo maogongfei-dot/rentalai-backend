@@ -208,6 +208,7 @@ def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
     rcs = _normalize_risk_category_summary(ex.get("risk_category_summary"))
     cov = _normalize_clause_overview(ex.get("clause_overview"))
     cro = _normalize_clause_risk_overview(ex.get("clause_risk_overview"))
+    cso = _normalize_clause_severity_overview(ex.get("clause_severity_overview"))
     return {
         "overall_conclusion": (str(ex.get("overall_conclusion") or "").strip() or "—"),
         "key_risk_summary": (str(ex.get("key_risk_summary") or "").strip() or "—"),
@@ -218,6 +219,7 @@ def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
         "risk_category_summary": rcs,
         "clause_overview": cov,
         "clause_risk_overview": cro,
+        "clause_severity_overview": cso,
     }
 
 
@@ -320,6 +322,51 @@ def _build_clause_risk_overview(
                 "clause_type": ct,
                 "short_clause_preview": preview or "—",
                 "linked_risks": linked_risks,
+            }
+        )
+    return out
+
+
+def _normalize_clause_severity_overview(raw: Any) -> list[dict[str, Any]]:
+    """
+    Explain 层 ``clause_severity_overview``：由结构化 ``clause_severity_summary`` 映射，字段稳定、顺序一致。
+    """
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        cid = str(item.get("clause_id") or "").strip()
+        if not cid:
+            continue
+        try:
+            sc = int(item.get("severity_score", 0))
+        except (TypeError, ValueError):
+            sc = 0
+        try:
+            n = int(item.get("linked_risk_count", 0))
+        except (TypeError, ValueError):
+            n = 0
+        hs = _normalize_severity(item.get("highest_severity"))
+        titles = item.get("linked_risk_titles")
+        if not isinstance(titles, list):
+            titles = []
+        titles = [str(t).strip() for t in titles if str(t).strip()]
+        prev = str(item.get("short_clause_preview") or "").strip()
+        if not prev:
+            prev = "—"
+        elif len(prev) > _CLAUSE_PREVIEW_CHARS + 5:
+            prev = _short_clause_preview(prev)
+        out.append(
+            {
+                "clause_id": cid,
+                "clause_type": coerce_contract_clause_type(item.get("clause_type")),
+                "severity_score": max(0, sc),
+                "highest_severity": hs,
+                "linked_risk_count": max(0, n),
+                "short_clause_preview": prev,
+                "linked_risk_titles": titles,
             }
         )
     return out
@@ -518,6 +565,7 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
     - risk_category_summary：按类的 count / highest_severity / short_summary
     - clause_overview：条款清单（clause_id / clause_type / short_clause_preview / matched_keywords）
     - clause_risk_overview：按条款聚合的风险挂接（clause_id / clause_type / short_clause_preview / linked_risks）
+    - clause_severity_overview：条款风险强度排序列表（与 ``clause_severity_summary`` 对齐，供 Top risky clauses）
     """
     if not isinstance(result, dict):
         result = {}
@@ -547,6 +595,7 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
                     "risk_category_summary": [],
                     "clause_overview": [],
                     "clause_risk_overview": [],
+                    "clause_severity_overview": [],
                 }
             ),
         )
@@ -563,6 +612,8 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
     clause_ov = _build_clause_overview(raw_clauses)
     raw_crm = _as_clause_list(result.get("clause_risk_map"))
     clause_risk_ov = _build_clause_risk_overview(raw_clauses, raw_crm, risks)
+    raw_css = result.get("clause_severity_summary")
+    clause_sev_ov = _normalize_clause_severity_overview(raw_css)
 
     return cast(
         ContractExplainResult,
@@ -577,6 +628,7 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
                 "risk_category_summary": raw_summary,
                 "clause_overview": clause_ov,
                 "clause_risk_overview": clause_risk_ov,
+                "clause_severity_overview": clause_sev_ov,
             }
         ),
     )
