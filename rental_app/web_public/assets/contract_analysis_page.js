@@ -3,7 +3,11 @@
  */
 (function () {
   var CA = window.RentalAIContractAnalysis;
-  if (!CA || typeof CA.analyzeContractText !== "function") {
+  if (
+    !CA ||
+    typeof CA.analyzeContractText !== "function" ||
+    typeof CA.analyzeContractUpload !== "function"
+  ) {
     if (typeof console !== "undefined" && console.error) {
       console.error("contract_analysis_api.js must load before contract_analysis_page.js");
     }
@@ -16,8 +20,8 @@
   var panelFile = document.getElementById("contract-panel-file");
   var ta = document.getElementById("contract-text");
   var filePathInput = document.getElementById("contract-file-path");
-  var localFile = document.getElementById("contract-local-file");
-  var localHint = document.getElementById("contract-local-file-hint");
+  var uploadFile = document.getElementById("contract-upload-file");
+  var uploadHint = document.getElementById("contract-upload-file-hint");
   var btn = document.getElementById("contract-submit");
   var loadingEl = document.getElementById("contract-loading");
   var loadingText = document.getElementById("contract-loading-text");
@@ -54,8 +58,8 @@
     setModePanels();
     if (ta) ta.value = Demo.SAMPLE_CONTRACT_TEXT;
     if (filePathInput) filePathInput.value = "";
-    if (localFile) localFile.value = "";
-    if (localHint) localHint.textContent = "";
+    if (uploadFile) uploadFile.value = "";
+    if (uploadHint) uploadHint.textContent = "";
     setError("");
   }
 
@@ -64,28 +68,30 @@
     if (modeFile) modeFile.checked = true;
     setModePanels();
     if (filePathInput) filePathInput.value = Demo.SAMPLE_FILE_PATH;
-    if (localFile) localFile.value = "";
-    if (localHint) localHint.textContent = "";
+    if (uploadFile) uploadFile.value = "";
+    if (uploadHint) uploadHint.textContent = "";
     setError("");
   }
 
   if (btnDemoText && Demo) btnDemoText.addEventListener("click", fillSampleText);
   if (btnDemoPath && Demo) btnDemoPath.addEventListener("click", fillSamplePath);
 
-  if (localFile && localHint) {
-    localFile.addEventListener("change", function () {
-      var f = localFile.files && localFile.files[0];
-      localHint.textContent = f ? "已选择：" + f.name + "（" + (f.type || "未知类型") + "）" : "";
+  if (uploadFile && uploadHint) {
+    uploadFile.addEventListener("change", function () {
+      var f = uploadFile.files && uploadFile.files[0];
+      uploadHint.textContent = f
+        ? "已选择：" + f.name + "（" + (f.type || "未知类型") + "）"
+        : "";
     });
   }
 
-  function setLoading(on) {
+  function setLoading(on, message) {
     if (btn) btn.disabled = !!on;
     if (loadingEl) {
       loadingEl.classList.toggle("hidden", !on);
       loadingEl.setAttribute("aria-busy", on ? "true" : "false");
     }
-    if (loadingText) loadingText.textContent = on ? "分析中…" : "";
+    if (loadingText) loadingText.textContent = on ? message || "分析中…" : "";
     if (on) {
       if (emptyEl) emptyEl.classList.add("hidden");
       if (resultSection) resultSection.classList.add("hidden");
@@ -372,19 +378,6 @@
     resultBody.innerHTML = parts.join("");
   }
 
-  function readFileAsText(file) {
-    return new Promise(function (resolve, reject) {
-      var fr = new FileReader();
-      fr.onload = function () {
-        resolve(String(fr.result || ""));
-      };
-      fr.onerror = function () {
-        reject(new Error("读取文件失败"));
-      };
-      fr.readAsText(file);
-    });
-  }
-
   function tryRestoreLastResult() {
     if (!CA.readLastContractAnalysisResult) return;
     var data = CA.readLastContractAnalysisResult();
@@ -398,8 +391,8 @@
     setError("");
     var isFile = modeFile && modeFile.checked;
 
-    function run(apiPromise) {
-      setLoading(true);
+    function run(apiPromise, loadingMessage) {
+      setLoading(true, loadingMessage);
       setError("");
       if (resultBody) resultBody.innerHTML = "";
       apiPromise
@@ -431,44 +424,36 @@
         CA.analyzeContractText(text, {
           source_name: "contract-analysis-web",
           source_type: "text",
-        })
+        }),
+        "分析中…"
       );
       return;
     }
 
     var pathRaw = filePathInput ? filePathInput.value.trim() : "";
-    var file = localFile && localFile.files && localFile.files[0];
+    var up = uploadFile && uploadFile.files && uploadFile.files[0];
+
+    if (up) {
+      run(
+        CA.analyzeContractUpload(up, {
+          source_name: up.name || "upload",
+        }),
+        "上传并分析中…"
+      );
+      return;
+    }
 
     if (pathRaw) {
       run(
         CA.analyzeContractFile(pathRaw, {
           source_name: "contract-analysis-web-path",
-        })
+        }),
+        "分析中…"
       );
       return;
     }
 
-    if (file) {
-      if (!/\.txt$/i.test(file.name) && file.type && file.type.indexOf("text") === -1) {
-        setError("本地文件模式当前仅支持 .txt；其它格式请填写服务端 file_path 或使用文本模式粘贴。");
-        return;
-      }
-      run(
-        readFileAsText(file).then(function (txt) {
-          var t = (txt || "").trim();
-          if (!t) {
-            throw new Error("所选文件为空或无法作为文本读取。");
-          }
-          return CA.analyzeContractText(t, {
-            source_name: file.name || "local.txt",
-            source_type: "txt",
-          });
-        })
-      );
-      return;
-    }
-
-    setError("文件模式下请填写 file_path（服务端路径）或选择本地 .txt 文件。");
+    setError("请先选择要上传的合同文件，或展开「开发：服务端路径」填写 file_path。");
   });
 
   if (document.readyState === "loading") {

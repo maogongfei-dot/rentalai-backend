@@ -79,9 +79,12 @@ def analyze_contract_file(
     deposit_amount: float | None = None,
     fixed_term_months: int | None = None,
     source_type: str | None = None,
+    source_name: str | None = None,
 ) -> ContractAnalysisFacadeResult:
     """
     文件路径（txt/pdf/docx）→ 抽取文本 → 与 :func:`analyze_contract_text` 相同管线、相同返回键。
+
+    ``source_name``：可选，写入 ``meta.source_name``（上传场景传入原始文件名）。
     """
     full = analyze_contract_file_with_explain(
         file_path=file_path,
@@ -89,5 +92,6 @@ def analyze_contract_file(
         deposit_amount=deposit_amount,
         fixed_term_months=fixed_term_months,
         source_type=source_type,
+        source_name=source_name,
     )
     return _facade_from_pipeline(full)

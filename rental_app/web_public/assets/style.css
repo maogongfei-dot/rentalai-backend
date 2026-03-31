@@ -471,6 +471,10 @@ a {
   border-radius: 4px;
 }
 
+.contract-dev-path-details summary {
+  cursor: pointer;
+}
+
 /* Phase 4 合同分析：summary_view 分段展示 */
 .contract-result-panel {
   margin-top: 0.75rem;

@@ -102,8 +102,9 @@ uvicorn api_server:app --host 127.0.0.1 --port 8000
 
 1. 启动：`cd rental_app` → `python run.py`，浏览器打开 **http://127.0.0.1:8000/contract-analysis**（须已登录 Demo，与首页同源）。
 2. **文本流程**：点「**填入示例文本**」→「**提交分析**」→ 应出现 loading → 下方「分析结果」各块有内容；`sessionStorage` 键 `rentalai_contract_analysis_last` 可看到完整 JSON。
-3. **文件路径流程**：点「**填入示例路径（文件模式）**」→「**提交分析**」（路径指向仓库内 `contract_analysis/samples/sample_contract.txt`，仅当 API 进程工作目录能解析该相对路径时成功）。
-4. 命令行冒烟（仅后端 JSON）：`python scripts/contract_analysis_api_smoke.py`。
+3. **文件路径流程**（开发）：切换到文件模式 → 展开「开发：服务端路径」→ 点「**填入示例路径（文件模式）**」→「**提交分析**」（路径指向仓库内 `contract_analysis/samples/sample_contract.txt`，仅当 API 进程工作目录能解析该相对路径时成功）。
+4. **上传流程**：文件模式 → 选择本地 `.txt`/`.pdf`/`.docx` →「**提交分析**」（multipart 调 `POST /api/contract/analysis/upload`）。
+5. 命令行冒烟（仅后端 JSON）：`python scripts/contract_analysis_api_smoke.py`。
 
 ---
 

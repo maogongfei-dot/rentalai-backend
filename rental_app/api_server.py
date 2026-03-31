@@ -21,7 +21,7 @@ from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 import threading
 
@@ -59,6 +59,7 @@ from task_store import TaskStore
 
 from config import get_cors_origins
 from contract_analysis_api_payload import build_contract_analysis_ui_payload
+from contract_analysis_upload_handler import ContractUploadError, analyze_contract_from_upload
 
 logger = logging.getLogger("rentalai.api")
 logging.basicConfig(
@@ -917,6 +918,67 @@ def api_contract_analysis_file_path(body: ContractAnalysisFilePathApiBody = Body
         }
     except Exception as exc:
         logger.exception("contract analysis/file-path failed")
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": "server_error", "message": str(exc)},
+        )
+
+
+@app.post("/api/contract/analysis/upload")
+async def api_contract_analysis_upload(
+    file: UploadFile = File(...),
+    metadata: Optional[str] = Form(default=None),
+):
+    """
+    Phase 4：multipart 上传合同（``.txt`` / ``.pdf`` / ``.docx``）。
+
+    - 表单字段 ``file``：上传文件（必填）。
+    - 表单字段 ``metadata``：可选 JSON 字符串，形状与 ``ContractAnalysisMetadata`` 一致（``source_name``、月租/押金等；``source_type`` 仅当为 ``txt``/``pdf``/``docx`` 时生效，否则按扩展名推断）。
+
+    成功响应与 ``POST /api/contract/analysis/text`` 相同：``result.summary_view`` + ``result.raw_analysis``。
+    """
+    try:
+        kw: dict[str, Any] = {}
+        if metadata and str(metadata).strip():
+            try:
+                obj = json.loads(metadata)
+                if not isinstance(obj, dict):
+                    raise ValueError("metadata must be a JSON object")
+                kw = _contract_analysis_metadata_kwargs(ContractAnalysisMetadata(**obj))
+            except (json.JSONDecodeError, ValidationError, ValueError) as exc:
+                return JSONResponse(
+                    status_code=400,
+                    content={"ok": False, "error": "invalid_metadata", "message": str(exc)},
+                )
+        st = kw.get("source_type")
+        if st is not None and str(st).strip().lower() not in ("txt", "pdf", "docx"):
+            st = None
+        facade = await analyze_contract_from_upload(
+            file,
+            monthly_rent=kw.get("monthly_rent"),
+            deposit_amount=kw.get("deposit_amount"),
+            fixed_term_months=kw.get("fixed_term_months"),
+            source_type=st,
+            source_name=kw.get("source_name"),
+        )
+        return {
+            "ok": True,
+            "engine": "contract_analysis_v1",
+            "result": build_contract_analysis_ui_payload(facade),
+        }
+    except ContractUploadError as exc:
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "error": exc.code, "message": exc.message},
+        )
+    except ValueError as exc:
+        logger.warning("contract analysis upload analyze failed: %s", exc)
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "error": "analyze_failed", "message": str(exc)},
+        )
+    except Exception as exc:
+        logger.exception("contract analysis upload failed")
         return JSONResponse(
             status_code=500,
             content={"ok": False, "error": "server_error", "message": str(exc)},

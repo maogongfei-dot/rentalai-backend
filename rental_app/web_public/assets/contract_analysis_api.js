@@ -3,6 +3,7 @@
  *
  * - analyzeContractText：POST /api/contract/analysis/text
  * - analyzeContractFile：POST /api/contract/analysis/file-path（服务端可读路径，非 multipart）
+ * - analyzeContractUpload：POST /api/contract/analysis/upload（multipart file + 可选 metadata）
  */
 (function (global) {
   var LAST_KEY = "rentalai_contract_analysis_last";
@@ -15,6 +16,24 @@
     return p.charAt(0) === "/" ? p : "/" + p;
   }
 
+  function parseJsonBody(r, text) {
+    var j = null;
+    try {
+      j = text ? JSON.parse(text) : {};
+    } catch (e) {
+      throw new Error("服务器返回非 JSON：" + (text || "").slice(0, 120));
+    }
+    if (!r.ok) {
+      var msg = (j && (j.message || j.error)) || "HTTP " + r.status;
+      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+    }
+    if (j && j.ok === false) {
+      var m = j.message || j.error || "请求失败";
+      throw new Error(typeof m === "string" ? m : JSON.stringify(m));
+    }
+    return j;
+  }
+
   function postJson(path, body) {
     var url = apiUrl(path);
     return fetch(url, {
@@ -23,21 +42,7 @@
       body: JSON.stringify(body || {}),
     }).then(function (r) {
       return r.text().then(function (text) {
-        var j = null;
-        try {
-          j = text ? JSON.parse(text) : {};
-        } catch (e) {
-          throw new Error("服务器返回非 JSON：" + (text || "").slice(0, 120));
-        }
-        if (!r.ok) {
-          var msg = (j && (j.message || j.error)) || "HTTP " + r.status;
-          throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
-        }
-        if (j && j.ok === false) {
-          var m = j.message || j.error || "请求失败";
-          throw new Error(typeof m === "string" ? m : JSON.stringify(m));
-        }
-        return j;
+        return parseJsonBody(r, text);
       });
     });
   }
@@ -69,6 +74,32 @@
     return postJson("/api/contract/analysis/file-path", body);
   }
 
+  /**
+   * multipart/form-data 上传 .txt / .pdf / .docx，字段名 ``file``；可选 ``metadata`` JSON 字符串。
+   * @param {File} file 浏览器 File 对象
+   * @param {object} [metadata] 可选，将序列化为表单字段 metadata
+   * @returns {Promise<object>}
+   */
+  function analyzeContractUpload(file, metadata) {
+    if (!file || typeof file !== "object") {
+      return Promise.reject(new Error("请选择有效的文件"));
+    }
+    var url = apiUrl("/api/contract/analysis/upload");
+    var fd = new FormData();
+    fd.append("file", file, file.name || "contract.bin");
+    if (metadata && typeof metadata === "object" && Object.keys(metadata).length > 0) {
+      fd.append("metadata", JSON.stringify(metadata));
+    }
+    return fetch(url, {
+      method: "POST",
+      body: fd,
+    }).then(function (r) {
+      return r.text().then(function (text) {
+        return parseJsonBody(r, text);
+      });
+    });
+  }
+
   /** 将最近一次成功响应写入 sessionStorage，供刷新或后续页面读取 */
   function saveLastContractAnalysisResult(payload) {
     try {
@@ -89,6 +120,7 @@
     analyzeContractText: analyzeContractText,
     /** 服务端路径版「文件」分析（与 multipart 上传无关） */
     analyzeContractFile: analyzeContractFile,
+    analyzeContractUpload: analyzeContractUpload,
     saveLastContractAnalysisResult: saveLastContractAnalysisResult,
     readLastContractAnalysisResult: readLastContractAnalysisResult,
     LAST_RESULT_STORAGE_KEY: LAST_KEY,

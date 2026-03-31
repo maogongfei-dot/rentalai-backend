@@ -101,11 +101,14 @@ def build_contract_input_from_file(
     deposit_amount: float | None = None,
     fixed_term_months: int | None = None,
     source_type: str | None = None,
+    source_name: str | None = None,
 ) -> ContractInput:
     """
     从 ``txt`` / ``pdf`` / ``docx`` 路径提取正文并构造 ``ContractInput``。
 
     ``source_type`` 为 ``None`` 时按扩展名推断；否则在提取时按传入类型选择读取器（须与文件实际格式一致）。
+
+    ``source_name``：写入 ``meta`` 的展示名（如上传原始文件名）；省略时使用 ``path.name``。
 
     提取失败时抛出 ``ValueError``，信息来自读取层（库缺失、空文件、无文本层等）。
     """
@@ -121,13 +124,14 @@ def build_contract_input_from_file(
         st = coerce_contract_source_type(source_type)
         if st == "text":
             st = "txt"
+    display_name = (source_name or "").strip() or path.name
     return ContractInput(
         contract_text=text,
         monthly_rent=monthly_rent,
         deposit_amount=deposit_amount,
         fixed_term_months=fixed_term_months,
         source_type=st,
-        source_name=path.name,
+        source_name=display_name,
     )
 
 
@@ -138,6 +142,7 @@ def analyze_contract_file(
     deposit_amount: float | None = None,
     fixed_term_months: int | None = None,
     source_type: str | None = None,
+    source_name: str | None = None,
 ) -> ContractAnalysisResult:
     """文件 → 结构化分析（第一层）。"""
     inp = build_contract_input_from_file(
@@ -146,6 +151,7 @@ def analyze_contract_file(
         deposit_amount=deposit_amount,
         fixed_term_months=fixed_term_months,
         source_type=source_type,
+        source_name=source_name,
     )
     return _analyze_contract_text(inp)
 
@@ -157,6 +163,7 @@ def analyze_contract_file_with_explain(
     deposit_amount: float | None = None,
     fixed_term_months: int | None = None,
     source_type: str | None = None,
+    source_name: str | None = None,
 ) -> ContractPhase3PipelineResult:
     """文件 → 提取 → 结构化分析 → explain → 展示层（与 ``analyze_contract_with_explain`` 同形）。"""
     inp = build_contract_input_from_file(
@@ -165,6 +172,7 @@ def analyze_contract_file_with_explain(
         deposit_amount=deposit_amount,
         fixed_term_months=fixed_term_months,
         source_type=source_type,
+        source_name=source_name,
     )
     base = _analyze_contract_text(inp)
     ex = explain_contract_analysis(base)

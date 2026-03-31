@@ -15,7 +15,9 @@
       <p class="back-link"><a href="/">← 首页</a></p>
       <header class="page-header">
         <h1>合同分析 <span class="hint muted" style="font-weight: normal">Contract Analysis</span></h1>
-        <p class="hint muted">文本模式粘贴正文；文件模式支持服务端路径或本地 .txt（浏览器读取）。</p>
+        <p class="hint muted">
+          文本模式粘贴正文；文件模式默认<strong>上传</strong> .txt / .pdf / .docx，由服务器解析；展开下方可填服务端路径（开发用）。
+        </p>
       </header>
 
       <section class="card form-card" aria-labelledby="contract-form-heading">
@@ -58,8 +60,25 @@
 
         <div id="contract-panel-file" class="contract-input-panel hidden">
           <div class="form-section">
-            <h3 class="form-section-title">服务端路径 file_path</h3>
-            <p class="hint small-print">仅当 API 与合同文件在同一机器可读路径时有效（如相对 rental_app 的 sample 路径）。</p>
+            <h3 class="form-section-title">上传合同（推荐）</h3>
+            <p class="hint small-print">
+              支持 .txt、.pdf、.docx；点击「提交分析」将以 multipart 上传至服务器并分析。
+            </p>
+            <label class="field-label" for="contract-upload-file">选择文件</label>
+            <input
+              type="file"
+              id="contract-upload-file"
+              name="contract_file"
+              accept=".txt,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            />
+            <p class="hint muted small-print" id="contract-upload-file-hint" aria-live="polite"></p>
+          </div>
+
+          <details class="form-section contract-dev-path-details">
+            <summary class="form-section-title">开发：服务端路径（可选）</summary>
+            <p class="hint small-print">
+              不经过上传，直接让 API 读取服务器磁盘路径（需与 API 进程同机可读，如相对 rental_app 的 sample）。
+            </p>
             <label class="field-label" for="contract-file-path">file_path</label>
             <input
               type="text"
@@ -68,18 +87,7 @@
               autocomplete="off"
               placeholder="例如 contract_analysis/samples/sample_contract.txt"
             />
-          </div>
-          <div class="form-section">
-            <h3 class="form-section-title">本地文件（可选）</h3>
-            <p class="hint small-print">选择 .txt 时由浏览器读取为文本再走文本分析；PDF/Word 请用上方路径或改用文本模式粘贴。</p>
-            <label class="field-label" for="contract-local-file">本地文件</label>
-            <input
-              type="file"
-              id="contract-local-file"
-              accept=".txt,text/plain"
-            />
-            <p class="hint muted small-print" id="contract-local-file-hint" aria-live="polite"></p>
-          </div>
+          </details>
         </div>
 
         <div class="actions-row">
