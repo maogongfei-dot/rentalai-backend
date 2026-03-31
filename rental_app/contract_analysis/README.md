@@ -70,7 +70,7 @@
 ## Phase 4 接入建议（最小）
 
 - **正式门面（推荐）**：仓库根 **`contract_analysis_service.py`** 提供 **`analyze_contract_text`** / **`analyze_contract_file`**，统一返回 **`analysis_result`**、**`explain_result`**、**`presentation`**（内部仍调用 ``contract_analysis.service``，不重复实现规则）。
-- **HTTP（Phase 4 最小）**：**`POST /api/contract/analysis/text`**（正文 + 可选 ``metadata``）、**`POST /api/contract/analysis/file-path`**（服务端本地路径，无上传）。响应 ``result`` 仅含门面键名。
+- **HTTP（Phase 4 最小）**：**`POST /api/contract/analysis/text`**（正文 + 可选 ``metadata``）、**`POST /api/contract/analysis/file-path`**（服务端本地路径，无上传）。响应 ``result`` 为两层：**``summary_view``**（首屏绑定，字段来自 explain 核心切片）+ **``raw_analysis``**（完整 ``analysis_result`` / ``explain_result`` / ``presentation``）。
 - **HTTP（Phase 3 兼容）**：**`POST /api/contract/phase3/analyze-text`** 由门面组装 ``result``，并保留 ``structured_analysis`` / ``explain`` 旧键名。
 - **包内等价**：**`contract_analysis.service.analyze_contract_with_explain`** / **`entrypoints`** 与门面数据一致，仅键名不同（``structured_analysis`` vs ``analysis_result``）。
 
@@ -117,7 +117,7 @@ r = requests.post(
 print(r.status_code, r.json().get("ok"), list((r.json().get("result") or {}).keys()))
 ```
 
-成功时 `result` 含 `analysis_result`、`explain_result`、`presentation`。
+成功时 `result` 含 **`summary_view`**（至少含 `overall_conclusion`、`key_risk_summary`、`risk_category_summary`、`highlighted_risk_clauses`、`clause_severity_overview`、`contract_completeness_overview`、`action_advice`）与 **`raw_analysis`**（上述三门面数据的完整副本）。
 
 ## 尚未做的增强（非 Phase 3 范围）
 

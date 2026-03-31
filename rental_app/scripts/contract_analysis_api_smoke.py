@@ -51,8 +51,24 @@ def main() -> int:
         res = data.get("result") or {}
         print(f"    ok={data.get('ok')} engine={data.get('engine')}")
         print(f"    result keys: {list(res.keys())}")
-        oc = (res.get("explain_result") or {}).get("overall_conclusion", "")[:120]
-        print(f"    overall_conclusion (preview): {oc!r}")
+        sv = res.get("summary_view") or {}
+        expected_sv = (
+            "overall_conclusion",
+            "key_risk_summary",
+            "risk_category_summary",
+            "highlighted_risk_clauses",
+            "clause_severity_overview",
+            "contract_completeness_overview",
+            "action_advice",
+        )
+        missing = [k for k in expected_sv if k not in sv]
+        if missing:
+            print(f"    ERROR: summary_view missing keys: {missing}", file=sys.stderr)
+            return 1
+        oc = str(sv.get("overall_conclusion", ""))[:120]
+        print(f"    summary_view.overall_conclusion (preview): {oc!r}")
+        ra = res.get("raw_analysis") or {}
+        print(f"    raw_analysis keys: {list(ra.keys())}")
     else:
         print(r1.text[:500])
         return 1
@@ -73,8 +89,9 @@ def main() -> int:
         res = data.get("result") or {}
         print(f"    ok={data.get('ok')} engine={data.get('engine')}")
         print(f"    result keys: {list(res.keys())}")
-        summ = (res.get("analysis_result") or {}).get("summary", "")[:120]
-        print(f"    analysis summary (preview): {summ!r}")
+        ar = (res.get("raw_analysis") or {}).get("analysis_result") or {}
+        summ = str(ar.get("summary", ""))[:120]
+        print(f"    raw_analysis.analysis_result summary (preview): {summ!r}")
     else:
         print(r2.text[:500])
         return 1

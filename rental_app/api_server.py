@@ -58,6 +58,7 @@ from data.storage.records_query_service import (
 from task_store import TaskStore
 
 from config import get_cors_origins
+from contract_analysis_api_payload import build_contract_analysis_ui_payload
 
 logger = logging.getLogger("rentalai.api")
 logging.basicConfig(
@@ -843,9 +844,11 @@ def _resolve_contract_file_path_for_api(raw: str) -> Path:
 @app.post("/api/contract/analysis/text")
 def api_contract_analysis_text(body: ContractAnalysisTextApiBody = Body(...)):
     """
-    Phase 4：合同文本分析（最小接口）。返回 ``result.analysis_result``、``result.explain_result``（及 ``presentation``）。
+    Phase 4：合同文本分析（最小接口）。返回 ``result.summary_view``（首屏展示）与
+    ``result.raw_analysis``（完整 ``analysis_result`` / ``explain_result`` / ``presentation``）。
 
-    与 ``/api/contract/phase3/analyze-text`` 共用 ``contract_analysis_service``，本路由响应仅含门面键名（无 ``structured_analysis`` 旧别名）。
+    与 ``/api/contract/phase3/analyze-text`` 共用 ``contract_analysis_service``；本路由在 HTTP 层整理形状，
+    不重复分析逻辑。Phase 3 兼容路由仍返回扁平 ``analysis_result`` + 旧别名。
     """
     from contract_analysis_service import analyze_contract_text
 
@@ -865,11 +868,7 @@ def api_contract_analysis_text(body: ContractAnalysisTextApiBody = Body(...)):
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
-            "result": {
-                "analysis_result": facade["analysis_result"],
-                "explain_result": facade["explain_result"],
-                "presentation": facade.get("presentation"),
-            },
+            "result": build_contract_analysis_ui_payload(facade),
         }
     except Exception as exc:
         logger.exception("contract analysis/text failed")
@@ -884,7 +883,7 @@ def api_contract_analysis_file_path(body: ContractAnalysisFilePathApiBody = Body
     """
     Phase 4：按**服务端本地路径**读取合同文件并分析（开发/受信环境）。生产需限制可访问目录。
 
-    返回键与 ``/api/contract/analysis/text`` 相同。
+    返回形状与 ``/api/contract/analysis/text`` 相同（``summary_view`` + ``raw_analysis``）。
     """
     from contract_analysis_service import analyze_contract_file
 
@@ -914,11 +913,7 @@ def api_contract_analysis_file_path(body: ContractAnalysisFilePathApiBody = Body
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
-            "result": {
-                "analysis_result": facade["analysis_result"],
-                "explain_result": facade["explain_result"],
-                "presentation": facade.get("presentation"),
-            },
+            "result": build_contract_analysis_ui_payload(facade),
         }
     except Exception as exc:
         logger.exception("contract analysis/file-path failed")
