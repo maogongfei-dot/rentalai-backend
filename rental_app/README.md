@@ -105,6 +105,10 @@ uvicorn api_server:app --host 127.0.0.1 --port 8000
 - **前端**：原生 HTML/CSS/JS，无构建步骤。
 - **数据**：Demo 分析结果在 **sessionStorage**（`ai_analyze_last`）；用户与收藏/历史在 **localStorage**。
 
+### 合同分析（Phase 3，可选子模块）
+
+与房源推荐主流程独立，规则引擎在包 **`contract_analysis/`**。最小说明、输入输出、Phase 4 接入建议见 **`contract_analysis/README.md`**；HTTP 入口示例 **`POST /api/contract/phase3/analyze-text`**（另有 Phase B 管线 **`/api/contract/analyze-text`**，勿混淆）。
+
 ---
 
 ## 可选：Streamlit 旧界面

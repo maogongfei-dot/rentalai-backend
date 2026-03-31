@@ -1,10 +1,14 @@
 """
 Phase 3 合同分析：对外服务包装（供 API / CLI 调用，与 MVP 房源流程隔离）。
 
+开发说明（输入/输出/限制/Phase 4 接入）：见同目录 ``README.md``。
+
 支持：
 - 纯文本：``analyze_contract`` / ``analyze_contract_with_explain``（``contract_text``）。
 - 文件路径：``build_contract_input_from_file``、``analyze_contract_file``、
   ``analyze_contract_file_with_explain``（``file_path`` → 提取 → 分析 → explain）。
+
+Phase 4 建议优先复用：``analyze_contract_with_explain``（或文件版 ``analyze_contract_file_with_explain``），与 ``api_server`` 中 Phase 3 路由一致。
 """
 
 from __future__ import annotations
@@ -63,7 +67,8 @@ def analyze_contract_with_explain(
     source_name: str | None = None,
 ) -> ContractPhase3PipelineResult:
     """
-    完整 Phase 3 输出（两层 + 展示层），形状见 ``ContractPhase3PipelineResult``：
+    完整 Phase 3 输出（两层 + 展示层），形状见 ``ContractPhase3PipelineResult``。
+    **推荐作为非 HTTP 调用的统一入口**（上传/任务队列封装时直接调用本函数）。
 
     - ``structured_analysis``：第一层（含 ``meta``、``risks[].matched_text``、``clause_risk_map``、``clause_severity_summary``、``contract_completeness``（``build_contract_completeness``）等）。
     - ``explain``：第二层（含 ``highlighted_risk_clauses``、``clause_risk_overview``、``clause_severity_overview``、``contract_completeness_overview`` 等，与 CLI/API 展示对齐）。

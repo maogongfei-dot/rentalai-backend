@@ -7,6 +7,9 @@ Phase 3 合同分析：样例合同演示与最小校验入口。
 
 或在代码中调用 ``run_contract_analysis_demo()``。
 
+Phase 3 收尾总验收（文本 + 文件格式 + 字段完整性）见 ``python -m contract_analysis.phase3_acceptance``
+或 ``run_phase3_acceptance()`` / ``test_phase3_acceptance()``；说明见 ``PHASE3_ACCEPTANCE.md``。
+
 Part 10 第 4 步：``sample_completeness_*.txt`` 四样例用于完整性检查收尾；期望见 ``_COMPLETENESS_FINALE_EXPECT``。
 """
 

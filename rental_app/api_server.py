@@ -662,7 +662,8 @@ class ContractAnalyzeTextBody(BaseModel):
 @app.post("/api/contract/analyze-text")
 def api_contract_analyze_text(body: ContractAnalyzeTextBody = Body(...)):
     """
-    合同文本分析入口（Phase B1）：返回 detected_risks / summary，后续可接 PDF 解析结果复用同一结构。
+    合同文本分析入口（Phase B1，根目录 ``contract_text_analyzer``）：与 Phase 3 包 ``contract_analysis`` 区分。
+    完整条款/explain/展示层请用 ``POST /api/contract/phase3/analyze-text``；说明见 ``contract_analysis/README.md``。
     """
     from contract_text_analyzer import analyze_contract_text
 
@@ -705,6 +706,8 @@ class ContractPhase3AnalyzeBody(BaseModel):
     )
 
 
+# Phase 3 合同分析：前端上传可先抽文本再 POST 本路由；文件路径场景也可在服务端调
+# ``contract_analysis.analyze_contract_file_with_explain``（与 Python 入口一致）。详见 ``contract_analysis/README.md``。
 @app.post("/api/contract/phase3/analyze-text")
 def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)):
     """

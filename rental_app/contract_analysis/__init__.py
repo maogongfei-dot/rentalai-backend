@@ -1,5 +1,7 @@
 """
 Phase 3：合同分析子模块（与项目根目录 ``contract_*.py`` 管线区分，用于新阶段扩展）。
+
+最小开发说明与 Phase 4 接入建议见 ``contract_analysis/README.md``。
 """
 
 from __future__ import annotations
@@ -83,6 +85,10 @@ from .demo_contract_samples import (
     validate_contract_category_samples,
     validate_contract_localization_samples,
     validate_contract_severity_samples,
+)
+from .phase3_acceptance import (
+    run_phase3_acceptance,
+    test_phase3_acceptance,
 )
 from .presentation import build_contract_presentation, format_contract_analysis_cli_report
 from .service import (
@@ -178,6 +184,8 @@ __all__ = [
     "detect_clause_type",
     "analyze_contract_with_explain",
     "build_contract_input_from_file",
+    "run_phase3_acceptance",
+    "test_phase3_acceptance",
     "build_contract_presentation",
     "explain_contract_analysis",
     "format_contract_analysis_cli_report",
