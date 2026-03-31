@@ -40,6 +40,7 @@ from .sample_contracts_data import (
     SAMPLE_SEVERITY_MIXED_CLAUSES,
     SAMPLE_SEVERITY_ONE_CLAUSE_MULTI_HIGH,
 )
+from .contract_models import coerce_contract_completeness_overall_status
 from .service import analyze_contract_with_explain
 
 
@@ -101,6 +102,39 @@ def _assert_clause_severity_summary_shape(sa: dict[str, Any], label: str) -> Non
         ]
         assert int(item.get("linked_risk_count") or 0) == len(links_for), label
         assert int(item.get("severity_score") or 0) == sum(_row_weight(x) for x in links_for), label
+
+
+def _assert_contract_completeness_shape(sa: dict[str, Any], label: str) -> None:
+    """Part 10：``contract_completeness`` 稳定存在且字段类型齐全。"""
+    cc = sa.get("contract_completeness")
+    assert isinstance(cc, dict), label
+    assert isinstance(cc.get("overall_status"), str), label
+    os = str(cc.get("overall_status") or "").strip()
+    assert os in ("unknown", "complete", "partially_complete", "incomplete", "ok", "mixed"), label
+    assert isinstance(cc.get("completeness_score"), int), label
+    assert 0 <= int(cc.get("completeness_score") or 0) <= 100, label
+    assert isinstance(cc.get("checked_items"), list), label
+    assert isinstance(cc.get("missing_core_items"), list), label
+    assert isinstance(cc.get("unclear_items"), list), label
+    assert isinstance(cc.get("summary"), str), label
+    assert len(cc.get("checked_items") or []) == 10, label
+
+
+def _assert_contract_completeness_overview_explain(ex: dict[str, Any], sa: dict[str, Any], label: str) -> None:
+    """Part 10 Step 3：explain.contract_completeness_overview 稳定键，与结构化层一致。"""
+    cco = ex.get("contract_completeness_overview")
+    assert isinstance(cco, dict), label
+    os = str(cco.get("overall_status") or "").strip()
+    assert os in ("unknown", "complete", "partially_complete", "incomplete"), label
+    assert isinstance(cco.get("completeness_score"), int), label
+    assert 0 <= int(cco.get("completeness_score") or 0) <= 100, label
+    assert isinstance(cco.get("missing_core_items"), list), label
+    assert isinstance(cco.get("unclear_items"), list), label
+    assert isinstance(cco.get("short_summary"), str), label
+    cc = sa.get("contract_completeness")
+    if isinstance(cc, dict):
+        assert os == coerce_contract_completeness_overall_status(cc.get("overall_status")), label
+        assert int(cco.get("completeness_score") or 0) == int(cc.get("completeness_score") or 0), label
 
 
 def _assert_clause_severity_score_descending(sa: dict[str, Any], label: str) -> None:
@@ -384,6 +418,7 @@ def validate_contract_severity_samples() -> None:
         assert isinstance(sa.get("clause_severity_summary"), list), label
         assert isinstance(ex.get("clause_severity_overview"), list), label
         _assert_clause_severity_summary_shape(sa, label)
+        _assert_contract_completeness_shape(sa, label)
         _assert_clause_severity_overview_explain(ex, label)
         _assert_clause_severity_score_descending(sa, label)
         _assert_clause_severity_explain_aligned(sa, ex, label)
@@ -433,6 +468,7 @@ def validate_contract_category_samples() -> None:
         assert isinstance(sa.get("clause_list"), list), label
         _assert_clause_risk_map_shape(sa, label)
         _assert_clause_severity_summary_shape(sa, label)
+        _assert_contract_completeness_shape(sa, label)
         assert isinstance(sa.get("risk_category_summary"), list), label
         assert isinstance(sa.get("risk_category_groups"), list), label
         assert isinstance(ex.get("risk_category_summary"), list), label
@@ -482,6 +518,7 @@ def validate_contract_clause_type_samples() -> None:
         assert isinstance(sa.get("clause_list"), list), label
         _assert_clause_risk_map_shape(sa, label)
         _assert_clause_severity_summary_shape(sa, label)
+        _assert_contract_completeness_shape(sa, label)
         assert isinstance(ex.get("clause_overview"), list), label
         _assert_clause_risk_overview_explain(ex, label)
         _assert_clause_severity_overview_explain(ex, label)
@@ -526,6 +563,7 @@ def validate_contract_clause_risk_samples() -> None:
         assert len(crm) >= 1, label
         _assert_clause_risk_map_shape(sa, label)
         _assert_clause_severity_summary_shape(sa, label)
+        _assert_contract_completeness_shape(sa, label)
         titles_in_map = {str(x.get("risk_title") or "").strip() for x in crm if isinstance(x, dict)}
         assert exp_title in titles_in_map, f"{label}: expected title {exp_title!r} in {titles_in_map!r}"
         cro = ex.get("clause_risk_overview")
@@ -559,6 +597,8 @@ def validate_contract_analysis_samples() -> None:
         assert len(sa.get("clause_list") or []) >= 1, label
         _assert_clause_risk_map_shape(sa, label)
         _assert_clause_severity_summary_shape(sa, label)
+        _assert_contract_completeness_shape(sa, label)
+        _assert_contract_completeness_overview_explain(ex, sa, label)
         assert isinstance(sa.get("risk_category_groups"), list)
         assert isinstance(sa.get("risk_category_summary"), list)
         assert len(sa["risk_category_groups"]) == len(sa["risk_category_summary"])
@@ -582,6 +622,7 @@ def validate_contract_analysis_samples() -> None:
         assert "clause_overview" in sec_ids, label
         assert "clause_risk_overview" in sec_ids, label
         assert "clause_severity_overview" in sec_ids, label
+        assert "contract_completeness_overview" in sec_ids, label
         assert "risk_category_summary" in sec_ids, label
         assert "risk_category_groups" in sec_ids, label
         for s in pres.get("sections") or []:
@@ -635,6 +676,8 @@ def validate_contract_localization_samples() -> None:
         assert len(sa.get("clause_list") or []) >= 1, label
         _assert_clause_risk_map_shape(sa, label)
         _assert_clause_severity_summary_shape(sa, label)
+        _assert_contract_completeness_shape(sa, label)
+        _assert_contract_completeness_overview_explain(ex, sa, label)
         assert isinstance(sa.get("risk_category_groups"), list), label
         assert isinstance(sa.get("risk_category_summary"), list), label
         assert isinstance(ex.get("risk_category_groups"), list), label
@@ -678,6 +721,8 @@ def validate_contract_empty_contract_text_clause_list() -> None:
     assert ex.get("clause_risk_overview") == []
     assert isinstance(ex.get("clause_severity_overview"), list)
     assert ex.get("clause_severity_overview") == []
+    _assert_contract_completeness_shape(sa, "empty_contract_text")
+    _assert_contract_completeness_overview_explain(ex, sa, "empty_contract_text")
 
 
 def validate_contract_analysis_empty_risk_fallback() -> None:
@@ -711,6 +756,7 @@ def validate_contract_analysis_empty_risk_fallback() -> None:
     assert isinstance(ex.get("clause_risk_overview"), list)
     assert isinstance(ex.get("clause_severity_overview"), list)
     assert ex.get("clause_severity_overview") == []
+    _assert_contract_completeness_shape(sa, "empty_risk_fallback")
     assert len(ex["clause_overview"]) >= 1
 
 
@@ -783,6 +829,24 @@ def run_contract_analysis_demo() -> None:
                 print(f"      titles: {ts}")
         if not (ex.get("clause_severity_overview") or []):
             print("  (none)")
+        print()
+        print("【contract_completeness_overview】")
+        cco = ex.get("contract_completeness_overview")
+        if isinstance(cco, dict):
+            print(f"  overall_status: {cco.get('overall_status')}")
+            print(f"  completeness_score: {cco.get('completeness_score')}")
+            for m in cco.get("missing_core_items") or []:
+                print(f"  - missing: {m}")
+            if not (cco.get("missing_core_items") or []):
+                print("  missing_core_items: (none)")
+            for u in cco.get("unclear_items") or []:
+                print(f"  - unclear: {u}")
+            if not (cco.get("unclear_items") or []):
+                print("  unclear_items: (none)")
+            ss = str(cco.get("short_summary") or "—")
+            print(f"  short_summary: {ss[:400]}{'…' if len(ss) > 400 else ''}")
+        else:
+            print("  (invalid)")
         print()
         print("【risk_category_summary】")
         for row in ex.get("risk_category_summary") or []:

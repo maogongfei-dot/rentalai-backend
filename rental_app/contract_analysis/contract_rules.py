@@ -21,6 +21,171 @@ SEVERITY_HIGH = "high"
 _UK_FIVE_WEEKS_OF_MONTHLY_RENT = 60.0 / 52.0
 
 # ---------------------------------------------------------------------------
+# Part 10：英国租房合同关键完整性检查项（清单定义；逐条判定逻辑见后续步骤）
+# 与 ``CONTRACT_CHECK_TOPICS`` 主题对齐，便于后续复用 coverage 关键词与缺失检测。
+# ---------------------------------------------------------------------------
+
+UK_RENTAL_COMPLETENESS_CHECKLIST: list[dict[str, Any]] = [
+    {
+        "id": "rent_payment",
+        "item_name": "租金与支付方式（Rent / Payment）",
+        "item_category": "rent",
+        "related_keywords": [
+            "rent",
+            "monthly",
+            "per month",
+            "pcm",
+            "payable",
+            "租金",
+            "月租",
+        ],
+        "weak_keywords": ["rent"],
+    },
+    {
+        "id": "deposit_amount",
+        "item_name": "押金金额与支付（Deposit）",
+        "item_category": "deposit",
+        "related_keywords": [
+            "deposit",
+            "tenancy deposit",
+            "holding deposit",
+            "押金",
+        ],
+        "weak_keywords": ["deposit"],
+    },
+    {
+        "id": "deposit_protection",
+        "item_name": "押金托管与保护计划（Deposit protection scheme）",
+        "item_category": "deposit",
+        "related_keywords": [
+            "deposit protection",
+            "custodial scheme",
+            "insured scheme",
+            "tds",
+            "dps",
+            "mydeposits",
+            "托管",
+        ],
+        "weak_keywords": ["tds", "dps", "托管"],
+    },
+    {
+        "id": "notice_period",
+        "item_name": "通知期（Notice period）",
+        "item_category": "notice",
+        "related_keywords": [
+            "notice period",
+            "one month notice",
+            "two months notice",
+            "通知期",
+            "提前通知",
+        ],
+        "weak_keywords": [],
+    },
+    {
+        "id": "maintenance_repairs",
+        "item_name": "维修与维护责任（Repairs / Maintenance）",
+        "item_category": "repairs",
+        "related_keywords": [
+            "repairs",
+            "maintenance",
+            "landlord's repairing",
+            "keep in repair",
+            "维修",
+        ],
+        "weak_keywords": ["maintenance"],
+    },
+    {
+        "id": "utilities_bills",
+        "item_name": "水电燃气与账单（Utilities / Bills）",
+        "item_category": "bills",
+        "related_keywords": [
+            "utilities",
+            "utility bills",
+            "bills included",
+            "council tax",
+            "gas",
+            "electricity",
+            "水电",
+            "包bill",
+        ],
+        "weak_keywords": ["gas", "electricity"],
+    },
+    {
+        "id": "rent_increase",
+        "item_name": "涨租与租金复查（Rent increase / Review）",
+        "item_category": "rent_increase",
+        "related_keywords": [
+            "rent increase",
+            "rent review",
+            "review of rent",
+            "涨租",
+            "租金上调",
+        ],
+        "weak_keywords": [],
+    },
+    {
+        "id": "termination_break",
+        "item_name": "提前终止与中断条款（Termination / Break clause）",
+        "item_category": "termination",
+        "related_keywords": [
+            "termination",
+            "break clause",
+            "early termination",
+            "surrender",
+            "提前终止",
+            "解约",
+        ],
+        "weak_keywords": ["termination", "surrender"],
+    },
+    {
+        "id": "access_entry",
+        "item_name": "进入权与查看通知（Access / Entry notice）",
+        "item_category": "access",
+        "related_keywords": [
+            "access",
+            "right of entry",
+            "landlord may enter",
+            "reasonable notice",
+            "inspect",
+            "进入",
+            "查看房屋",
+        ],
+        "weak_keywords": ["access", "inspect"],
+    },
+    {
+        "id": "inventory_checkin",
+        "item_name": "房屋清单与进退房（Inventory / Check-in / Check-out）",
+        "item_category": "inventory",
+        "related_keywords": [
+            "inventory",
+            "check-in",
+            "check-out",
+            "schedule of condition",
+            "房屋清单",
+            "交接",
+        ],
+        "weak_keywords": ["inventory"],
+    },
+]
+
+
+def default_contract_completeness_result() -> dict[str, Any]:
+    """
+    返回稳定的 ``ContractCompletenessResult`` 形状占位（未执行逐条判定时使用）。
+
+    ``checked_items`` 在后续步骤由检测逻辑填充；此处为空 list，字段齐全。
+    """
+    return {
+        "overall_status": "unknown",
+        "completeness_score": 0,
+        "checked_items": [],
+        "missing_core_items": [],
+        "unclear_items": [],
+        "summary": "",
+    }
+
+
+# ---------------------------------------------------------------------------
 # Part 7：条款级 clause_type（子串匹配；按 CLAUSE_TYPE_DETECTION_ORDER 取第一个有命中的类型）
 # 与风险层 risk_category 独立；多主题并存时只保留优先级最高的一类。
 # ---------------------------------------------------------------------------

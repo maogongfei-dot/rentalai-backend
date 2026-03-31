@@ -106,6 +106,83 @@ def coerce_contract_clause_type(raw: str | None) -> str:
     return "general"
 
 
+# Part 10：合同完整性检查（与 ``contract_rules.UK_RENTAL_COMPLETENESS_CHECKLIST`` / 检测逻辑对齐）
+ContractCompletenessItemStatus = Literal["present", "missing", "unclear"]
+ContractCompletenessOverallStatus = Literal[
+    "unknown",
+    "complete",
+    "partially_complete",
+    "incomplete",
+    "ok",
+    "mixed",
+]
+
+_COMPLETENESS_ITEM_STATUS_VALUES = frozenset({"present", "missing", "unclear"})
+# complete / partially_complete / incomplete 为 Part10 判定；ok / mixed 为兼容旧占位
+_COMPLETENESS_OVERALL_STATUS_VALUES = frozenset(
+    {"unknown", "complete", "partially_complete", "incomplete", "ok", "mixed"}
+)
+
+
+def coerce_contract_completeness_item_status(raw: str | None) -> str:
+    """单条检查项状态；未知值回退为 ``unclear``。"""
+    r = (raw or "unclear").strip().lower()
+    if r in _COMPLETENESS_ITEM_STATUS_VALUES:
+        return r
+    return "unclear"
+
+
+def coerce_contract_completeness_overall_status(raw: str | None) -> str:
+    """整体完整性状态；未知值回退为 ``unknown``；``ok``→``complete``，``mixed``→``partially_complete``。"""
+    r = (raw or "unknown").strip().lower()
+    if r == "ok":
+        return "complete"
+    if r == "mixed":
+        return "partially_complete"
+    if r in _COMPLETENESS_OVERALL_STATUS_VALUES:
+        return r
+    return "unknown"
+
+
+class ContractCompletenessItem(TypedDict, total=False):
+    """
+    单条完整性检查项结果（``ContractCompletenessResult.checked_items`` 元素）。
+
+    ``related_keywords``：与 ``UK_RENTAL_COMPLETENESS_CHECKLIST`` 对齐的参考关键词子集，便于展示与后续匹配。
+    """
+
+    item_name: str
+    item_category: str
+    status: str
+    reason: str
+    related_keywords: list[str]
+
+
+class ContractCompletenessResult(TypedDict, total=False):
+    """合同完整性检查汇总（``ContractAnalysisResult.contract_completeness``）。"""
+
+    overall_status: str
+    completeness_score: int
+    checked_items: list[ContractCompletenessItem]
+    missing_core_items: list[str]
+    unclear_items: list[str]
+    summary: str
+
+
+class ContractCompletenessOverviewExplain(TypedDict, total=False):
+    """
+    Explain 层合同完整性卡片（与结构化 ``contract_completeness`` 对齐，供前端单卡展示）。
+
+    ``short_summary`` 为结构化 ``summary`` 的截断版；``missing_core_items`` / ``unclear_items`` 无则稳定空 list。
+    """
+
+    overall_status: str
+    completeness_score: int
+    missing_core_items: list[str]
+    unclear_items: list[str]
+    short_summary: str
+
+
 @dataclass
 class ContractInput:
     """
@@ -241,6 +318,7 @@ class ContractAnalysisResult(TypedDict, total=False):
     clause_list: list[ContractClauseItem]
     clause_risk_map: list[ClauseRiskLinkItem]
     clause_severity_summary: list[ClauseSeverityItem]
+    contract_completeness: ContractCompletenessResult
     missing_items: list[str]
     recommendations: list[str]
     detected_topics: list[str]
@@ -307,6 +385,7 @@ class ContractExplainResult(TypedDict, total=False):
     clause_overview: list[ContractClauseOverviewItem]
     clause_risk_overview: list[ClauseRiskOverviewItem]
     clause_severity_overview: list[ClauseSeverityOverviewItem]
+    contract_completeness_overview: ContractCompletenessOverviewExplain
 
 
 # 兼容旧名（Part 2 前使用 ContractExplainBundle）

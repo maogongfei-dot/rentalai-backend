@@ -14,11 +14,13 @@ from .contract_models import (
     ContractExplainResult,
     HighlightedRiskClause,
     coerce_contract_clause_type,
+    coerce_contract_completeness_overall_status,
     coerce_contract_risk_category,
 )
 
 _CLAUSE_PREVIEW_CHARS = 120
 _SHORT_REASON_CHARS = 120
+_SHORT_COMPLETENESS_SUMMARY_CHARS = 400
 
 _RE_CLAUSE_ID_NUM = re.compile(r"^clause_(\d+)$", re.IGNORECASE)
 
@@ -168,6 +170,59 @@ def _normalize_risk_category_summary(raw: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _short_completeness_summary(full: str, max_len: int = _SHORT_COMPLETENESS_SUMMARY_CHARS) -> str:
+    """结构化 ``contract_completeness.summary`` 压成短摘要，便于 explain 单卡。"""
+    t = re.sub(r"\s+", " ", (full or "").strip())
+    if len(t) <= max_len:
+        return t
+    return t[: max_len - 1] + "…"
+
+
+def _normalize_contract_completeness_overview(raw: Any) -> dict[str, Any]:
+    """Explain 层 ``contract_completeness_overview`` 字段稳定、列表非空即 list。"""
+    if not isinstance(raw, dict):
+        raw = {}
+    os = coerce_contract_completeness_overall_status(str(raw.get("overall_status") or "").strip() or None)
+    try:
+        sc = int(raw.get("completeness_score", 0))
+    except (TypeError, ValueError):
+        sc = 0
+    sc = max(0, min(100, sc))
+    miss = raw.get("missing_core_items")
+    if not isinstance(miss, list):
+        miss = []
+    miss = [str(x).strip() for x in miss if str(x).strip()]
+    unc = raw.get("unclear_items")
+    if not isinstance(unc, list):
+        unc = []
+    unc = [str(x).strip() for x in unc if str(x).strip()]
+    ss = str(raw.get("short_summary") or "").strip() or "—"
+    return {
+        "overall_status": os,
+        "completeness_score": sc,
+        "missing_core_items": miss,
+        "unclear_items": unc,
+        "short_summary": ss,
+    }
+
+
+def _build_contract_completeness_overview_from_structured(cc: dict[str, Any] | None) -> dict[str, Any]:
+    """由第一层 ``contract_completeness`` 生成 explain 用单卡结构。"""
+    if not isinstance(cc, dict):
+        cc = {}
+    full = str(cc.get("summary") or "").strip()
+    short = _short_completeness_summary(full) if full else "—"
+    return _normalize_contract_completeness_overview(
+        {
+            "overall_status": cc.get("overall_status"),
+            "completeness_score": cc.get("completeness_score"),
+            "missing_core_items": cc.get("missing_core_items"),
+            "unclear_items": cc.get("unclear_items"),
+            "short_summary": short,
+        }
+    )
+
+
 def _normalize_highlighted_clauses(raw: Any) -> list[dict[str, Any]]:
     if not isinstance(raw, list):
         return []
@@ -209,6 +264,7 @@ def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
     cov = _normalize_clause_overview(ex.get("clause_overview"))
     cro = _normalize_clause_risk_overview(ex.get("clause_risk_overview"))
     cso = _normalize_clause_severity_overview(ex.get("clause_severity_overview"))
+    ccomp = _normalize_contract_completeness_overview(ex.get("contract_completeness_overview"))
     return {
         "overall_conclusion": (str(ex.get("overall_conclusion") or "").strip() or "—"),
         "key_risk_summary": (str(ex.get("key_risk_summary") or "").strip() or "—"),
@@ -220,6 +276,7 @@ def _normalize_explain_out(ex: dict[str, Any]) -> dict[str, Any]:
         "clause_overview": cov,
         "clause_risk_overview": cro,
         "clause_severity_overview": cso,
+        "contract_completeness_overview": ccomp,
     }
 
 
@@ -566,6 +623,7 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
     - clause_overview：条款清单（clause_id / clause_type / short_clause_preview / matched_keywords）
     - clause_risk_overview：按条款聚合的风险挂接（clause_id / clause_type / short_clause_preview / linked_risks）
     - clause_severity_overview：条款风险强度排序列表（与 ``clause_severity_summary`` 对齐，供 Top risky clauses）
+    - contract_completeness_overview：合同完整性单卡（overall_status / completeness_score / missing_core_items / unclear_items / short_summary）
     """
     if not isinstance(result, dict):
         result = {}
@@ -596,6 +654,9 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
                     "clause_overview": [],
                     "clause_risk_overview": [],
                     "clause_severity_overview": [],
+                    "contract_completeness_overview": _build_contract_completeness_overview_from_structured(
+                        result.get("contract_completeness") if isinstance(result.get("contract_completeness"), dict) else {}
+                    ),
                 }
             ),
         )
@@ -614,6 +675,10 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
     clause_risk_ov = _build_clause_risk_overview(raw_clauses, raw_crm, risks)
     raw_css = result.get("clause_severity_summary")
     clause_sev_ov = _normalize_clause_severity_overview(raw_css)
+    cc_raw = result.get("contract_completeness")
+    contract_comp_ov = _build_contract_completeness_overview_from_structured(
+        cc_raw if isinstance(cc_raw, dict) else {}
+    )
 
     return cast(
         ContractExplainResult,
@@ -629,6 +694,7 @@ def explain_contract_analysis(result: dict[str, Any]) -> ContractExplainResult:
                 "clause_overview": clause_ov,
                 "clause_risk_overview": clause_risk_ov,
                 "clause_severity_overview": clause_sev_ov,
+                "contract_completeness_overview": contract_comp_ov,
             }
         ),
     )

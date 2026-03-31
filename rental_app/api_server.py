@@ -718,11 +718,13 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
       **clause_list**（条款级占位列表，``ContractClauseItem``；默认可为空）/
       **clause_risk_map**（条款—风险联动，``ClauseRiskLinkItem`` 列表；由正文重叠/关键词/location_hint 轻量匹配生成；可为空但必须存在）/
       **clause_severity_summary**（条款级风险强度汇总，``ClauseSeverityItem`` 列表；可为空但必须存在）/
+      **contract_completeness**（合同完整性检查，``ContractCompletenessResult``；``build_contract_completeness`` 基于关键词强/弱命中）/
       missing_items / recommendations / detected_topics / meta
     - ``explain``：overall_conclusion / key_risk_summary /
       **clause_overview**（``clause_id`` / ``clause_type`` / ``short_clause_preview`` / ``matched_keywords``）/
       **clause_risk_overview**（按条款聚合：``clause_id`` / ``clause_type`` / ``short_clause_preview`` / ``linked_risks``）/
       **clause_severity_overview**（优先关注条款：``clause_id`` / ``clause_type`` / ``severity_score`` / ``highest_severity`` / ``linked_risk_count`` / ``short_clause_preview`` / ``linked_risk_titles``；与 ``clause_severity_summary`` 对齐）/
+      **contract_completeness_overview**（单卡：``overall_status`` / ``completeness_score`` / ``missing_core_items`` / ``unclear_items`` / ``short_summary``；与 ``contract_completeness`` 对齐）/
       与结构化层一致的 **risk_category_summary** / **risk_category_groups** /
       **highlighted_risk_clauses**（``risk_title`` / ``severity`` / ``matched_text`` /
       ``location_hint`` / ``short_advice`` / ``risk_category`` / ``risk_code``）/
@@ -730,6 +732,7 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
     - ``presentation``：sections 含 ``title_en``；含 ``kind=clause_overview``、
       ``kind=clause_risk_overview``、
       ``kind=clause_severity_overview``、
+      ``kind=contract_completeness_overview``（items 为单元素列表，元素为完整性卡）、
       ``kind=risk_category_summary``、
       ``kind=risk_category_groups``（items 另附 ``risk_titles`` 便于列表展示）、
       ``kind=risk_clauses`` 等；``plain_text`` 与 CLI 报告一致

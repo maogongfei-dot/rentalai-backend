@@ -11,6 +11,8 @@ from .contract_models import (
     ContractAnalysisResult,
     ContractInput,
     coerce_contract_clause_type,
+    coerce_contract_completeness_item_status,
+    coerce_contract_completeness_overall_status,
     coerce_contract_risk_category,
     coerce_contract_source_type,
 )
@@ -48,6 +50,8 @@ _RCS_SUMMARY_LABEL_ZH: dict[str, str] = {
 }
 from .contract_clause_split import parse_contract_clauses
 from .contract_rules import (
+    UK_RENTAL_COMPLETENESS_CHECKLIST,
+    default_contract_completeness_result,
     detect_contract_topic_labels,
     evaluate_deposit_amount_risk,
     match_clause_type_from_text,
@@ -467,8 +471,49 @@ def _normalize_clause_severity_dict(d: dict[str, Any]) -> dict[str, Any]:
     return x
 
 
+def _normalize_contract_completeness_item_dict(d: dict[str, Any]) -> dict[str, Any]:
+    """Part 10：单条完整性检查项归一化。"""
+    x = dict(d)
+    x["item_name"] = str(x.get("item_name") or "").strip()
+    x["item_category"] = str(x.get("item_category") or "").strip()
+    x["status"] = coerce_contract_completeness_item_status(str(x.get("status") or "").strip() or None)
+    x["reason"] = str(x.get("reason") or "").strip()
+    rk = x.get("related_keywords")
+    if not isinstance(rk, list):
+        rk = []
+    x["related_keywords"] = [str(t).strip() for t in rk if str(t).strip()]
+    return x
+
+
+def _normalize_contract_completeness_dict(raw: Any) -> dict[str, Any]:
+    """Part 10：``contract_completeness`` 与 ``default_contract_completeness_result`` 合并，字段稳定。"""
+    base = default_contract_completeness_result()
+    if not isinstance(raw, dict):
+        raw = {}
+    out = {**base, **raw}
+    out["overall_status"] = coerce_contract_completeness_overall_status(
+        str(out.get("overall_status") or "").strip() or None
+    )
+    try:
+        sc = int(out.get("completeness_score", 0))
+    except (TypeError, ValueError):
+        sc = 0
+    out["completeness_score"] = max(0, min(100, sc))
+    checked = out.get("checked_items")
+    if not isinstance(checked, list):
+        checked = []
+    out["checked_items"] = [_normalize_contract_completeness_item_dict(x) for x in checked if isinstance(x, dict)]
+    for key in ("missing_core_items", "unclear_items"):
+        v = out.get(key)
+        if not isinstance(v, list):
+            v = []
+        out[key] = [str(i).strip() for i in v if str(i).strip()]
+    out["summary"] = str(out.get("summary") or "").strip()
+    return out
+
+
 def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
-    """保证输出字段类型稳定：risks / clause_list / clause_risk_map / clause_severity_summary / missing_items 等均为 list。"""
+    """保证输出字段类型稳定：risks / clause_list / clause_risk_map / clause_severity_summary / contract_completeness / missing_items 等均为 list。"""
     out = dict(data)
     raw_risks = out.get("risks")
     if not isinstance(raw_risks, list):
@@ -486,6 +531,7 @@ def _normalize_analysis_output(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(raw_sev, list):
         raw_sev = []
     out["clause_severity_summary"] = [_normalize_clause_severity_dict(x) for x in raw_sev if isinstance(x, dict)]
+    out["contract_completeness"] = _normalize_contract_completeness_dict(out.get("contract_completeness"))
     for key in ("missing_items", "recommendations", "detected_topics"):
         v = out.get(key)
         if not isinstance(v, list):
@@ -516,6 +562,131 @@ def _uniq_preserve(xs: list[str]) -> list[str]:
         seen.add(t)
         out.append(t)
     return out
+
+
+def _completeness_keyword_hit(haystack_lower: str, kw: str) -> bool:
+    """与 ``contract_rules._clause_keyword_hit`` 语义一致：整词 / 短语 / 中文子串。"""
+    kw = (kw or "").strip()
+    if not kw:
+        return False
+    if any("\u4e00" <= c <= "\u9fff" for c in kw):
+        return kw.lower() in haystack_lower
+    if " " in kw:
+        return kw.lower() in haystack_lower
+    if kw.isascii() and kw.isalpha() and len(kw) <= 6:
+        return bool(re.search(r"(?<![a-z])" + re.escape(kw) + r"(?![a-z])", haystack_lower))
+    return kw.lower() in haystack_lower
+
+
+def _completeness_haystack(contract_text: str, clause_list: list[dict[str, Any]]) -> str:
+    """合并合同正文与条款文本，便于轻量关键词扫描。"""
+    parts: list[str] = [re.sub(r"\s+", " ", (contract_text or "").strip())]
+    for c in clause_list:
+        if not isinstance(c, dict):
+            continue
+        parts.append(re.sub(r"\s+", " ", str(c.get("clause_text") or "").strip()))
+    return " ".join(p for p in parts if p).strip().lower()
+
+
+def build_contract_completeness(
+    contract_text: str,
+    clause_list: list[dict[str, Any]],
+    detected_topics: list[str] | None = None,
+) -> dict[str, Any]:
+    """
+    Part 10：英国租房合同关键完整性检查（最小可用：正文 + 条款合并文本上的关键词命中，无 NLP）。
+
+    - **present**：命中至少一个「强关键词」（``related_keywords`` 中不在 ``weak_keywords`` 内）。
+    - **unclear**：仅命中弱关键词（``weak_keywords``），未命中任何强关键词。
+    - **missing**：该项相关关键词均未命中。
+
+    ``detected_topics`` 预留与主题标签交叉校验，当前不参与判定。
+    """
+    _ = detected_topics
+    haystack = _completeness_haystack(contract_text, clause_list)
+    checked: list[dict[str, Any]] = []
+    missing_names: list[str] = []
+    unclear_names: list[str] = []
+    n_present = n_unclear = n_missing = 0
+    n_items = len(UK_RENTAL_COMPLETENESS_CHECKLIST)
+
+    for row in UK_RENTAL_COMPLETENESS_CHECKLIST:
+        if not isinstance(row, dict):
+            continue
+        item_name = str(row.get("item_name") or "").strip()
+        item_cat = str(row.get("item_category") or "").strip()
+        related = [str(x).strip() for x in (row.get("related_keywords") or []) if str(x).strip()]
+        weak_raw = [str(x).strip() for x in (row.get("weak_keywords") or []) if str(x).strip()]
+        weak_lower = {w.lower() for w in weak_raw}
+        strong_hit: list[str] = []
+        weak_hit: list[str] = []
+        for kw in related:
+            if not _completeness_keyword_hit(haystack, kw):
+                continue
+            if kw.lower() in weak_lower:
+                weak_hit.append(kw)
+            else:
+                strong_hit.append(kw)
+
+        if strong_hit:
+            status = "present"
+            tail = "…" if len(strong_hit) > 5 else ""
+            reason = (
+                f"已命中较明确表述（{', '.join(strong_hit[:5])}{tail}）。"
+            )
+            n_present += 1
+        elif weak_hit:
+            status = "unclear"
+            tail = "…" if len(weak_hit) > 5 else ""
+            reason = (
+                f"仅命中较弱/泛化关键词（{', '.join(weak_hit[:5])}{tail}），建议通读全文或核对附件。"
+            )
+            n_unclear += 1
+            unclear_names.append(item_name)
+        else:
+            status = "missing"
+            reason = "正文中未匹配到预设关键词（可能写在附件、表格或使用不同措辞）。"
+            n_missing += 1
+            missing_names.append(item_name)
+
+        checked.append(
+            {
+                "item_name": item_name,
+                "item_category": item_cat,
+                "status": status,
+                "reason": reason,
+                "related_keywords": related,
+            }
+        )
+
+    if n_items <= 0:
+        completeness_score = 0
+    else:
+        completeness_score = round((n_present * 100 + n_unclear * 50) / n_items)
+
+    if n_missing >= n_items:
+        overall_status = "incomplete"
+    elif n_missing == 0 and n_unclear == 0:
+        overall_status = "complete"
+    elif n_missing >= 5 or completeness_score < 35:
+        overall_status = "incomplete"
+    else:
+        overall_status = "partially_complete"
+
+    summary = (
+        f"共检查 {n_items} 项关键主题：{n_present} 项在正文中有较明确表述，"
+        f"{n_unclear} 项仅有弱关键词命中，{n_missing} 项未匹配到关键词。"
+        f"综合完整度约 {completeness_score} 分（满分 100，present=100%、unclear=50% 权重）。"
+    )
+
+    return {
+        "overall_status": overall_status,
+        "completeness_score": completeness_score,
+        "checked_items": checked,
+        "missing_core_items": missing_names,
+        "unclear_items": unclear_names,
+        "summary": summary,
+    }
 
 
 def detect_clause_type(clause_text: str) -> tuple[str, list[str]]:
@@ -645,6 +816,7 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
       clause_list（``parse_contract_clauses`` + ``annotate_clause_types``）
     - clause_risk_map：条款—风险联动列表（由 ``build_clause_risk_map`` 生成；见 ``ClauseRiskLinkItem``）
     - clause_severity_summary：条款级风险强度汇总（``build_clause_severity_summary``；无联动则为空 list；见 ``ClauseSeverityItem``）
+    - contract_completeness：合同完整性检查（``build_contract_completeness`` / ``ContractCompletenessResult``）
     - missing_items, recommendations, detected_topics
     - meta: { source_type, source_name }（与 ``ContractInput`` 对应）
     """
@@ -657,6 +829,7 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
                 "missing_items": ["合同正文"],
                 "recommendations": ["请上传或粘贴完整合同文本后再试。"],
                 "detected_topics": [],
+                "contract_completeness": build_contract_completeness("", [], []),
             }
         )
         out["meta"] = _meta_from_input(contract_input)
@@ -671,6 +844,7 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
     clause_list = annotate_clause_types(clause_list)
     clause_risk_map = build_clause_risk_map(clause_list, risks)
     clause_severity_summary = build_clause_severity_summary(clause_list, clause_risk_map)
+    contract_completeness = build_contract_completeness(text, clause_list, detected_topics)
 
     out = _normalize_analysis_output(
         {
@@ -679,6 +853,7 @@ def analyze_contract_text(contract_input: ContractInput) -> ContractAnalysisResu
             "clause_list": clause_list,
             "clause_risk_map": clause_risk_map,
             "clause_severity_summary": clause_severity_summary,
+            "contract_completeness": contract_completeness,
             "missing_items": missing_items,
             "recommendations": recommendations,
             "detected_topics": detected_topics,

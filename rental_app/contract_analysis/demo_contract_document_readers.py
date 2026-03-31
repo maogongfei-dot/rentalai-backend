@@ -79,6 +79,12 @@ def run_contract_file_demo() -> None:
         n_sum = len(ex.get("risk_category_summary") or [])
         n_grp = len(ex.get("risk_category_groups") or [])
         print(f"  [explain] risk_category_summary: {n_sum} row(s), risk_category_groups: {n_grp} group(s)")
+        cco = ex.get("contract_completeness_overview")
+        if isinstance(cco, dict):
+            print(
+                f"  [explain] contract_completeness_overview: "
+                f"status={cco.get('overall_status')} score={cco.get('completeness_score')}"
+            )
         print()
 
     print("=== done ===")
@@ -113,6 +119,11 @@ def test_contract_document_readers() -> None:
         assert isinstance(sa.get("clause_list"), list)
         assert isinstance(sa.get("clause_risk_map"), list)
         assert isinstance(sa.get("clause_severity_summary"), list)
+        assert isinstance(sa.get("contract_completeness"), dict)
+        cco = ex.get("contract_completeness_overview")
+        assert isinstance(cco, dict)
+        assert isinstance(cco.get("missing_core_items"), list)
+        assert isinstance(cco.get("unclear_items"), list)
         assert isinstance(sa.get("risk_category_groups"), list)
         assert isinstance(sa.get("risk_category_summary"), list)
         assert len(ex["risk_category_groups"]) == len(ex["risk_category_summary"])

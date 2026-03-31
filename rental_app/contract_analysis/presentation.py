@@ -10,6 +10,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .contract_explainer import (
+    _build_contract_completeness_overview_from_structured,
+    _normalize_contract_completeness_overview,
+)
 from .contract_models import coerce_contract_clause_type
 
 _CLI_SEP = "────────────────────────────"
@@ -46,6 +50,19 @@ _CLAUSE_TYPE_LABEL_ZH: dict[str, str] = {
     "subletting": "转租",
     "general": "其他",
 }
+
+# explain ``contract_completeness_overview.overall_status`` 中文（与 ``coerce_contract_completeness_overall_status`` 对齐）
+_OVERALL_COMPLETENESS_STATUS_ZH: dict[str, str] = {
+    "unknown": "未知",
+    "complete": "完整",
+    "partially_complete": "部分完整",
+    "incomplete": "不完整",
+}
+
+
+def _overall_completeness_status_zh(code: str) -> str:
+    c = (code or "unknown").strip().lower()
+    return _OVERALL_COMPLETENESS_STATUS_ZH.get(c, c)
 
 
 def _category_title_zh(code: str) -> str:
@@ -92,6 +109,20 @@ def _clause_risk_overview_display_items(ex: dict[str, Any], sa: dict[str, Any]) 
     if isinstance(raw, list) and raw:
         return [x for x in raw if isinstance(x, dict)]
     return []
+
+
+def _contract_completeness_overview_display(ex: dict[str, Any], sa: dict[str, Any]) -> dict[str, Any]:
+    """
+    Explain 的 ``contract_completeness_overview`` 优先；否则由 ``structured_analysis.contract_completeness`` 生成。
+    返回单卡 dict（与 explain 归一化一致），便于 ``sections[].items`` 单元素列表渲染。
+    """
+    raw = ex.get("contract_completeness_overview")
+    if isinstance(raw, dict) and raw:
+        return _normalize_contract_completeness_overview(raw)
+    cc = sa.get("contract_completeness")
+    if isinstance(cc, dict) and cc:
+        return _build_contract_completeness_overview_from_structured(cc)
+    return _normalize_contract_completeness_overview({})
 
 
 def _clause_severity_overview_display_items(ex: dict[str, Any], sa: dict[str, Any]) -> list[dict[str, Any]]:
@@ -178,10 +209,13 @@ def format_contract_analysis_cli_report(
 
     第二层按固定顺序分段：Overall Conclusion → Key Risk Summary → Risk Category Summary →
     Risk Category Groups → Highlighted Risk Clauses → Clause Overview → Clause Risk Overview →
-    Clause Severity Overview（Top Risky Clauses）→ Missing Clause Summary → Action Advice。
+    Clause Severity Overview（Top Risky Clauses）→ Contract Completeness Check →
+    Missing Clause Summary → Action Advice。
     """
     sa = structured_analysis if isinstance(structured_analysis, dict) else {}
     ex = explain if isinstance(explain, dict) else {}
+
+    cc_ov = _contract_completeness_overview_display(ex, sa)
 
     risks = sa.get("risks") or []
     topics = sa.get("detected_topics") or []
@@ -208,6 +242,10 @@ def format_contract_analysis_cli_report(
         f"· 切分条款条数：{clauses_n} 条",
         f"· 条款—风险联动：{crm_n} 条（clause_risk_map）",
         f"· 条款风险强度汇总：{css_n} 条（clause_severity_summary / Top risky clauses）",
+        (
+            f"· 合同完整性：{_overall_completeness_status_zh(str(cc_ov.get('overall_status') or 'unknown'))} "
+            f"({cc_ov.get('overall_status')}) · score={cc_ov.get('completeness_score')}"
+        ),
         "",
     ]
     if isinstance(risks, list) and risks:
@@ -437,6 +475,42 @@ def format_contract_analysis_cli_report(
 
     lines.extend(
         [
+            "Contract Completeness Check",
+            _CLI_SEP,
+            f"  overall_status: {cc_ov.get('overall_status')} ({_overall_completeness_status_zh(str(cc_ov.get('overall_status') or ''))})",
+            f"  completeness_score: {cc_ov.get('completeness_score')}",
+        ]
+    )
+    miss = cc_ov.get("missing_core_items")
+    if not isinstance(miss, list):
+        miss = []
+    unc = cc_ov.get("unclear_items")
+    if not isinstance(unc, list):
+        unc = []
+    if miss:
+        lines.append("  missing_core_items:")
+        for m in miss[:24]:
+            lines.append(f"    - {m}")
+        if len(miss) > 24:
+            lines.append(f"    … 另有 {len(miss) - 24} 条")
+    else:
+        lines.append("  missing_core_items: (none)")
+    if unc:
+        lines.append("  unclear_items:")
+        for u in unc[:24]:
+            lines.append(f"    - {u}")
+        if len(unc) > 24:
+            lines.append(f"    … 另有 {len(unc) - 24} 条")
+    else:
+        lines.append("  unclear_items: (none)")
+    ss = str(cc_ov.get("short_summary") or "—").strip()
+    if len(ss) > 500:
+        ss = ss[:497] + "…"
+    lines.append(f"  short_summary: {ss}")
+    lines.append("")
+
+    lines.extend(
+        [
             "Missing Clause Summary",
             _CLI_SEP,
             ex.get("missing_clause_summary") or "—",
@@ -477,6 +551,8 @@ def build_contract_presentation(
     linked_risks（含 risk_title / risk_category / severity / matched_keyword / short_reason）。
     ``clause_severity_overview`` 的 ``items`` 与 explain 一致：clause_id / clause_type / severity_score /
     highest_severity / linked_risk_count / short_clause_preview / linked_risk_titles。
+    ``contract_completeness_overview`` 的 ``items`` 为单元素列表，元素为
+    overall_status / completeness_score / missing_core_items / unclear_items / short_summary。
     ``highlighted_risk_clauses`` 的 ``items`` 为 ``HighlightedRiskClause`` 字典列表，
     每条含 risk_title / severity / matched_text / location_hint / short_advice / risk_category / risk_code。
     """
@@ -487,6 +563,7 @@ def build_contract_presentation(
     clause_overview_items = _clause_overview_display_items(ex, sa)
     clause_risk_overview_items = _clause_risk_overview_display_items(ex, sa)
     clause_severity_overview_items = _clause_severity_overview_display_items(ex, sa)
+    contract_completeness_card = _contract_completeness_overview_display(ex, sa)
     rc_summary_items = [x for x in (ex.get("risk_category_summary") or []) if isinstance(x, dict)]
     if not rc_summary_items:
         rc_summary_items = [x for x in (sa.get("risk_category_summary") or []) if isinstance(x, dict)]
@@ -551,6 +628,13 @@ def build_contract_presentation(
             "title_en": "Top Risky Clauses",
             "kind": "clause_severity_overview",
             "items": clause_severity_overview_items,
+        },
+        {
+            "id": "contract_completeness_overview",
+            "title": "合同完整性检查",
+            "title_en": "Contract Completeness Check",
+            "kind": "contract_completeness_overview",
+            "items": [contract_completeness_card],
         },
         {
             "id": "missing_clause_summary",
