@@ -1341,6 +1341,74 @@ select {
   row-gap: 0.25rem;
 }
 
+.demo-unified-nav[data-auth-state="signed-in"] .nav-account-email {
+  font-weight: 600;
+  color: #0f172a;
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: bottom;
+}
+.nav-auth-link {
+  font-weight: 600;
+}
+
+/* Phase 5 Round2：首页账户条（与导航 Login/Sign Up 一致） */
+.home-account-strip {
+  margin: 0 0 0.85rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.35rem;
+  font-size: 0.9rem;
+}
+.home-account-strip--guest {
+  border-color: #cbd5e1;
+}
+.home-account-strip--signed-in {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+.home-account-strip-label {
+  font-weight: 600;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+.home-account-strip .nav-account-email {
+  font-weight: 600;
+  color: #0f172a;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-account-strip-hint {
+  margin-left: auto;
+  font-size: 0.78rem;
+}
+@media (max-width: 640px) {
+  .home-account-strip-hint {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+.home-account-logout-btn {
+  font: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #0f172a;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
 .result-actions {
   margin-bottom: 0.75rem;
   display: flex;

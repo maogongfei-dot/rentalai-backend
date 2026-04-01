@@ -18,6 +18,12 @@
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
     <main class="wrap wrap-wide">
+      <div
+        id="home-account-strip"
+        class="home-account-strip"
+        role="region"
+        aria-label="Account"
+      ></div>
       <!-- Phase 4 Round5：主功能 + 最小产品引导（何时点左 / 何时点右）；h1 为页内首标题 -->
       <section class="card home-main-entries" aria-labelledby="main-entries-heading">
         <h1 id="main-entries-heading" class="section-title">主功能</h1>
@@ -40,12 +46,6 @@
         <p class="hint small-print home-smart-entry-cta">
           <a href="/assistant">智能入口</a>
           <span class="hint muted"> · AI Assistant — Describe what you need，再选房源或合同流程</span>
-        </p>
-        <p id="home-auth-cta" class="hint small-print home-auth-cta">
-          <a href="/login">登录</a>
-          <span class="hint muted"> · </span>
-          <a href="/register">注册</a>
-          <span class="hint muted"> · 账户（Phase 5）</span>
         </p>
         <div class="home-entry-grid" role="list">
           <a
@@ -246,16 +246,6 @@
       document.getElementById("go").onclick = function () {
         window.RentalAIPhase3.startAnalyze();
       };
-    </script>
-    <script>
-      (function () {
-        var el = document.getElementById("home-auth-cta");
-        if (!el || !window.RentalAILocalAuth) return;
-        var st = window.RentalAILocalAuth.loadUserState
-          ? window.RentalAILocalAuth.loadUserState()
-          : null;
-        if (st && st.isAuthenticated) el.classList.add("hidden");
-      })();
     </script>
   </body>
 </html>

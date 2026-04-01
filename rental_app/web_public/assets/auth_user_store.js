@@ -126,7 +126,10 @@
   }
 
   /**
+   * 登出：清理 current_user、Bearer 与 auth_session 键；可选 POST /auth/logout。
+   * 登出后历史分桶自动回到 guest（见 getHistoryBucketId）。
    * @param {{ redirect?: boolean, redirectTo?: string, tryServerLogout?: boolean }} [options]
+   * @returns {Promise<object>|object} redirect 为 false 时返回 loadUserFromStorage() 快照
    */
   function logoutUser(options) {
     options = options || {};
@@ -148,6 +151,14 @@
       } catch (e2) {}
       if (global.RentalAIAuth && typeof global.RentalAIAuth.clearSession === "function") {
         global.RentalAIAuth.clearSession();
+      }
+      notifyAuthUiIfPresent();
+      if (
+        redirect === false &&
+        global.RentalAILocalAuth &&
+        typeof global.RentalAILocalAuth.refreshIdentityUI === "function"
+      ) {
+        global.RentalAILocalAuth.refreshIdentityUI();
       }
     }
 

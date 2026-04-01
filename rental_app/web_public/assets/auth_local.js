@@ -103,12 +103,51 @@
     return d.innerHTML;
   }
 
-  /** 各业务页共用的顶部导航：未登录时显示 登录/注册；已登录显示用户与退出 */
+  /** 首页主内容区：账户条（与导航状态一致） */
+  function renderHomeAccountStrip() {
+    var el = document.getElementById("home-account-strip");
+    if (!el) return;
+    var u = getUser();
+    if (!u) {
+      el.className = "home-account-strip home-account-strip--guest";
+      el.setAttribute("data-auth-state", "guest");
+      el.innerHTML =
+        '<span class="home-account-strip-label" lang="en">Account</span>' +
+        '<span class="nav-sep">·</span>' +
+        '<a href="/login" class="nav-auth-link">Login</a>' +
+        '<span class="nav-sep">·</span>' +
+        '<a href="/register" class="nav-auth-link">Sign Up</a>' +
+        '<span class="hint muted home-account-strip-hint">未登录时历史为 guest 桶</span>';
+      return;
+    }
+    var email = u.email ? String(u.email) : "";
+    var who = email || String(u.display_name || u.user_id || "—");
+    el.className = "home-account-strip home-account-strip--signed-in";
+    el.setAttribute("data-auth-state", "signed-in");
+    el.innerHTML =
+      '<span class="home-account-strip-label" lang="en">Signed in</span>' +
+      '<span class="nav-sep">·</span>' +
+      '<span class="nav-account-email" title="Current account">' +
+      escapeHtml(who) +
+      "</span>" +
+      '<span class="nav-sep">·</span>' +
+      '<button type="button" class="home-account-logout-btn" title="Log out">Logout</button>';
+    var btn = el.querySelector(".home-account-logout-btn");
+    if (btn) btn.addEventListener("click", logout);
+  }
+
+  function refreshIdentityUI() {
+    renderUnifiedNav();
+    renderHomeAccountStrip();
+  }
+
+  /** 各业务页共用的顶部导航：未登录 Login / Sign Up；已登录 email + Logout */
   function renderUnifiedNav() {
     var nav = document.getElementById("demo-unified-nav");
     if (!nav) return;
     var u = getUser();
     if (!u) {
+      nav.setAttribute("data-auth-state", "guest");
       nav.innerHTML =
         '<a href="/">首页</a>' +
         '<span class="nav-sep">·</span>' +
@@ -122,15 +161,14 @@
         '<span class="nav-sep">·</span>' +
         '<a href="/compare">房源对比</a>' +
         '<span class="nav-sep">·</span>' +
-        '<a href="/login">登录</a>' +
+        '<a href="/login" class="nav-auth-link">Login</a>' +
         '<span class="nav-sep">·</span>' +
-        '<a href="/register">注册</a>';
+        '<a href="/register" class="nav-auth-link">Sign Up</a>';
       return;
     }
     var email = u.email ? String(u.email) : "";
-    var mainLabel = email
-      ? "已登录：" + escapeHtml(email)
-      : "当前用户：" + escapeHtml(String(u.display_name || u.user_id || "用户"));
+    var who = email || String(u.display_name || u.user_id || "—");
+    nav.setAttribute("data-auth-state", "signed-in");
     nav.innerHTML =
       '<a href="/">首页</a>' +
       '<span class="nav-sep">·</span>' +
@@ -144,11 +182,11 @@
       '<span class="nav-sep">·</span>' +
       '<a href="/compare">房源对比</a>' +
       '<span class="nav-sep">·</span>' +
-      '<span class="local-user-name" title="当前登录状态">' +
-      mainLabel +
+      '<span class="nav-account-email" title="Current account">' +
+      escapeHtml(who) +
       "</span>" +
       '<span class="nav-sep">·</span>' +
-      '<button type="button" class="local-logout-btn" title="Logout">Logout</button>';
+      '<button type="button" class="local-logout-btn" title="Log out">Logout</button>';
     var btn = nav.querySelector(".local-logout-btn");
     if (btn) btn.addEventListener("click", logout);
   }
@@ -188,7 +226,7 @@
 
   function initDemoChrome() {
     function run() {
-      renderUnifiedNav();
+      refreshIdentityUI();
       initDemoClearStorage();
     }
     if (document.readyState === "loading") {
@@ -204,6 +242,9 @@
     requireLogin: requireLogin,
     logout: logout,
     favStorageKey: favStorageKey,
+    refreshIdentityUI: refreshIdentityUI,
+    renderUnifiedNav: renderUnifiedNav,
+    renderHomeAccountStrip: renderHomeAccountStrip,
   };
 
   requireLogin();
