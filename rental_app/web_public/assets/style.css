@@ -1780,6 +1780,20 @@ body.assistant-page-body {
 .analysis-history-page .history-server-notice.hidden {
   display: none;
 }
+/* Phase 5 Round5 Step4：云端加载成功轻提示（不含 token） */
+.analysis-history-page .history-cloud-load-hint {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #a7f3d0;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.analysis-history-page .history-cloud-load-hint.hidden {
+  display: none;
+}
 .unified-history-mount[data-unified-history-state="empty"] {
   margin-top: 0.5rem;
 }

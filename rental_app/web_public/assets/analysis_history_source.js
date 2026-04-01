@@ -4,6 +4,7 @@
  * - 写：不在此文件；见 analysis_history_persist（guest 本地）与后端 analysis_history_writer（已登录 JSON）
  * - 记录：normalizeRemoteRecord 与本地项对齐字段（created_at 均为 ISO 字符串）；远端行带 _historySource: "remote"
  * 未实现：分页、搜索、guest→user 迁移、冲突处理 — 见 rental_app/README.md「Phase 5 第四轮」
+ * Phase 5 Round5 Step4：云端请求 token 由 RentalAIServerHistoryApi.getBearerTokenForHistory；缺失/401 时回退本地并带 cloudAuthStatus。
  * 依赖：RentalAIUserStore、RentalAIAnalysisHistoryStore、RentalAIServerHistoryApi。
  */
 (function (global) {
@@ -143,6 +144,7 @@
         bucketId: info.bucketId,
         success: true,
         message: "ok_local",
+        cloudAuthStatus: "local_guest",
         propertyRecords: listLocalByType("property"),
         contractRecords: listLocalByType("contract"),
         usedFallback: false,
@@ -157,6 +159,22 @@
         bucketId: uid,
         success: false,
         message: "server_history_api_missing",
+        cloudAuthStatus: "api_missing",
+        propertyRecords: listLocalByType("property"),
+        contractRecords: listLocalByType("contract"),
+        usedFallback: true,
+      });
+    }
+
+    var tok =
+      typeof api.getBearerTokenForHistory === "function" ? api.getBearerTokenForHistory() : null;
+    if (!tok) {
+      return Promise.resolve({
+        mode: MODE_REMOTE_USER,
+        bucketId: uid,
+        success: false,
+        message: "auth_token_missing",
+        cloudAuthStatus: "missing_token",
         propertyRecords: listLocalByType("property"),
         contractRecords: listLocalByType("contract"),
         usedFallback: true,
@@ -167,11 +185,16 @@
       .fetchUserHistory(uid, {})
       .then(function (body) {
         if (!body || body.success === false) {
+          var authErr = !!(body && body._authError);
+          var st = body && body._httpStatus;
+          var cloudAuthStatus = "remote_failed";
+          if (authErr || st === 401 || st === 403) cloudAuthStatus = "auth_error";
           return {
             mode: MODE_REMOTE_USER,
             bucketId: uid,
             success: false,
             message: String((body && body.message) || "remote_fetch_failed"),
+            cloudAuthStatus: cloudAuthStatus,
             propertyRecords: listLocalByType("property"),
             contractRecords: listLocalByType("contract"),
             usedFallback: true,
@@ -183,6 +206,7 @@
           bucketId: uid,
           success: true,
           message: "ok_remote",
+          cloudAuthStatus: "loaded",
           propertyRecords: split.propertyRecords,
           contractRecords: split.contractRecords,
           usedFallback: false,
@@ -194,6 +218,7 @@
           bucketId: uid,
           success: false,
           message: "network_error",
+          cloudAuthStatus: "network_error",
           propertyRecords: listLocalByType("property"),
           contractRecords: listLocalByType("contract"),
           usedFallback: true,

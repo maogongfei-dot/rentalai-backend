@@ -1,7 +1,7 @@
 /**
- * Phase 5 Round3/4 + Round5 Step3 — GET /api/analysis/history/records
- * 需 Authorization: Bearer（与登录 session 一致）；userId query 可选，若带则须与 token 用户一致。
- * 失败时 analysis_history_source 回退本地。
+ * Phase 5 Round3/4 + Round5 Step3/4 — GET /api/analysis/history/records
+ * 云端读取统一由此模块带 Authorization: Bearer（RentalAIUserStore / rentalai_bearer）。
+ * userId query 可选，须与 token 用户一致。响应体可含 _httpStatus / _authError 供上层区分 401/403。
  */
 (function (global) {
   function apiUrl(path) {
@@ -44,17 +44,24 @@
         return r
           .json()
           .then(function (j) {
+            var obj =
+              j && typeof j === "object"
+                ? j
+                : { success: false, message: "invalid_json", records: [] };
+            obj._httpStatus = r.status;
+            obj._authError = r.status === 401 || r.status === 403;
             if (!r.ok && (!j || typeof j !== "object")) {
-              return { success: false, message: "http_" + r.status, records: [] };
+              obj.success = false;
+              if (!obj.message) obj.message = "http_" + r.status;
             }
-            return j && typeof j === "object" ? j : { success: false, message: "invalid_json", records: [] };
+            return obj;
           })
           .catch(function () {
-            return { success: false, message: "bad_json", records: [] };
+            return { success: false, message: "bad_json", records: [], _httpStatus: r.status, _authError: false };
           });
       })
       .catch(function () {
-        return { success: false, message: "network_error", records: [] };
+        return { success: false, message: "network_error", records: [], _httpStatus: 0, _authError: false };
       });
   }
 
@@ -86,5 +93,6 @@
     fetchUserHistory: fetchUserHistory,
     getHistoryRecords: getHistoryRecords,
     fetchServerHistoryRecords: fetchServerHistoryRecords,
+    getBearerTokenForHistory: getBearerTokenForHistory,
   };
 })(window);

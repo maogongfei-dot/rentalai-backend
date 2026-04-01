@@ -2,6 +2,7 @@
  * Phase 4 Round6：/analysis-history — 统一历史列表 + detail_snapshot 展开回看。
  * Phase 5 Round4：RentalAIAnalysisHistorySource.loadAnalysisHistory；data-history-source-mode / 来源文案见 history_access_context。
  * 双模式收尾：未改列表行为，仅与 persist/source/API 对齐；能力边界见 rental_app/README.md「Phase 5 第四轮」。
+ * Phase 5 Round5 Step4：cloudAuthStatus 提示（#history-cloud-load-hint / #history-server-notice），token 仅在 server_history_api 注入。
  */
 (function () {
   var S = window.RentalAIAnalysisHistoryStore;
@@ -429,6 +430,20 @@
     n.classList.remove("hidden");
   }
 
+  /** 云端历史成功时的轻量双语提示（不含 token）；空则隐藏 */
+  function setCloudLoadHint(text) {
+    var el = document.getElementById("history-cloud-load-hint");
+    if (!el) return;
+    var t = text && String(text).trim();
+    if (!t) {
+      el.textContent = "";
+      el.classList.add("hidden");
+      return;
+    }
+    el.textContent = t;
+    el.classList.remove("hidden");
+  }
+
   function run() {
     if (
       window.RentalAIHistoryAccess &&
@@ -453,6 +468,7 @@
     function renderFromLocal() {
       resetAnalysisLead();
       setServerNotice("");
+      setCloudLoadHint("");
       renderList(propEl, S.listByType("property"), emptyProp, "本地自动保存");
       renderList(contractEl, S.listByType("contract"), emptyContract, "本地自动保存");
     }
@@ -468,9 +484,11 @@
       renderLoading(propEl);
       renderLoading(contractEl);
       setServerNotice("");
+      setCloudLoadHint("");
     } else {
       resetAnalysisLead();
       setServerNotice("");
+      setCloudLoadHint("");
     }
 
     if (
@@ -489,20 +507,37 @@
             if (main) {
               main.setAttribute("data-history-source-mode", bundle.mode || "");
               main.setAttribute("data-history-used-fallback", bundle.usedFallback ? "1" : "0");
+              main.setAttribute("data-history-cloud-auth-status", bundle.cloudAuthStatus || "");
             }
           } catch (eMain) {}
           if (bundle.mode === "local_guest") {
             resetAnalysisLead();
             setServerNotice("");
+            setCloudLoadHint("");
           } else if (bundle.mode === "remote_user") {
             if (bundle.usedFallback) {
               setAnalysisLeadRemoteFallback();
-              setServerNotice(
-                "云端历史暂时不可用，已显示本机缓存（" + (bundle.message || "error") + "）。"
-              );
+              setCloudLoadHint("");
+              var cas = bundle.cloudAuthStatus;
+              if (cas === "missing_token") {
+                setServerNotice(
+                  "Authentication required to load cloud history. 未检测到有效会话，已显示本机缓存。请登录后重试。"
+                );
+              } else if (cas === "auth_error") {
+                setServerNotice(
+                  "Authentication failed or session expired. 云端会话无效或已过期，已显示本机缓存。请重新登录。"
+                );
+              } else {
+                setServerNotice(
+                  "云端历史暂时不可用，已显示本机缓存（" + (bundle.message || "error") + "）。"
+                );
+              }
             } else {
               setAnalysisLeadCloud();
               setServerNotice("");
+              setCloudLoadHint(
+                "Signed-in history loaded from account · 已从账户加载云端历史"
+              );
             }
           }
           var label =
@@ -515,6 +550,7 @@
           renderList(contractEl, bundle.contractRecords, emptyContract, label);
         })
         .catch(function () {
+          setCloudLoadHint("");
           setServerNotice("加载失败，已显示本机历史。");
           renderFromLocal();
         });
