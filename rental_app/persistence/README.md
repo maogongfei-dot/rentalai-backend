@@ -8,4 +8,6 @@
 
 ## Analysis history (server-side JSON)
 
-- Optional next step: `history_store` / `HistoryRepository` beside user rows; not wired to web UI yet.
+- **File**: `data/storage/persistence_analysis_history.json` (override: `RENTALAI_PERSISTENCE_ANALYSIS_HISTORY_JSON`).
+- **Write** (Phase 5 Round3 Step3): `analysis_history_writer` appends after successful **`POST /api/ai/query`** (property) and **`POST /api/contract/analysis/text`**, **`/file-path`**, **`/upload`** (contract). Optional JSON/form **`userId`** / **`user_id`**; omitted → **`guest`**.
+- **Read API**: not in this step; use `HistoryRepository.list_by_user` from server code or add HTTP later.

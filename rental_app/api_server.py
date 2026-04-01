@@ -38,6 +38,11 @@ from data.storage.records_db import (
     list_favorite_records,
     normalize_analysis_input_signature,
 )
+from persistence.analysis_history_writer import (
+    resolve_history_user_id,
+    try_append_contract,
+    try_append_property,
+)
 from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
 from data.explain.rule_explain import (
     build_p10_explain_for_batch_row,
@@ -686,6 +691,7 @@ def api_ai_query(body: dict = Body(default_factory=dict)):
     """
     Phase D10：自然语言房源查询编排（``run_housing_ai_query``）。
     请求体：``{ "user_text": "..." }``，兼容 ``query`` 字段。
+    可选 ``userId`` / ``user_id``：写入服务端 JSON 历史（缺省为 ``guest``）；不影响本地 localStorage 历史。
     """
     from services.chat_orchestrator import run_housing_ai_query
 
@@ -694,6 +700,7 @@ def api_ai_query(body: dict = Body(default_factory=dict)):
     try:
         ut = body.get("user_text") if body.get("user_text") is not None else body.get("query")
         out = run_housing_ai_query(str(ut or ""))
+        try_append_property(body, out)
         return JSONResponse(content=out)
     except Exception as exc:
         logger.exception("ai query failed")
@@ -866,6 +873,14 @@ class ContractAnalysisTextApiBody(BaseModel):
         default=None,
         description="可选：source_name、source_type、月租/押金等",
     )
+    userId: Optional[str] = Field(
+        default=None,
+        description="可选：服务端历史分桶；缺省 guest。兼容字段名 user_id。",
+    )
+    user_id: Optional[str] = Field(
+        default=None,
+        description="同 userId（snake_case）。",
+    )
 
 
 class ContractAnalysisFilePathApiBody(BaseModel):
@@ -877,6 +892,8 @@ class ContractAnalysisFilePathApiBody(BaseModel):
         default=None,
         description="可选：与文本接口相同；source_type 可被文件扩展名推断覆盖",
     )
+    userId: Optional[str] = Field(default=None, description="可选：服务端历史 userId")
+    user_id: Optional[str] = Field(default=None, description="同 userId")
 
 
 def _contract_analysis_metadata_kwargs(meta: Optional[ContractAnalysisMetadata]) -> dict[str, Any]:
@@ -920,10 +937,16 @@ def api_contract_analysis_text(body: ContractAnalysisTextApiBody = Body(...)):
     try:
         kw = _contract_analysis_metadata_kwargs(body.metadata)
         facade = analyze_contract_text(contract_text=ct, **kw)
+        ui_payload = build_contract_analysis_ui_payload(facade)
+        try_append_contract(
+            resolve_history_user_id(body.model_dump()),
+            "contract_analysis_v1",
+            ui_payload,
+        )
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
-            "result": build_contract_analysis_ui_payload(facade),
+            "result": ui_payload,
         }
     except Exception as exc:
         logger.exception("contract analysis/text failed")
@@ -965,10 +988,16 @@ def api_contract_analysis_file_path(body: ContractAnalysisFilePathApiBody = Body
     try:
         kw = _contract_analysis_metadata_kwargs(body.metadata)
         facade = analyze_contract_file(file_path=path, **kw)
+        ui_payload = build_contract_analysis_ui_payload(facade)
+        try_append_contract(
+            resolve_history_user_id(body.model_dump()),
+            "contract_analysis_v1",
+            ui_payload,
+        )
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
-            "result": build_contract_analysis_ui_payload(facade),
+            "result": ui_payload,
         }
     except Exception as exc:
         logger.exception("contract analysis/file-path failed")
@@ -982,12 +1011,14 @@ def api_contract_analysis_file_path(body: ContractAnalysisFilePathApiBody = Body
 async def api_contract_analysis_upload(
     file: UploadFile = File(...),
     metadata: Optional[str] = Form(default=None),
+    userId: Optional[str] = Form(default=None),
 ):
     """
     Phase 4：multipart 上传合同（``.txt`` / ``.pdf`` / ``.docx``）。
 
     - 表单字段 ``file``：上传文件（必填）。
     - 表单字段 ``metadata``：可选 JSON 字符串，形状与 ``ContractAnalysisMetadata`` 一致（``source_name``、月租/押金等；``source_type`` 仅当为 ``txt``/``pdf``/``docx`` 时生效，否则按扩展名推断）。
+    - 表单字段 ``userId``（可选）：服务端 JSON 历史分桶；缺省为 ``guest``。
 
     成功响应与 ``POST /api/contract/analysis/text`` 相同：``result.summary_view`` + ``result.raw_analysis``。
     """
@@ -1015,10 +1046,16 @@ async def api_contract_analysis_upload(
             source_type=st,
             source_name=kw.get("source_name"),
         )
+        ui_payload = build_contract_analysis_ui_payload(facade)
+        try_append_contract(
+            resolve_history_user_id({"userId": userId} if userId else {}),
+            "contract_analysis_v1",
+            ui_payload,
+        )
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
-            "result": build_contract_analysis_ui_payload(facade),
+            "result": ui_payload,
         }
     except ContractUploadError as exc:
         return JSONResponse(
