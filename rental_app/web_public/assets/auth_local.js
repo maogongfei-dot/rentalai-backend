@@ -1,6 +1,7 @@
 /**
  * 本地假登录 + Phase 5：会话判定委托 RentalAIUserStore（auth_user_store.js）。
- * 公开页：/、/login、/register、/assistant；其余路径无会话则跳转 /login。
+ * 公开页：/、/login、/register、/account、/assistant、/ai-result、/analysis-history、/history；
+ * 其余路径无会话则跳转 /login。顶栏 Login·Sign Up / 邮箱·Logout /「账户」见 README「Phase 5 第二轮」。
  */
 (function (global) {
   var KEY = "current_user";
@@ -78,6 +79,7 @@
       "/",
       "/login",
       "/register",
+      "/account",
       "/assistant",
       "/ai-result",
       "/analysis-history",
@@ -112,7 +114,7 @@
       el.className = "home-account-strip home-account-strip--guest";
       el.setAttribute("data-auth-state", "guest");
       el.innerHTML =
-        '<span class="home-account-strip-label" lang="en">Account</span>' +
+        '<a href="/account" class="home-account-strip-label">账户</a>' +
         '<span class="nav-sep">·</span>' +
         '<a href="/login" class="nav-auth-link">Login</a>' +
         '<span class="nav-sep">·</span>' +
@@ -126,6 +128,8 @@
     el.setAttribute("data-auth-state", "signed-in");
     el.innerHTML =
       '<span class="home-account-strip-label" lang="en">Signed in</span>' +
+      '<span class="nav-sep">·</span>' +
+      '<a href="/account" class="nav-auth-link">账户</a>' +
       '<span class="nav-sep">·</span>' +
       '<span class="nav-account-email" title="Current account">' +
       escapeHtml(who) +
@@ -161,6 +165,8 @@
         '<span class="nav-sep">·</span>' +
         '<a href="/compare">房源对比</a>' +
         '<span class="nav-sep">·</span>' +
+        '<a href="/account">账户</a>' +
+        '<span class="nav-sep">·</span>' +
         '<a href="/login" class="nav-auth-link">Login</a>' +
         '<span class="nav-sep">·</span>' +
         '<a href="/register" class="nav-auth-link">Sign Up</a>';
@@ -181,6 +187,8 @@
       '<a href="/analysis-history">分析历史</a>' +
       '<span class="nav-sep">·</span>' +
       '<a href="/compare">房源对比</a>' +
+      '<span class="nav-sep">·</span>' +
+      '<a href="/account">账户</a>' +
       '<span class="nav-sep">·</span>' +
       '<span class="nav-account-email" title="Current account">' +
       escapeHtml(who) +

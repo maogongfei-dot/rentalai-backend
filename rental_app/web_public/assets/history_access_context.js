@@ -1,6 +1,7 @@
 /**
  * Phase 5 Round2 Step1：历史页「受保护访问」轻量状态（不拦截路由，仅提示）。
  * 依赖 RentalAIUserStore（guest vs 已登录分桶与 authMode 一致）。
+ * 用户体系能力边界：rental_app/README.md「Phase 5 第二轮」。
  */
 (function (global) {
   function esc(s) {
@@ -77,7 +78,7 @@
         '<p class="hint muted history-access-banner-sub">' +
         esc(st.detail) +
         " " +
-        '<a href="/login">登录</a> · <a href="/register">注册</a>' +
+        '<a href="/login">登录</a> · <a href="/register">注册</a> · <a href="/account">账户</a>' +
         "</p>"
       );
     }
@@ -90,6 +91,7 @@
       "</code>）。</p>" +
       '<p class="hint muted history-access-banner-sub">' +
       esc(st.detail) +
+      ' <a href="/account">账户</a>' +
       "</p>"
     );
   }

@@ -2,6 +2,10 @@
  * Phase 5 Step2 — 最小前端用户状态（localStorage，无 React）
  * 统一：isAuthenticated / userId / email；与 auth_session.js 的 Bearer 键、current_user 兼容。
  * API：loadUserFromStorage、loginUser、logoutUser、registerUser（占位）
+ *
+ * 第二轮收口摘要：当前为「最小 auth」——会话以本机键为准；分析历史按 getHistoryBucketId()
+ * 分 guest 与 userId（键后缀 __{bucket}）。未包含：数据库用户主数据、HttpOnly 会话、
+ * 受保护 API、云端历史同步（见 rental_app/README.md「Phase 5 第二轮」）。
  */
 (function (global) {
   var CURRENT_USER_KEY = "current_user";

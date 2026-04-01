@@ -1,6 +1,7 @@
 /**
  * Phase 5 Round2 Step3 — 轻量访客提示（AuthHintBanner），不弹窗、不强制登录。
  * 依赖 RentalAIUserStore；挂载点由页面提供空 div。
+ * 能力边界见 rental_app/README.md「Phase 5 第二轮」。
  */
 (function (global) {
   function isGuest() {
@@ -21,6 +22,7 @@
       "</p>" +
       '<p class="hint muted auth-hint-banner-sub">' +
       '<a href="/login">登录</a> 后按账号保留<strong>个人</strong>历史（仍存本机；换设备需后续同步）。' +
+      ' <a href="/account">账户</a> 页可查看当前分桶。' +
       "</p>" +
       "</div>"
     );

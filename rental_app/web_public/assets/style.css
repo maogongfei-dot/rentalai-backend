@@ -452,6 +452,53 @@ body.analysis-history-page-body {
   max-width: min(100%, 52rem);
 }
 
+/* Phase 5 Round2 Step4：/account 最小账户页 */
+body.account-page-body {
+  max-width: min(100%, 40rem);
+}
+.account-page-lead {
+  margin-top: 0.25rem;
+}
+.account-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.account-summary-card,
+.account-hint-card {
+  margin-top: 0;
+}
+.account-dl {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.4rem 1rem;
+  margin: 0.65rem 0 0;
+  font-size: 0.95rem;
+}
+.account-dl dt {
+  font-weight: 600;
+  color: #444;
+  margin: 0;
+}
+.account-dl dd {
+  margin: 0;
+  color: #222;
+}
+.account-code {
+  font-size: 0.86rem;
+  word-break: break-word;
+}
+.account-hint-text {
+  margin: 0.5rem 0 0;
+  line-height: 1.45;
+}
+.account-storage-keys {
+  margin-top: 0.65rem;
+}
+.account-actions {
+  margin-top: 0.5rem;
+}
+
 /* Phase 5 Round2：历史页访问状态（guest / 已登录分桶提示） */
 .history-access-banner {
   margin: 0 0 1rem;
@@ -1379,6 +1426,14 @@ select {
   font-weight: 600;
   color: #64748b;
   font-size: 0.82rem;
+}
+a.home-account-strip-label {
+  text-decoration: none;
+  color: #475569;
+}
+a.home-account-strip-label:hover {
+  text-decoration: underline;
+  color: #0f172a;
 }
 .home-account-strip .nav-account-email {
   font-weight: 600;

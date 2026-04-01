@@ -2008,6 +2008,21 @@ def web_history_detail():
     return FileResponse(page)
 
 
+@app.get("/account")
+def web_account_page():
+    """Phase 5 Round2 Step4 — minimal account / history bucket (static HTML)."""
+    page = _WEB_PUBLIC_DIR / "account.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/account.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
 @app.get("/login")
 def web_phase3_login():
     """P10 Phase3 Step4 — login form (static HTML)."""

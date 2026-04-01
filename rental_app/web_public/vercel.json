@@ -3,6 +3,7 @@
   "installCommand": "npm install",
   "rewrites": [
     { "source": "/login", "destination": "/login.html" },
+    { "source": "/account", "destination": "/account.html" },
     { "source": "/ai-result", "destination": "/ai_result.html" },
     { "source": "/compare", "destination": "/compare.html" },
     { "source": "/assistant", "destination": "/assistant.html" },
