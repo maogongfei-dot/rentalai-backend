@@ -97,12 +97,24 @@
     return j;
   }
 
+  function mergeHistoryUserId(body) {
+    var b = body && typeof body === "object" ? body : {};
+    try {
+      var P = global.RentalAIAnalysisHistoryPersist;
+      if (P && typeof P.getHistoryUserIdForApi === "function") {
+        var uid = P.getHistoryUserIdForApi();
+        if (uid) b.userId = uid;
+      }
+    } catch (e) {}
+    return b;
+  }
+
   function postJson(path, body) {
     var url = apiUrl(path);
     return fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body || {}),
+      body: JSON.stringify(mergeHistoryUserId(body || {})),
     }).then(function (r) {
       return r.text().then(function (text) {
         return normalizeContractAnalysisResponse(parseJsonBody(r, text));
@@ -153,6 +165,13 @@
     if (metadata && typeof metadata === "object" && Object.keys(metadata).length > 0) {
       fd.append("metadata", JSON.stringify(metadata));
     }
+    try {
+      var P = global.RentalAIAnalysisHistoryPersist;
+      if (P && typeof P.getHistoryUserIdForApi === "function") {
+        var uid = P.getHistoryUserIdForApi();
+        if (uid) fd.append("userId", uid);
+      }
+    } catch (e2) {}
     return fetch(url, {
       method: "POST",
       body: fd,

@@ -975,6 +975,15 @@
           } catch (e) {}
           try {
             if (
+              window.RentalAIAnalysisHistoryPersist &&
+              typeof window.RentalAIAnalysisHistoryPersist.persistAnalysisResult === "function"
+            ) {
+              window.RentalAIAnalysisHistoryPersist.persistAnalysisResult({
+                kind: "contract",
+                data: data,
+                sourceMeta: sourceMeta,
+              });
+            } else if (
               window.RentalAIAnalysisHistoryStore &&
               typeof window.RentalAIAnalysisHistoryStore.pushContractFromContractData === "function"
             ) {

@@ -107,10 +107,19 @@
         ? window.rentalaiApiUrl("/api/ai/query")
         : "/api/ai/query";
 
+    var body = { user_text: q };
+    try {
+      var P = window.RentalAIAnalysisHistoryPersist;
+      if (P && typeof P.getHistoryUserIdForApi === "function") {
+        var uid = P.getHistoryUserIdForApi();
+        if (uid) body.userId = uid;
+      }
+    } catch (eUid) {}
+
     fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_text: q }),
+      body: JSON.stringify(body),
     })
       .then(function (r) {
         return r.text().then(function (text) {

@@ -447,6 +447,11 @@
 
     try {
       if (
+        window.RentalAIAnalysisHistoryPersist &&
+        typeof window.RentalAIAnalysisHistoryPersist.persistAnalysisResult === "function"
+      ) {
+        window.RentalAIAnalysisHistoryPersist.persistAnalysisResult({ kind: "housing", data: data });
+      } else if (
         window.RentalAIAnalysisHistoryStore &&
         typeof window.RentalAIAnalysisHistoryStore.pushPropertyFromHousingData === "function"
       ) {
@@ -616,6 +621,11 @@
 
     try {
       if (
+        window.RentalAIAnalysisHistoryPersist &&
+        typeof window.RentalAIAnalysisHistoryPersist.persistAnalysisResult === "function"
+      ) {
+        window.RentalAIAnalysisHistoryPersist.persistAnalysisResult({ kind: "legacy", data: data });
+      } else if (
         window.RentalAIAnalysisHistoryStore &&
         typeof window.RentalAIAnalysisHistoryStore.pushPropertyFromLegacyData === "function"
       ) {
