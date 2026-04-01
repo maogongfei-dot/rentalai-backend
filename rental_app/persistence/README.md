@@ -10,6 +10,12 @@
 - **Register / login 已持久化**：**`/auth/register`**、**`/auth/login`**、**`/auth/me`** 经 **`user_auth_service`** 读写该文件；`password_hash` + **`password_hash_algorithm`**（当前 **`sha256_v1`**，可扩展到 `password_hashing.py`）；**`created_at`** 为 UTC **ISO8601**。
 - **Duplicate email**: `register_user` → `UserRepository.get_by_email`（邮箱小写归一）。
 
+## Session tokens (`auth_session_store.py` — Phase 5 Round5 Step1)
+
+- **内存占位**：`token_hex → user_id`（`secrets.token_hex` 签发）；**不落盘**；单进程有效。
+- **API**：`issue_token`、`revoke_token`（logout）、`resolve_user_id`（Bearer 解析）、`build_auth_payload`（`auth_type`: **`session_placeholder`**）。
+- **`/auth/register` / `/auth/login` 成功响应**含 **`auth: { token, auth_type }`**，并保留顶层 **`token`** 兼容旧前端。
+
 ## Analysis history (server-side JSON)
 
 - **File**: `data/storage/persistence_analysis_history.json` (override: `RENTALAI_PERSISTENCE_ANALYSIS_HISTORY_JSON`).

@@ -48,7 +48,9 @@
           return;
         }
         var b = result.body || {};
-        if (!b.token) {
+        var tok =
+          typeof api.getTokenFromAuthBody === "function" ? api.getTokenFromAuthBody(b) : b.token;
+        if (!tok) {
           showErr("注册响应缺少 token");
           return;
         }

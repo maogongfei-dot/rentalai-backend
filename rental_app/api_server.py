@@ -44,6 +44,7 @@ from persistence.analysis_history_writer import (
     try_append_property,
 )
 from persistence.history_read_service import list_public_records
+from persistence.auth_session_store import build_auth_payload, issue_token, resolve_user_id, revoke_token
 from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
 from data.explain.rule_explain import (
     build_p10_explain_for_batch_row,
@@ -172,21 +173,10 @@ def _body_dict(body: AnalyzeRequest) -> dict:
     return body.model_dump(exclude_none=True)
 
 
-_AUTH_TOKENS: dict[str, str] = {}
-_AUTH_LOCK = threading.Lock()
-
-
 class AuthRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     email: str
     password: str
-
-
-def _issue_token(user_id: str) -> str:
-    token = uuid.uuid4().hex
-    with _AUTH_LOCK:
-        _AUTH_TOKENS[token] = user_id
-    return token
 
 
 def _extract_bearer_token(request: Request) -> str | None:
@@ -201,8 +191,7 @@ def _get_user_id_from_request(request: Request) -> str:
     token = _extract_bearer_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="missing_bearer_token")
-    with _AUTH_LOCK:
-        user_id = _AUTH_TOKENS.get(token)
+    user_id = resolve_user_id(token)
     if not user_id:
         raise HTTPException(status_code=401, detail="invalid_or_expired_token")
     return user_id
@@ -212,8 +201,7 @@ def _get_task_identity(request: Request) -> str:
     """Bearer → real user id; otherwise stable guest id from X-Guest-Session (P10 Phase7)."""
     token = _extract_bearer_token(request)
     if token:
-        with _AUTH_LOCK:
-            uid = _AUTH_TOKENS.get(token)
+        uid = resolve_user_id(token)
         if uid:
             return uid
     raw = (request.headers.get("X-Guest-Session") or "").strip()
@@ -297,11 +285,12 @@ def auth_register(body: AuthRequest):
             content={
                 "success": False,
                 "user": None,
+                "auth": None,
                 "message": err,
                 "error": "register_failed",
             },
         )
-    token = _issue_token(user["user_id"])
+    token = issue_token(user["user_id"])
     uid = user["user_id"]
     em = user["email"]
     ca = user["created_at"]
@@ -310,6 +299,7 @@ def auth_register(body: AuthRequest):
         "success": True,
         "message": "Registered successfully.",
         "user": nested,
+        "auth": build_auth_payload(token),
         "user_id": uid,
         "email": em,
         "created_at": ca,
@@ -327,11 +317,12 @@ def auth_login(body: AuthRequest):
             content={
                 "success": False,
                 "user": None,
+                "auth": None,
                 "message": "Invalid email or password.",
                 "error": "login_failed",
             },
         )
-    token = _issue_token(user["user_id"])
+    token = issue_token(user["user_id"])
     uid = user["user_id"]
     em = user["email"]
     ca = user["created_at"]
@@ -340,6 +331,7 @@ def auth_login(body: AuthRequest):
         "success": True,
         "message": "Logged in successfully.",
         "user": nested,
+        "auth": build_auth_payload(token),
         "user_id": uid,
         "email": em,
         "created_at": ca,
@@ -352,8 +344,7 @@ def auth_logout(request: Request):
     """Invalidate the current bearer token (in-process store)."""
     token = _extract_bearer_token(request)
     if token:
-        with _AUTH_LOCK:
-            _AUTH_TOKENS.pop(token, None)
+        revoke_token(token)
     return {"ok": True}
 
 

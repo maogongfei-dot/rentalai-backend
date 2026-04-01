@@ -1,5 +1,5 @@
 /**
- * Phase 5 Step4 — 后端 /auth/login、/auth/register 的最小封装（与 auth_user_store 配合）。
+ * Phase 5 Step4 + Round5 Step1 — /auth/login、/auth/register；成功响应含 auth: { token, auth_type } 与兼容字段 token。
  */
 (function (global) {
   function apiUrl(path) {
@@ -79,15 +79,27 @@
   }
 
   /**
+   * @param {object} body
+   * @returns {string|null}
+   */
+  function getTokenFromAuthBody(body) {
+    if (!body || typeof body !== "object") return null;
+    if (body.auth && body.auth.token) return String(body.auth.token);
+    if (body.token) return String(body.token);
+    return null;
+  }
+
+  /**
    * 将 /auth/login 或 /auth/register 成功响应写入 RentalAIUserStore（Bearer + userId + email）。
-   * @param {{ token?: string, user_id?: string, email?: string }} body
+   * @param {{ token?: string, auth?: { token?: string }, user_id?: string, email?: string }} body
    */
   function applySessionFromAuthBody(body) {
-    if (!body || !body.token) return;
+    var token = getTokenFromAuthBody(body);
+    if (!token) return;
     var S = global.RentalAIUserStore;
     if (S && typeof S.loginUser === "function") {
       S.loginUser({
-        token: body.token,
+        token: token,
         userId: body.user_id,
         email: body.email,
       });
@@ -96,7 +108,7 @@
         localStorage.removeItem("current_user");
       } catch (e) {}
       global.RentalAIAuth.persistSession({
-        token: body.token,
+        token: token,
         user_id: body.user_id,
         email: body.email,
       });
@@ -107,6 +119,7 @@
     loginApi: loginApi,
     registerApi: registerApi,
     getErrorMessage: getErrorMessage,
+    getTokenFromAuthBody: getTokenFromAuthBody,
     applySessionFromAuthBody: applySessionFromAuthBody,
   };
 })(window);
