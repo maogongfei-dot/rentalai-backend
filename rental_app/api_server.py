@@ -44,6 +44,7 @@ from persistence.analysis_history_writer import (
     try_append_property,
 )
 from persistence.history_read_service import list_public_records
+from persistence.auth_http_helpers import resolve_user_id_from_auth_header
 from persistence.auth_session_store import build_auth_payload, issue_token, resolve_user_id, revoke_token
 from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
 from data.explain.rule_explain import (
@@ -360,7 +361,12 @@ def _parse_analysis_history_type_query(raw: Optional[str]) -> tuple[Optional[str
 
 @app.get("/api/analysis/history/records")
 def api_analysis_history_records(
-    userId: str = Query(..., min_length=1, max_length=128, description="History bucket id (e.g. guest or logged-in user id)"),
+    request: Request,
+    userId: Optional[str] = Query(
+        None,
+        max_length=128,
+        description="Optional legacy; if sent, must match the user id from Bearer token.",
+    ),
     record_type: Optional[str] = Query(
         None,
         alias="type",
@@ -368,9 +374,11 @@ def api_analysis_history_records(
     ),
 ):
     """
-    Phase 5 Round3 Step4 — Read server-side JSON analysis history (minimal; no auth gate).
+    Phase 5 Round3 Step4 + Round5 Step3 — Read server-side JSON analysis history.
 
-    Query: ``userId`` (required), ``type`` optional filter.
+    **Auth:** ``Authorization: Bearer <token>`` required (session placeholder from login).
+    Effective bucket id is the authenticated user id from the token; optional ``userId`` query
+    must match when provided (legacy clients).
     """
     flt, err = _parse_analysis_history_type_query(record_type)
     if err:
@@ -378,14 +386,28 @@ def api_analysis_history_records(
             status_code=400,
             content={"success": False, "message": err, "records": []},
         )
-    uid = str(userId or "").strip()
-    if not uid:
+    uid_auth = resolve_user_id_from_auth_header(request)
+    if not uid_auth:
         return JSONResponse(
-            status_code=400,
-            content={"success": False, "message": "userId is required", "records": []},
+            status_code=401,
+            content={
+                "success": False,
+                "message": "Authentication required. Send Authorization: Bearer <token> from login.",
+                "records": [],
+            },
+        )
+    q_uid = str(userId or "").strip()
+    if q_uid and q_uid != uid_auth:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "success": False,
+                "message": "userId query does not match authenticated user.",
+                "records": [],
+            },
         )
     try:
-        records = list_public_records(uid, record_type=flt, limit=200)
+        records = list_public_records(uid_auth, record_type=flt, limit=200)
     except Exception as exc:
         logger.exception("analysis history read failed")
         return JSONResponse(

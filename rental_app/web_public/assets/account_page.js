@@ -23,6 +23,8 @@
             email: null,
             displayName: null,
             authMode: null,
+            authToken: null,
+            authType: null,
           };
     var bucket =
       S && typeof S.getHistoryBucketId === "function" ? S.getHistoryBucketId() : "guest";
@@ -42,6 +44,10 @@
         : s.authMode === "local_demo"
           ? "本地演示"
           : "—";
+    var authTypeDisp =
+      s.isAuthenticated && s.authMode === "bearer" && s.authType
+        ? esc(String(s.authType))
+        : "—";
     var emailDisp = s.email ? esc(s.email) : "—";
     var uidDisp = s.userId ? esc(String(s.userId)) : "—";
     var bucketDisp = esc(bucket);
@@ -59,6 +65,9 @@
       "<dt>Session type</dt><dd>" +
       esc(modeLabel) +
       "</dd>" +
+      "<dt>Auth type</dt><dd>" +
+      authTypeDisp +
+      ' <span class="hint muted">（占位，非 token）</span></dd>' +
       "<dt>Email</dt><dd>" +
       emailDisp +
       "</dd>" +

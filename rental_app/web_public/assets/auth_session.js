@@ -11,6 +11,7 @@
     bearer: "rentalai_bearer",
     userId: "rentalai_user_id",
     email: "rentalai_user_email",
+    authType: "rentalai_auth_type",
   };
   var GUEST_KEY = "rentalai_guest_session";
 
@@ -27,6 +28,9 @@
     localStorage.setItem(K.bearer, String(data.token));
     if (data.user_id) localStorage.setItem(K.userId, String(data.user_id));
     if (data.email) localStorage.setItem(K.email, String(data.email));
+    if (data.auth_type) {
+      localStorage.setItem(K.authType, String(data.auth_type));
+    }
     initAuthNav();
     updateHomeGuestNotice();
     updateResultGuestBanner();
@@ -36,6 +40,7 @@
     localStorage.removeItem(K.bearer);
     localStorage.removeItem(K.userId);
     localStorage.removeItem(K.email);
+    localStorage.removeItem(K.authType);
     initAuthNav();
     updateHomeGuestNotice();
     updateResultGuestBanner();

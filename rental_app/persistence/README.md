@@ -20,7 +20,7 @@
 
 - **File**: `data/storage/persistence_analysis_history.json` (override: `RENTALAI_PERSISTENCE_ANALYSIS_HISTORY_JSON`).
 - **写入**：`analysis_history_writer` 在成功响应后追加；房源 **`POST /api/ai/query`**；合同 **`/api/contract/analysis/text`**、**`/file-path`**、**`/upload`**。请求体可选 **`userId` / `user_id`**，缺省桶 **`guest`**。存储行内字段名为 **`userId`**（与读接口 query 一致）；用户文件行内为 **`user_id`**（与 **`/auth/*`** 响应一致）。
-- **读取**：**`GET /api/analysis/history/records`** → `{ success, message, records }`。前端 **`/analysis-history`** 在已登录时**优先**拉取此接口（失败回退 localStorage）；见 **`web_public/assets/analysis_history_source.js`**、**`server_history_api.js`**。
+- **读取**：**`GET /api/analysis/history/records`** → `{ success, message, records }`。**Phase 5 第五轮 Step3**：须 **`Authorization: Bearer <token>`**；桶 id 以 token 解析的 user 为准（可选 `userId` query 须与之一致）。见 **`auth_http_helpers.resolve_user_id_from_auth_header`**、**`server_history_api.js`**。
 
 ## 本轮未做（后续增强）
 

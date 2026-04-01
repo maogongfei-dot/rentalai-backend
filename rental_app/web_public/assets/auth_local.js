@@ -55,6 +55,8 @@
         email: null,
         displayName: null,
         authMode: null,
+        authToken: null,
+        authType: null,
       };
     }
     return {
@@ -63,6 +65,8 @@
       email: u.email || null,
       displayName: u.display_name || u.user_id,
       authMode: u.auth_bearer ? "bearer" : "local_demo",
+      authToken: null,
+      authType: null,
     };
   }
 
@@ -124,6 +128,10 @@
     }
     var email = u.email ? String(u.email) : "";
     var who = email || String(u.display_name || u.user_id || "—");
+    var prot =
+      u.auth_bearer === true
+        ? '<span class="nav-sep">·</span><span class="hint muted nav-auth-protected-hint" title="会话已就绪，可用于后续受保护 API">受保护会话</span>'
+        : "";
     el.className = "home-account-strip home-account-strip--signed-in";
     el.setAttribute("data-auth-state", "signed-in");
     el.innerHTML =
@@ -134,6 +142,7 @@
       '<span class="nav-account-email" title="Current account">' +
       escapeHtml(who) +
       "</span>" +
+      prot +
       '<span class="nav-sep">·</span>' +
       '<button type="button" class="home-account-logout-btn" title="Log out">Logout</button>';
     var btn = el.querySelector(".home-account-logout-btn");
@@ -174,6 +183,10 @@
     }
     var email = u.email ? String(u.email) : "";
     var who = email || String(u.display_name || u.user_id || "—");
+    var prot =
+      u.auth_bearer === true
+        ? '<span class="nav-sep">·</span><span class="hint muted nav-auth-protected-hint" title="会话已就绪">受保护会话</span>'
+        : "";
     nav.setAttribute("data-auth-state", "signed-in");
     nav.innerHTML =
       '<a href="/">首页</a>' +
@@ -193,6 +206,7 @@
       '<span class="nav-account-email" title="Current account">' +
       escapeHtml(who) +
       "</span>" +
+      prot +
       '<span class="nav-sep">·</span>' +
       '<button type="button" class="local-logout-btn" title="Log out">Logout</button>';
     var btn = nav.querySelector(".local-logout-btn");

@@ -1,6 +1,6 @@
 /**
- * Phase 5 Step2 — 最小前端用户状态（localStorage，无 React）
- * 统一：isAuthenticated / userId / email；与 auth_session.js 的 Bearer 键、current_user 兼容。
+ * Phase 5 Step2 + Round5 Step2 — 最小前端用户状态（localStorage，无 React）
+ * 统一：isAuthenticated / userId / email / authToken / authType；Bearer 存 rentalai_bearer（即 authToken）。
  * API：loadUserFromStorage、loginUser、logoutUser、registerUser（占位）
  *
  * 第二轮收口摘要：当前为「最小 auth」——会话以本机键为准；分析历史按 getHistoryBucketId()
@@ -13,6 +13,7 @@
     bearer: "rentalai_bearer",
     userId: "rentalai_user_id",
     email: "rentalai_user_email",
+    authType: "rentalai_auth_type",
   };
 
   function apiUrl(path) {
@@ -33,7 +34,9 @@
    *   userId: string|null,
    *   email: string|null,
    *   displayName: string|null,
-   *   authMode: "bearer"|"local_demo"|null
+   *   authMode: "bearer"|"local_demo"|null,
+   *   authToken: string|null,
+   *   authType: string|null
    * }}
    */
   function loadUserFromStorage() {
@@ -44,12 +47,18 @@
       if (token && (uid || em)) {
         var uidStr = uid || em || null;
         var emailStr = em || null;
+        var at = null;
+        try {
+          at = localStorage.getItem(K.authType);
+        } catch (e0) {}
         return {
           isAuthenticated: true,
           userId: uidStr,
           email: emailStr,
           displayName: emailStr || uidStr,
           authMode: "bearer",
+          authToken: token,
+          authType: at || "session_placeholder",
         };
       }
     } catch (e) {}
@@ -68,6 +77,8 @@
             email: mail,
             displayName: disp || mail || id,
             authMode: "local_demo",
+            authToken: null,
+            authType: "local_demo",
           };
         }
       }
@@ -79,12 +90,16 @@
       email: null,
       displayName: null,
       authMode: null,
+      authToken: null,
+      authType: null,
     };
   }
 
   /**
    * @param {{
    *   token?: string,
+   *   authToken?: string,
+   *   authType?: string,
    *   userId?: string|number,
    *   email?: string,
    *   displayName?: string,
@@ -93,15 +108,23 @@
    */
   function loginUser(opts) {
     opts = opts || {};
-    if (opts.token) {
+    var bearerVal = opts.authToken != null && opts.authToken !== "" ? opts.authToken : opts.token;
+    if (bearerVal) {
       try {
         localStorage.removeItem(CURRENT_USER_KEY);
       } catch (e) {}
-      localStorage.setItem(K.bearer, String(opts.token));
+      localStorage.setItem(K.bearer, String(bearerVal));
       if (opts.userId != null && opts.userId !== "") {
         localStorage.setItem(K.userId, String(opts.userId));
       }
       if (opts.email) localStorage.setItem(K.email, String(opts.email));
+      var at =
+        opts.authType != null && String(opts.authType).trim()
+          ? String(opts.authType).trim()
+          : "session_placeholder";
+      try {
+        localStorage.setItem(K.authType, at);
+      } catch (e1) {}
       notifyAuthUiIfPresent();
       return loadUserFromStorage();
     }
@@ -111,6 +134,7 @@
         localStorage.removeItem(K.bearer);
         localStorage.removeItem(K.userId);
         localStorage.removeItem(K.email);
+        localStorage.removeItem(K.authType);
       } catch (e2) {}
       if (global.RentalAIAuth && typeof global.RentalAIAuth.clearSession === "function") {
         global.RentalAIAuth.clearSession();
@@ -152,6 +176,7 @@
         localStorage.removeItem(K.bearer);
         localStorage.removeItem(K.userId);
         localStorage.removeItem(K.email);
+        localStorage.removeItem(K.authType);
       } catch (e2) {}
       if (global.RentalAIAuth && typeof global.RentalAIAuth.clearSession === "function") {
         global.RentalAIAuth.clearSession();

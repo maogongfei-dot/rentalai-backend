@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   Phase 4 Round6 收口：统一「分析历史」页（/analysis-history）
-  - 双模式（Phase5 Round4）：未登录 → 仅本地 guest 分桶；已登录 → 优先 GET /api/analysis/history/records?userId=…，失败回退本机
+  - 双模式：未登录 → 仅本地 guest；已登录 → GET /api/analysis/history/records + Bearer，失败回退本机（Phase5 Round5 Step3）
   - 本地键：rentalai_unified_analysis_history_v1__{guest|userId}；写入见 analysis_history_persist（guest 写本地；登录默认后端写）
   - UI：loading/回退提示 + 来源横幅（guest 本机 / 账户云端）；调试 ?server_history=1 控制台探测
   - 全量手动保存：/history（仅 localStorage）· 主说明 rental_app/README.md「Phase 5 第四轮」「统一分析历史」

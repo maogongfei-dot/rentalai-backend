@@ -1,5 +1,5 @@
 /**
- * Phase 5 Step4 + Round5 Step1 — /auth/login、/auth/register；成功响应含 auth: { token, auth_type } 与兼容字段 token。
+ * Phase 5 Step4 + Round5 Step1/2 — /auth/login、/auth/register；成功响应写入 RentalAIUserStore（token + authType）。
  */
 (function (global) {
   function apiUrl(path) {
@@ -90,16 +90,30 @@
   }
 
   /**
-   * 将 /auth/login 或 /auth/register 成功响应写入 RentalAIUserStore（Bearer + userId + email）。
-   * @param {{ token?: string, auth?: { token?: string }, user_id?: string, email?: string }} body
+   * @param {object} body
+   * @returns {string|null}
+   */
+  function getAuthTypeFromAuthBody(body) {
+    if (!body || typeof body !== "object") return null;
+    if (body.auth && body.auth.auth_type) return String(body.auth.auth_type);
+    if (typeof body.auth_type === "string" && body.auth_type) return body.auth_type;
+    return null;
+  }
+
+  /**
+   * 将 /auth/login 或 /auth/register 成功响应写入 RentalAIUserStore（Bearer + authType + userId + email）。
+   * @param {{ token?: string, auth?: { token?: string, auth_type?: string }, user_id?: string, email?: string }} body
    */
   function applySessionFromAuthBody(body) {
     var token = getTokenFromAuthBody(body);
     if (!token) return;
+    var authType = getAuthTypeFromAuthBody(body) || "session_placeholder";
     var S = global.RentalAIUserStore;
     if (S && typeof S.loginUser === "function") {
       S.loginUser({
         token: token,
+        authToken: token,
+        authType: authType,
         userId: body.user_id,
         email: body.email,
       });
@@ -111,6 +125,7 @@
         token: token,
         user_id: body.user_id,
         email: body.email,
+        auth_type: authType,
       });
     }
   }
@@ -120,6 +135,7 @@
     registerApi: registerApi,
     getErrorMessage: getErrorMessage,
     getTokenFromAuthBody: getTokenFromAuthBody,
+    getAuthTypeFromAuthBody: getAuthTypeFromAuthBody,
     applySessionFromAuthBody: applySessionFromAuthBody,
   };
 })(window);
