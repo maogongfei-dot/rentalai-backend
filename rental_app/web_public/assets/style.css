@@ -1755,6 +1755,31 @@ body.assistant-page-body {
 .unified-history-mount {
   margin-top: 0.35rem;
 }
+.unified-history-mount[data-unified-history-state="loading"] {
+  padding: 0.35rem 0;
+}
+.unified-history-loading {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a5c;
+}
+.analysis-history-page .history-server-notice {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.analysis-history-page .history-server-notice.hidden {
+  display: none;
+}
 .unified-history-mount[data-unified-history-state="empty"] {
   margin-top: 0.5rem;
 }

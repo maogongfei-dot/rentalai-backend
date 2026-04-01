@@ -3,6 +3,7 @@
   Phase 4 Round6 收口：统一「分析历史」页（/analysis-history）
   - 本地：按 user 分桶 rentalai_unified_analysis_history_v1__{guest|userId}（Phase5）
   - 服务端 JSON 历史读取：GET /api/analysis/history/records（Phase5 Round3）；调试可加 ?server_history=1 看控制台探测
+  - Phase5 Round4：server_history_api（fetchUserHistory）+ analysis_history_source（loadAnalysisHistory）+ 本页 loading/回退提示
   - 全量手动保存列表：/history · 说明见 rental_app/README.md「统一分析历史（Phase 4 第六轮）」
 -->
 <html lang="zh-Hans">
@@ -24,12 +25,13 @@
 
       <header class="page-header">
         <h1>分析历史 <span class="hint muted" style="font-weight: normal">Analysis History</span></h1>
-        <p class="hint muted analysis-history-lead">
+        <p id="analysis-history-lead" class="hint muted analysis-history-lead">
           以下为浏览器本地保存的<strong>最近分析摘要</strong>（自动写入）；全量快照与详情仍可从房源历史列表进入。
         </p>
       </header>
 
       <div id="history-access-banner" class="history-access-banner"></div>
+      <p id="history-server-notice" class="history-server-notice hidden" role="status" aria-live="polite"></p>
 
       <section
         class="card analysis-history-block"
@@ -73,6 +75,7 @@
     <script src="/assets/analysis_history_store.js"></script>
     <script src="/assets/history_access_context.js"></script>
     <script src="/assets/server_history_api.js"></script>
+    <script src="/assets/analysis_history_source.js"></script>
     <script src="/assets/analysis_history_page.js"></script>
   </body>
 </html>

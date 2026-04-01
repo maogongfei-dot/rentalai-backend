@@ -1,5 +1,6 @@
 /**
- * Phase 4 Round6：/analysis-history — 统一历史列表 + 本地 detail_snapshot 展开回看（不请求后端）
+ * Phase 4 Round6：/analysis-history — 统一历史列表 + detail_snapshot 展开回看。
+ * Phase 5 Round4：优先经 RentalAIAnalysisHistorySource.loadAnalysisHistory（guest→本地，已登录→云端优先，失败回退本地）。
  */
 (function () {
   var S = window.RentalAIAnalysisHistoryStore;
@@ -240,6 +241,56 @@
     return html;
   }
 
+  /** 云端 JSON 写入的房源历史（无本地 housing 大快照） */
+  function renderRemotePropertyDetail(snap) {
+    if (!snap || snap.variant !== "remote_property") {
+      return '<p class="hint muted">暂无云端房源详情字段。</p>';
+    }
+    var html =
+      '<div class="unified-history-detail-section">' +
+      '<span class="history-record-label">来源</span>' +
+      '<p class="hint muted">服务端 JSON 历史（摘要级）</p>' +
+      "</div>";
+    if (snap.user_text_preview) {
+      html +=
+        '<div class="unified-history-detail-section">' +
+        '<span class="history-record-label">需求摘要</span>' +
+        '<p class="history-cond-v unified-history-detail-text">' +
+        escapeHtml(snap.user_text_preview) +
+        "</p></div>";
+    }
+    if (snap.market_summary_title) {
+      html +=
+        '<div class="unified-history-detail-section">' +
+        '<span class="history-record-label">市场摘要标题</span>' +
+        '<p class="history-cond-v unified-history-detail-text">' +
+        escapeHtml(snap.market_summary_title) +
+        "</p></div>";
+    }
+    if (snap.top_deal_count != null) {
+      html +=
+        '<div class="unified-history-detail-section">' +
+        '<span class="history-record-label">Top 条数</span>' +
+        "<p>" +
+        escapeHtml(String(snap.top_deal_count)) +
+        "</p></div>";
+    }
+    if (snap.result_snapshot && typeof snap.result_snapshot === "object") {
+      var rs = snap.result_snapshot;
+      if (rs.parsed_intent != null || rs.message != null) {
+        html += '<div class="unified-history-detail-section"><span class="history-record-label">快照</span>';
+        if (rs.message) {
+          html += '<p class="hint">' + escapeHtml(String(rs.message)) + "</p>";
+        }
+        if (rs.parsed_intent != null) {
+          html += '<p class="hint muted">intent: ' + escapeHtml(String(rs.parsed_intent)) + "</p>";
+        }
+        html += "</div>";
+      }
+    }
+    return html;
+  }
+
   function renderDetailBody(it) {
     var snap = it.detail_snapshot;
     if (!snap) {
@@ -255,6 +306,7 @@
     if (it.type === "property") {
       if (snap.variant === "housing") return renderHousingDetail(snap);
       if (snap.variant === "legacy") return renderLegacyDetail(snap);
+      if (snap.variant === "remote_property") return renderRemotePropertyDetail(snap);
       return '<p class="hint muted">未知房源快照格式。</p>';
     }
     return '<p class="hint muted">未知记录类型。</p>';
@@ -308,18 +360,22 @@
     );
   }
 
-  function renderList(container, items, emptyHint) {
+  function renderList(container, items, emptyHint, countSourceLabel) {
     if (!container) return;
+    container.setAttribute("aria-busy", "false");
     if (!items || !items.length) {
       container.innerHTML = renderEmpty(emptyHint);
       container.setAttribute("data-unified-history-state", "empty");
       return;
     }
     var n = items.length;
+    var csl = countSourceLabel != null && String(countSourceLabel).trim() ? String(countSourceLabel).trim() : "自动保存";
     var html =
       '<p class="unified-history-count hint muted" aria-live="polite">共 ' +
       n +
-      " 条记录（自动保存）</p>" +
+      " 条记录（" +
+      escapeHtml(csl) +
+      "）</p>" +
       '<ul class="unified-history-list" role="list">';
     var i;
     for (i = 0; i < items.length; i++) {
@@ -330,6 +386,41 @@
     container.setAttribute("data-unified-history-state", "populated");
   }
 
+  function renderLoading(container) {
+    if (!container) return;
+    container.innerHTML =
+      '<div class="unified-history-loading" role="status">正在从服务器加载云端历史…</div>';
+    container.setAttribute("data-unified-history-state", "loading");
+    container.setAttribute("aria-busy", "true");
+  }
+
+  var _defaultAnalysisLeadHtml = null;
+
+  function resetAnalysisLead() {
+    var lead = document.getElementById("analysis-history-lead");
+    if (!lead || _defaultAnalysisLeadHtml === null) return;
+    lead.innerHTML = _defaultAnalysisLeadHtml;
+  }
+
+  function setAnalysisLeadCloud() {
+    var lead = document.getElementById("analysis-history-lead");
+    if (!lead) return;
+    lead.innerHTML =
+      "已登录：下列为<strong>服务端 JSON 历史</strong>（与本地自动摘要分源；本地仍可在未登录或回退时查看）。";
+  }
+
+  function setServerNotice(msg) {
+    var n = document.getElementById("history-server-notice");
+    if (!n) return;
+    if (!msg || !String(msg).trim()) {
+      n.textContent = "";
+      n.classList.add("hidden");
+      return;
+    }
+    n.textContent = String(msg).trim();
+    n.classList.remove("hidden");
+  }
+
   function run() {
     if (
       window.RentalAIHistoryAccess &&
@@ -337,30 +428,100 @@
     ) {
       window.RentalAIHistoryAccess.applyBannerById("history-access-banner");
     }
+    var leadEl = document.getElementById("analysis-history-lead");
+    if (leadEl && _defaultAnalysisLeadHtml === null) {
+      _defaultAnalysisLeadHtml = leadEl.innerHTML;
+    }
+
     var propEl = document.getElementById("unified-history-property-list");
     var contractEl = document.getElementById("unified-history-contract-list");
-    renderList(
-      propEl,
-      S.listByType("property"),
-      "暂无记录。完成房源分析并进入结果页后，将自动在此出现摘要；展开「查看详情」可回看本地保存的结论与市场摘要。"
-    );
-    renderList(
-      contractEl,
-      S.listByType("contract"),
-      "暂无记录。合同分析提交成功后，将自动在此出现摘要；展开「查看详情」可回看结论、风险与完整性要点。"
-    );
+    var emptyProp =
+      "暂无记录。完成房源分析并进入结果页后，将自动在此出现摘要；展开「查看详情」可回看本地保存的结论与市场摘要。";
+    var emptyContract =
+      "暂无记录。合同分析提交成功后，将自动在此出现摘要；展开「查看详情」可回看结论、风险与完整性要点。";
 
-    // Phase 5 Round3：可选探测服务端 JSON 历史（?server_history=1 时 console 输出，不替换本页列表）
+    function renderFromLocal() {
+      resetAnalysisLead();
+      setServerNotice("");
+      renderList(propEl, S.listByType("property"), emptyProp, "本地自动保存");
+      renderList(contractEl, S.listByType("contract"), emptyContract, "本地自动保存");
+    }
+
+    var strat =
+      window.RentalAIAnalysisHistorySource &&
+      typeof window.RentalAIAnalysisHistorySource.resolveHistoryMode === "function"
+        ? window.RentalAIAnalysisHistorySource.resolveHistoryMode()
+        : null;
+    var isRemote = strat && strat.mode === "remote_user";
+
+    if (isRemote && propEl && contractEl) {
+      renderLoading(propEl);
+      renderLoading(contractEl);
+      setServerNotice("");
+    } else {
+      resetAnalysisLead();
+      setServerNotice("");
+    }
+
+    if (
+      window.RentalAIAnalysisHistorySource &&
+      typeof window.RentalAIAnalysisHistorySource.loadAnalysisHistory === "function"
+    ) {
+      window.RentalAIAnalysisHistorySource
+        .loadAnalysisHistory()
+        .then(function (bundle) {
+          if (!bundle || !Array.isArray(bundle.propertyRecords) || !Array.isArray(bundle.contractRecords)) {
+            renderFromLocal();
+            return;
+          }
+          try {
+            var main = document.querySelector(".analysis-history-page");
+            if (main) {
+              main.setAttribute("data-history-source-mode", bundle.mode || "");
+              main.setAttribute("data-history-used-fallback", bundle.usedFallback ? "1" : "0");
+            }
+          } catch (eMain) {}
+          if (bundle.mode === "local_guest") {
+            resetAnalysisLead();
+            setServerNotice("");
+          } else if (bundle.mode === "remote_user") {
+            if (bundle.usedFallback) {
+              resetAnalysisLead();
+              setServerNotice(
+                "云端历史暂时不可用，已显示本机缓存（" + (bundle.message || "error") + "）。"
+              );
+            } else {
+              setAnalysisLeadCloud();
+              setServerNotice("");
+            }
+          }
+          var label =
+            bundle.mode === "remote_user"
+              ? bundle.usedFallback
+                ? "本机回退（云端不可用）"
+                : "服务端 JSON 历史"
+              : "本地 guest 自动保存";
+          renderList(propEl, bundle.propertyRecords, emptyProp, label);
+          renderList(contractEl, bundle.contractRecords, emptyContract, label);
+        })
+        .catch(function () {
+          setServerNotice("加载失败，已显示本机历史。");
+          renderFromLocal();
+        });
+    } else {
+      renderFromLocal();
+    }
+
     try {
       if (
         window.location.search.indexOf("server_history=1") >= 0 &&
         window.RentalAIServerHistoryApi &&
-        typeof window.RentalAIServerHistoryApi.fetchServerHistoryRecords === "function" &&
+        typeof window.RentalAIServerHistoryApi.fetchUserHistory === "function" &&
         window.RentalAIUserStore &&
         typeof window.RentalAIUserStore.getHistoryBucketId === "function"
       ) {
         var bucket = window.RentalAIUserStore.getHistoryBucketId();
-        window.RentalAIServerHistoryApi.fetchServerHistoryRecords(bucket, {}).then(function (j) {
+        window.RentalAIServerHistoryApi.fetchUserHistory(bucket, {}).then(function (j) {
           console.info("[RentalAI] server history probe (GET /api/analysis/history/records)", bucket, j);
         });
       }
