@@ -19,13 +19,13 @@
 ## Analysis history (server-side JSON)
 
 - **File**: `data/storage/persistence_analysis_history.json` (override: `RENTALAI_PERSISTENCE_ANALYSIS_HISTORY_JSON`).
-- **写入**：`analysis_history_writer` 在成功响应后追加；房源 **`POST /api/ai/query`**；合同 **`/api/contract/analysis/text`**、**`/file-path`**、**`/upload`**。请求体可选 **`userId` / `user_id`**，缺省桶 **`guest`**。存储行内字段名为 **`userId`**（与读接口 query 一致）；用户文件行内为 **`user_id`**（与 **`/auth/*`** 响应一致）。
+- **写入**：`analysis_history_writer` 在成功响应后追加；房源 **`POST /api/ai/query`**；合同 **`/api/contract/analysis/text`**、**`/file-path`**、**`/upload`**。请求体可选 **`userId` / `user_id`**，缺省桶 **`guest`**。**Phase 5 第六轮 Step1**：非 **`guest`** 的写入须 **`Authorization: Bearer`**，且 body 中 **`userId` 须与 token 解析用户一致**（`auth_http_helpers.resolve_history_write_user_id`）；否则不追加但分析结果仍返回，响应含 **`history_write`**。存储行内字段名为 **`userId`**。
 - **读取**：**`GET /api/analysis/history/records`** → `{ success, message, records }`。**Phase 5 第五轮 Step3**：须 **`Authorization: Bearer <token>`**；桶 id 以 token 解析的 user 为准（可选 `userId` query 须与之一致）。见 **`auth_http_helpers.resolve_user_id_from_auth_header`**、**`server_history_api.js`**。
 
-## 最小受保护 API（Phase 5 第五轮 — **阶段完成**）
+## 最小受保护 API（Phase 5 第五轮 + Phase 5 第六轮 Step1 — **阶段完成**）
 
 - **会话形态**：进程内 **session/token placeholder**（`auth_session_store`：`secrets.token_hex` → userId），**非** JWT；无过期、无 refresh；**logout** 使 token 失效。
-- **已保护接口范围（仅此一步）**：**`GET /api/analysis/history/records`** 须 **`Authorization: Bearer`**；有效 token 才返回该用户 JSON 历史；**其它**路由（分析写入、`/auth/me` 等）行为与第三轮/既有逻辑一致，**未**做全站中间件。
+- **已保护接口范围**：**读** — **`GET /api/analysis/history/records`** 须 Bearer。**写（Step1）** — 房源 **`POST /api/ai/query`**、合同 **`POST /api/contract/analysis/text`**、**`/file-path`**、**`/upload`** 在写入服务端 JSON 历史时走 **`resolve_history_write_user_id`**（guest 免 Bearer；非 guest 须 Bearer 且与 body `userId` 一致）。**`/auth/me`** 等其它路由未加全站中间件。
 - **前端**：`rentalai_bearer` + `rentalai_auth_type`；`server_history_api.js` 统一注入 Bearer；访客仍走 **localStorage guest**，不调用受保护读接口。
 - **刻意未做**：**JWT**、**过期/刷新**、**全接口强制鉴权**、**history 写入与 token 绑定**、**bcrypt/Argon2**、**数据库**由 JSON 升级；见主 **`README.md`**「Phase 5 第五轮 Step5」。
 

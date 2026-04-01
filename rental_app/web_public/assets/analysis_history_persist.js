@@ -3,7 +3,7 @@
  * - guest：写入 RentalAIAnalysisHistoryStore（localStorage 分桶）
  * - 已登录：依赖请求体 userId 由后端追加 persistence JSON；本函数默认不写本地，避免与 /analysis-history 云端列表重复
  * - alsoWriteLocalBackup：已登录时仍写本地（可选兜底）
- * 见 README「Phase 5 第四轮」；未做 token 校验与同步迁移。
+ * Phase 6 Round1：服务端 JSON 写入需 Bearer（见 auth_http_helpers.resolve_history_write_user_id）；此处提供 **mergeAuthHeadersForFetch** 给房源/合同 POST。
  */
 (function (global) {
   function loadU() {
@@ -25,6 +25,32 @@
 
   function isGuestForHistory() {
     return !loadU().isAuthenticated;
+  }
+
+  /** 与 server_history_api 一致：供写入类请求带 Authorization */
+  function getBearerTokenForApi() {
+    try {
+      var S = global.RentalAIUserStore;
+      if (S && typeof S.loadUserFromStorage === "function") {
+        var u = S.loadUserFromStorage();
+        if (u && u.authToken) return String(u.authToken);
+      }
+    } catch (e) {}
+    try {
+      return localStorage.getItem("rentalai_bearer");
+    } catch (e2) {}
+    return null;
+  }
+
+  /**
+   * @param {Record<string, string>} [headers]
+   * @returns {Record<string, string>}
+   */
+  function mergeAuthHeadersForFetch(headers) {
+    headers = headers || {};
+    var tok = getBearerTokenForApi();
+    if (tok) headers["Authorization"] = "Bearer " + tok;
+    return headers;
   }
 
   /**
@@ -79,6 +105,8 @@
 
   global.RentalAIAnalysisHistoryPersist = {
     getHistoryUserIdForApi: getHistoryUserIdForApi,
+    getBearerTokenForApi: getBearerTokenForApi,
+    mergeAuthHeadersForFetch: mergeAuthHeadersForFetch,
     isGuestForHistory: isGuestForHistory,
     persistAnalysisResult: persistAnalysisResult,
     saveAnalysisHistory: saveAnalysisHistory,

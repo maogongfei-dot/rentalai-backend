@@ -111,9 +111,16 @@
 
   function postJson(path, body) {
     var url = apiUrl(path);
+    var headers = { "Content-Type": "application/json" };
+    try {
+      var P = global.RentalAIAnalysisHistoryPersist;
+      if (P && typeof P.mergeAuthHeadersForFetch === "function") {
+        headers = P.mergeAuthHeadersForFetch(headers);
+      }
+    } catch (eH) {}
     return fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: headers,
       body: JSON.stringify(mergeHistoryUserId(body || {})),
     }).then(function (r) {
       return r.text().then(function (text) {
@@ -172,8 +179,16 @@
         if (uid) fd.append("userId", uid);
       }
     } catch (e2) {}
+    var headers = {};
+    try {
+      var P2 = global.RentalAIAnalysisHistoryPersist;
+      if (P2 && typeof P2.mergeAuthHeadersForFetch === "function") {
+        headers = P2.mergeAuthHeadersForFetch(headers);
+      }
+    } catch (e3) {}
     return fetch(url, {
       method: "POST",
+      headers: headers,
       body: fd,
     })
       .then(function (r) {

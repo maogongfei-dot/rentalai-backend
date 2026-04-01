@@ -116,9 +116,17 @@
       }
     } catch (eUid) {}
 
+    var headers = { "Content-Type": "application/json" };
+    try {
+      var P2 = window.RentalAIAnalysisHistoryPersist;
+      if (P2 && typeof P2.mergeAuthHeadersForFetch === "function") {
+        headers = P2.mergeAuthHeadersForFetch(headers);
+      }
+    } catch (eH) {}
+
     fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: headers,
       body: JSON.stringify(body),
     })
       .then(function (r) {

@@ -38,13 +38,12 @@ from data.storage.records_db import (
     list_favorite_records,
     normalize_analysis_input_signature,
 )
-from persistence.analysis_history_writer import (
-    resolve_history_user_id,
-    try_append_contract,
-    try_append_property,
-)
+from persistence.analysis_history_writer import append_property_analysis_record, try_append_contract
 from persistence.history_read_service import list_public_records
-from persistence.auth_http_helpers import resolve_user_id_from_auth_header
+from persistence.auth_http_helpers import (
+    resolve_history_write_user_id,
+    resolve_user_id_from_auth_header,
+)
 from persistence.auth_session_store import build_auth_payload, issue_token, resolve_user_id, revoke_token
 from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
 from data.explain.rule_explain import (
@@ -752,11 +751,11 @@ def api_market_explain(body: dict = Body(default_factory=dict)):
 @app.post("/api/ai/query")
 @app.post("/ai/query")
 @app.post("/market/ask")
-def api_ai_query(body: dict = Body(default_factory=dict)):
+def api_ai_query(request: Request, body: dict = Body(default_factory=dict)):
     """
     Phase D10：自然语言房源查询编排（``run_housing_ai_query``）。
     请求体：``{ "user_text": "..." }``，兼容 ``query`` 字段。
-    可选 ``userId`` / ``user_id``：写入服务端 JSON 历史（缺省为 ``guest``）；不影响本地 localStorage 历史。
+    可选 ``userId`` / ``user_id``：写入服务端 JSON 历史（缺省为 ``guest``）；非 guest 须带 ``Authorization: Bearer`` 且与 body userId 一致。
     """
     from services.chat_orchestrator import run_housing_ai_query
 
@@ -765,8 +764,25 @@ def api_ai_query(body: dict = Body(default_factory=dict)):
     try:
         ut = body.get("user_text") if body.get("user_text") is not None else body.get("query")
         out = run_housing_ai_query(str(ut or ""))
-        try_append_property(body, out)
-        return JSONResponse(content=out)
+        hw = resolve_history_write_user_id(request, body)
+        if hw["ok"]:
+            append_property_analysis_record(hw["user_id"], out)
+        if isinstance(out, dict):
+            payload = dict(out)
+            payload["history_write"] = {
+                "success": hw["ok"],
+                "message": hw["message"] or ("ok" if hw["ok"] else ""),
+            }
+            return JSONResponse(content=payload)
+        return JSONResponse(
+            content={
+                "result": out,
+                "history_write": {
+                    "success": hw["ok"],
+                    "message": hw["message"] or ("ok" if hw["ok"] else ""),
+                },
+            }
+        )
     except Exception as exc:
         logger.exception("ai query failed")
         return JSONResponse(
@@ -979,7 +995,7 @@ def _resolve_contract_file_path_for_api(raw: str) -> Path:
 
 
 @app.post("/api/contract/analysis/text")
-def api_contract_analysis_text(body: ContractAnalysisTextApiBody = Body(...)):
+def api_contract_analysis_text(request: Request, body: ContractAnalysisTextApiBody = Body(...)):
     """
     Phase 4：合同文本分析（最小接口）。返回 ``result.summary_view``（首屏展示）与
     ``result.raw_analysis``（完整 ``analysis_result`` / ``explain_result`` / ``presentation``）。
@@ -1003,15 +1019,17 @@ def api_contract_analysis_text(body: ContractAnalysisTextApiBody = Body(...)):
         kw = _contract_analysis_metadata_kwargs(body.metadata)
         facade = analyze_contract_text(contract_text=ct, **kw)
         ui_payload = build_contract_analysis_ui_payload(facade)
-        try_append_contract(
-            resolve_history_user_id(body.model_dump()),
-            "contract_analysis_v1",
-            ui_payload,
-        )
+        hw = resolve_history_write_user_id(request, body.model_dump())
+        if hw["ok"]:
+            try_append_contract(hw["user_id"], "contract_analysis_v1", ui_payload)
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
             "result": ui_payload,
+            "history_write": {
+                "success": hw["ok"],
+                "message": hw["message"] or ("ok" if hw["ok"] else ""),
+            },
         }
     except Exception as exc:
         logger.exception("contract analysis/text failed")
@@ -1022,7 +1040,7 @@ def api_contract_analysis_text(body: ContractAnalysisTextApiBody = Body(...)):
 
 
 @app.post("/api/contract/analysis/file-path")
-def api_contract_analysis_file_path(body: ContractAnalysisFilePathApiBody = Body(...)):
+def api_contract_analysis_file_path(request: Request, body: ContractAnalysisFilePathApiBody = Body(...)):
     """
     Phase 4：按**服务端本地路径**读取合同文件并分析（开发/受信环境）。生产需限制可访问目录。
 
@@ -1054,15 +1072,17 @@ def api_contract_analysis_file_path(body: ContractAnalysisFilePathApiBody = Body
         kw = _contract_analysis_metadata_kwargs(body.metadata)
         facade = analyze_contract_file(file_path=path, **kw)
         ui_payload = build_contract_analysis_ui_payload(facade)
-        try_append_contract(
-            resolve_history_user_id(body.model_dump()),
-            "contract_analysis_v1",
-            ui_payload,
-        )
+        hw = resolve_history_write_user_id(request, body.model_dump())
+        if hw["ok"]:
+            try_append_contract(hw["user_id"], "contract_analysis_v1", ui_payload)
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
             "result": ui_payload,
+            "history_write": {
+                "success": hw["ok"],
+                "message": hw["message"] or ("ok" if hw["ok"] else ""),
+            },
         }
     except Exception as exc:
         logger.exception("contract analysis/file-path failed")
@@ -1074,6 +1094,7 @@ def api_contract_analysis_file_path(body: ContractAnalysisFilePathApiBody = Body
 
 @app.post("/api/contract/analysis/upload")
 async def api_contract_analysis_upload(
+    request: Request,
     file: UploadFile = File(...),
     metadata: Optional[str] = Form(default=None),
     userId: Optional[str] = Form(default=None),
@@ -1112,15 +1133,17 @@ async def api_contract_analysis_upload(
             source_name=kw.get("source_name"),
         )
         ui_payload = build_contract_analysis_ui_payload(facade)
-        try_append_contract(
-            resolve_history_user_id({"userId": userId} if userId else {}),
-            "contract_analysis_v1",
-            ui_payload,
-        )
+        hw = resolve_history_write_user_id(request, {"userId": userId} if userId else {})
+        if hw["ok"]:
+            try_append_contract(hw["user_id"], "contract_analysis_v1", ui_payload)
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
             "result": ui_payload,
+            "history_write": {
+                "success": hw["ok"],
+                "message": hw["message"] or ("ok" if hw["ok"] else ""),
+            },
         }
     except ContractUploadError as exc:
         return JSONResponse(

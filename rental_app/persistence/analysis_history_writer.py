@@ -2,6 +2,7 @@
 Phase 5 Round3 Step3 — Build minimal history rows and append (best-effort; never raises to callers).
 
 * ``userId``: explicit from request, else ``\"guest\"`` (stable server-side bucket).
+* HTTP 层写入前须通过 ``auth_http_helpers.resolve_history_write_user_id``（非 guest 须 Bearer）。
 * Types: ``property`` | ``contract`` (align with frontend unified history vocabulary).
 """
 
