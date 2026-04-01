@@ -2,6 +2,7 @@
 <!--
   Phase 4 Round6 收口：统一「分析历史」页（/analysis-history）
   - 本地：按 user 分桶 rentalai_unified_analysis_history_v1__{guest|userId}（Phase5）
+  - 服务端 JSON 历史读取：GET /api/analysis/history/records（Phase5 Round3）；调试可加 ?server_history=1 看控制台探测
   - 全量手动保存列表：/history · 说明见 rental_app/README.md「统一分析历史（Phase 4 第六轮）」
 -->
 <html lang="zh-Hans">
@@ -68,8 +69,10 @@
         ></div>
       </section>
     </main>
+    <script src="/assets/api_config.js"></script>
     <script src="/assets/analysis_history_store.js"></script>
     <script src="/assets/history_access_context.js"></script>
+    <script src="/assets/server_history_api.js"></script>
     <script src="/assets/analysis_history_page.js"></script>
   </body>
 </html>

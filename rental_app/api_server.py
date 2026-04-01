@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import Body, FastAPI, File, Form, Request, UploadFile
+from fastapi import Body, FastAPI, File, Form, Query, Request, UploadFile
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -43,6 +43,7 @@ from persistence.analysis_history_writer import (
     try_append_contract,
     try_append_property,
 )
+from persistence.history_read_service import list_public_records
 from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
 from data.explain.rule_explain import (
     build_p10_explain_for_batch_row,
@@ -354,6 +355,57 @@ def auth_logout(request: Request):
         with _AUTH_LOCK:
             _AUTH_TOKENS.pop(token, None)
     return {"ok": True}
+
+
+def _parse_analysis_history_type_query(raw: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """Return (filter property|contract|None, error_message)."""
+    if raw is None or not str(raw).strip():
+        return None, None
+    t = str(raw).strip().lower()
+    if t in ("property", "contract"):
+        return t, None
+    return None, "type must be property or contract"
+
+
+@app.get("/api/analysis/history/records")
+def api_analysis_history_records(
+    userId: str = Query(..., min_length=1, max_length=128, description="History bucket id (e.g. guest or logged-in user id)"),
+    record_type: Optional[str] = Query(
+        None,
+        alias="type",
+        description="Optional: property | contract",
+    ),
+):
+    """
+    Phase 5 Round3 Step4 — Read server-side JSON analysis history (minimal; no auth gate).
+
+    Query: ``userId`` (required), ``type`` optional filter.
+    """
+    flt, err = _parse_analysis_history_type_query(record_type)
+    if err:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": err, "records": []},
+        )
+    uid = str(userId or "").strip()
+    if not uid:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "userId is required", "records": []},
+        )
+    try:
+        records = list_public_records(uid, record_type=flt, limit=200)
+    except Exception as exc:
+        logger.exception("analysis history read failed")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": str(exc), "records": []},
+        )
+    return {
+        "success": True,
+        "message": "ok",
+        "records": records,
+    }
 
 
 @app.get("/auth/me")

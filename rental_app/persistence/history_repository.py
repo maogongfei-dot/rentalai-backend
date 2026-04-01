@@ -32,16 +32,29 @@ class HistoryRepository:
             doc["records"] = records
             self.save_document(doc)
 
-    def list_by_user(self, user_id: str, limit: int = 100) -> list[dict[str, Any]]:
+    def list_by_user(
+        self,
+        user_id: str,
+        limit: int = 100,
+        *,
+        record_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         uid = str(user_id or "").strip()
         if not uid:
             return []
+        want_type: str | None = None
+        if record_type is not None and str(record_type).strip():
+            want_type = str(record_type).strip().lower()
         doc = self.load_document()
         out: list[dict[str, Any]] = []
         for row in doc.get("records") or []:
             if not isinstance(row, dict):
                 continue
-            if str(row.get("userId") or "").strip() == uid:
-                out.append(dict(row))
+            if str(row.get("userId") or "").strip() != uid:
+                continue
+            if want_type is not None:
+                if str(row.get("type") or "").strip().lower() != want_type:
+                    continue
+            out.append(dict(row))
         out.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
         return out[: max(1, min(int(limit), 500))]

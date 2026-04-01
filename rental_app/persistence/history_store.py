@@ -1,5 +1,5 @@
 """
-Phase 5 Round3 Step3 — Server-side analysis history as JSON (formal shape).
+Phase 5 Round3 — Server-side analysis history as JSON (formal shape; Step3 写入 / Step4 读取).
 
 Document::
     { "schema_version": 1, "records": [ { ... }, ... ] }

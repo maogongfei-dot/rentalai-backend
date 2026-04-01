@@ -1,5 +1,5 @@
 """
-Phase 5 Round3 Step1 — User rows persisted as JSON (formal backend shape, not wired to /auth yet).
+Phase 5 Round3 — User rows persisted as JSON (formal backend shape; `/auth/*` wired via ``user_auth_service``).
 
 On-disk document::
     {

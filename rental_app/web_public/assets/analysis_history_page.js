@@ -349,6 +349,22 @@
       S.listByType("contract"),
       "暂无记录。合同分析提交成功后，将自动在此出现摘要；展开「查看详情」可回看结论、风险与完整性要点。"
     );
+
+    // Phase 5 Round3：可选探测服务端 JSON 历史（?server_history=1 时 console 输出，不替换本页列表）
+    try {
+      if (
+        window.location.search.indexOf("server_history=1") >= 0 &&
+        window.RentalAIServerHistoryApi &&
+        typeof window.RentalAIServerHistoryApi.fetchServerHistoryRecords === "function" &&
+        window.RentalAIUserStore &&
+        typeof window.RentalAIUserStore.getHistoryBucketId === "function"
+      ) {
+        var bucket = window.RentalAIUserStore.getHistoryBucketId();
+        window.RentalAIServerHistoryApi.fetchServerHistoryRecords(bucket, {}).then(function (j) {
+          console.info("[RentalAI] server history probe (GET /api/analysis/history/records)", bucket, j);
+        });
+      }
+    } catch (e) {}
   }
 
   if (document.readyState === "loading") {
