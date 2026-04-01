@@ -74,7 +74,15 @@
 
   function requireLogin() {
     var path = (window.location.pathname || "").replace(/\/$/, "") || "/";
-    var publicPaths = ["/", "/login", "/register", "/assistant"];
+    var publicPaths = [
+      "/",
+      "/login",
+      "/register",
+      "/assistant",
+      "/ai-result",
+      "/analysis-history",
+      "/history",
+    ];
     if (publicPaths.indexOf(path) !== -1) return;
     if (!getUser()) {
       window.location.replace("/login");
@@ -152,30 +160,24 @@
     btn.addEventListener("click", function () {
       if (!confirm("确定清空本地测试数据？将退出登录。")) return;
       var favKey = favStorageKey();
-      var uid = (getUser() || {}).user_id;
       try {
         sessionStorage.removeItem("ai_analyze_last");
         sessionStorage.removeItem("history_current");
       } catch (e) {}
       try {
         localStorage.removeItem(favKey);
-        var rawHist = localStorage.getItem("analysis_history");
-        if (rawHist && uid) {
-          var arr = JSON.parse(rawHist);
-          if (Array.isArray(arr)) {
-            var kept = arr.filter(function (x) {
-              return !x || x.user_id !== uid;
-            });
-            localStorage.setItem("analysis_history", JSON.stringify(kept));
-          }
-        } else if (rawHist && !uid) {
+        if (global.RentalAIUserStore && global.RentalAIUserStore.getManualHistoryStorageKey) {
+          localStorage.removeItem(global.RentalAIUserStore.getManualHistoryStorageKey());
+        } else {
           localStorage.removeItem("analysis_history");
         }
-      } catch (e) {
-        try {
-          localStorage.removeItem("analysis_history");
-        } catch (e2) {}
-      }
+        if (
+          global.RentalAIAnalysisHistoryStore &&
+          typeof global.RentalAIAnalysisHistoryStore.clearCurrentBucket === "function"
+        ) {
+          global.RentalAIAnalysisHistoryStore.clearCurrentBucket();
+        }
+      } catch (e) {}
       if (global.RentalAIUserStore && typeof global.RentalAIUserStore.logoutUser === "function") {
         global.RentalAIUserStore.logoutUser({ redirect: true });
         return;

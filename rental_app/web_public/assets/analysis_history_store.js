@@ -1,15 +1,51 @@
 /**
- * Phase 4 Round6：统一本地「最近分析」记录（localStorage）
- * 类型：property（housing / legacy）、contract；含 detail_snapshot 供 /analysis-history 展开回看。
- * 未实现：云端同步、服务端持久化、跨设备；与 analysis_history 全量手动保存并存。
+ * Phase 4 Round6 + Phase 5 Step5：统一「最近分析」localStorage，按 userId 分桶（guest | 已登录）。
+ * 键：rentalai_unified_analysis_history_v1__{bucketId}；与 analysis_history__{bucketId} 手动保存并存。
  */
 (function (global) {
-  var STORAGE_KEY = "rentalai_unified_analysis_history_v1";
+  var STORAGE_PREFIX = "rentalai_unified_analysis_history_v1";
   var MAX_ITEMS = 50;
-  /** 与 sessionStorage ai_housing_query_last 内容比对，避免同一次结果页刷新重复写入 */
   var DEDUP_HOUSING = "rentalai_unified_hist_dedup_property";
-  /** 与 sessionStorage ai_analyze_last 比对 */
   var DEDUP_LEGACY = "rentalai_unified_hist_dedup_legacy";
+
+  function getBucketId() {
+    try {
+      if (global.RentalAIUserStore && typeof global.RentalAIUserStore.getHistoryBucketId === "function") {
+        return global.RentalAIUserStore.getHistoryBucketId();
+      }
+    } catch (e) {}
+    return "guest";
+  }
+
+  function getUnifiedStorageKey() {
+    try {
+      if (global.RentalAIUserStore && typeof global.RentalAIUserStore.getUnifiedHistoryStorageKey === "function") {
+        return global.RentalAIUserStore.getUnifiedHistoryStorageKey();
+      }
+    } catch (e2) {}
+    return STORAGE_PREFIX + "__" + getBucketId();
+  }
+
+  function getDedupHousingKey() {
+    return DEDUP_HOUSING + "_" + getBucketId();
+  }
+
+  function getDedupLegacyKey() {
+    return DEDUP_LEGACY + "_" + getBucketId();
+  }
+
+  /** 仅 guest：旧无后缀键一次性迁到 __guest */
+  function migrateLegacyUnifiedIfNeeded() {
+    if (getBucketId() !== "guest") return;
+    var newKey = getUnifiedStorageKey();
+    if (localStorage.getItem(newKey)) return;
+    var legacy = localStorage.getItem(STORAGE_PREFIX);
+    if (!legacy) return;
+    try {
+      localStorage.setItem(newKey, legacy);
+      localStorage.removeItem(STORAGE_PREFIX);
+    } catch (e) {}
+  }
 
   function getUserId() {
     try {
@@ -39,8 +75,9 @@
   }
 
   function loadRaw() {
+    migrateLegacyUnifiedIfNeeded();
     try {
-      var raw = localStorage.getItem(STORAGE_KEY);
+      var raw = localStorage.getItem(getUnifiedStorageKey());
       var arr = raw ? JSON.parse(raw) : [];
       return Array.isArray(arr) ? arr : [];
     } catch (e) {
@@ -50,7 +87,7 @@
 
   function saveRaw(arr) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+      localStorage.setItem(getUnifiedStorageKey(), JSON.stringify(arr));
     } catch (e) {}
   }
 
@@ -97,7 +134,6 @@
     return s.slice(0, max - 1) + "…";
   }
 
-  /** 合同：保存 summary_view 中回看所需字段 */
   function buildContractDetailSnapshot(data) {
     var res = (data && data.result) || {};
     var sv = res.summary_view || {};
@@ -133,7 +169,6 @@
     };
   }
 
-  /** 房源 housing：结论 / 市场摘要 / Top deals 星级 */
   function buildPropertyHousingDetailSnapshot(data) {
     var rep = data.recommendation_report || {};
     var v = rep.star_final_verdict || {};
@@ -164,7 +199,6 @@
     };
   }
 
-  /** 旧版 ai-analyze：推荐与决策摘要 */
   function buildPropertyLegacyDetailSnapshot(data) {
     var recos = data.recommendations || [];
     var top = [];
@@ -205,19 +239,15 @@
     return "房源分析已完成";
   }
 
-  /**
-   * @param {object} data — POST /api/ai/query 成功体（housing）
-   * @returns {object|null}
-   */
   function pushPropertyFromHousingData(data) {
     if (!data || data.success === false) return null;
     if (typeof data.user_text !== "string") return null;
     try {
       var raw = sessionStorage.getItem("ai_housing_query_last");
       if (!raw) return null;
-      var mark = sessionStorage.getItem(DEDUP_HOUSING);
+      var mark = sessionStorage.getItem(getDedupHousingKey());
       if (mark === raw) return null;
-      sessionStorage.setItem(DEDUP_HOUSING, raw);
+      sessionStorage.setItem(getDedupHousingKey(), raw);
     } catch (e) {
       return null;
     }
@@ -235,17 +265,14 @@
     return entry;
   }
 
-  /**
-   * @param {object} data — 旧版 ai-analyze 成功体
-   */
   function pushPropertyFromLegacyData(data) {
     if (!data || !data.success) return null;
     try {
       var raw = sessionStorage.getItem("ai_analyze_last");
       if (!raw) return null;
-      var mark = sessionStorage.getItem(DEDUP_LEGACY);
+      var mark = sessionStorage.getItem(getDedupLegacyKey());
       if (mark === raw) return null;
-      sessionStorage.setItem(DEDUP_LEGACY, raw);
+      sessionStorage.setItem(getDedupLegacyKey(), raw);
     } catch (e) {
       return null;
     }
@@ -285,10 +312,6 @@
     return "合同分析";
   }
 
-  /**
-   * @param {object} data — normalize 后的合同 API JSON（ok === true）
-   * @param {object} [sourceMeta] — 与 contract_analysis_api 一致
-   */
   function pushContractFromContractData(data, sourceMeta) {
     if (!data || data.ok !== true) return null;
     var res = (data && data.result) || {};
@@ -309,16 +332,7 @@
   }
 
   function listForUser() {
-    var uid = getUserId();
-    var all = loadRaw();
-    if (!uid) {
-      return all.filter(function (x) {
-        return x && !x.user_id;
-      });
-    }
-    return all.filter(function (x) {
-      return x && (x.user_id === uid || !x.user_id);
-    });
+    return loadRaw();
   }
 
   function listByType(type) {
@@ -327,13 +341,24 @@
     });
   }
 
+  function clearCurrentBucket() {
+    try {
+      localStorage.removeItem(getUnifiedStorageKey());
+      sessionStorage.removeItem(getDedupHousingKey());
+      sessionStorage.removeItem(getDedupLegacyKey());
+    } catch (e) {}
+  }
+
   global.RentalAIAnalysisHistoryStore = {
-    STORAGE_KEY: STORAGE_KEY,
+    STORAGE_PREFIX: STORAGE_PREFIX,
+    getBucketId: getBucketId,
+    getUnifiedStorageKey: getUnifiedStorageKey,
     pushPropertyFromHousingData: pushPropertyFromHousingData,
     pushPropertyFromLegacyData: pushPropertyFromLegacyData,
     pushContractFromContractData: pushContractFromContractData,
     listForUser: listForUser,
     listByType: listByType,
     loadRaw: loadRaw,
+    clearCurrentBucket: clearCurrentBucket,
   };
 })(window);

@@ -1,17 +1,50 @@
 /**
- * 分析历史：localStorage analysis_history，卡片列表 + 查看详情 + 删除。
+ * 分析历史：按 Phase5 分桶键 analysis_history__{bucketId}（guest | userId），卡片列表 + 详情 + 删除。
  */
 (function () {
   var container = document.getElementById("history-list");
   if (!container) return;
 
-  var uid =
-    window.RentalAILocalAuth && window.RentalAILocalAuth.getUser
-      ? (window.RentalAILocalAuth.getUser() || {}).user_id
-      : null;
+  if (
+    window.RentalAIHistoryAccess &&
+    typeof window.RentalAIHistoryAccess.applyBannerById === "function"
+  ) {
+    window.RentalAIHistoryAccess.applyBannerById("history-access-banner");
+  }
+
+  function manualHistoryKey() {
+    if (window.RentalAIUserStore && window.RentalAIUserStore.getManualHistoryStorageKey) {
+      return window.RentalAIUserStore.getManualHistoryStorageKey();
+    }
+    return "analysis_history";
+  }
+
+  /** guest 桶：旧 analysis_history 一次性迁入 analysis_history__guest */
+  function migrateLegacyManualIfNeeded() {
+    try {
+      if (
+        window.RentalAIUserStore &&
+        window.RentalAIUserStore.getHistoryBucketId &&
+        window.RentalAIUserStore.getHistoryBucketId() !== "guest"
+      ) {
+        return;
+      }
+    } catch (e) {
+      return;
+    }
+    var newKey = manualHistoryKey();
+    if (localStorage.getItem(newKey)) return;
+    var legacy = localStorage.getItem("analysis_history");
+    if (!legacy) return;
+    try {
+      localStorage.setItem(newKey, legacy);
+      localStorage.removeItem("analysis_history");
+    } catch (e2) {}
+  }
 
   function loadList() {
-    var raw = localStorage.getItem("analysis_history");
+    migrateLegacyManualIfNeeded();
+    var raw = localStorage.getItem(manualHistoryKey());
     var items = [];
     try {
       items = raw ? JSON.parse(raw) : [];
@@ -19,13 +52,6 @@
       items = [];
     }
     if (!Array.isArray(items)) items = [];
-    if (uid) {
-      items = items.filter(function (x) {
-        return x && x.user_id === uid;
-      });
-    } else {
-      items = [];
-    }
     return items;
   }
 
@@ -162,19 +188,13 @@
   }
 
   function render() {
-    if (!uid) {
-      container.className = "history-page-grid";
-      container.innerHTML =
-        "<p class='hint history-empty-hint'>请先登录后查看已保存的分析记录。</p>";
-      return;
-    }
-
     var items = loadList();
     var ordered = items.slice().reverse();
 
     if (!ordered.length) {
       container.className = "history-page-grid";
-      container.innerHTML = "<p class='hint history-empty-hint'>暂无历史记录</p>";
+      container.innerHTML =
+        "<p class='hint history-empty-hint'>暂无历史记录（未登录时为 guest 桶）。</p>";
       return;
     }
 
@@ -238,9 +258,10 @@
 
     if (t.classList.contains("history-delete-btn")) {
       if (!confirm("确定删除这条记录？")) return;
+      migrateLegacyManualIfNeeded();
       var list = [];
       try {
-        list = JSON.parse(localStorage.getItem("analysis_history") || "[]");
+        list = JSON.parse(localStorage.getItem(manualHistoryKey()) || "[]");
       } catch (err) {
         list = [];
       }
@@ -249,7 +270,7 @@
         return !x || String(x.id) !== String(id);
       });
       try {
-        localStorage.setItem("analysis_history", JSON.stringify(list));
+        localStorage.setItem(manualHistoryKey(), JSON.stringify(list));
       } catch (err2) {
         alert("删除失败");
         return;
@@ -259,12 +280,9 @@
     }
 
     if (!t.classList.contains("history-detail-btn")) return;
-    if (!uid) {
-      alert("请先登录");
-      return;
-    }
 
-    var rawList = localStorage.getItem("analysis_history");
+    migrateLegacyManualIfNeeded();
+    var rawList = localStorage.getItem(manualHistoryKey());
     var list = [];
     try {
       list = rawList ? JSON.parse(rawList) : [];
@@ -274,7 +292,7 @@
     if (!Array.isArray(list)) list = [];
     var found = null;
     for (var i = 0; i < list.length; i++) {
-      if (String(list[i].id) === String(id) && list[i].user_id === uid) {
+      if (String(list[i].id) === String(id)) {
         found = list[i];
         break;
       }

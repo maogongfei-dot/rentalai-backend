@@ -98,17 +98,7 @@
   }
 
   function guardHistoryLinks() {
-    document.querySelectorAll('a[href="/history"], a[href="/analysis-history"]').forEach(function (a) {
-      a.addEventListener("click", function (ev) {
-        try {
-          if (localStorage.getItem("current_user")) return;
-        } catch (e) {}
-        if (!isLoggedIn()) {
-          ev.preventDefault();
-          window.alert("Login to save your analysis history");
-        }
-      });
-    });
+    /* Phase 5：本地历史已按 guest/userId 分桶；未登录可进入 /analysis-history、/history 读 guest 桶 */
   }
 
   function logout() {

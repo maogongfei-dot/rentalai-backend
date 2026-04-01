@@ -182,11 +182,35 @@
     });
   }
 
+  /** Phase 5 Step5：localStorage 历史分桶 id（guest | 已登录 userId 净化） */
+  function sanitizeHistoryBucketId(uid) {
+    var s = String(uid || "").replace(/[^a-zA-Z0-9._-]/g, "_");
+    if (s.length > 96) s = s.slice(0, 96);
+    return s || "guest";
+  }
+
+  function getHistoryBucketId() {
+    var s = loadUserFromStorage();
+    if (!s.isAuthenticated) return "guest";
+    return sanitizeHistoryBucketId(s.userId);
+  }
+
+  function getUnifiedHistoryStorageKey() {
+    return "rentalai_unified_analysis_history_v1__" + getHistoryBucketId();
+  }
+
+  function getManualHistoryStorageKey() {
+    return "analysis_history__" + getHistoryBucketId();
+  }
+
   global.RentalAIUserStore = {
     STORAGE_KEYS: { CURRENT_USER_KEY: CURRENT_USER_KEY, SESSION: K },
     loadUserFromStorage: loadUserFromStorage,
     loginUser: loginUser,
     logoutUser: logoutUser,
     registerUser: registerUser,
+    getHistoryBucketId: getHistoryBucketId,
+    getUnifiedHistoryStorageKey: getUnifiedHistoryStorageKey,
+    getManualHistoryStorageKey: getManualHistoryStorageKey,
   };
 })(window);

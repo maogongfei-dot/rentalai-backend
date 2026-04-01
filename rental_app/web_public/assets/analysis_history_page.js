@@ -331,6 +331,12 @@
   }
 
   function run() {
+    if (
+      window.RentalAIHistoryAccess &&
+      typeof window.RentalAIHistoryAccess.applyBannerById === "function"
+    ) {
+      window.RentalAIHistoryAccess.applyBannerById("history-access-banner");
+    }
     var propEl = document.getElementById("unified-history-property-list");
     var contractEl = document.getElementById("unified-history-contract-list");
     renderList(

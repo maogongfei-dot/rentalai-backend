@@ -451,6 +451,41 @@ body.contract-analysis-page-body {
 body.analysis-history-page-body {
   max-width: min(100%, 52rem);
 }
+
+/* Phase 5 Round2：历史页访问状态（guest / 已登录分桶提示） */
+.history-access-banner {
+  margin: 0 0 1rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.history-access-banner--guest {
+  border-color: #fdba74;
+  background: #fffbeb;
+}
+.history-access-banner--user {
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+}
+.history-access-banner-lead {
+  margin: 0 0 0.35rem;
+}
+.history-access-banner-sub {
+  margin: 0;
+}
+.history-bucket-code {
+  font-size: 0.85em;
+  padding: 0.05rem 0.25rem;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+}
+.history-page .history-access-banner {
+  margin-bottom: 1rem;
+}
+
 .contract-analysis-main {
   width: 100%;
 }

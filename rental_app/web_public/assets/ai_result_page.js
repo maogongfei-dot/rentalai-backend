@@ -694,25 +694,47 @@
         alert("暂无分析数据");
         return;
       }
+      function manualHistoryKey() {
+        if (window.RentalAIUserStore && window.RentalAIUserStore.getManualHistoryStorageKey) {
+          return window.RentalAIUserStore.getManualHistoryStorageKey();
+        }
+        return "analysis_history";
+      }
+      function migrateLegacyManualIfNeeded() {
+        try {
+          if (
+            window.RentalAIUserStore &&
+            window.RentalAIUserStore.getHistoryBucketId &&
+            window.RentalAIUserStore.getHistoryBucketId() !== "guest"
+          ) {
+            return;
+          }
+        } catch (e0) {}
+        var nk = manualHistoryKey();
+        if (localStorage.getItem(nk)) return;
+        var legacy = localStorage.getItem("analysis_history");
+        if (!legacy) return;
+        try {
+          localStorage.setItem(nk, legacy);
+          localStorage.removeItem("analysis_history");
+        } catch (e1) {}
+      }
       var cu =
         window.RentalAILocalAuth && window.RentalAILocalAuth.getUser
           ? window.RentalAILocalAuth.getUser()
           : null;
-      if (!cu || !cu.user_id) {
-        alert("请先登录");
-        return;
-      }
+      migrateLegacyManualIfNeeded();
       var list = [];
       try {
-        list = JSON.parse(localStorage.getItem("analysis_history") || "[]");
+        list = JSON.parse(localStorage.getItem(manualHistoryKey()) || "[]");
       } catch (e) {
         list = [];
       }
       if (!Array.isArray(list)) list = [];
       var entry = {
         id: String(Date.now()),
-        user_id: cu.user_id,
-        display_name: cu.display_name || "",
+        user_id: cu && cu.user_id ? cu.user_id : "guest",
+        display_name: (cu && cu.display_name) || "",
         saved_at: new Date().toISOString(),
         mode: mode,
       };
@@ -732,8 +754,8 @@
         entry.recommendations = parsed.recommendations || [];
       }
       list.push(entry);
-      localStorage.setItem("analysis_history", JSON.stringify(list));
-      alert("已保存到历史记录");
+      localStorage.setItem(manualHistoryKey(), JSON.stringify(list));
+      alert("已保存到历史记录（当前分桶）");
     });
   })();
 })();
