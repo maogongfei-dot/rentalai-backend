@@ -37,10 +37,16 @@
           }
           return;
         }
-        try {
-          localStorage.removeItem("current_user");
-        } catch (e) {}
-        if (window.RentalAIAuth && typeof window.RentalAIAuth.persistSession === "function") {
+        if (window.RentalAIUserStore && typeof window.RentalAIUserStore.loginUser === "function") {
+          window.RentalAIUserStore.loginUser({
+            token: x.body.token,
+            userId: x.body.user_id,
+            email: x.body.email,
+          });
+        } else if (window.RentalAIAuth && typeof window.RentalAIAuth.persistSession === "function") {
+          try {
+            localStorage.removeItem("current_user");
+          } catch (e) {}
           window.RentalAIAuth.persistSession({
             token: x.body.token,
             user_id: x.body.user_id,

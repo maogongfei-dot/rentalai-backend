@@ -1,7 +1,6 @@
 /**
- * 本地假登录 v1 + Phase 5 Step1：current_user 或 Bearer 会话（auth_session.js 键）视为已登录。
+ * 本地假登录 + Phase 5：会话判定委托 RentalAIUserStore（auth_user_store.js）。
  * 公开页：/、/login、/register、/assistant；其余路径无会话则跳转 /login。
- * 统一顶栏：renderUnifiedNav（含「智能入口」、登录/注册入口）。
  */
 (function (global) {
   var KEY = "current_user";
@@ -10,14 +9,25 @@
   var UID_KEY = "rentalai_user_id";
 
   function getUser() {
+    if (
+      global.RentalAIUserStore &&
+      typeof global.RentalAIUserStore.loadUserFromStorage === "function"
+    ) {
+      var s = global.RentalAIUserStore.loadUserFromStorage();
+      if (!s.isAuthenticated) return null;
+      return {
+        user_id: s.userId,
+        display_name: s.displayName || s.email || s.userId || "用户",
+        email: s.email || undefined,
+        auth_bearer: s.authMode === "bearer",
+      };
+    }
     try {
       var raw = localStorage.getItem(KEY);
       if (raw) {
         var o = JSON.parse(raw);
         if (o && o.user_id) return o;
       }
-    } catch (e) {}
-    try {
       var token = localStorage.getItem(BEARER_KEY);
       var email = localStorage.getItem(EMAIL_KEY);
       var uid = localStorage.getItem(UID_KEY);
@@ -28,8 +38,31 @@
           auth_bearer: true,
         };
       }
-    } catch (e2) {}
+    } catch (e) {}
     return null;
+  }
+
+  function loadUserState() {
+    if (global.RentalAIUserStore && global.RentalAIUserStore.loadUserFromStorage) {
+      return global.RentalAIUserStore.loadUserFromStorage();
+    }
+    var u = getUser();
+    if (!u) {
+      return {
+        isAuthenticated: false,
+        userId: null,
+        email: null,
+        displayName: null,
+        authMode: null,
+      };
+    }
+    return {
+      isAuthenticated: true,
+      userId: u.user_id,
+      email: u.email || null,
+      displayName: u.display_name || u.user_id,
+      authMode: u.auth_bearer ? "bearer" : "local_demo",
+    };
   }
 
   /** 收藏按用户隔离：fav_list_{user_id} */
@@ -49,14 +82,9 @@
   }
 
   function logout() {
-    localStorage.removeItem(KEY);
-    try {
-      localStorage.removeItem(BEARER_KEY);
-      localStorage.removeItem(EMAIL_KEY);
-      localStorage.removeItem(UID_KEY);
-    } catch (e) {}
-    if (global.RentalAIAuth && typeof global.RentalAIAuth.clearSession === "function") {
-      global.RentalAIAuth.clearSession();
+    if (global.RentalAIUserStore && typeof global.RentalAIUserStore.logoutUser === "function") {
+      global.RentalAIUserStore.logoutUser({ redirect: true });
+      return;
     }
     window.location.href = "/login";
   }
@@ -145,14 +173,9 @@
           localStorage.removeItem("analysis_history");
         } catch (e2) {}
       }
-      try {
-        localStorage.removeItem(KEY);
-        localStorage.removeItem(BEARER_KEY);
-        localStorage.removeItem(EMAIL_KEY);
-        localStorage.removeItem(UID_KEY);
-      } catch (e) {}
-      if (global.RentalAIAuth && typeof global.RentalAIAuth.clearSession === "function") {
-        global.RentalAIAuth.clearSession();
+      if (global.RentalAIUserStore && typeof global.RentalAIUserStore.logoutUser === "function") {
+        global.RentalAIUserStore.logoutUser({ redirect: true });
+        return;
       }
       window.location.href = "/login";
     });
@@ -172,6 +195,7 @@
 
   global.RentalAILocalAuth = {
     getUser: getUser,
+    loadUserState: loadUserState,
     requireLogin: requireLogin,
     logout: logout,
     favStorageKey: favStorageKey,

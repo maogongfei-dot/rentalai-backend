@@ -12,6 +12,7 @@
     <script src="/assets/api_config.js"></script>
   </head>
   <body>
+    <script src="/assets/auth_user_store.js"></script>
     <script src="/assets/auth_local.js"></script>
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
@@ -249,7 +250,10 @@
       (function () {
         var el = document.getElementById("home-auth-cta");
         if (!el || !window.RentalAILocalAuth) return;
-        if (window.RentalAILocalAuth.getUser()) el.classList.add("hidden");
+        var st = window.RentalAILocalAuth.loadUserState
+          ? window.RentalAILocalAuth.loadUserState()
+          : null;
+        if (st && st.isAuthenticated) el.classList.add("hidden");
       })();
     </script>
   </body>

@@ -1,21 +1,11 @@
 (function () {
   try {
     if (
-      localStorage.getItem("rentalai_bearer") &&
-      localStorage.getItem("rentalai_user_email")
+      window.RentalAIUserStore &&
+      window.RentalAIUserStore.loadUserFromStorage().isAuthenticated
     ) {
       window.location.replace("/");
       return;
-    }
-    var raw = localStorage.getItem("current_user");
-    if (raw) {
-      try {
-        var o = JSON.parse(raw);
-        if (o && o.user_id) {
-          window.location.replace("/");
-          return;
-        }
-      } catch (e2) {}
     }
   } catch (e) {}
 
@@ -57,10 +47,16 @@
           }
           return;
         }
-        try {
-          localStorage.removeItem("current_user");
-        } catch (e) {}
-        if (window.RentalAIAuth && typeof window.RentalAIAuth.persistSession === "function") {
+        if (window.RentalAIUserStore && typeof window.RentalAIUserStore.loginUser === "function") {
+          window.RentalAIUserStore.loginUser({
+            token: x.body.token,
+            userId: x.body.user_id,
+            email: x.body.email,
+          });
+        } else if (window.RentalAIAuth && typeof window.RentalAIAuth.persistSession === "function") {
+          try {
+            localStorage.removeItem("current_user");
+          } catch (e) {}
           window.RentalAIAuth.persistSession({
             token: x.body.token,
             user_id: x.body.user_id,

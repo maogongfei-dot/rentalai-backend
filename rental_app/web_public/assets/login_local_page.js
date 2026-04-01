@@ -1,22 +1,14 @@
 /**
- * 本地假登录：写入 current_user 后跳转首页。
+ * 本地假登录：经 RentalAIUserStore.loginUser(local_demo) 写入 current_user。
  */
 (function () {
   try {
     if (
-      localStorage.getItem("rentalai_bearer") &&
-      localStorage.getItem("rentalai_user_email")
+      window.RentalAIUserStore &&
+      window.RentalAIUserStore.loadUserFromStorage().isAuthenticated
     ) {
       window.location.replace("/");
       return;
-    }
-    var raw = localStorage.getItem("current_user");
-    if (raw) {
-      var o = JSON.parse(raw);
-      if (o && o.user_id) {
-        window.location.replace("/");
-        return;
-      }
     }
   } catch (e) {}
 
@@ -30,12 +22,24 @@
       alert("请输入用户名或邮箱");
       return;
     }
+    var looksEmail = v.indexOf("@") > 0;
     var user = {
       user_id: "u_" + Date.now(),
       display_name: v,
       login_at: new Date().toISOString(),
     };
-    localStorage.setItem("current_user", JSON.stringify(user));
+    if (window.RentalAIUserStore && typeof window.RentalAIUserStore.loginUser === "function") {
+      window.RentalAIUserStore.loginUser({
+        source: "local_demo",
+        userId: user.user_id,
+        displayName: user.display_name,
+        email: looksEmail ? v : undefined,
+      });
+    } else {
+      try {
+        localStorage.setItem("current_user", JSON.stringify(user));
+      } catch (e2) {}
+    }
     window.location.href = "/";
   });
 })();
