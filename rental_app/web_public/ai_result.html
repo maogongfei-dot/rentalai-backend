@@ -17,6 +17,8 @@
         <h1>需求解析结果</h1>
       </header>
 
+      <div id="guest-auth-hint" class="guest-auth-hint-host" aria-live="polite"></div>
+
       <section class="card result-actions" aria-label="结果页操作">
         <button type="button" class="save-analysis-btn">保存本次分析</button>
         <span class="nav-sep">·</span>
@@ -87,6 +89,12 @@
       </div>
     </main>
     <script src="/assets/analysis_history_store.js"></script>
+    <script src="/assets/guest_auth_hint.js"></script>
     <script src="/assets/ai_result_page.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        if (window.RentalAIAuthHint) window.RentalAIAuthHint.mount("guest-auth-hint");
+      });
+    </script>
   </body>
 </html>

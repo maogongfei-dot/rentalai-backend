@@ -43,7 +43,7 @@
         authMode: null,
         title: "访客 · guest 历史",
         detail:
-          "未登录时仅显示保存在本机 guest 桶中的记录；登录后可查看与当前账号绑定的分桶数据。",
+          "以下为 guest 桶，仅本机。登录后历史与账号绑定，便于区分个人记录（仍本地存储）。",
       };
     }
 
@@ -73,7 +73,7 @@
     var st = resolveHistoryAccessState();
     if (st.mode === "guest") {
       return (
-        '<p class="history-access-banner-lead"><strong>访客模式</strong>：正在查看 <code class="history-bucket-code">guest</code> 桶的本地历史（未与账号同步）。</p>' +
+        '<p class="history-access-banner-lead"><strong>访客模式</strong>：正在查看 <code class="history-bucket-code">guest</code> 桶；可照常使用，数据仅本机。</p>' +
         '<p class="hint muted history-access-banner-sub">' +
         esc(st.detail) +
         " " +

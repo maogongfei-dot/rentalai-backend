@@ -117,7 +117,7 @@
         '<a href="/login" class="nav-auth-link">Login</a>' +
         '<span class="nav-sep">·</span>' +
         '<a href="/register" class="nav-auth-link">Sign Up</a>' +
-        '<span class="hint muted home-account-strip-hint">未登录时历史为 guest 桶</span>';
+        '<span class="hint muted home-account-strip-hint">访客可完整使用；登录后按账号保留个人历史（仍本机）</span>';
       return;
     }
     var email = u.email ? String(u.email) : "";

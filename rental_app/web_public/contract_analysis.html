@@ -32,6 +32,8 @@
         </p>
       </header>
 
+      <div id="guest-contract-hint" class="guest-auth-hint-host" aria-live="polite"></div>
+
       <div class="contract-analysis-layout">
         <!-- 左栏：输入 -->
         <div class="contract-analysis-input-column">
@@ -176,9 +178,15 @@
       </div>
     </main>
     <script src="/assets/analysis_history_store.js"></script>
+    <script src="/assets/guest_auth_hint.js"></script>
     <script src="/assets/assistant_prefill.js"></script>
     <script src="/assets/contract_analysis_api.js"></script>
     <script src="/assets/contract_analysis_demo.js"></script>
     <script src="/assets/contract_analysis_page.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        if (window.RentalAIAuthHint) window.RentalAIAuthHint.mount("guest-contract-hint");
+      });
+    </script>
   </body>
 </html>
