@@ -1,5 +1,9 @@
 /**
- * Phase 5 Round4 — 历史来源解析层：guest→本地；已登录→云端（fetchUserHistory 单次拉全量后拆分）。
+ * Phase 5 Round4 — 历史来源解析层（双模式收尾）
+ * - 读：未登录 → local_guest + 本地 listByType；已登录 → remote_user + fetchUserHistory 全量后按 property/contract 拆分
+ * - 写：不在此文件；见 analysis_history_persist（guest 本地）与后端 analysis_history_writer（已登录 JSON）
+ * - 记录：normalizeRemoteRecord 与本地项对齐字段（created_at 均为 ISO 字符串）；远端行带 _historySource: "remote"
+ * 未实现：分页、搜索、guest→user 迁移、冲突处理 — 见 rental_app/README.md「Phase 5 第四轮」
  * 依赖：RentalAIUserStore、RentalAIAnalysisHistoryStore、RentalAIServerHistoryApi。
  */
 (function (global) {
@@ -93,7 +97,7 @@
       id: String(rec.record_id || "").trim() || "remote_" + String(Math.random()).slice(2),
       type: t === "contract" ? "contract" : "property",
       title: String(rec.title || "—").trim() || "—",
-      created_at: String(rec.created_at || ""),
+      created_at: String(rec.created_at == null ? "" : rec.created_at).trim(),
       summary_snippet: String(snippet).slice(0, 260),
       result_preview: String(preview).slice(0, 260),
       detail_snapshot: detail,

@@ -1,6 +1,9 @@
 /**
- * Phase 5 Round4 Step3 — 统一历史保存：guest → 本地分桶；已登录 → 同次分析 POST 已带 userId 时由后端写入 JSON（本函数不写本地，避免与云端列表重复）。
- * alsoWriteLocalBackup：已登录时仍写本地（可选兜底，默认关）。
+ * Phase 5 Round4 — 统一历史保存（与 analysis_history_source 读路径对称）
+ * - guest：写入 RentalAIAnalysisHistoryStore（localStorage 分桶）
+ * - 已登录：依赖请求体 userId 由后端追加 persistence JSON；本函数默认不写本地，避免与 /analysis-history 云端列表重复
+ * - alsoWriteLocalBackup：已登录时仍写本地（可选兜底）
+ * 见 README「Phase 5 第四轮」；未做 token 校验与同步迁移。
  */
 (function (global) {
   function loadU() {

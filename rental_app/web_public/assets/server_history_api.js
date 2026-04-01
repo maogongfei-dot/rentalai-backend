@@ -1,6 +1,7 @@
 /**
- * Phase 5 Round3/4 — GET /api/analysis/history/records
- * Phase 5 Round4 Step2：fetchUserHistory / getHistoryRecords（已登录用户读取云端 JSON 历史）。
+ * Phase 5 Round3/4 — GET /api/analysis/history/records（Demo：无 Authorization 校验）
+ * 已登录用户的 /analysis-history 优先经 fetchUserHistory(userId) 拉全量；失败由 analysis_history_source 回退本地。
+ * 下一步安全增强：受保护 API + token 绑定 userId（见 README「Phase 5 第四轮」推荐下一步）。
  */
 (function (global) {
   function apiUrl(path) {

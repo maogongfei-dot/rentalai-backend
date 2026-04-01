@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <!--
   Phase 4 Round6 收口：统一「分析历史」页（/analysis-history）
-  - 本地：按 user 分桶 rentalai_unified_analysis_history_v1__{guest|userId}（Phase5）
-  - 服务端 JSON 历史读取：GET /api/analysis/history/records（Phase5 Round3）；调试可加 ?server_history=1 看控制台探测
-  - Phase5 Round4：server_history_api（fetchUserHistory）+ analysis_history_source（loadAnalysisHistory）+ 本页 loading/回退提示
-  - 全量手动保存列表：/history · 说明见 rental_app/README.md「统一分析历史（Phase 4 第六轮）」
+  - 双模式（Phase5 Round4）：未登录 → 仅本地 guest 分桶；已登录 → 优先 GET /api/analysis/history/records?userId=…，失败回退本机
+  - 本地键：rentalai_unified_analysis_history_v1__{guest|userId}；写入见 analysis_history_persist（guest 写本地；登录默认后端写）
+  - UI：loading/回退提示 + 来源横幅（guest 本机 / 账户云端）；调试 ?server_history=1 控制台探测
+  - 全量手动保存：/history（仅 localStorage）· 主说明 rental_app/README.md「Phase 5 第四轮」「统一分析历史」
 -->
 <html lang="zh-Hans">
   <head>
@@ -26,7 +26,7 @@
       <header class="page-header">
         <h1>分析历史 <span class="hint muted" style="font-weight: normal">Analysis History</span></h1>
         <p id="analysis-history-lead" class="hint muted analysis-history-lead">
-          以下为浏览器本地保存的<strong>最近分析摘要</strong>（自动写入）；全量快照与详情仍可从房源历史列表进入。
+          <strong>访客</strong>：仅本机保存的最近分析摘要（不上传账户）。<strong>登录</strong>后本页<strong>优先</strong>显示与账号同步的记录。全量手动快照仍从<a href="/history">保存列表</a>进入。
         </p>
       </header>
 

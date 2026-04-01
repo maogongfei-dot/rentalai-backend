@@ -1,6 +1,7 @@
 /**
  * Phase 4 Round6：/analysis-history — 统一历史列表 + detail_snapshot 展开回看。
- * Phase 5 Round4：优先经 RentalAIAnalysisHistorySource.loadAnalysisHistory（guest→本地，已登录→云端优先，失败回退本地）。
+ * Phase 5 Round4：RentalAIAnalysisHistorySource.loadAnalysisHistory；data-history-source-mode / 来源文案见 history_access_context。
+ * 双模式收尾：未改列表行为，仅与 persist/source/API 对齐；能力边界见 rental_app/README.md「Phase 5 第四轮」。
  */
 (function () {
   var S = window.RentalAIAnalysisHistoryStore;
@@ -406,7 +407,14 @@
     var lead = document.getElementById("analysis-history-lead");
     if (!lead) return;
     lead.innerHTML =
-      "已登录：下列为<strong>服务端 JSON 历史</strong>（与本地自动摘要分源；本地仍可在未登录或回退时查看）。";
+      "已登录：下列为与<strong>当前账户同步</strong>的最近分析摘要（云端优先；未登录访客仅见本机）。<span class=\"hint\" lang=\"en\">Account-synced history.</span>";
+  }
+
+  function setAnalysisLeadRemoteFallback() {
+    var lead = document.getElementById("analysis-history-lead");
+    if (!lead) return;
+    lead.innerHTML =
+      "已登录：云端历史暂不可用，下列为<strong>本机缓存</strong>中的最近分析摘要（恢复连接后将优先显示账户同步记录）。";
   }
 
   function setServerNotice(msg) {
@@ -426,7 +434,9 @@
       window.RentalAIHistoryAccess &&
       typeof window.RentalAIHistoryAccess.applyBannerById === "function"
     ) {
-      window.RentalAIHistoryAccess.applyBannerById("history-access-banner");
+      window.RentalAIHistoryAccess.applyBannerById("history-access-banner", {
+        page: "unified_analysis",
+      });
     }
     var leadEl = document.getElementById("analysis-history-lead");
     if (leadEl && _defaultAnalysisLeadHtml === null) {
@@ -486,7 +496,7 @@
             setServerNotice("");
           } else if (bundle.mode === "remote_user") {
             if (bundle.usedFallback) {
-              resetAnalysisLead();
+              setAnalysisLeadRemoteFallback();
               setServerNotice(
                 "云端历史暂时不可用，已显示本机缓存（" + (bundle.message || "error") + "）。"
               );

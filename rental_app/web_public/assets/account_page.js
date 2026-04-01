@@ -46,8 +46,8 @@
     var uidDisp = s.userId ? esc(String(s.userId)) : "—";
     var bucketDisp = esc(bucket);
     var bindHint = s.isAuthenticated
-      ? "当前本地历史与<strong>上述 userId</strong> 分桶绑定；数据仍仅存本机浏览器。"
-      : "未登录时历史落在 <strong>guest</strong> 桶；登录后切换到账号分桶（原 guest 记录不会自动合并）。";
+      ? "「分析历史」在登录后<strong>优先</strong>从云端同步；本机键用于回退与缓存。手动保存列表仍仅保存在本浏览器。"
+      : "未登录时分析摘要落在 <strong>guest</strong> 桶、仅本机；登录后「分析历史」优先看账户同步记录（原 guest 不会自动合并）。";
 
     root.innerHTML =
       '<section class="card form-card account-summary-card">' +
