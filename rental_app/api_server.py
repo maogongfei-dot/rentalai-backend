@@ -30,18 +30,15 @@ from api_analysis import analyze_batch_request_body, modular_analyze_response
 from data.storage.records_db import (
     _DB_PATH as _RECORDS_DB_PATH,
     UI_HISTORY_ANALYSIS_TYPE,
-    create_user,
     delete_favorite_record,
-    email_exists,
     find_reusable_analysis_result,
-    get_user_by_id,
     init_records_db,
     insert_analysis_record,
     insert_favorite_record,
     list_favorite_records,
     normalize_analysis_input_signature,
-    verify_user,
 )
+from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
 from data.explain.rule_explain import (
     build_p10_explain_for_batch_row,
     build_p10_explain_from_msa_result,
@@ -285,43 +282,63 @@ def alerts_status():
 
 @app.post("/auth/register")
 def auth_register(body: AuthRequest):
-    em = str(body.email or "").strip()
-    pw = str(body.password or "")
-    if not em or not pw:
+    """Register into JSON persistence (``persistence_users.json``); response includes legacy token fields."""
+    user, err = register_user(body.email, body.password)
+    if err:
+        status = 409 if "already exists" in err.lower() else 400
         return JSONResponse(
-            status_code=400,
-            content={"error": "register_failed", "message": "Invalid email or password."},
+            status_code=status,
+            content={
+                "success": False,
+                "user": None,
+                "message": err,
+                "error": "register_failed",
+            },
         )
-    if email_exists(em):
-        return JSONResponse(
-            status_code=400,
-            content={"error": "register_failed", "message": "User already exists"},
-        )
-    user = create_user(body.email, body.password)
-    if user is None:
-        return JSONResponse(
-            status_code=400,
-            content={"error": "register_failed", "message": "Could not create account."},
-        )
-    token = _issue_token(user["id"])
+    token = _issue_token(user["user_id"])
+    uid = user["user_id"]
+    em = user["email"]
+    ca = user["created_at"]
+    nested = {"userId": uid, "email": em, "created_at": ca}
     return {
-        "user_id": user["id"],
-        "email": user["email"],
-        "created_at": user["created_at"],
+        "success": True,
+        "message": "Registered successfully.",
+        "user": nested,
+        "user_id": uid,
+        "email": em,
+        "created_at": ca,
         "token": token,
     }
 
 
 @app.post("/auth/login")
 def auth_login(body: AuthRequest):
-    user = verify_user(body.email, body.password)
+    """Login against JSON user store; same response shape as before plus success/user/message."""
+    user = verify_login(body.email, body.password)
     if user is None:
         return JSONResponse(
             status_code=401,
-            content={"error": "login_failed", "message": "Invalid email or password."},
+            content={
+                "success": False,
+                "user": None,
+                "message": "Invalid email or password.",
+                "error": "login_failed",
+            },
         )
-    token = _issue_token(user["id"])
-    return {"user_id": user["id"], "email": user["email"], "token": token}
+    token = _issue_token(user["user_id"])
+    uid = user["user_id"]
+    em = user["email"]
+    ca = user["created_at"]
+    nested = {"userId": uid, "email": em, "created_at": ca}
+    return {
+        "success": True,
+        "message": "Logged in successfully.",
+        "user": nested,
+        "user_id": uid,
+        "email": em,
+        "created_at": ca,
+        "token": token,
+    }
 
 
 @app.post("/auth/logout")
@@ -336,15 +353,31 @@ def auth_logout(request: Request):
 
 @app.get("/auth/me")
 def auth_me(request: Request):
-    """Resolve bearer token to a minimal public profile."""
+    """Resolve bearer token to a minimal public profile (JSON user store)."""
     user_id = _get_user_id_from_request(request)
-    user = get_user_by_id(user_id)
+    user = get_public_user_by_id(user_id)
     if user is None:
         return JSONResponse(
             status_code=401,
-            content={"error": "invalid_or_expired_token", "message": "Session expired. Please log in again."},
+            content={
+                "success": False,
+                "user": None,
+                "message": "Session expired. Please log in again.",
+                "error": "invalid_or_expired_token",
+            },
         )
-    return {"user_id": user["id"], "email": user["email"], "created_at": user["created_at"]}
+    uid = user["user_id"]
+    em = user["email"]
+    ca = user["created_at"]
+    nested = {"userId": uid, "email": em, "created_at": ca}
+    return {
+        "success": True,
+        "message": "ok",
+        "user": nested,
+        "user_id": uid,
+        "email": em,
+        "created_at": ca,
+    }
 
 
 @app.post("/api/auth/minimal/register")

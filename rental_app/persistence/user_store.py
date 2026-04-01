@@ -9,8 +9,9 @@ On-disk document::
       }
     }
 
-This layer is independent of ``data.storage.records_db`` (SQLite). Existing auth flows stay unchanged
-until explicitly migrated in a later step.
+``/auth/register`` and ``/auth/login`` write/read this store via ``user_auth_service`` (Phase 5 Round3 Step2).
+SQLite ``records_db.users`` is no longer used for those routes (accounts created earlier in SQLite-only
+DBs are not migrated automatically).
 """
 
 from __future__ import annotations
