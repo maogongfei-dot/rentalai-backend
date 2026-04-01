@@ -119,7 +119,10 @@
         '<a href="/register">注册</a>';
       return;
     }
-    var name = escapeHtml(String(u.display_name || u.user_id || "用户"));
+    var email = u.email ? String(u.email) : "";
+    var mainLabel = email
+      ? "已登录：" + escapeHtml(email)
+      : "当前用户：" + escapeHtml(String(u.display_name || u.user_id || "用户"));
     nav.innerHTML =
       '<a href="/">首页</a>' +
       '<span class="nav-sep">·</span>' +
@@ -133,11 +136,11 @@
       '<span class="nav-sep">·</span>' +
       '<a href="/compare">房源对比</a>' +
       '<span class="nav-sep">·</span>' +
-      '<span class="local-user-name">当前用户：' +
-      name +
+      '<span class="local-user-name" title="当前登录状态">' +
+      mainLabel +
       "</span>" +
       '<span class="nav-sep">·</span>' +
-      '<button type="button" class="local-logout-btn">退出登录</button>';
+      '<button type="button" class="local-logout-btn" title="Logout">Logout</button>';
     var btn = nav.querySelector(".local-logout-btn");
     if (btn) btn.addEventListener("click", logout);
   }

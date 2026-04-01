@@ -57,6 +57,7 @@ from data.storage.records_query_service import (
 )
 from task_store import TaskStore
 
+from api_auth_minimal import MinimalAuthBody, minimal_login_response, minimal_register_response
 from config import get_cors_origins
 from contract_analysis_api_payload import build_contract_analysis_ui_payload
 from contract_analysis_upload_handler import ContractUploadError, analyze_contract_from_upload
@@ -344,6 +345,26 @@ def auth_me(request: Request):
             content={"error": "invalid_or_expired_token", "message": "Session expired. Please log in again."},
         )
     return {"user_id": user["id"], "email": user["email"], "created_at": user["created_at"]}
+
+
+@app.post("/api/auth/minimal/register")
+def api_auth_minimal_register(body: MinimalAuthBody):
+    """
+    Phase 5 Step3：占位注册（内存 mock，与 SQLite /auth/register 独立）。
+    响应：{ success, user: { userId, email } | null, message }。
+    """
+    content, status = minimal_register_response(body)
+    return JSONResponse(status_code=status, content=content)
+
+
+@app.post("/api/auth/minimal/login")
+def api_auth_minimal_login(body: MinimalAuthBody):
+    """
+    Phase 5 Step3：占位登录（内存 mock，不签发 token）。
+    响应：{ success, user: { userId, email } | null, message }。
+    """
+    content, status = minimal_login_response(body)
+    return JSONResponse(status_code=status, content=content)
 
 
 @app.post("/analyze")

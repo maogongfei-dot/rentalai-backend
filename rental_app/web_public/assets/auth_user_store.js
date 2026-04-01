@@ -171,14 +171,14 @@
   }
 
   /**
-   * 占位：程序化注册入口；实际注册仍走注册页 + POST /auth/register。
+   * 占位：请使用 RentalAIAuthApi.registerApi（注册页）或 POST /auth/register。
    * @returns {Promise<{ ok: boolean, placeholder: boolean, message: string }>}
    */
   function registerUser() {
     return Promise.resolve({
       ok: false,
       placeholder: true,
-      message: "请使用「注册」页完成账户创建；程序化 registerUser 将在后续与 API 完全打通。",
+      message: "请使用「注册」页；程序化注册请调用 RentalAIAuthApi.registerApi。",
     });
   }
 
