@@ -6,6 +6,9 @@ Phase 5 Round5 Step1 — Minimal in-process session token store (placeholder for
 * Thread-safe for concurrent FastAPI workers is NOT guaranteed (in-memory only); use one worker for demo.
 
 Replaceable later with: signed tokens, Redis, or DB-backed sessions.
+
+Round5 scope: login/register issue tokens; history **read** requires Bearer; history **write** and most POST APIs
+still accept body ``userId`` without Bearer binding (see README).
 """
 
 from __future__ import annotations

@@ -1,8 +1,9 @@
 """
-Phase 5 Round5 Step3 — HTTP auth helpers for protected routes (minimal; not global middleware).
+Phase 5 Round5 Step3/5 — HTTP auth helpers for protected routes (minimal; not global middleware).
 
-* ``Authorization: Bearer <token>`` → ``resolve_user_id`` via ``auth_session_store``.
-* Use on selected endpoints only (e.g. analysis history read).
+* ``Authorization: Bearer <token>`` → ``resolve_user_id`` via ``auth_session_store`` (session placeholder, not JWT).
+* Currently used by: ``GET /api/analysis/history/records`` only; other endpoints unchanged in Round5.
+* Not done here: JWT, expiry, refresh, full-route middleware — see ``persistence/README.md``「最小受保护 API」.
 """
 
 from __future__ import annotations
