@@ -379,6 +379,21 @@ a {
   color: #5d4037;
 }
 
+/* Phase 6：访客本机保存（与云端绿色区分） */
+.save-banner-local {
+  background: #eceff1;
+  border: 1px solid #cfd8dc;
+  color: #37474f;
+}
+
+.analysis-history-toolbar {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
 /* P10 Phase7 — structured home form */
 .wrap-wide {
   max-width: 48rem;

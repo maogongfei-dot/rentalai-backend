@@ -82,14 +82,23 @@
 
   function setContractPersistHint(msg, variant) {
     if (!persistHintEl) return;
-    persistHintEl.classList.remove("save-banner-ok", "save-banner-warn", "hidden");
+    persistHintEl.classList.remove("save-banner-ok", "save-banner-warn", "save-banner-local", "hidden");
     if (!msg) {
       persistHintEl.classList.add("hidden");
       persistHintEl.textContent = "";
       return;
     }
     persistHintEl.textContent = msg;
-    persistHintEl.classList.add(variant === "warn" ? "save-banner-warn" : "save-banner-ok");
+    if (variant === "warn") persistHintEl.classList.add("save-banner-warn");
+    else if (variant === "local") persistHintEl.classList.add("save-banner-local");
+    else persistHintEl.classList.add("save-banner-ok");
+  }
+
+  function contractPersistHintVariant(pr) {
+    if (!pr || !pr.hint) return null;
+    if (pr.hintIsLocal) return "local";
+    if (pr.fallbackLocal) return "warn";
+    return "ok";
   }
 
   function renderSourceHint(meta) {
@@ -998,7 +1007,7 @@
                 sourceMeta: sourceMeta,
               });
               if (prC && prC.hint) {
-                setContractPersistHint(prC.hint, prC.fallbackLocal ? "warn" : "ok");
+                setContractPersistHint(prC.hint, contractPersistHintVariant(prC));
               } else {
                 setContractPersistHint("", null);
               }

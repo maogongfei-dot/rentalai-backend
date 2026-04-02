@@ -3,10 +3,13 @@
  * Phase 5 Round4：RentalAIAnalysisHistorySource.loadAnalysisHistory；data-history-source-mode / 来源文案见 history_access_context。
  * 双模式收尾：未改列表行为，仅与 persist/source/API 对齐；能力边界见 rental_app/README.md「Phase 5 第四轮」。
  * Phase 5 Round5 Step4：cloudAuthStatus 提示（#history-cloud-load-hint / #history-server-notice），token 仅在 server_history_api 注入。
+ * Phase 6 Round4：刷新按钮 + 保存后 sessionStorage 触发 GET cache-bust；pageshow(bfcache) 重载。
  */
 (function () {
   var S = window.RentalAIAnalysisHistoryStore;
   if (!S || typeof S.listByType !== "function") return;
+
+  var _refreshClickBound = false;
 
   function escapeHtml(s) {
     var d = document.createElement("div");
@@ -458,6 +461,23 @@
       _defaultAnalysisLeadHtml = leadEl.innerHTML;
     }
 
+    var toolbarEl = document.getElementById("analysis-history-toolbar");
+    var refreshBtn = document.getElementById("analysis-history-refresh-btn");
+    if (!_refreshClickBound && refreshBtn) {
+      _refreshClickBound = true;
+      refreshBtn.addEventListener("click", function () {
+        try {
+          if (
+            window.RentalAIAnalysisHistoryPersist &&
+            typeof window.RentalAIAnalysisHistoryPersist.markCloudHistoryNeedsRefresh === "function"
+          ) {
+            window.RentalAIAnalysisHistoryPersist.markCloudHistoryNeedsRefresh();
+          }
+        } catch (eR) {}
+        run();
+      });
+    }
+
     var propEl = document.getElementById("unified-history-property-list");
     var contractEl = document.getElementById("unified-history-contract-list");
     var emptyProp =
@@ -479,6 +499,10 @@
         ? window.RentalAIAnalysisHistorySource.resolveHistoryMode()
         : null;
     var isRemote = strat && strat.mode === "remote_user";
+
+    if (toolbarEl) {
+      toolbarEl.classList.toggle("hidden", !isRemote);
+    }
 
     if (isRemote && propEl && contractEl) {
       renderLoading(propEl);
@@ -535,9 +559,15 @@
             } else {
               setAnalysisLeadCloud();
               setServerNotice("");
-              setCloudLoadHint(
-                "Signed-in history loaded from account · 已从账户加载云端历史"
-              );
+              if (bundle.cacheBustUsed) {
+                setCloudLoadHint(
+                  "Latest cloud history loaded · 已拉取最新云端分析记录"
+                );
+              } else {
+                setCloudLoadHint(
+                  "Signed-in history loaded from account · 已从账户加载云端历史"
+                );
+              }
             }
           }
           var label =
@@ -579,4 +609,8 @@
   } else {
     run();
   }
+
+  window.addEventListener("pageshow", function (ev) {
+    if (ev.persisted) run();
+  });
 })();

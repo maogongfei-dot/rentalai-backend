@@ -28,6 +28,12 @@
         <p id="analysis-history-lead" class="hint muted analysis-history-lead">
           <strong>访客</strong>：仅本机保存的最近分析摘要（不上传账户）。<strong>登录</strong>后本页<strong>优先</strong>显示与账号同步的记录。全量手动快照仍从<a href="/history">保存列表</a>进入。
         </p>
+        <p id="analysis-history-toolbar" class="analysis-history-toolbar hint muted small-print hidden">
+          <button type="button" id="analysis-history-refresh-btn" class="btn-history-primary">
+            刷新云端列表
+          </button>
+          <span lang="en">Refresh cloud history</span>
+        </p>
       </header>
 
       <div id="history-access-banner" class="history-access-banner"></div>
@@ -74,6 +80,7 @@
     </main>
     <script src="/assets/api_config.js"></script>
     <script src="/assets/analysis_history_store.js"></script>
+    <script src="/assets/analysis_history_persist.js"></script>
     <script src="/assets/history_access_context.js"></script>
     <script src="/assets/server_history_api.js"></script>
     <script src="/assets/analysis_history_source.js"></script>

@@ -5,8 +5,10 @@
  * - alsoWriteLocalBackup：已登录时仍写本地（可选兜底）
  * Phase 6 Round1：服务端 JSON 写入需 Bearer；**mergeAuthHeadersForFetch** 给房源/合同 POST。
  * Phase 6 Round2：分析成功后 **persistAnalysisResult** 根据 **`serverHistoryWrite`/`history_write`** 决定：云端成功则跳过本地重复写入；失败则回退本机摘要。
+ * Phase 6 Round4：**markCloudHistoryNeedsRefresh** / **consumeCloudHistoryRefreshFlag** 供历史页拉取最新 GET。
  */
 (function (global) {
+  var SESSION_CLOUD_REFRESH_KEY = "rentalai_cloud_history_need_refresh";
   function loadU() {
     try {
       var S = global.RentalAIUserStore;
@@ -54,9 +56,30 @@
     return headers;
   }
 
+  /** 云端写入成功后调用，历史页 GET 将带 cache-bust 拉最新。 */
+  function markCloudHistoryNeedsRefresh() {
+    try {
+      sessionStorage.setItem(SESSION_CLOUD_REFRESH_KEY, String(Date.now()));
+    } catch (e) {}
+  }
+
+  /** 供 analysis_history_source：若已标记则清除并返回 true（GET 加 `_t`）。 */
+  function consumeCloudHistoryRefreshFlag() {
+    try {
+      if (sessionStorage.getItem(SESSION_CLOUD_REFRESH_KEY)) {
+        sessionStorage.removeItem(SESSION_CLOUD_REFRESH_KEY);
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   var HINT_CLOUD_OK =
-    "已同步至账户云端历史（本页未重复写入本地「最近分析」摘要）。";
-  var HINT_FALLBACK = "云端历史未保存，已写入本机「最近分析」摘要。";
+    "Saved to your account history · 已保存到账户云端历史（分析历史页可查看）。";
+  var HINT_FALLBACK =
+    "Cloud history not saved · 云端未写入；已保存到本机「最近分析」摘要。";
+  var HINT_LOCAL_GUEST =
+    "Saved locally only · 已保存到本机「最近分析」（访客未登录，未上传账户）。";
 
   /**
    * 统一保存入口：guest → 仅本地；已登录 → 若 **`serverHistoryWrite.success`** 为 true 则跳过本地（避免与云端重复）；为 false 则回退本地。
@@ -108,15 +131,28 @@
         if (!Store) return { mode: "local_guest", localWritten: false, reason: "no_store" };
         if (kind === "contract") {
           if (!pushLocalContract()) return { mode: "local_guest", localWritten: false, reason: "bad_args" };
-          return { mode: "local_guest", localWritten: true, remote: false };
+          return {
+            mode: "local_guest",
+            localWritten: true,
+            remote: false,
+            hint: HINT_LOCAL_GUEST,
+            hintIsLocal: true,
+          };
         }
         if (pushLocalProperty()) {
-          return { mode: "local_guest", localWritten: true, remote: false };
+          return {
+            mode: "local_guest",
+            localWritten: true,
+            remote: false,
+            hint: HINT_LOCAL_GUEST,
+            hintIsLocal: true,
+          };
         }
         return { mode: "local_guest", localWritten: false, reason: "bad_args" };
       }
 
       if (hw && hw.success === true) {
+        markCloudHistoryNeedsRefresh();
         return {
           mode: "remote_user",
           localWritten: false,
@@ -169,5 +205,8 @@
     isGuestForHistory: isGuestForHistory,
     persistAnalysisResult: persistAnalysisResult,
     saveAnalysisHistory: saveAnalysisHistory,
+    SESSION_CLOUD_REFRESH_KEY: SESSION_CLOUD_REFRESH_KEY,
+    markCloudHistoryNeedsRefresh: markCloudHistoryNeedsRefresh,
+    consumeCloudHistoryRefreshFlag: consumeCloudHistoryRefreshFlag,
   };
 })(window);

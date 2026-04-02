@@ -148,6 +148,7 @@
         propertyRecords: listLocalByType("property"),
         contractRecords: listLocalByType("contract"),
         usedFallback: false,
+        cacheBustUsed: false,
       });
     }
 
@@ -163,6 +164,7 @@
         propertyRecords: listLocalByType("property"),
         contractRecords: listLocalByType("contract"),
         usedFallback: true,
+        cacheBustUsed: false,
       });
     }
 
@@ -178,11 +180,20 @@
         propertyRecords: listLocalByType("property"),
         contractRecords: listLocalByType("contract"),
         usedFallback: true,
+        cacheBustUsed: false,
       });
     }
 
+    var bust = false;
+    try {
+      var P = global.RentalAIAnalysisHistoryPersist;
+      if (P && typeof P.consumeCloudHistoryRefreshFlag === "function") {
+        bust = P.consumeCloudHistoryRefreshFlag();
+      }
+    } catch (eBust) {}
+
     return api
-      .fetchUserHistory(uid, {})
+      .fetchUserHistory(uid, { cacheBust: bust })
       .then(function (body) {
         if (!body || body.success === false) {
           var authErr = !!(body && body._authError);
@@ -198,6 +209,7 @@
             propertyRecords: listLocalByType("property"),
             contractRecords: listLocalByType("contract"),
             usedFallback: true,
+            cacheBustUsed: bust,
           };
         }
         var split = splitCloudRecords(body.records || []);
@@ -210,6 +222,7 @@
           propertyRecords: split.propertyRecords,
           contractRecords: split.contractRecords,
           usedFallback: false,
+          cacheBustUsed: bust,
         };
       })
       .catch(function () {
@@ -222,6 +235,7 @@
           propertyRecords: listLocalByType("property"),
           contractRecords: listLocalByType("contract"),
           usedFallback: true,
+          cacheBustUsed: bust,
         };
       });
   }

@@ -148,6 +148,17 @@
       })
       .then(function (data) {
         try {
+          if (
+            data &&
+            data.history_write &&
+            data.history_write.success &&
+            window.RentalAIAnalysisHistoryPersist &&
+            typeof window.RentalAIAnalysisHistoryPersist.markCloudHistoryNeedsRefresh === "function"
+          ) {
+            window.RentalAIAnalysisHistoryPersist.markCloudHistoryNeedsRefresh();
+          }
+        } catch (eMark) {}
+        try {
           sessionStorage.setItem("ai_housing_query_last", JSON.stringify(data));
         } catch (e) {
           hideLoading();

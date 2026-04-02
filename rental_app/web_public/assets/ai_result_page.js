@@ -26,18 +26,27 @@
       .replace(/>/g, "&gt;");
   }
 
-  /** Phase 6：persistAnalysisResult 返回的轻量提示（云端已同步 / 回退本机）。 */
+  /** Phase 6：persistAnalysisResult 返回的轻量提示（云端已同步 / 回退本机 / 访客本机）。 */
   function setPersistHintBar(elId, msg, variant) {
     var el = document.getElementById(elId);
     if (!el) return;
-    el.classList.remove("save-banner-ok", "save-banner-warn", "hidden");
+    el.classList.remove("save-banner-ok", "save-banner-warn", "save-banner-local", "hidden");
     if (!msg) {
       el.classList.add("hidden");
       el.textContent = "";
       return;
     }
     el.textContent = msg;
-    el.classList.add(variant === "warn" ? "save-banner-warn" : "save-banner-ok");
+    if (variant === "warn") el.classList.add("save-banner-warn");
+    else if (variant === "local") el.classList.add("save-banner-local");
+    else el.classList.add("save-banner-ok");
+  }
+
+  function persistHintVariant(pr) {
+    if (!pr || !pr.hint) return null;
+    if (pr.hintIsLocal) return "local";
+    if (pr.fallbackLocal) return "warn";
+    return "ok";
   }
 
   var DEAL_CARD_PLACEHOLDER_SVG =
@@ -469,11 +478,7 @@
           data: data,
         });
         if (prH && prH.hint) {
-          setPersistHintBar(
-            "housing-history-hint",
-            prH.hint,
-            prH.fallbackLocal ? "warn" : "ok"
-          );
+          setPersistHintBar("housing-history-hint", prH.hint, persistHintVariant(prH));
         } else {
           setPersistHintBar("housing-history-hint", null, null);
         }
@@ -565,11 +570,7 @@
             data: data,
           });
           if (prL0 && prL0.hint) {
-            setPersistHintBar(
-              "legacy-history-hint",
-              prL0.hint,
-              prL0.fallbackLocal ? "warn" : "ok"
-            );
+            setPersistHintBar("legacy-history-hint", prL0.hint, persistHintVariant(prL0));
           } else {
             setPersistHintBar("legacy-history-hint", null, null);
           }
@@ -674,11 +675,7 @@
           data: data,
         });
         if (prL && prL.hint) {
-          setPersistHintBar(
-            "legacy-history-hint",
-            prL.hint,
-            prL.fallbackLocal ? "warn" : "ok"
-          );
+          setPersistHintBar("legacy-history-hint", prL.hint, persistHintVariant(prL));
         } else {
           setPersistHintBar("legacy-history-hint", null, null);
         }

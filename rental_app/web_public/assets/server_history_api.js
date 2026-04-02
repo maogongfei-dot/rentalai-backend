@@ -36,6 +36,7 @@
     var uid = (userId || "").trim();
     if (uid) q.set("userId", uid);
     if (opts.type) q.set("type", String(opts.type));
+    if (opts.cacheBust) q.set("_t", String(Date.now()));
     var qs = q.toString();
     var url = apiUrl("/api/analysis/history/records" + (qs ? "?" + qs : ""));
     return global
