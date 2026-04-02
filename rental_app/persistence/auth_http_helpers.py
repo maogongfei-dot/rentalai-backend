@@ -2,7 +2,7 @@
 Phase 5 Round5 Step3/5 — HTTP auth helpers for protected routes (minimal; not global middleware).
 
 * ``Authorization: Bearer <token>`` → ``resolve_user_id`` via ``auth_session_store`` (session placeholder, not JWT).
-* Used by: ``GET /api/analysis/history/records`` (read); ``resolve_history_write_user_id`` (Phase 6) for JSON history **append** on analysis routes.
+* Used by: ``GET /api/analysis/history/records`` (read); ``resolve_history_write_user_id`` (Phase 5 Round 6) for JSON history **append** on analysis routes.
 * Not done here: JWT, expiry, refresh, full-route middleware — see ``persistence/README.md``「最小受保护 API」.
 """
 

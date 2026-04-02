@@ -6,6 +6,8 @@ Phase 5 Round3 Step3 — Build minimal history rows and append (best-effort; nev
 * Types: ``property`` | ``contract`` (align with frontend unified history vocabulary).
 
 Phase 5 Round6 Step3 — 统一入口 :func:`persist_analysis_history`；房源 / 合同分析共用同一套落库形状。
+
+Phase 5 Round6 Step5 — 与 ``resolve_history_write_user_id`` + 各分析路由的 **try_persist_*** 组成「受保护写入」收尾；未做 JWT/过期/云端删除（见 ``persistence/README.md``）。
 """
 
 from __future__ import annotations

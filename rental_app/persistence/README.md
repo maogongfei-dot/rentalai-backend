@@ -19,19 +19,18 @@
 ## Analysis history (server-side JSON)
 
 - **File**: `data/storage/persistence_analysis_history.json` (override: `RENTALAI_PERSISTENCE_ANALYSIS_HISTORY_JSON`).
-- **写入**：`analysis_history_writer` 在成功响应后追加；房源 **`POST /api/ai/query`**；合同 **`/api/contract/analysis/text`**、**`/file-path`**、**`/upload`**。请求体可选 **`userId` / `user_id`**，缺省桶 **`guest`**。**Phase 5 第六轮 Step1**：非 **`guest`** 的写入须 **`Authorization: Bearer`**，且 body 中 **`userId` 须与 token 解析用户一致**（`auth_http_helpers.resolve_history_write_user_id`）；否则不追加但分析结果仍返回，响应含 **`history_write`**。存储行内字段名为 **`userId`**。
-- **读取**：**`GET /api/analysis/history/records`** → `{ success, message, records }`。**Phase 5 第五轮 Step3**：须 **`Authorization: Bearer <token>`**；桶 id 以 token 解析的 user 为准（可选 `userId` query 须与之一致）。见 **`auth_http_helpers.resolve_user_id_from_auth_header`**、**`server_history_api.js`**。
+- **写入**：`analysis_history_writer.persist_analysis_history`（房源/合同共用形状）在分析成功响应后追加；路由：房源 **`POST /api/ai/query`**；合同 **`/api/contract/analysis/text`**、**`/file-path`**、**`/upload`**。**`auth_http_helpers.resolve_history_write_user_id`**：**有 Bearer 时写入分桶仅以 token 解析的 `user_id` 为准**；body 可选 **`userId` / `user_id`** 仅作一致性校验（若声称非 guest 则须与 token 用户相同）。**无 Bearer** 时仅允许 **`guest`** 桶。未通过校验则不追加 JSON，但分析主响应仍返回，并带 **`history_write: { success, message }`**。存储行顶层字段名为 **`userId`**。
+- **读取**：**`GET /api/analysis/history/records`** → `{ success, message, records }`；须 **`Authorization: Bearer`**；桶以 token 解析用户为准（可选 `userId` query 须一致）。见 **`server_history_api.js`**、前端 **`analysis_history_source.loadAnalysisHistory`**。
 
-## 最小受保护 API（Phase 5 第五轮 + Phase 5 第六轮 Step1 — **阶段完成**）
+## 最小受保护 API（Phase 5 第五轮 + Phase 5 第六轮 — **history 读/写依赖 token/session placeholder**）
 
-- **会话形态**：进程内 **session/token placeholder**（`auth_session_store`：`secrets.token_hex` → userId），**非** JWT；无过期、无 refresh；**logout** 使 token 失效。
-- **已保护接口范围**：**读** — **`GET /api/analysis/history/records`** 须 Bearer。**写（Step1）** — 房源 **`POST /api/ai/query`**、合同 **`POST /api/contract/analysis/text`**、**`/file-path`**、**`/upload`** 在写入服务端 JSON 历史时走 **`resolve_history_write_user_id`**（guest 免 Bearer；非 guest 须 Bearer 且与 body `userId` 一致）。**`/auth/me`** 等其它路由未加全站中间件。
-- **前端**：`rentalai_bearer` + `rentalai_auth_type`；`server_history_api.js` 统一注入 Bearer；访客仍走 **localStorage guest**，不调用受保护读接口。
-- **刻意未做**：**JWT**、**过期/刷新**、**全接口强制鉴权**、**history 写入与 token 绑定**、**bcrypt/Argon2**、**数据库**由 JSON 升级；见主 **`README.md`**「Phase 5 第五轮 Step5」。
+- **会话形态**：进程内 **session/token placeholder**（`auth_session_store`：`secrets.token_hex` → userId），**非** JWT；无过期、无 refresh；**logout** 撤销映射。
+- **已保护范围**：**读** — **`GET /api/analysis/history/records`** 须 Bearer。**写** — 上述分析路由在追加服务端 JSON 历史时走 **`resolve_history_write_user_id`**（guest 免 Bearer；已登录须 Bearer）。**`/auth/me`** 等未加全站中间件。
+- **前端**：`rentalai_bearer`；**`mergeAuthHeadersForFetch`**（`analysis_history_persist.js`）为分析 POST 带 **`Authorization`**；**`server_history_api.js`** 为历史 GET 带 Bearer；**访客**仍仅用 **localStorage** 统一摘要，不调用受保护读接口。
+- **Phase 5 第六轮（Step1–Step5）产品结论**：**已登录用户**在分析成功且校验通过时 **自动写入云端 JSON 历史**；**访客**仍为 **仅本地** 历史；结果页有 **`history_write` 与轻提示**；历史页支持刷新与 cache-bust。**本轮不升级为完整安全体系**。
 
 ## 本轮未做（后续增强）
 
-- 密码：**bcrypt/Argon2**、盐与策略；仅当前 **SHA-256 演示级**哈希。
-- 会话：**HttpOnly Cookie**、刷新令牌；当前 Bearer 仍为**进程内**映射。
-- 安全扩展：分析类 **POST** 与 body **`userId`** 对齐 Bearer；全路由统一鉴权中间件。
-- 产品：**guest→user 迁移**、分页/搜索、冲突合并、多设备同步；**数据库**由 JSON 迁移至业务库。
+- **认证**：**JWT**、**过期/refresh**、**HttpOnly Cookie**；生产级密码 **bcrypt/Argon2**（当前演示级 SHA-256）。
+- **服务端**：全路由统一鉴权中间件；**数据库**由 JSON 升级；多实例下 session 外置。
+- **分析历史产品**：**云端删除/清空/编辑**、分页与搜索、**guest→user 迁移**、**多设备冲突合并**；前端 token **失效统一 UX**（除现有 `#history-server-notice` 外）。

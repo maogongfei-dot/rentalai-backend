@@ -1,11 +1,9 @@
 /**
  * Phase 5 Round4 — 统一历史保存（与 analysis_history_source 读路径对称）
- * - guest：写入 RentalAIAnalysisHistoryStore（localStorage 分桶）
- * - 已登录：依赖请求体 userId 由后端追加 persistence JSON；本函数默认不写本地，避免与 /analysis-history 云端列表重复
+ * - guest：仅写入 RentalAIAnalysisHistoryStore（localStorage 分桶），不上传账户
+ * - 已登录：分析 POST 带 **mergeAuthHeadersForFetch**；后端以 **Bearer** 解析用户并追加 persistence JSON；本函数在 **`history_write.success`** 时跳过本地重复写入，避免与 /analysis-history 云端列表重复
  * - alsoWriteLocalBackup：已登录时仍写本地（可选兜底）
- * Phase 6 Round1：服务端 JSON 写入需 Bearer；**mergeAuthHeadersForFetch** 给房源/合同 POST。
- * Phase 6 Round2：分析成功后 **persistAnalysisResult** 根据 **`serverHistoryWrite`/`history_write`** 决定：云端成功则跳过本地重复写入；失败则回退本机摘要。
- * Phase 6 Round4：**markCloudHistoryNeedsRefresh** / **consumeCloudHistoryRefreshFlag** 供历史页拉取最新 GET。
+ * Phase 5 第六轮：服务端写入须 Bearer（guest 除外）；**persistAnalysisResult** 读 **`history_write`**；成功提示与 **markCloudHistoryNeedsRefresh** 供历史页 GET cache-bust
  */
 (function (global) {
   var SESSION_CLOUD_REFRESH_KEY = "rentalai_cloud_history_need_refresh";
