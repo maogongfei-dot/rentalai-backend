@@ -1850,6 +1850,17 @@ body.assistant-page-body {
   flex-shrink: 0;
   white-space: nowrap;
 }
+.unified-history-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem 0.65rem;
+  margin-bottom: 0.45rem;
+}
+.unified-history-delete-en {
+  font-size: 0.82rem;
+}
 .unified-history-fields {
   display: flex;
   flex-direction: column;

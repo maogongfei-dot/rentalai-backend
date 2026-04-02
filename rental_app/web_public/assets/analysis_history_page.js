@@ -4,17 +4,26 @@
  * 双模式收尾：未改列表行为，仅与 persist/source/API 对齐；能力边界见 rental_app/README.md「Phase 5 第四轮」。
  * Phase 5 Round5 Step4：cloudAuthStatus 提示（#history-cloud-load-hint / #history-server-notice），token 仅在 server_history_api 注入。
  * Phase 6 Round4：刷新按钮 + 保存后 sessionStorage 触发 GET cache-bust；pageshow(bfcache) 重载。
+ * Phase 7 Round3：每条「删除」— 已登录云端走 DELETE API；guest/本机回退走 removeEntryById。
  */
 (function () {
   var S = window.RentalAIAnalysisHistoryStore;
   if (!S || typeof S.listByType !== "function") return;
 
   var _refreshClickBound = false;
+  var _deleteDelegateBound = false;
 
   function escapeHtml(s) {
     var d = document.createElement("div");
     d.textContent = s == null ? "" : String(s);
     return d.innerHTML;
+  }
+
+  function escapeAttr(s) {
+    return String(s == null ? "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
   }
 
   function fmtTime(iso) {
@@ -317,13 +326,31 @@
     return '<p class="hint muted">未知记录类型。</p>';
   }
 
-  function renderItem(it, idx) {
+  function renderItem(it, idx, deleteContext) {
     var title = it.title || "—";
     var iso = it.created_at || "";
     var displayTime = fmtTime(iso);
     var snippet = it.summary_snippet != null && String(it.summary_snippet).trim() ? "" + it.summary_snippet : "—";
     var preview = it.result_preview != null && String(it.result_preview).trim() ? "" + it.result_preview : "—";
     var detailId = "uh-detail-" + String(it.id || idx).replace(/[^a-zA-Z0-9_-]/g, "_");
+    var dc = deleteContext || {};
+    var dm = dc.mode;
+    var showDel = dm === "api" || dm === "local";
+    var delRow = "";
+    if (showDel && String(it.id || "").trim()) {
+      delRow =
+        '<div class="unified-history-item-actions">' +
+        '<button type="button" class="btn-history-danger unified-history-delete-btn" ' +
+        'data-delete-mode="' +
+        escapeAttr(dm) +
+        '" data-entry-id="' +
+        escapeAttr(String(it.id)) +
+        '">' +
+        "删除" +
+        "</button>" +
+        '<span class="hint muted unified-history-delete-en" lang="en">Delete</span>' +
+        "</div>";
+    }
 
     return (
       '<li class="unified-history-item history-record-card" role="listitem">' +
@@ -339,6 +366,7 @@
           "</time>"
         : '<span class="history-record-time">' + escapeHtml(displayTime) + "</span>") +
       "</div>" +
+      delRow +
       '<div class="unified-history-fields">' +
       '<div class="unified-history-field">' +
       '<span class="history-record-label">摘要</span>' +
@@ -365,7 +393,7 @@
     );
   }
 
-  function renderList(container, items, emptyHint, countSourceLabel) {
+  function renderList(container, items, emptyHint, countSourceLabel, deleteContext) {
     if (!container) return;
     container.setAttribute("aria-busy", "false");
     if (!items || !items.length) {
@@ -384,7 +412,7 @@
       '<ul class="unified-history-list" role="list">';
     var i;
     for (i = 0; i < items.length; i++) {
-      html += renderItem(items[i], i);
+      html += renderItem(items[i], i, deleteContext);
     }
     html += "</ul>";
     container.innerHTML = html;
@@ -489,8 +517,9 @@
       resetAnalysisLead();
       setServerNotice("");
       setCloudLoadHint("");
-      renderList(propEl, S.listByType("property"), emptyProp, "本地自动保存");
-      renderList(contractEl, S.listByType("contract"), emptyContract, "本地自动保存");
+      var localDel = { mode: "local" };
+      renderList(propEl, S.listByType("property"), emptyProp, "本地自动保存", localDel);
+      renderList(contractEl, S.listByType("contract"), emptyContract, "本地自动保存", localDel);
     }
 
     var strat =
@@ -576,8 +605,12 @@
                 ? "本机回退（云端不可用）"
                 : "服务端 JSON 历史"
               : "本地 guest 自动保存";
-          renderList(propEl, bundle.propertyRecords, emptyProp, label);
-          renderList(contractEl, bundle.contractRecords, emptyContract, label);
+          var delCtx = {
+            mode:
+              bundle.mode === "remote_user" && !bundle.usedFallback ? "api" : "local",
+          };
+          renderList(propEl, bundle.propertyRecords, emptyProp, label, delCtx);
+          renderList(contractEl, bundle.contractRecords, emptyContract, label, delCtx);
         })
         .catch(function () {
           setCloudLoadHint("");
@@ -603,6 +636,71 @@
       }
     } catch (e) {}
   }
+
+  function bindDeleteDelegation() {
+    if (_deleteDelegateBound) return;
+    _deleteDelegateBound = true;
+    document.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var btn = t.closest(".unified-history-delete-btn");
+      if (!btn) return;
+      var eid = btn.getAttribute("data-entry-id");
+      var mode = btn.getAttribute("data-delete-mode");
+      if (!eid || !mode) return;
+      ev.preventDefault();
+      if (mode === "local") {
+        if (typeof S.removeEntryById !== "function") {
+          setServerNotice("删除失败：本机存储不可用。");
+          return;
+        }
+        if (S.removeEntryById(eid)) {
+          setServerNotice("");
+          run();
+        } else {
+          setServerNotice("删除失败：未找到该条本机记录。");
+        }
+        return;
+      }
+      if (mode === "api") {
+        var api = window.RentalAIServerHistoryApi;
+        if (!api || typeof api.deleteHistoryRecord !== "function") {
+          setServerNotice("删除失败：云端接口不可用。");
+          return;
+        }
+        btn.disabled = true;
+        api
+          .deleteHistoryRecord(eid)
+          .then(function (j) {
+            btn.disabled = false;
+            if (j && j.success === true) {
+              setServerNotice("");
+              try {
+                if (
+                  window.RentalAIAnalysisHistoryPersist &&
+                  typeof window.RentalAIAnalysisHistoryPersist.markCloudHistoryNeedsRefresh === "function"
+                ) {
+                  window.RentalAIAnalysisHistoryPersist.markCloudHistoryNeedsRefresh();
+                }
+              } catch (eM) {}
+              run();
+              return;
+            }
+            var msg = (j && j.message) || "unknown";
+            if (j && j._httpStatus === 401) {
+              msg = "请先登录（会话无效）。";
+            }
+            setServerNotice("删除失败：" + String(msg));
+          })
+          .catch(function () {
+            btn.disabled = false;
+            setServerNotice("删除失败：网络错误");
+          });
+      }
+    });
+  }
+
+  bindDeleteDelegation();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", run);

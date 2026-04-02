@@ -42,7 +42,11 @@ from persistence.analysis_history_writer import (
     try_persist_contract_analysis_snapshot,
     try_persist_property_analysis_snapshot,
 )
-from persistence.history_read_service import list_public_records
+from persistence.history_read_service import (
+    clear_public_records_for_user,
+    delete_public_record_for_user,
+    list_public_records,
+)
 from persistence.auth_http_helpers import (
     resolve_history_write_user_id,
     resolve_user_id_from_auth_header,
@@ -420,6 +424,88 @@ def api_analysis_history_records(
         "success": True,
         "message": "ok",
         "records": records,
+    }
+
+
+@app.delete("/api/analysis/history/records/{record_id}")
+def api_analysis_history_delete_record(request: Request, record_id: str):
+    """
+    Phase 5 Round7 Step1 — Delete one server-side JSON history row for the **authenticated user only**.
+
+    **Auth:** ``Authorization: Bearer <token>`` required. ``record_id`` must match a row whose
+    ``userId`` equals the token user; otherwise **404** (missing) or **403** (other user's row).
+    """
+    uid_auth = resolve_user_id_from_auth_header(request)
+    if not uid_auth:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "success": False,
+                "message": "Authentication required. Send Authorization: Bearer <token> from login.",
+            },
+        )
+    rid = str(record_id or "").strip()
+    if not rid:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "record_id is required."},
+        )
+    try:
+        outcome = delete_public_record_for_user(rid, uid_auth)
+    except Exception as exc:
+        logger.exception("analysis history delete failed")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": str(exc)},
+        )
+    if outcome == "not_found":
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "message": "Record not found.",
+            },
+        )
+    if outcome == "forbidden":
+        return JSONResponse(
+            status_code=403,
+            content={
+                "success": False,
+                "message": "You cannot delete this record.",
+            },
+        )
+    return {"success": True, "message": "Deleted."}
+
+
+@app.delete("/api/analysis/history/clear")
+def api_analysis_history_clear(request: Request):
+    """
+    Phase 5 Round7 Step2 — Remove **all** server-side JSON analysis history rows for the
+    authenticated user only. Other users' rows are unchanged.
+
+    **Auth:** ``Authorization: Bearer <token>`` required.
+    """
+    uid_auth = resolve_user_id_from_auth_header(request)
+    if not uid_auth:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "success": False,
+                "message": "Authentication required. Send Authorization: Bearer <token> from login.",
+            },
+        )
+    try:
+        n = clear_public_records_for_user(uid_auth)
+    except Exception as exc:
+        logger.exception("analysis history clear failed")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": str(exc)},
+        )
+    return {
+        "success": True,
+        "message": "ok",
+        "deleted_count": n,
     }
 
 

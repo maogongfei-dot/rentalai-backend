@@ -90,10 +90,57 @@
     return fetchUserHistory(userId, opts);
   }
 
+  /**
+   * Phase 5 Round7 Step3 — DELETE /api/analysis/history/records/{record_id}（须 Bearer）。
+   * @returns {Promise<{ success?: boolean, message?: string, _httpStatus?: number }>}
+   */
+  function deleteHistoryRecord(recordId) {
+    var rid = String(recordId || "").trim();
+    if (!rid) {
+      return Promise.resolve({ success: false, message: "record_id is required", _httpStatus: 0 });
+    }
+    var tok = getBearerTokenForHistory();
+    var headers = {};
+    if (tok) headers["Authorization"] = "Bearer " + tok;
+    var url =
+      apiUrl("/api/analysis/history/records/" + encodeURIComponent(rid));
+    return global
+      .fetch(url, { method: "DELETE", headers: headers })
+      .then(function (r) {
+        return r
+          .json()
+          .then(function (j) {
+            var obj =
+              j && typeof j === "object"
+                ? j
+                : { success: false, message: "invalid_json" };
+            obj._httpStatus = r.status;
+            if (!r.ok) {
+              obj.success = false;
+              if (obj.message == null || obj.message === "") {
+                obj.message = "http_" + r.status;
+              }
+            }
+            return obj;
+          })
+          .catch(function () {
+            return {
+              success: false,
+              message: "bad_json",
+              _httpStatus: r.status,
+            };
+          });
+      })
+      .catch(function () {
+        return { success: false, message: "network_error", _httpStatus: 0 };
+      });
+  }
+
   global.RentalAIServerHistoryApi = {
     fetchUserHistory: fetchUserHistory,
     getHistoryRecords: getHistoryRecords,
     fetchServerHistoryRecords: fetchServerHistoryRecords,
     getBearerTokenForHistory: getBearerTokenForHistory,
+    deleteHistoryRecord: deleteHistoryRecord,
   };
 })(window);

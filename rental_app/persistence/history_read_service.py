@@ -38,3 +38,18 @@ def list_public_records(
         record_type=record_type,
     )
     return [serialize_record_for_api(r) for r in rows]
+
+
+def delete_public_record_for_user(record_id: str, user_id: str) -> str:
+    """
+    Delete a server-side history row if it belongs to ``user_id``.
+
+    Returns ``deleted`` | ``not_found`` | ``forbidden`` (same semantics as
+    :meth:`HistoryRepository.delete_record_for_user`).
+    """
+    return _REPO.delete_record_for_user(record_id, user_id)
+
+
+def clear_public_records_for_user(user_id: str) -> int:
+    """Remove all server-side history rows for ``user_id``. Returns number removed."""
+    return _REPO.delete_all_records_for_user(user_id)

@@ -58,3 +58,59 @@ class HistoryRepository:
             out.append(dict(row))
         out.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
         return out[: max(1, min(int(limit), 500))]
+
+    def delete_record_for_user(self, record_id: str, user_id: str) -> str:
+        """
+        Remove one record by ``record_id`` only if ``userId`` on the row matches ``user_id``.
+
+        Returns ``deleted`` | ``not_found`` | ``forbidden``.
+        """
+        rid = str(record_id or "").strip()
+        uid = str(user_id or "").strip()
+        if not rid or not uid:
+            return "not_found"
+        with _LOCK:
+            doc = self.load_document()
+            records = list(doc.get("records") or [])
+            idx: int | None = None
+            for i, r in enumerate(records):
+                if not isinstance(r, dict):
+                    continue
+                if str(r.get("record_id") or "").strip() == rid:
+                    idx = i
+                    break
+            if idx is None:
+                return "not_found"
+            row = records[idx]
+            if str(row.get("userId") or "").strip() != uid:
+                return "forbidden"
+            records.pop(idx)
+            doc["records"] = records
+            self.save_document(doc)
+        return "deleted"
+
+    def delete_all_records_for_user(self, user_id: str) -> int:
+        """
+        Remove every record whose ``userId`` matches ``user_id``; leave all other rows unchanged.
+
+        Returns the number of rows removed.
+        """
+        uid = str(user_id or "").strip()
+        if not uid:
+            return 0
+        removed = 0
+        with _LOCK:
+            doc = self.load_document()
+            records = list(doc.get("records") or [])
+            kept: list[Any] = []
+            for r in records:
+                if not isinstance(r, dict):
+                    kept.append(r)
+                    continue
+                if str(r.get("userId") or "").strip() == uid:
+                    removed += 1
+                else:
+                    kept.append(dict(r))
+            doc["records"] = kept
+            self.save_document(doc)
+        return removed

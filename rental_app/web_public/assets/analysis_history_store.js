@@ -341,6 +341,19 @@
     });
   }
 
+  /** 按条目标识从当前分桶移除一条（guest / 已登录本机列表）。 */
+  function removeEntryById(entryId) {
+    var id = entryId != null ? String(entryId).trim() : "";
+    if (!id) return false;
+    var list = loadRaw();
+    var next = list.filter(function (x) {
+      return !x || String(x.id) !== id;
+    });
+    if (next.length === list.length) return false;
+    saveRaw(next);
+    return true;
+  }
+
   function clearCurrentBucket() {
     try {
       localStorage.removeItem(getUnifiedStorageKey());
@@ -359,6 +372,7 @@
     listForUser: listForUser,
     listByType: listByType,
     loadRaw: loadRaw,
+    removeEntryById: removeEntryById,
     clearCurrentBucket: clearCurrentBucket,
   };
 })(window);
