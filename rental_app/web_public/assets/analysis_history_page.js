@@ -5,13 +5,19 @@
  * Phase 5 Round5 Step4：cloudAuthStatus 提示（#history-cloud-load-hint / #history-server-notice），token 仅在 server_history_api 注入。
  * Phase 6 Round4：刷新按钮 + 保存后 sessionStorage 触发 GET cache-bust；pageshow(bfcache) 重载。
  * Phase 7 Round3：每条「删除」— 已登录云端走 DELETE API；guest/本机回退走 removeEntryById。
+ * Phase 7 Round4：「清空全部」— guest 清本地桶；已登录调 DELETE /api/analysis/history/clear。
+ * Phase 7 Round5：类型筛选（全部 / 房源 / 合同）— 仅前端切换两个 section 显隐，不调后端。
  */
 (function () {
   var S = window.RentalAIAnalysisHistoryStore;
   if (!S || typeof S.listByType !== "function") return;
 
   var _refreshClickBound = false;
+  var _clearAllClickBound = false;
   var _deleteDelegateBound = false;
+  var _filterBound = false;
+  /** @type {'all'|'property'|'contract'} */
+  var _historyFilter = "all";
 
   function escapeHtml(s) {
     var d = document.createElement("div");
@@ -20,7 +26,7 @@
   }
 
   function escapeAttr(s) {
-    return String(s == null ? "")
+    return String(s == null ? "" : String(s))
       .replace(/&/g, "&amp;")
       .replace(/"/g, "&quot;")
       .replace(/</g, "&lt;");
@@ -461,6 +467,40 @@
     n.classList.remove("hidden");
   }
 
+  /** 本地筛选：控制两个 `data-unified-history-section` 卡片的显隐。 */
+  function applyHistoryFilter() {
+    var v = _historyFilter || "all";
+    var propSec = document.querySelector(
+      '.analysis-history-block[data-unified-history-section="property"]'
+    );
+    var conSec = document.querySelector(
+      '.analysis-history-block[data-unified-history-section="contract"]'
+    );
+    if (propSec) propSec.classList.toggle("hidden", v === "contract");
+    if (conSec) conSec.classList.toggle("hidden", v === "property");
+    var btns = document.querySelectorAll(".analysis-history-filter-btn");
+    var i;
+    for (i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      var f = b.getAttribute("data-filter");
+      if (f) b.classList.toggle("analysis-history-filter-btn--active", f === v);
+    }
+  }
+
+  function bindFilterOnce() {
+    if (_filterBound) return;
+    _filterBound = true;
+    document.addEventListener("click", function (ev) {
+      var btn = ev.target && ev.target.closest && ev.target.closest(".analysis-history-filter-btn");
+      if (!btn) return;
+      var f = btn.getAttribute("data-filter");
+      if (!f || f === _historyFilter) return;
+      ev.preventDefault();
+      _historyFilter = f;
+      applyHistoryFilter();
+    });
+  }
+
   /** 云端历史成功时的轻量双语提示（不含 token）；空则隐藏 */
   function setCloudLoadHint(text) {
     var el = document.getElementById("history-cloud-load-hint");
@@ -506,6 +546,67 @@
       });
     }
 
+    var clearAllBtn = document.getElementById("analysis-history-clear-all-btn");
+    if (!_clearAllClickBound && clearAllBtn) {
+      _clearAllClickBound = true;
+      clearAllBtn.addEventListener("click", function () {
+        if (!window.confirm("Are you sure?")) return;
+        var strat =
+          window.RentalAIAnalysisHistorySource &&
+          typeof window.RentalAIAnalysisHistorySource.resolveHistoryMode === "function"
+            ? window.RentalAIAnalysisHistorySource.resolveHistoryMode()
+            : null;
+        var mode = strat && strat.mode;
+        if (mode !== "remote_user") {
+          if (typeof S.clearCurrentBucket === "function") {
+            S.clearCurrentBucket();
+          }
+          setServerNotice("");
+          setCloudLoadHint("");
+          run();
+          return;
+        }
+        var api = window.RentalAIServerHistoryApi;
+        if (!api || typeof api.clearAllHistory !== "function") {
+          setServerNotice("清空失败：接口不可用。");
+          return;
+        }
+        clearAllBtn.disabled = true;
+        api
+          .clearAllHistory()
+          .then(function (j) {
+            clearAllBtn.disabled = false;
+            if (j && j.success === true) {
+              try {
+                if (typeof S.clearCurrentBucket === "function") {
+                  S.clearCurrentBucket();
+                }
+              } catch (eL) {}
+              try {
+                if (
+                  window.RentalAIAnalysisHistoryPersist &&
+                  typeof window.RentalAIAnalysisHistoryPersist.markCloudHistoryNeedsRefresh === "function"
+                ) {
+                  window.RentalAIAnalysisHistoryPersist.markCloudHistoryNeedsRefresh();
+                }
+              } catch (eM) {}
+              setServerNotice("");
+              run();
+              return;
+            }
+            var msg = (j && j.message) || "unknown";
+            if (j && j._httpStatus === 401) {
+              msg = "请先登录（会话无效）。";
+            }
+            setServerNotice("清空失败：" + String(msg));
+          })
+          .catch(function () {
+            clearAllBtn.disabled = false;
+            setServerNotice("清空失败：网络错误");
+          });
+      });
+    }
+
     var propEl = document.getElementById("unified-history-property-list");
     var contractEl = document.getElementById("unified-history-contract-list");
     var emptyProp =
@@ -520,6 +621,7 @@
       var localDel = { mode: "local" };
       renderList(propEl, S.listByType("property"), emptyProp, "本地自动保存", localDel);
       renderList(contractEl, S.listByType("contract"), emptyContract, "本地自动保存", localDel);
+      applyHistoryFilter();
     }
 
     var strat =
@@ -538,6 +640,7 @@
       renderLoading(contractEl);
       setServerNotice("");
       setCloudLoadHint("");
+      applyHistoryFilter();
     } else {
       resetAnalysisLead();
       setServerNotice("");
@@ -701,6 +804,7 @@
   }
 
   bindDeleteDelegation();
+  bindFilterOnce();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", run);

@@ -28,6 +28,34 @@
         <p id="analysis-history-lead" class="hint muted analysis-history-lead">
           <strong>访客</strong>：仅本机保存的最近分析摘要（不上传账户）。<strong>登录</strong>后本页<strong>优先</strong>显示与账号同步的记录。全量手动快照仍从<a href="/history">保存列表</a>进入。
         </p>
+        <p
+          id="analysis-history-filter-bar"
+          class="analysis-history-filter-bar hint muted small-print"
+          role="toolbar"
+          aria-label="按类型筛选"
+        >
+          <span class="analysis-history-filter-label">类型</span>
+          <button
+            type="button"
+            class="analysis-history-filter-btn analysis-history-filter-btn--active"
+            data-filter="all"
+          >
+            全部
+          </button>
+          <button type="button" class="analysis-history-filter-btn" data-filter="property">
+            房源
+          </button>
+          <button type="button" class="analysis-history-filter-btn" data-filter="contract">
+            合同
+          </button>
+          <span class="hint muted" lang="en">All / Property / Contract</span>
+        </p>
+        <p id="analysis-history-clear-toolbar" class="analysis-history-clear-toolbar hint muted small-print">
+          <button type="button" id="analysis-history-clear-all-btn" class="btn-history-danger">
+            清空全部历史
+          </button>
+          <span lang="en">Clear all</span>
+        </p>
         <p id="analysis-history-toolbar" class="analysis-history-toolbar hint muted small-print hidden">
           <button type="button" id="analysis-history-refresh-btn" class="btn-history-primary">
             刷新云端列表
