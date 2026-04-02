@@ -31,6 +31,7 @@
   var resultSection = document.getElementById("contract-state-result");
   var resultSourceEl = document.getElementById("contract-result-source");
   var resultBody = document.getElementById("contract-result-body");
+  var persistHintEl = document.getElementById("contract-history-persist-hint");
   var devBundle = document.getElementById("contract-dev-bundle");
   var devToggle = document.getElementById("contract-dev-toggle");
   var demoPathWrap = document.getElementById("contract-demo-path-wrap");
@@ -77,6 +78,18 @@
       );
     }
     return "";
+  }
+
+  function setContractPersistHint(msg, variant) {
+    if (!persistHintEl) return;
+    persistHintEl.classList.remove("save-banner-ok", "save-banner-warn", "hidden");
+    if (!msg) {
+      persistHintEl.classList.add("hidden");
+      persistHintEl.textContent = "";
+      return;
+    }
+    persistHintEl.textContent = msg;
+    persistHintEl.classList.add(variant === "warn" ? "save-banner-warn" : "save-banner-ok");
   }
 
   function renderSourceHint(meta) {
@@ -966,6 +979,7 @@
     function run(apiPromise, loadingMessage, sourceMeta) {
       setLoading(true, loadingMessage);
       setError("");
+      setContractPersistHint("", null);
       if (resultBody) resultBody.innerHTML = "";
       renderSourceHint(null);
       apiPromise
@@ -978,16 +992,22 @@
               window.RentalAIAnalysisHistoryPersist &&
               typeof window.RentalAIAnalysisHistoryPersist.persistAnalysisResult === "function"
             ) {
-              window.RentalAIAnalysisHistoryPersist.persistAnalysisResult({
+              var prC = window.RentalAIAnalysisHistoryPersist.persistAnalysisResult({
                 kind: "contract",
                 data: data,
                 sourceMeta: sourceMeta,
               });
+              if (prC && prC.hint) {
+                setContractPersistHint(prC.hint, prC.fallbackLocal ? "warn" : "ok");
+              } else {
+                setContractPersistHint("", null);
+              }
             } else if (
               window.RentalAIAnalysisHistoryStore &&
               typeof window.RentalAIAnalysisHistoryStore.pushContractFromContractData === "function"
             ) {
               window.RentalAIAnalysisHistoryStore.pushContractFromContractData(data, sourceMeta);
+              setContractPersistHint("", null);
             }
           } catch (eHist) {}
           renderSummary(data);

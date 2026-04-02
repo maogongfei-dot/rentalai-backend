@@ -46,10 +46,9 @@ def resolve_history_write_user_id(request: Request, body: Any) -> dict[str, Any]
     """
     Decide whether server-side JSON history may be appended, and as which user.
 
-    * Body ``userId`` / ``user_id`` from :func:`analysis_history_writer.resolve_history_user_id` (**claimed**).
-    * **guest** bucket: no Bearer required; append as ``guest``.
-    * **non-guest** claimed id: requires ``Authorization: Bearer``; token must resolve to the **same** user id
-      (token is source of truth; body must match).
+    * **Bearer**（若存在）：写入分桶 **仅以 token 解析出的 user_id 为准**；请求体里的 ``userId`` / ``user_id``
+      仅作校验——若声称非 guest 则必须与 token 用户一致，**不得**单独作为身份来源。
+    * **无 Bearer**：仅允许写入 ``guest`` 分桶；若 body 声称非 guest 则拒绝（须先登录）。
 
     Returns ``{ "ok": bool, "user_id": str | None, "message": str | None }``.
     ``ok`` False means do not append; ``message`` is safe for API JSON.
@@ -57,19 +56,21 @@ def resolve_history_write_user_id(request: Request, body: Any) -> dict[str, Any]
     from .analysis_history_writer import resolve_history_user_id
 
     claimed = resolve_history_user_id(body)
-    if claimed == "guest":
-        return {"ok": True, "user_id": "guest", "message": None}
     uid_auth = resolve_user_id_from_auth_header(request)
-    if not uid_auth:
+
+    if uid_auth:
+        if claimed != "guest" and claimed != uid_auth:
+            return {
+                "ok": False,
+                "user_id": None,
+                "message": "userId does not match authenticated user.",
+            }
+        return {"ok": True, "user_id": uid_auth, "message": None}
+
+    if claimed != "guest":
         return {
             "ok": False,
             "user_id": None,
             "message": "Authentication required. Send Authorization: Bearer <token> to write server-side history.",
         }
-    if uid_auth != claimed:
-        return {
-            "ok": False,
-            "user_id": None,
-            "message": "userId does not match authenticated user.",
-        }
-    return {"ok": True, "user_id": uid_auth, "message": None}
+    return {"ok": True, "user_id": "guest", "message": None}

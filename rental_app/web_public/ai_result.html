@@ -38,6 +38,12 @@
         <div id="housing-missing-location" class="card card-warn hidden" role="alert"></div>
         <div id="housing-empty-hint" class="card empty-state-card hidden"></div>
         <p id="housing-banner" class="hint muted" role="status"></p>
+        <p
+          id="housing-history-hint"
+          class="hint save-banner hidden"
+          role="status"
+          aria-live="polite"
+        ></p>
         <div id="housing-errors" class="err hidden" role="alert"></div>
 
         <section class="card" aria-labelledby="hq-heading">
@@ -83,6 +89,12 @@
         <section class="card" id="block-reco" aria-labelledby="r-heading">
           <h2 id="r-heading" class="section-title">推荐结果</h2>
           <p id="summary-line" class="hint muted"></p>
+          <p
+            id="legacy-history-hint"
+            class="hint save-banner hidden"
+            role="status"
+            aria-live="polite"
+          ></p>
           <div id="reco-empty" class="hint hidden">当前没有找到合适房源</div>
           <ul id="reco-list" class="reco-list"></ul>
         </section>

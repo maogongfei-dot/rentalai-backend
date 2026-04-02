@@ -3,7 +3,8 @@
  * - guest：写入 RentalAIAnalysisHistoryStore（localStorage 分桶）
  * - 已登录：依赖请求体 userId 由后端追加 persistence JSON；本函数默认不写本地，避免与 /analysis-history 云端列表重复
  * - alsoWriteLocalBackup：已登录时仍写本地（可选兜底）
- * Phase 6 Round1：服务端 JSON 写入需 Bearer（见 auth_http_helpers.resolve_history_write_user_id）；此处提供 **mergeAuthHeadersForFetch** 给房源/合同 POST。
+ * Phase 6 Round1：服务端 JSON 写入需 Bearer；**mergeAuthHeadersForFetch** 给房源/合同 POST。
+ * Phase 6 Round2：分析成功后 **persistAnalysisResult** 根据 **`serverHistoryWrite`/`history_write`** 决定：云端成功则跳过本地重复写入；失败则回退本机摘要。
  */
 (function (global) {
   function loadU() {
@@ -53,33 +54,91 @@
     return headers;
   }
 
+  var HINT_CLOUD_OK =
+    "已同步至账户云端历史（本页未重复写入本地「最近分析」摘要）。";
+  var HINT_FALLBACK = "云端历史未保存，已写入本机「最近分析」摘要。";
+
   /**
+   * 统一保存入口：guest → 仅本地；已登录 → 若 **`serverHistoryWrite.success`** 为 true 则跳过本地（避免与云端重复）；为 false 则回退本地。
    * @param {{
    *   kind: 'housing'|'legacy'|'contract',
    *   data: object,
    *   sourceMeta?: object,
-   *   alsoWriteLocalBackup?: boolean
+   *   alsoWriteLocalBackup?: boolean,
+   *   serverHistoryWrite?: { success?: boolean, message?: string },
+   *   history_write?: { success?: boolean, message?: string }
    * }} opts
+   * @returns {object} 含可选 **hint**（供结果页轻提示）
    */
   function persistAnalysisResult(opts) {
     opts = opts || {};
     var kind = opts.kind;
     var guest = isGuestForHistory();
     var Store = global.RentalAIAnalysisHistoryStore;
+    var hw =
+      opts.serverHistoryWrite != null
+        ? opts.serverHistoryWrite
+        : opts.history_write != null
+          ? opts.history_write
+          : opts.data && typeof opts.data === "object"
+            ? opts.data.history_write
+            : null;
+
+    function pushLocalProperty() {
+      if (!Store) return false;
+      if (kind === "housing" && opts.data) {
+        Store.pushPropertyFromHousingData(opts.data);
+        return true;
+      }
+      if (kind === "legacy" && opts.data) {
+        Store.pushPropertyFromLegacyData(opts.data);
+        return true;
+      }
+      return false;
+    }
+
+    function pushLocalContract() {
+      if (!Store || kind !== "contract" || !opts.data) return false;
+      Store.pushContractFromContractData(opts.data, opts.sourceMeta || {});
+      return true;
+    }
 
     try {
       if (guest) {
         if (!Store) return { mode: "local_guest", localWritten: false, reason: "no_store" };
-        if (kind === "housing" && opts.data) {
-          Store.pushPropertyFromHousingData(opts.data);
-        } else if (kind === "legacy" && opts.data) {
-          Store.pushPropertyFromLegacyData(opts.data);
-        } else if (kind === "contract" && opts.data) {
-          Store.pushContractFromContractData(opts.data, opts.sourceMeta || {});
-        } else {
-          return { mode: "local_guest", localWritten: false, reason: "bad_args" };
+        if (kind === "contract") {
+          if (!pushLocalContract()) return { mode: "local_guest", localWritten: false, reason: "bad_args" };
+          return { mode: "local_guest", localWritten: true, remote: false };
         }
-        return { mode: "local_guest", localWritten: true, remote: false };
+        if (pushLocalProperty()) {
+          return { mode: "local_guest", localWritten: true, remote: false };
+        }
+        return { mode: "local_guest", localWritten: false, reason: "bad_args" };
+      }
+
+      if (hw && hw.success === true) {
+        return {
+          mode: "remote_user",
+          localWritten: false,
+          remote: true,
+          serverHistoryOk: true,
+          skippedLocalDuplicate: true,
+          hint: HINT_CLOUD_OK,
+        };
+      }
+
+      if (hw && hw.success === false) {
+        var wrote = false;
+        if (kind === "contract") wrote = pushLocalContract();
+        else wrote = pushLocalProperty();
+        return {
+          mode: "remote_user",
+          localWritten: wrote,
+          remote: false,
+          serverHistoryOk: false,
+          fallbackLocal: true,
+          hint: wrote ? HINT_FALLBACK : null,
+        };
       }
 
       if (opts.alsoWriteLocalBackup === true && Store) {

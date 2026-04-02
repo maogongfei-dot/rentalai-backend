@@ -38,7 +38,10 @@ from data.storage.records_db import (
     list_favorite_records,
     normalize_analysis_input_signature,
 )
-from persistence.analysis_history_writer import append_property_analysis_record, try_append_contract
+from persistence.analysis_history_writer import (
+    try_persist_contract_analysis_snapshot,
+    try_persist_property_analysis_snapshot,
+)
 from persistence.history_read_service import list_public_records
 from persistence.auth_http_helpers import (
     resolve_history_write_user_id,
@@ -755,7 +758,7 @@ def api_ai_query(request: Request, body: dict = Body(default_factory=dict)):
     """
     Phase D10：自然语言房源查询编排（``run_housing_ai_query``）。
     请求体：``{ "user_text": "..." }``，兼容 ``query`` 字段。
-    可选 ``userId`` / ``user_id``：写入服务端 JSON 历史（缺省为 ``guest``）；非 guest 须带 ``Authorization: Bearer`` 且与 body userId 一致。
+    可选 ``userId`` / ``user_id``：若带 ``Authorization: Bearer``，历史分桶以 **token 解析用户** 为准（body 仅校验一致）；无 token 时仅写入 ``guest``。
     """
     from services.chat_orchestrator import run_housing_ai_query
 
@@ -766,7 +769,7 @@ def api_ai_query(request: Request, body: dict = Body(default_factory=dict)):
         out = run_housing_ai_query(str(ut or ""))
         hw = resolve_history_write_user_id(request, body)
         if hw["ok"]:
-            append_property_analysis_record(hw["user_id"], out)
+            try_persist_property_analysis_snapshot(hw["user_id"], out)
         if isinstance(out, dict):
             payload = dict(out)
             payload["history_write"] = {
@@ -1021,7 +1024,7 @@ def api_contract_analysis_text(request: Request, body: ContractAnalysisTextApiBo
         ui_payload = build_contract_analysis_ui_payload(facade)
         hw = resolve_history_write_user_id(request, body.model_dump())
         if hw["ok"]:
-            try_append_contract(hw["user_id"], "contract_analysis_v1", ui_payload)
+            try_persist_contract_analysis_snapshot(hw["user_id"], "contract_analysis_v1", ui_payload)
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
@@ -1074,7 +1077,7 @@ def api_contract_analysis_file_path(request: Request, body: ContractAnalysisFile
         ui_payload = build_contract_analysis_ui_payload(facade)
         hw = resolve_history_write_user_id(request, body.model_dump())
         if hw["ok"]:
-            try_append_contract(hw["user_id"], "contract_analysis_v1", ui_payload)
+            try_persist_contract_analysis_snapshot(hw["user_id"], "contract_analysis_v1", ui_payload)
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
@@ -1135,7 +1138,7 @@ async def api_contract_analysis_upload(
         ui_payload = build_contract_analysis_ui_payload(facade)
         hw = resolve_history_write_user_id(request, {"userId": userId} if userId else {})
         if hw["ok"]:
-            try_append_contract(hw["user_id"], "contract_analysis_v1", ui_payload)
+            try_persist_contract_analysis_snapshot(hw["user_id"], "contract_analysis_v1", ui_payload)
         return {
             "ok": True,
             "engine": "contract_analysis_v1",

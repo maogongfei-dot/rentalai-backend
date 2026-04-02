@@ -26,6 +26,20 @@
       .replace(/>/g, "&gt;");
   }
 
+  /** Phase 6：persistAnalysisResult 返回的轻量提示（云端已同步 / 回退本机）。 */
+  function setPersistHintBar(elId, msg, variant) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    el.classList.remove("save-banner-ok", "save-banner-warn", "hidden");
+    if (!msg) {
+      el.classList.add("hidden");
+      el.textContent = "";
+      return;
+    }
+    el.textContent = msg;
+    el.classList.add(variant === "warn" ? "save-banner-warn" : "save-banner-ok");
+  }
+
   var DEAL_CARD_PLACEHOLDER_SVG =
     "data:image/svg+xml," +
     encodeURIComponent(
@@ -450,12 +464,25 @@
         window.RentalAIAnalysisHistoryPersist &&
         typeof window.RentalAIAnalysisHistoryPersist.persistAnalysisResult === "function"
       ) {
-        window.RentalAIAnalysisHistoryPersist.persistAnalysisResult({ kind: "housing", data: data });
+        var prH = window.RentalAIAnalysisHistoryPersist.persistAnalysisResult({
+          kind: "housing",
+          data: data,
+        });
+        if (prH && prH.hint) {
+          setPersistHintBar(
+            "housing-history-hint",
+            prH.hint,
+            prH.fallbackLocal ? "warn" : "ok"
+          );
+        } else {
+          setPersistHintBar("housing-history-hint", null, null);
+        }
       } else if (
         window.RentalAIAnalysisHistoryStore &&
         typeof window.RentalAIAnalysisHistoryStore.pushPropertyFromHousingData === "function"
       ) {
         window.RentalAIAnalysisHistoryStore.pushPropertyFromHousingData(data);
+        setPersistHintBar("housing-history-hint", null, null);
       }
     } catch (eHist) {}
   }
@@ -530,10 +557,28 @@
       if (recoEmpty) recoEmpty.classList.remove("hidden");
       try {
         if (
+          window.RentalAIAnalysisHistoryPersist &&
+          typeof window.RentalAIAnalysisHistoryPersist.persistAnalysisResult === "function"
+        ) {
+          var prL0 = window.RentalAIAnalysisHistoryPersist.persistAnalysisResult({
+            kind: "legacy",
+            data: data,
+          });
+          if (prL0 && prL0.hint) {
+            setPersistHintBar(
+              "legacy-history-hint",
+              prL0.hint,
+              prL0.fallbackLocal ? "warn" : "ok"
+            );
+          } else {
+            setPersistHintBar("legacy-history-hint", null, null);
+          }
+        } else if (
           window.RentalAIAnalysisHistoryStore &&
           typeof window.RentalAIAnalysisHistoryStore.pushPropertyFromLegacyData === "function"
         ) {
           window.RentalAIAnalysisHistoryStore.pushPropertyFromLegacyData(data);
+          setPersistHintBar("legacy-history-hint", null, null);
         }
       } catch (eHistL) {}
       return;
@@ -624,12 +669,25 @@
         window.RentalAIAnalysisHistoryPersist &&
         typeof window.RentalAIAnalysisHistoryPersist.persistAnalysisResult === "function"
       ) {
-        window.RentalAIAnalysisHistoryPersist.persistAnalysisResult({ kind: "legacy", data: data });
+        var prL = window.RentalAIAnalysisHistoryPersist.persistAnalysisResult({
+          kind: "legacy",
+          data: data,
+        });
+        if (prL && prL.hint) {
+          setPersistHintBar(
+            "legacy-history-hint",
+            prL.hint,
+            prL.fallbackLocal ? "warn" : "ok"
+          );
+        } else {
+          setPersistHintBar("legacy-history-hint", null, null);
+        }
       } else if (
         window.RentalAIAnalysisHistoryStore &&
         typeof window.RentalAIAnalysisHistoryStore.pushPropertyFromLegacyData === "function"
       ) {
         window.RentalAIAnalysisHistoryStore.pushPropertyFromLegacyData(data);
+        setPersistHintBar("legacy-history-hint", null, null);
       }
     } catch (eHistL2) {}
   }
