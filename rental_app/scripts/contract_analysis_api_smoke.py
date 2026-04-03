@@ -25,8 +25,19 @@ def _root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _ensure_config_path() -> None:
+    root = _root()
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+
 def main() -> int:
-    base = (os.environ.get("RENTALAI_API_BASE") or "http://127.0.0.1:8000").rstrip("/")
+    _ensure_config_path()
+    from config import get_default_api_url_for_tools
+
+    base = (os.environ.get("RENTALAI_API_BASE") or get_default_api_url_for_tools()).rstrip(
+        "/"
+    )
     root = _root()
     sample_rel = "contract_analysis/samples/sample_contract.txt"
     sample_path = (root / sample_rel).resolve()

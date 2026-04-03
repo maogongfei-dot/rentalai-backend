@@ -1,6 +1,7 @@
 # RentalAI — core install
 #   cd rental_app
 #   pip install -r requirements.txt
+# Python 版本见 runtime.txt（PaaS 等可据此固定解释器）。
 #
 # 真实房源抓取（异步 /tasks 多源分析）需要 Chromium：
 #   playwright install chromium

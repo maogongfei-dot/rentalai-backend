@@ -52,9 +52,9 @@ if str(_ROOT) not in sys.path:
 def main() -> None:
     import uvicorn
 
-    from config import DEBUG, get_bind_host, get_bind_port, get_uvicorn_reload
+    from config import get_bind_host, get_bind_port, get_effective_debug, get_uvicorn_reload
 
-    if DEBUG:
+    if get_effective_debug():
         logging.basicConfig(level=logging.DEBUG)
     host = get_bind_host()
     port = get_bind_port()

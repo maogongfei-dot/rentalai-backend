@@ -21,6 +21,30 @@ DEBUG: bool = os.environ.get("RENTALAI_DEBUG", "").strip().lower() in (
 )
 
 
+def get_env_profile() -> str:
+    """Local dev vs deploy: ``development`` | ``production``.
+
+    Set ``RENTALAI_ENV=production`` on PaaS; omit or ``development`` for local.
+    """
+    raw = (os.environ.get("RENTALAI_ENV") or "").strip().lower()
+    if raw in ("production", "prod"):
+        return "production"
+    if raw in ("development", "dev"):
+        return "development"
+    return "development"
+
+
+def is_production_profile() -> bool:
+    return get_env_profile() == "production"
+
+
+def get_effective_debug() -> bool:
+    """Never treat production profile as debug unless ``RENTALAI_DEBUG`` forces it."""
+    if is_production_profile() and (os.environ.get("RENTALAI_DEBUG") or "").strip() == "":
+        return False
+    return DEBUG
+
+
 def get_bind_host() -> str:
     explicit = (os.environ.get("RENTALAI_HOST") or "").strip()
     if explicit:
@@ -41,8 +65,28 @@ def get_bind_port() -> int:
     return 8000
 
 
+def get_default_api_url_for_tools() -> str:
+    """Default FastAPI base URL for Streamlit / CLI when ``RENTALAI_API_URL`` is unset.
+
+    Uses ``RENTALAI_PUBLIC_API_HOST`` (default ``127.0.0.1``) and the same port as
+    :func:`get_bind_port` so changing ``RENTALAI_PORT`` keeps defaults aligned.
+    """
+    explicit = (os.environ.get("RENTALAI_API_URL") or "").strip()
+    if explicit:
+        return explicit.rstrip("/")
+    host = (os.environ.get("RENTALAI_PUBLIC_API_HOST") or "127.0.0.1").strip() or "127.0.0.1"
+    return "http://%s:%s" % (host, get_bind_port())
+
+
 def get_uvicorn_reload() -> bool:
-    return os.environ.get("RENTALAI_RELOAD", "").strip().lower() in ("1", "true", "yes")
+    explicit = (os.environ.get("RENTALAI_RELOAD") or "").strip().lower()
+    if explicit in ("1", "true", "yes"):
+        return True
+    if explicit in ("0", "false", "no"):
+        return False
+    if is_production_profile():
+        return False
+    return False
 
 
 def _cors_default_origins() -> list[str]:
@@ -51,9 +95,10 @@ def _cors_default_origins() -> list[str]:
     Covers local dev and common Render hostnames so a partial ALLOWED_ORIGINS (e.g. only Vercel)
     does not block the Render-hosted UI or same-service hostname.
     """
+    port = get_bind_port()
     return [
-        "http://127.0.0.1:8000",
-        "http://localhost:8000",
+        "http://127.0.0.1:%s" % port,
+        "http://localhost:%s" % port,
         "http://localhost:5173",
         "http://localhost:3000",
         "https://rentalai-backend.onrender.com",

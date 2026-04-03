@@ -8,7 +8,8 @@
 //   4. VITE_API_BASE_URL
 //
 // The meta tag "vite-rentalai-api-base" is filled only from VITE_RENTALAI_API_BASE (for runtime priority in api_config.js).
-// If no env vars are set, exits 0 without modifying files (same-origin local dev).
+// Optional: RENTALAI_ENV → meta "rentalai-env" (development | production) for static builds.
+// If no API base and no RENTALAI_ENV, exits 0 without modifying files (same-origin local dev).
 
 import fs from "fs";
 import path from "path";
@@ -53,10 +54,11 @@ const resolved = stripSlash(
     "VITE_API_BASE_URL",
   ),
 );
+const envInject = (process.env.RENTALAI_ENV || "").trim();
 
-if (!resolved && !viteOnly) {
+if (!resolved && !viteOnly && !envInject) {
   console.log(
-    "inject-api-base: no API base env set; leaving meta tags empty (same-origin).",
+    "inject-api-base: no API base or RENTALAI_ENV; leaving meta tags unchanged (same-origin local dev).",
   );
   process.exit(0);
 }
@@ -82,6 +84,13 @@ function walk(dir) {
         html = r.html;
         changed = true;
       }
+      if (envInject) {
+        r = patchMetaContent(html, "rentalai-env", envInject);
+        if (r.changed) {
+          html = r.html;
+          changed = true;
+        }
+      }
       if (changed) {
         fs.writeFileSync(p, html, "utf8");
         console.log("inject-api-base: patched", path.relative(staticRoot, p));
@@ -96,4 +105,6 @@ console.log(
   viteToWrite || "(empty)",
   "| rentalai-api-base =",
   rentalToWrite,
+  "| rentalai-env =",
+  envInject || "(unchanged)",
 );

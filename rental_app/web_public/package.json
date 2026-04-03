@@ -1,7 +1,10 @@
 {
   "name": "rentalai-web-public",
   "private": true,
-  "description": "Static HTML/CSS/JS; output is this folder (web_public), not dist. build runs inject-api-base.mjs.",
+  "description": "Static HTML/CSS/JS; output is this folder (web_public), not dist. build runs inject-api-base.mjs. No runtime npm dependencies — only Node for the build script.",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "node ../scripts/inject-api-base.mjs",
     "vercel-build": "npm run build"

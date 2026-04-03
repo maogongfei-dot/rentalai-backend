@@ -22,6 +22,7 @@ if not _ui_logger.handlers:
     )
 
 from alert_utils import FailureTracker, send_alert
+from config import get_bind_port, get_default_api_url_for_tools
 
 _ui_api_failures = FailureTracker(threshold=3, source="streamlit-ui")
 
@@ -622,12 +623,12 @@ _use_local = st.sidebar.checkbox(
     value=os.environ.get("RENTALAI_USE_LOCAL", "").strip().lower() in ("1", "true", "yes"),
     help="On = in-process full analysis (same as /analyze). Modular paths require API.",
 )
-_api_default = os.environ.get("RENTALAI_API_URL", "http://127.0.0.1:8000").strip()
+_api_default = get_default_api_url_for_tools()
 _api_base = st.sidebar.text_input(
     "API base URL",
-    value=_api_default or "http://127.0.0.1:8000",
+    value=_api_default,
     disabled=_use_local,
-    help="Set via env RENTALAI_API_URL or type here. Local: http://127.0.0.1:8000",
+    help="Env: RENTALAI_API_URL (deploy), or RENTALAI_PUBLIC_API_HOST + RENTALAI_PORT/PORT for local default.",
 )
 _api_endpoint = st.sidebar.selectbox(
     "API endpoint",
@@ -639,7 +640,10 @@ _api_endpoint = st.sidebar.selectbox(
 if _use_local:
     st.sidebar.caption("Local mode always uses full engine output (≈ POST /analyze).")
 if _api_default.startswith("http://127.") or _api_default.startswith("http://localhost"):
-    st.sidebar.caption("Start API: `uvicorn api_server:app --host 127.0.0.1 --port 8000`")
+    st.sidebar.caption(
+        "Start API: `python run.py` or `uvicorn api_server:app --host 127.0.0.1 --port %s`"
+        % get_bind_port()
+    )
 else:
     st.sidebar.caption("API: **%s**" % _api_default)
 
