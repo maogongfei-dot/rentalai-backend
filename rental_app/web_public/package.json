@@ -7,6 +7,9 @@
   },
   "scripts": {
     "build": "node ../scripts/inject-api-base.mjs",
-    "vercel-build": "npm run build"
+    "dev": "npm run build",
+    "vercel-build": "npm run build",
+    "preview": "npx --yes serve . -l 4173",
+    "start": "npm run preview"
   }
 }

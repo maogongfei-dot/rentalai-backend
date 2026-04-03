@@ -1,6 +1,6 @@
 # RentalAI — 本地启动（最短说明 · Phase 6 第 3 步）
 
-面向：**同机**跑通「FastAPI + 静态页 `web_public/`」，便于联调与部署前自检。详细产品说明见 **`README.md`**。
+面向：**同机**跑通「FastAPI + 静态页 `web_public/`」，便于联调与部署前自检。详细产品说明见 **`README.md`**。**PowerShell 预演顺序**见 **`README_LOCAL_RUN.md`**（Phase 6-B Step 4）。
 
 ---
 
