@@ -29,6 +29,8 @@
 python run.py
 ```
 
+亦可 **`python api_server.py`**（与 `run.py` 同样读取 `.env`、绑定 `config` 中的 host/port，文件末尾 `uvicorn.run(app, …)`）。
+
 等价：`uvicorn api_server:app --host <见 config> --port <PORT|RENTALAI_PORT|8000>`
 
 **脚本（任选）**

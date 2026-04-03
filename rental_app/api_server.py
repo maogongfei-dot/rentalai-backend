@@ -1,19 +1,56 @@
 # P2 Phase1–4: RentalAI HTTP API（FastAPI）
 # 推荐本地一键启动（Phase4）: python run.py
+# 亦可: python api_server.py（与本文件末尾 __main__ 一致，见 uvicorn.run）
 # 等价: uvicorn api_server:app --reload --host 127.0.0.1 --port 8000
 # 生产/PaaS: uvicorn api_server:app --host 0.0.0.0 --port $PORT
 # 需在 rental_app 目录下执行（或设置 rootDir），以便正确 import web_bridge
 
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+# Match run.py: load .env + cwd before config (stdlib, no python-dotenv).
+
+
+def _load_env_file(path: Path) -> None:
+    if not path.is_file():
+        return
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        if "=" not in s:
+            continue
+        key, _, val = s.partition("=")
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+        val = val.strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+            val = val[1:-1]
+        os.environ[key] = val
+
+
+_ROOT = Path(__file__).resolve().parent
+_load_env_file(_ROOT / ".env")
+os.chdir(_ROOT)
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import json
 import logging
-import os
 import queue
 import re
 import time
 import traceback
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import Body, FastAPI, File, Form, Query, Request, UploadFile
@@ -2300,3 +2337,26 @@ if _assets_dir.is_dir():
 
 
 _start_task_workers_once()
+
+
+if __name__ == "__main__":
+    # Direct `python api_server.py` — same bind/env as `python run.py` (uvicorn CLI 仍可用).
+    import uvicorn
+
+    from config import get_bind_host, get_bind_port, get_effective_debug, get_uvicorn_reload
+
+    if get_effective_debug():
+        logging.basicConfig(level=logging.DEBUG)
+    _host = get_bind_host()
+    _port = get_bind_port()
+    _reload = get_uvicorn_reload()
+    print(
+        "RentalAI starting — http://%s:%s/  (reload=%s)" % (_host, _port, _reload),
+        flush=True,
+    )
+    uvicorn.run(
+        app,
+        host=_host,
+        port=_port,
+        reload=_reload,
+    )
