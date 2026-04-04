@@ -8,6 +8,8 @@ Phase 4：合同分析 HTTP 响应体整理（仅组装字段，不修改 analyz
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Any
 
 from contract_analysis_service import ContractAnalysisFacadeResult
@@ -51,7 +53,27 @@ def build_contract_analysis_ui_payload(facade: ContractAnalysisFacadeResult) -> 
             "presentation": pr,
         },
     }
-    lc = facade.get("legal_compliance")
-    if lc is not None:
-        out["legal_compliance"] = lc
+    try:
+        _repo_root = Path(__file__).resolve().parents[1]
+        if str(_repo_root) not in sys.path:
+            sys.path.insert(0, str(_repo_root))
+        from backend.app.legal.legal_integration import attach_legal_compliance_to_result
+
+        result = attach_legal_compliance_to_result(
+            {
+                "analysis_result": ar,
+                "explain_result": er,
+                "presentation": pr,
+            },
+            jurisdiction="england",
+            target_date=None,
+            source_type="contract_clause",
+        )
+        if result.get("legal_compliance") is not None:
+            out["legal_compliance"] = result["legal_compliance"]
+    except Exception as e:
+        print("LEGAL INTEGRATION ERROR:", e)
+        lc = facade.get("legal_compliance")
+        if lc is not None:
+            out["legal_compliance"] = lc
     return out
