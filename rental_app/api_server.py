@@ -1052,6 +1052,9 @@ def api_contract_phase3_analyze_text(body: ContractPhase3AnalyzeBody = Body(...)
             "structured_analysis": facade["analysis_result"],
             "explain": facade["explain_result"],
         }
+        lc = facade.get("legal_compliance")
+        if lc is not None:
+            result["legal_compliance"] = lc
         return {
             "ok": True,
             "engine": "phase3_contract_analysis",

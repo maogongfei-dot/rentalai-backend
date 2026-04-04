@@ -11,7 +11,9 @@ API、脚本与前端应优先通过本模块调用，**不要**直接引用 ``c
 from __future__ import annotations
 
 import os
-from typing import TypedDict, cast
+import sys
+from pathlib import Path
+from typing import Any, TypedDict, cast
 
 from contract_analysis.contract_models import (
     ContractAnalysisResult,
@@ -25,12 +27,40 @@ from contract_analysis.service import (
 )
 
 
+def _ensure_repo_root_for_backend() -> None:
+    """So ``import backend.app...`` works when the process cwd is ``rental_app`` only."""
+    root = Path(__file__).resolve().parents[1]
+    rs = str(root)
+    if rs not in sys.path:
+        sys.path.insert(0, rs)
+
+
+def _facade_with_legal(full: ContractPhase3PipelineResult) -> ContractAnalysisFacadeResult:
+    facade = _facade_from_pipeline(full)
+    try:
+        _ensure_repo_root_for_backend()
+        from backend.app.legal.legal_integration import attach_legal_compliance_to_result
+    except ImportError:
+        return facade
+    try:
+        merged = attach_legal_compliance_to_result(
+            dict(facade),
+            jurisdiction="england",
+            target_date=None,
+            source_type="contract_clause",
+        )
+        return cast(ContractAnalysisFacadeResult, merged)
+    except Exception:
+        return facade
+
+
 class ContractAnalysisFacadeResult(TypedDict, total=False):
     """正式门面返回值（与管线内容一致，仅键名面向 API）。"""
 
     analysis_result: ContractAnalysisResult
     explain_result: ContractExplainResult
     presentation: ContractPresentationBundle
+    legal_compliance: dict[str, Any]
 
 
 def _facade_from_pipeline(full: ContractPhase3PipelineResult) -> ContractAnalysisFacadeResult:
@@ -69,7 +99,7 @@ def analyze_contract_text(
         source_type=source_type,
         source_name=source_name,
     )
-    return _facade_from_pipeline(full)
+    return _facade_with_legal(full)
 
 
 def analyze_contract_file(
@@ -94,4 +124,4 @@ def analyze_contract_file(
         source_type=source_type,
         source_name=source_name,
     )
-    return _facade_from_pipeline(full)
+    return _facade_with_legal(full)

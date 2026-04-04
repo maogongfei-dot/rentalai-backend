@@ -43,7 +43,7 @@ def build_contract_analysis_ui_payload(facade: ContractAnalysisFacadeResult) -> 
         "action_advice": _list("action_advice"),
     }
 
-    return {
+    out: dict[str, Any] = {
         "summary_view": summary_view,
         "raw_analysis": {
             "analysis_result": ar,
@@ -51,3 +51,7 @@ def build_contract_analysis_ui_payload(facade: ContractAnalysisFacadeResult) -> 
             "presentation": pr,
         },
     }
+    lc = facade.get("legal_compliance")
+    if lc is not None:
+        out["legal_compliance"] = lc
+    return out
