@@ -112,16 +112,28 @@
   function postJson(path, body) {
     var url = apiUrl(path);
     var headers = { "Content-Type": "application/json" };
-    try {
-      var P = global.RentalAIAnalysisHistoryPersist;
-      if (P && typeof P.mergeAuthHeadersForFetch === "function") {
-        headers = P.mergeAuthHeadersForFetch(headers);
-      }
-    } catch (eH) {}
+    if (typeof global.rentalaiMergeAuthHeaders === "function") {
+      headers = global.rentalaiMergeAuthHeaders(headers);
+    } else {
+      try {
+        var P = global.RentalAIAnalysisHistoryPersist;
+        if (P && typeof P.mergeAuthHeadersForFetch === "function") {
+          headers = P.mergeAuthHeadersForFetch(headers);
+        }
+      } catch (eH) {}
+    }
+    if (typeof global.rentalaiDebugAuthLog === "function") {
+      global.rentalaiDebugAuthLog("POST " + path, url, !!headers["Authorization"]);
+    }
+    var cred =
+      typeof global.rentalaiDefaultFetchCredentials === "function"
+        ? global.rentalaiDefaultFetchCredentials()
+        : "same-origin";
     return fetch(url, {
       method: "POST",
       headers: headers,
       body: JSON.stringify(mergeHistoryUserId(body || {})),
+      credentials: cred,
     }).then(function (r) {
       return r.text().then(function (text) {
         return normalizeContractAnalysisResponse(parseJsonBody(r, text));
@@ -180,16 +192,28 @@
       }
     } catch (e2) {}
     var headers = {};
-    try {
-      var P2 = global.RentalAIAnalysisHistoryPersist;
-      if (P2 && typeof P2.mergeAuthHeadersForFetch === "function") {
-        headers = P2.mergeAuthHeadersForFetch(headers);
-      }
-    } catch (e3) {}
+    if (typeof global.rentalaiMergeAuthHeaders === "function") {
+      headers = global.rentalaiMergeAuthHeaders(headers);
+    } else {
+      try {
+        var P2 = global.RentalAIAnalysisHistoryPersist;
+        if (P2 && typeof P2.mergeAuthHeadersForFetch === "function") {
+          headers = P2.mergeAuthHeadersForFetch(headers);
+        }
+      } catch (e3) {}
+    }
+    if (typeof global.rentalaiDebugAuthLog === "function") {
+      global.rentalaiDebugAuthLog("POST /api/contract/analysis/upload", url, !!headers["Authorization"]);
+    }
+    var credUp =
+      typeof global.rentalaiDefaultFetchCredentials === "function"
+        ? global.rentalaiDefaultFetchCredentials()
+        : "same-origin";
     return fetch(url, {
       method: "POST",
       headers: headers,
       body: fd,
+      credentials: credUp,
     })
       .then(function (r) {
         return r.text().then(function (text) {

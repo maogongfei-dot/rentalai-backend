@@ -28,8 +28,11 @@
     return !loadU().isAuthenticated;
   }
 
-  /** 与 server_history_api 一致：供写入类请求带 Authorization */
+  /** 与 server_history_api / api_config.rentalaiMergeAuthHeaders 一致 */
   function getBearerTokenForApi() {
+    if (typeof global.rentalaiGetBearerToken === "function") {
+      return global.rentalaiGetBearerToken();
+    }
     try {
       var S = global.RentalAIUserStore;
       if (S && typeof S.loadUserFromStorage === "function") {
@@ -48,6 +51,9 @@
    * @returns {Record<string, string>}
    */
   function mergeAuthHeadersForFetch(headers) {
+    if (typeof global.rentalaiMergeAuthHeaders === "function") {
+      return global.rentalaiMergeAuthHeaders(headers || {});
+    }
     headers = headers || {};
     var tok = getBearerTokenForApi();
     if (tok) headers["Authorization"] = "Bearer " + tok;

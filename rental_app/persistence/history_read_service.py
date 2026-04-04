@@ -15,14 +15,21 @@ def serialize_record_for_api(row: dict[str, Any]) -> dict[str, Any]:
     """Stable fields for HTTP responses (no internal-only keys)."""
     if not isinstance(row, dict):
         return {}
+    uid = str(row.get("userId") or row.get("user_id") or "")
+    res = row.get("result")
+    if res is None:
+        res = row.get("result_snapshot")
     return {
         "record_id": str(row.get("record_id") or ""),
-        "userId": str(row.get("userId") or ""),
+        "userId": uid,
+        "user_id": uid,
         "type": str(row.get("type") or ""),
         "title": str(row.get("title") or ""),
         "created_at": str(row.get("created_at") or ""),
+        "input": row.get("input") if row.get("input") is not None else "",
         "summary": row.get("summary") if isinstance(row.get("summary"), dict) else {},
-        "result_snapshot": row.get("result_snapshot"),
+        "result": res,
+        "result_snapshot": row.get("result_snapshot") if row.get("result_snapshot") is not None else res,
     }
 
 

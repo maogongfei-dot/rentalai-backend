@@ -435,7 +435,7 @@ def api_analysis_history_records(
             status_code=401,
             content={
                 "success": False,
-                "message": "Authentication required. Send Authorization: Bearer <token> from login.",
+                "message": "需要登录才能使用云历史。请使用 Authorization: Bearer <token>（登录后获取）。",
                 "records": [],
             },
         )
@@ -478,7 +478,7 @@ def api_analysis_history_delete_record(request: Request, record_id: str):
             status_code=401,
             content={
                 "success": False,
-                "message": "Authentication required. Send Authorization: Bearer <token> from login.",
+                "message": "需要登录才能使用云历史。请使用 Authorization: Bearer <token>（登录后获取）。",
             },
         )
     rid = str(record_id or "").strip()
@@ -528,7 +528,7 @@ def api_analysis_history_clear(request: Request):
             status_code=401,
             content={
                 "success": False,
-                "message": "Authentication required. Send Authorization: Bearer <token> from login.",
+                "message": "需要登录才能使用云历史。请使用 Authorization: Bearer <token>（登录后获取）。",
             },
         )
     try:

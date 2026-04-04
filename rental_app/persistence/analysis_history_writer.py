@@ -64,11 +64,12 @@ def persist_analysis_history(
     summary: dict[str, Any],
     result_snapshot: Any,
     created_at_iso: str | None = None,
+    input_text: str | None = None,
 ) -> None:
     """
     统一写入一条分析历史（房源 / 合同共用）。
 
-    最少字段：``type``、``title``、``created_at``、``summary``、``result_snapshot``、``userId``（记录顶层）；
+    最少字段：``type``、``title``、``created_at``、``summary``、``result`` / ``result_snapshot``、``userId``（记录顶层）；
     ``summary`` 内带 ``identity_user_id``（与 HTTP 层解析一致）、``kind`` 与可选 ``short_label``。
     """
     uid = str(user_id or "").strip() or "guest"
@@ -84,16 +85,25 @@ def persist_analysis_history(
     sl = str(short_label or "").strip()
     if sl:
         summ["short_label"] = sl[:200]
+    inp = (input_text or "").strip()
+    if inp and "input_preview" not in summ:
+        summ["input_preview"] = inp[:2000]
+    trimmed = _trim_snapshot(result_snapshot)
     record = {
         "record_id": uuid.uuid4().hex,
         "userId": uid,
+        "user_id": uid,
         "type": rt,
         "title": t,
         "created_at": created_at_iso or _utc_now_iso(),
+        "input": inp[:8000] if inp else "",
         "summary": summ,
-        "result_snapshot": _trim_snapshot(result_snapshot),
+        "result": trimmed,
+        "result_snapshot": trimmed,
     }
     _REPO.append_record(record)
+    if uid != "guest":
+        print("Saved to cloud:", uid)
 
 
 # Alias for naming preference (Round6 Step3)
@@ -125,19 +135,14 @@ def persist_property_analysis_snapshot(user_id: str, orchestrator_out: dict[str,
         "top_deal_count": len(deals),
         "error_keys": sorted(errors.keys()) if errors else [],
     }
-    result_snapshot: dict[str, Any] = {
-        "message": orchestrator_out.get("message"),
-        "parsed_intent": (orchestrator_out.get("parsed_query") or {}).get("intent")
-        if isinstance(orchestrator_out.get("parsed_query"), dict)
-        else None,
-    }
     persist_analysis_history(
         user_id,
         record_type="property",
         title=title,
         short_label=short_label,
         summary=summary,
-        result_snapshot=result_snapshot,
+        result_snapshot=orchestrator_out,
+        input_text=ut,
     )
 
 
@@ -159,14 +164,17 @@ def persist_contract_analysis_snapshot(user_id: str, engine: str, ui_payload: di
         "overall_conclusion_preview": oc[:800],
         "key_risk_preview": str(sv.get("key_risk_summary") or "")[:800],
     }
-    result_snapshot = {"summary_view": sv}
+    raw = ui_payload.get("raw_analysis") if isinstance(ui_payload.get("raw_analysis"), dict) else {}
+    ar = raw.get("analysis_result") if isinstance(raw.get("analysis_result"), dict) else {}
+    cin = str(ar.get("contract_text") or ar.get("source_text") or ar.get("text") or "")[:8000]
     persist_analysis_history(
         user_id,
         record_type="contract",
         title=title,
         short_label=short_label,
         summary=summary,
-        result_snapshot=result_snapshot,
+        result_snapshot=ui_payload,
+        input_text=cin or oc[:2000],
     )
 
 

@@ -117,17 +117,29 @@
     } catch (eUid) {}
 
     var headers = { "Content-Type": "application/json" };
-    try {
-      var P2 = window.RentalAIAnalysisHistoryPersist;
-      if (P2 && typeof P2.mergeAuthHeadersForFetch === "function") {
-        headers = P2.mergeAuthHeadersForFetch(headers);
-      }
-    } catch (eH) {}
+    if (typeof window.rentalaiMergeAuthHeaders === "function") {
+      headers = window.rentalaiMergeAuthHeaders(headers);
+    } else {
+      try {
+        var P2 = window.RentalAIAnalysisHistoryPersist;
+        if (P2 && typeof P2.mergeAuthHeadersForFetch === "function") {
+          headers = P2.mergeAuthHeadersForFetch(headers);
+        }
+      } catch (eH) {}
+    }
+    if (typeof window.rentalaiDebugAuthLog === "function") {
+      window.rentalaiDebugAuthLog("POST /api/ai/query", url, !!headers["Authorization"]);
+    }
+    var cred =
+      typeof window.rentalaiDefaultFetchCredentials === "function"
+        ? window.rentalaiDefaultFetchCredentials()
+        : "same-origin";
 
     fetch(url, {
       method: "POST",
       headers: headers,
       body: JSON.stringify(body),
+      credentials: cred,
     })
       .then(function (r) {
         return r.text().then(function (text) {

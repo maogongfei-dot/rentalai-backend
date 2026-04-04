@@ -1,6 +1,6 @@
 /**
  * Phase 5 Round3/4 + Round5 Step3/4 — GET /api/analysis/history/records
- * 云端读取统一由此模块带 Authorization: Bearer（RentalAIUserStore / rentalai_bearer）。
+ * 云端读取统一带 Authorization: Bearer（rentalaiMergeAuthHeaders / rentalai_bearer）。
  * userId query 可选，须与 token 用户一致。响应体可含 _httpStatus / _authError 供上层区分 401/403。
  */
 (function (global) {
@@ -9,6 +9,9 @@
   }
 
   function getBearerTokenForHistory() {
+    if (typeof global.rentalaiGetBearerToken === "function") {
+      return global.rentalaiGetBearerToken();
+    }
     try {
       if (global.RentalAIUserStore && typeof global.RentalAIUserStore.loadUserFromStorage === "function") {
         var s = global.RentalAIUserStore.loadUserFromStorage();
@@ -21,6 +24,23 @@
     return null;
   }
 
+  function mergeHistoryHeaders() {
+    if (typeof global.rentalaiMergeAuthHeaders === "function") {
+      return global.rentalaiMergeAuthHeaders({});
+    }
+    var h = {};
+    var tok = getBearerTokenForHistory();
+    if (tok) h["Authorization"] = "Bearer " + tok;
+    return h;
+  }
+
+  function fetchCredentials() {
+    if (typeof global.rentalaiDefaultFetchCredentials === "function") {
+      return global.rentalaiDefaultFetchCredentials();
+    }
+    return "same-origin";
+  }
+
   /**
    * 拉取当前 Bearer 会话用户的分析历史（不传 type 则为全部类型，最多后端 limit）。
    * @param {string} userId 与 RentalAIUserStore 分桶一致；可选写入 query 供校验
@@ -29,9 +49,7 @@
    */
   function fetchUserHistory(userId, opts) {
     opts = opts || {};
-    var tok = getBearerTokenForHistory();
-    var headers = {};
-    if (tok) headers["Authorization"] = "Bearer " + tok;
+    var headers = mergeHistoryHeaders();
     var q = new URLSearchParams();
     var uid = (userId || "").trim();
     if (uid) q.set("userId", uid);
@@ -39,8 +57,11 @@
     if (opts.cacheBust) q.set("_t", String(Date.now()));
     var qs = q.toString();
     var url = apiUrl("/api/analysis/history/records" + (qs ? "?" + qs : ""));
+    if (typeof global.rentalaiDebugAuthLog === "function") {
+      global.rentalaiDebugAuthLog("GET /api/analysis/history/records", url, !!headers["Authorization"]);
+    }
     return global
-      .fetch(url, { method: "GET", headers: headers })
+      .fetch(url, { method: "GET", headers: headers, credentials: fetchCredentials() })
       .then(function (r) {
         return r
           .json()
@@ -99,13 +120,13 @@
     if (!rid) {
       return Promise.resolve({ success: false, message: "record_id is required", _httpStatus: 0 });
     }
-    var tok = getBearerTokenForHistory();
-    var headers = {};
-    if (tok) headers["Authorization"] = "Bearer " + tok;
-    var url =
-      apiUrl("/api/analysis/history/records/" + encodeURIComponent(rid));
+    var headers = mergeHistoryHeaders();
+    var url = apiUrl("/api/analysis/history/records/" + encodeURIComponent(rid));
+    if (typeof global.rentalaiDebugAuthLog === "function") {
+      global.rentalaiDebugAuthLog("DELETE history record", url, !!headers["Authorization"]);
+    }
     return global
-      .fetch(url, { method: "DELETE", headers: headers })
+      .fetch(url, { method: "DELETE", headers: headers, credentials: fetchCredentials() })
       .then(function (r) {
         return r
           .json()
@@ -141,12 +162,13 @@
    * @returns {Promise<{ success?: boolean, message?: string, deleted_count?: number, _httpStatus?: number }>}
    */
   function clearAllHistory() {
-    var tok = getBearerTokenForHistory();
-    var headers = {};
-    if (tok) headers["Authorization"] = "Bearer " + tok;
+    var headers = mergeHistoryHeaders();
     var url = apiUrl("/api/analysis/history/clear");
+    if (typeof global.rentalaiDebugAuthLog === "function") {
+      global.rentalaiDebugAuthLog("DELETE /api/analysis/history/clear", url, !!headers["Authorization"]);
+    }
     return global
-      .fetch(url, { method: "DELETE", headers: headers })
+      .fetch(url, { method: "DELETE", headers: headers, credentials: fetchCredentials() })
       .then(function (r) {
         return r
           .json()
