@@ -1,0 +1,7 @@
+{
+  "name": "rentalai-frontend",
+  "private": true,
+  "devDependencies": {
+    "@types/react": "^18.3.12"
+  }
+}

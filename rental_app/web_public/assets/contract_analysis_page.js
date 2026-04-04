@@ -901,6 +901,170 @@
     return html;
   }
 
+  /** Phase 0 legal_compliance: read from API result (tolerates nesting). */
+  function getLegalCompliance(data) {
+    if (!data || typeof data !== "object") return null;
+    var r = data.result;
+    if (r && typeof r === "object" && r.legal_compliance != null) {
+      return r.legal_compliance;
+    }
+    if (data.data && typeof data.data === "object" && data.data.legal_compliance != null) {
+      return data.data.legal_compliance;
+    }
+    return null;
+  }
+
+  function normalizeRulesList(v) {
+    return Array.isArray(v) ? v : [];
+  }
+
+  function normalizeStringArray(v) {
+    if (!Array.isArray(v)) return [];
+    var out = [];
+    for (var i = 0; i < v.length; i++) {
+      var s = safeStr(v[i]).trim();
+      if (s) out.push(s);
+    }
+    return out;
+  }
+
+  function formatConfidence(value) {
+    if (value == null || value === "") return "";
+    var n = Number(value);
+    if (isNaN(n)) return "";
+    if (n >= 0 && n <= 1) return Math.round(n * 100) + "%";
+    return safeStr(n);
+  }
+
+  function safeLegalObject(v) {
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  }
+
+  function renderLegalRuleArticle(rule) {
+    var r = rule && typeof rule === "object" ? rule : {};
+    var title = safeStr(r.title).trim() || "—";
+    var ls = safeStr(r.legal_status).trim();
+    var rl = safeStr(r.risk_level).trim();
+    var exp = safeStr(r.explanation_plain).trim();
+    var reds = normalizeStringArray(r.matched_red_flags);
+    var kps = normalizeStringArray(r.matched_key_points);
+    var conf = formatConfidence(r.confidence);
+    var html =
+      '<article class="contract-result-subcard legal-rule-card">' +
+      '<div class="contract-result-subcard-head">' +
+      "<strong>" +
+      escapeHtml(title) +
+      "</strong>";
+    html += '<div class="contract-result-subcard-badges">';
+    if (ls) {
+      html +=
+        '<span class="contract-result-pill contract-result-pill--muted">' +
+        escapeHtml(ls) +
+        "</span>";
+    }
+    if (rl) {
+      html +=
+        '<span class="contract-result-pill contract-result-pill--severity">' +
+        escapeHtml(rl) +
+        "</span>";
+    }
+    html += "</div></div>";
+    if (exp) {
+      html +=
+        '<p class="contract-result-text">' +
+        escapeHtml(exp).replace(/\n/g, "<br/>") +
+        "</p>";
+    }
+    if (reds.length) {
+      html +=
+        '<section class="legal-rule-card__section" aria-label="Red flags">' +
+        '<h4 class="legal-rule-card__section-title">Red flags</h4>' +
+        '<ul class="contract-result-list contract-result-list--spaced">';
+      for (var ri = 0; ri < reds.length; ri++) {
+        html += "<li>" + escapeHtml(reds[ri]) + "</li>";
+      }
+      html += "</ul></section>";
+    }
+    if (kps.length) {
+      html +=
+        '<section class="legal-rule-card__section" aria-label="Key points">' +
+        '<h4 class="legal-rule-card__section-title">Key points</h4>' +
+        '<ul class="contract-result-list contract-result-list--spaced">';
+      for (var ki = 0; ki < kps.length; ki++) {
+        html += "<li>" + escapeHtml(kps[ki]) + "</li>";
+      }
+      html += "</ul></section>";
+    }
+    if (conf) {
+      html +=
+        '<p class="contract-result-muted">' +
+        '<span class="contract-result-quick-label">Confidence</span> ' +
+        escapeHtml(conf) +
+        "</p>";
+    }
+    html += "</article>";
+    return html;
+  }
+
+  function renderLegalComplianceInner(lc) {
+    if (lc == null || typeof lc !== "object") {
+      return (
+        '<p class="contract-result-muted">' +
+        escapeHtml("No detailed legal compliance result is available yet.") +
+        "</p>"
+      );
+    }
+    var ov = safeLegalObject(lc.overall);
+    var rules = normalizeRulesList(lc.rules);
+    var status = safeStr(ov.overall_legal_status).trim();
+    var risk = safeStr(ov.overall_risk_level).trim();
+    var summary = safeStr(ov.summary_plain).trim();
+    var disclaimer = safeStr(ov.disclaimer).trim();
+    var showOverall = !!(status || risk || summary);
+    var html = "";
+    if (showOverall) {
+      html += '<div class="legal-compliance-overall">';
+      if (status) {
+        html +=
+          '<p class="contract-result-kv"><span class="contract-result-kv-label">Overall legal status</span>' +
+          escapeHtml(status) +
+          "</p>";
+      }
+      if (risk) {
+        html +=
+          '<p class="contract-result-kv"><span class="contract-result-kv-label">Overall risk level</span>' +
+          escapeHtml(risk) +
+          "</p>";
+      }
+      if (summary) {
+        html +=
+          '<p class="contract-result-text">' +
+          escapeHtml(summary).replace(/\n/g, "<br/>") +
+          "</p>";
+      }
+      html += "</div>";
+    }
+    if (disclaimer) {
+      html +=
+        '<div class="legal-compliance-disclaimer" role="note">' +
+        escapeHtml(disclaimer).replace(/\n/g, "<br/>") +
+        "</div>";
+    }
+    if (rules.length === 0) {
+      html +=
+        '<p class="contract-result-muted legal-compliance-empty-hint">' +
+        escapeHtml("No detailed legal compliance result is available yet.") +
+        "</p>";
+    } else {
+      html += '<div class="contract-result-subcard-stack legal-compliance-rules">';
+      for (var i = 0; i < rules.length; i++) {
+        html += renderLegalRuleArticle(rules[i] && typeof rules[i] === "object" ? rules[i] : {});
+      }
+      html += "</div>";
+    }
+    return html;
+  }
+
   function renderSummary(data) {
     if (!resultBody) return;
     var res = (data && data.result) || {};
@@ -931,6 +1095,15 @@
         "Risk Category Summary",
         "风险分类汇总",
         renderRiskCategorySummary(sv.risk_category_summary)
+      )
+    );
+    parts.push(
+      wrapBlock(
+        "legal-compliance",
+        "Legal Compliance Check",
+        "法律合规检查",
+        renderLegalComplianceInner(getLegalCompliance(data)),
+        {}
       )
     );
     parts.push(

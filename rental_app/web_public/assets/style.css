@@ -2547,3 +2547,34 @@ body.assistant-page-body {
   padding-top: 0.5rem;
   border-top: 1px solid #e8ecf1;
 }
+
+/* Phase 0：法律合规模块（contract_analysis_page.js + LegalCompliancePanel.tsx 对齐） */
+.legal-compliance-overall {
+  margin-bottom: 0.65rem;
+}
+.legal-compliance-disclaimer {
+  margin: 0.65rem 0;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.85rem;
+  color: #5c6570;
+  line-height: 1.45;
+  background: #f8fafc;
+  border: 1px solid #e8edf3;
+  border-radius: 6px;
+  border-left: 3px solid #94a3b8;
+}
+.legal-compliance-empty-hint {
+  margin-top: 0.35rem;
+}
+.legal-rule-card__section {
+  margin: 0.55rem 0 0;
+}
+.legal-rule-card__section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+}
+.legal-compliance-rules {
+  margin-top: 0.35rem;
+}
