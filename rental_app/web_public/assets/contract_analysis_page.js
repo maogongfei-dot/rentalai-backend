@@ -905,12 +905,13 @@
   function getLegalCompliance(data) {
     if (!data || typeof data !== "object") return null;
     var r = data.result;
-    if (r && typeof r === "object" && r.legal_compliance != null) {
-      return r.legal_compliance;
+    if (r && typeof r === "object") {
+      if (r.legal_compliance != null) return r.legal_compliance;
+      if (r.data && r.data.legal_compliance != null) return r.data.legal_compliance;
+      if (r.result && r.result.legal_compliance != null) return r.result.legal_compliance;
     }
-    if (data.data && typeof data.data === "object" && data.data.legal_compliance != null) {
-      return data.data.legal_compliance;
-    }
+    if (data.data && data.data.legal_compliance != null) return data.data.legal_compliance;
+    if (data.legal_compliance != null) return data.legal_compliance;
     return null;
   }
 
@@ -1067,7 +1068,10 @@
 
   function renderSummary(data) {
     if (!resultBody) return;
-    var res = (data && data.result) || {};
+    var result = data && data.result ? data.result : data;
+    console.log("FULL RESULT:", data);
+    console.log("LEGAL FIELD:", result && result.legal_compliance);
+    var res = result && typeof result === "object" ? result : {};
     var sv = safeObject(res.summary_view);
     var parts = [];
 
