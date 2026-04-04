@@ -102,12 +102,28 @@ def persist_analysis_history(
         "result_snapshot": trimmed,
     }
     _REPO.append_record(record)
-    if uid != "guest":
-        print("Saved to cloud:", uid)
 
 
 # Alias for naming preference (Round6 Step3)
 save_analysis_snapshot = persist_analysis_history
+
+
+def save_analysis(payload: dict[str, Any]) -> None:
+    """Explicit cloud save (JSON file via :class:`HistoryRepository`).
+
+    Expected keys: ``user_id`` (or ``userId``), ``type`` (``property`` | ``contract``), ``result`` (full API result dict).
+    Optional: ``input``, ``summary``, ``created_at`` (reserved for callers; persistence uses ``persist_*`` shapes).
+    """
+    uid = str(payload.get("user_id") or payload.get("userId") or "").strip() or "guest"
+    rt = str(payload.get("type") or "property").strip().lower()
+    res = payload.get("result")
+    if rt == "contract":
+        if not isinstance(res, dict):
+            return
+        persist_contract_analysis_snapshot(uid, "contract_analysis_v1", res)
+        return
+    if isinstance(res, dict) and res.get("success"):
+        persist_property_analysis_snapshot(uid, res)
 
 
 def persist_property_analysis_snapshot(user_id: str, orchestrator_out: dict[str, Any]) -> None:

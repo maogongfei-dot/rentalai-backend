@@ -75,10 +75,7 @@ from data.storage.records_db import (
     list_favorite_records,
     normalize_analysis_input_signature,
 )
-from persistence.analysis_history_writer import (
-    try_persist_contract_analysis_snapshot,
-    try_persist_property_analysis_snapshot,
-)
+from persistence.analysis_history_writer import save_analysis
 from persistence.history_read_service import (
     clear_public_records_for_user,
     delete_public_record_for_user,
@@ -892,7 +889,21 @@ def api_ai_query(request: Request, body: dict = Body(default_factory=dict)):
         out = run_housing_ai_query(str(ut or ""))
         hw = resolve_history_write_user_id(request, body)
         if hw["ok"]:
-            try_persist_property_analysis_snapshot(hw["user_id"], out)
+            try:
+                save_analysis(
+                    {
+                        "user_id": hw["user_id"],
+                        "type": "property",
+                        "input": str(ut or ""),
+                        "summary": out.get("market_summary")
+                        if isinstance(out, dict) and isinstance(out.get("market_summary"), dict)
+                        else {},
+                        "result": out,
+                    }
+                )
+                print("Saved to cloud:", hw["user_id"])
+            except Exception as e:
+                print("Cloud save failed:", str(e))
         if isinstance(out, dict):
             payload = dict(out)
             payload["history_write"] = {
@@ -1147,7 +1158,19 @@ def api_contract_analysis_text(request: Request, body: ContractAnalysisTextApiBo
         ui_payload = build_contract_analysis_ui_payload(facade)
         hw = resolve_history_write_user_id(request, body.model_dump())
         if hw["ok"]:
-            try_persist_contract_analysis_snapshot(hw["user_id"], "contract_analysis_v1", ui_payload)
+            try:
+                save_analysis(
+                    {
+                        "user_id": hw["user_id"],
+                        "type": "contract",
+                        "input": ct[:8000],
+                        "summary": {},
+                        "result": ui_payload,
+                    }
+                )
+                print("Saved to cloud:", hw["user_id"])
+            except Exception as e:
+                print("Cloud save failed:", str(e))
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
@@ -1200,7 +1223,19 @@ def api_contract_analysis_file_path(request: Request, body: ContractAnalysisFile
         ui_payload = build_contract_analysis_ui_payload(facade)
         hw = resolve_history_write_user_id(request, body.model_dump())
         if hw["ok"]:
-            try_persist_contract_analysis_snapshot(hw["user_id"], "contract_analysis_v1", ui_payload)
+            try:
+                save_analysis(
+                    {
+                        "user_id": hw["user_id"],
+                        "type": "contract",
+                        "input": str(path)[:8000],
+                        "summary": {},
+                        "result": ui_payload,
+                    }
+                )
+                print("Saved to cloud:", hw["user_id"])
+            except Exception as e:
+                print("Cloud save failed:", str(e))
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
@@ -1261,7 +1296,19 @@ async def api_contract_analysis_upload(
         ui_payload = build_contract_analysis_ui_payload(facade)
         hw = resolve_history_write_user_id(request, {"userId": userId} if userId else {})
         if hw["ok"]:
-            try_persist_contract_analysis_snapshot(hw["user_id"], "contract_analysis_v1", ui_payload)
+            try:
+                save_analysis(
+                    {
+                        "user_id": hw["user_id"],
+                        "type": "contract",
+                        "input": str(file.filename or "")[:8000],
+                        "summary": {},
+                        "result": ui_payload,
+                    }
+                )
+                print("Saved to cloud:", hw["user_id"])
+            except Exception as e:
+                print("Cloud save failed:", str(e))
         return {
             "ok": True,
             "engine": "contract_analysis_v1",
