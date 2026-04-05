@@ -7,39 +7,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-# UK cities / areas (lowercase substring match on normalized text).
-KNOWN_UK_CITIES: tuple[str, ...] = (
-    "london",
-    "manchester",
-    "birmingham",
-    "leeds",
-    "glasgow",
-    "liverpool",
-    "bristol",
-    "sheffield",
-    "edinburgh",
-    "cardiff",
-    "belfast",
-    "newcastle",
-    "nottingham",
-    "southampton",
-    "leicester",
-    "oxford",
-    "cambridge",
-    "brighton",
-    "reading",
-    "york",
-    "bath",
-    "norwich",
-    "plymouth",
-    "coventry",
-    "swansea",
-    "portsmouth",
-    "bournemouth",
-    "milton keynes",
-    "aberdeen",
-    "dundee",
-)
+from .location.uk_cities import KNOWN_UK_CITIES
 
 # (priority_key, tuple of substrings to search in lowercased text)
 _PRICE_PATTERNS: tuple[str, ...] = (

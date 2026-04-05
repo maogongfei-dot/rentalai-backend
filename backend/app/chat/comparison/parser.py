@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from ..preference_detection import KNOWN_UK_CITIES
+from ..location.uk_cities import KNOWN_UK_CITIES
 
 _UK_POSTCODE_RE = re.compile(
     r"\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b",

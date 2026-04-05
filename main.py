@@ -4,6 +4,7 @@ RentalAI repo root: quick test entry for the Phase 1 chat router.
 Usage (from repo root):
   python main.py "Is my deposit protected?"
   python main.py
+  python main.py --phase8
 """
 
 from __future__ import annotations
@@ -18,6 +19,14 @@ if str(ROOT) not in sys.path:
 
 from backend.app.chat import handle_chat_request
 
+_PHASE8_UK_LOCATION_TESTS = (
+    "Manchester",
+    "M1 4BT",
+    "Manchester M1 4BT",
+    "Affordable flat in Birmingham city centre",
+    "Compare my current place in Leeds with this property at B15 2TT",
+)
+
 
 def main() -> None:
     if sys.platform == "win32":
@@ -26,6 +35,24 @@ def main() -> None:
         except Exception:
             pass
     argv = sys.argv[1:]
+    if argv and argv[0] in ("--phase8", "--loc-tests", "--uk-location-tests"):
+        for text in _PHASE8_UK_LOCATION_TESTS:
+            print("=" * 72)
+            print("INPUT:", text)
+            result = handle_chat_request(text)
+            print(
+                "uk_location_context:",
+                json.dumps(result.get("uk_location_context") or {}, indent=2, ensure_ascii=False),
+            )
+            print("city_context:", result.get("city_context"))
+            print("postcode_context:", result.get("postcode_context"))
+            print(
+                "analysis_route:",
+                json.dumps(result.get("analysis_route") or {}, indent=2, ensure_ascii=False),
+            )
+            print("--- response_text ---")
+            print(result.get("response_text") or "")
+        return
     if argv:
         text = " ".join(argv)
     else:

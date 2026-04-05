@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from ..preference_detection import KNOWN_UK_CITIES
+from ..location.uk_cities import KNOWN_UK_CITIES
 
 _URL_RE = re.compile(r"https?://[^\s<>\]\"']+", re.I)
 _UK_POSTCODE_RE = re.compile(
@@ -109,9 +109,6 @@ def _extract_locations(low: str) -> list[str]:
             if title not in seen:
                 seen.add(title)
                 found.append(title)
-    if "london" in low and "London" not in seen:
-        found.append("London")
-        seen.add("London")
     return found
 
 

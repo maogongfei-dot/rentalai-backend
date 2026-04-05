@@ -43,6 +43,7 @@ from .analysis_route import (
     empty_analysis_entry,
     empty_analysis_route,
 )
+from .location import build_uk_location_context, empty_uk_location_context
 
 MODULE_ID = "chat_router"
 
@@ -100,9 +101,13 @@ def _merge_scope_into(base: dict[str, Any], scope_info: dict[str, Any]) -> dict[
     return out
 
 
-def _with_preferences(result: dict[str, Any], trimmed: str) -> dict[str, Any]:
+def _with_preferences(
+    result: dict[str, Any],
+    trimmed: str,
+    pref_det: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Attach structured preferences; optional one-line acknowledgement in response_text."""
-    det = detect_user_preferences(trimmed)
+    det = pref_det if pref_det is not None else detect_user_preferences(trimmed)
     po: list[str] = list(det.get("priority_order") or [])
     summary = build_user_signals_summary(po)
     out = dict(result)
@@ -152,6 +157,10 @@ def _failure_empty() -> dict[str, Any]:
         "analysis_readiness": "pending",
         "next_analysis_action": "",
         "route_based_response_text": "",
+        "uk_location_context": empty_uk_location_context(),
+        "city_context": "",
+        "postcode_context": "",
+        "supports_uk_wide_routing": True,
         **scope_block,
     }
 
@@ -174,6 +183,69 @@ def _attach_property_input(
     out["property_input_detected"] = pi_parsed.get("is_property_reference", False)
     out["property_input_parsed"] = pi_parsed
     out["property_reference"] = pi_ref
+    return out
+
+
+def _attach_uk_location(
+    out: dict[str, Any],
+    trimmed: str,
+    pi_parsed: dict[str, Any],
+    pi_ref: dict[str, Any],
+    detected_preferences: dict[str, Any],
+) -> dict[str, Any]:
+    uk = build_uk_location_context(
+        trimmed,
+        property_input_parsed=pi_parsed,
+        property_reference=pi_ref,
+        comparison_inputs=out.get("comparison_inputs"),
+        comparison_result=out.get("comparison_result"),
+        detected_preferences=detected_preferences,
+    )
+    o = dict(out)
+    o["uk_location_context"] = uk
+    o["city_context"] = uk.get("city") or ""
+    o["postcode_context"] = uk.get("postcode") or ""
+    o["supports_uk_wide_routing"] = True
+    return o
+
+
+def _append_uk_location_hint(result: dict[str, Any]) -> dict[str, Any]:
+    if result.get("intent") == "legal_risk" or result.get("scope") == "out_of_scope":
+        return result
+    uk = result.get("uk_location_context") or {}
+    if not uk.get("is_supported_uk_context"):
+        return result
+    lt = uk.get("location_type")
+    if lt == "unknown":
+        return result
+    city = uk.get("city")
+    pc = uk.get("postcode")
+    if lt == "city" and city:
+        hint = (
+            f"I noted a UK city context ({city}). "
+            "That can later anchor area-level analysis across UK cities."
+        )
+    elif lt == "postcode" and pc:
+        hint = (
+            f"I noted postcode {pc}. "
+            "That can work as a local anchor when area-level analysis is connected."
+        )
+    elif lt == "mixed" and city and pc:
+        hint = (
+            f"I noted {city} and {pc} together for more precise local context later."
+        )
+    else:
+        hint = (
+            "I noted UK location context for later area-level and cross-city use."
+        )
+    rt_body = (result.get("response_text") or "").rstrip()
+    if hint in rt_body:
+        return result
+    out = dict(result)
+    out["response_text"] = f"{rt_body}\n\n{hint}" if rt_body else hint
+    nsp = (out.get("next_step_prompt") or "").strip()
+    if nsp and hint not in nsp:
+        out["next_step_prompt"] = f"{nsp}\n{hint}"
     return out
 
 
@@ -214,6 +286,7 @@ def _apply_analysis_route(
         "comparison_inputs": out.get("comparison_inputs"),
         "comparison_result": out.get("comparison_result"),
         "user_text": trimmed,
+        "uk_location_context": out.get("uk_location_context") or {},
     }
     route = decide_analysis_route(ctx)
     entry = build_analysis_entry_result(route, ctx, pi_ref)
@@ -255,8 +328,11 @@ def _finish_chat_response(
 ) -> dict[str, Any]:
     out = _merge_followup(_merge_scope_into(base, scope_info), bundle)
     out = _attach_property_input(out, pi_parsed, pi_ref)
+    pref_det = detect_user_preferences(trimmed)
+    out = _attach_uk_location(out, trimmed, pi_parsed, pi_ref, pref_det)
     out = _apply_analysis_route(out, trimmed, pi_parsed, pi_ref, scope_info)
-    out = _with_preferences(out, trimmed)
+    out = _with_preferences(out, trimmed, pref_det)
+    out = _append_uk_location_hint(out)
     out = _append_property_hint(out, pi_parsed)
     return out
 

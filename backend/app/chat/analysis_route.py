@@ -6,7 +6,8 @@ from __future__ import annotations
 
 from typing import Any
 
-def decide_analysis_route(context: dict[str, Any]) -> dict[str, Any]:
+
+def _decide_analysis_route_core(context: dict[str, Any]) -> dict[str, Any]:
     """
     Choose analysis path from intent, scope, property_input parse, and comparison payloads.
 
@@ -21,6 +22,7 @@ def decide_analysis_route(context: dict[str, Any]) -> dict[str, Any]:
     comp_in = context.get("comparison_inputs") or {}
     comp_res = context.get("comparison_result") or {}
     low = " ".join((context.get("user_text") or "").lower().split())
+    uk_ctx = context.get("uk_location_context") or {}
 
     # 1) Comparison — highest priority
     if intent == "property_comparison" or comp_in.get("is_comparison"):
@@ -101,9 +103,19 @@ def decide_analysis_route(context: dict[str, Any]) -> dict[str, Any]:
         }
 
     if cit == "postcode":
+        if (
+            uk_ctx.get("location_type") == "mixed"
+            and uk_ctx.get("city")
+            and uk_ctx.get("postcode")
+        ):
+            pc_reason = (
+                "City and postcode together; suitable for area-level and local analysis."
+            )
+        else:
+            pc_reason = "Postcode-only input suits area and surroundings review."
         return {
             "route_type": "area_analysis_candidate",
-            "route_reason": "Postcode-only input suits area and surroundings review.",
+            "route_reason": pc_reason,
             "route_confidence": 0.78,
             "analysis_ready": False,
             "missing_inputs": [
@@ -196,6 +208,54 @@ def decide_analysis_route(context: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _join_route_reason(base: str, suffix: str) -> str:
+    b = (base or "").strip()
+    if not b:
+        return suffix
+    if b.endswith("."):
+        return f"{b} {suffix}"
+    return f"{b}. {suffix}"
+
+
+def _enhance_route_with_uk(route: dict[str, Any], uk: dict[str, Any] | None) -> dict[str, Any]:
+    if not uk or uk.get("location_type") == "unknown":
+        return dict(route)
+    r = dict(route)
+    lt = uk.get("location_type")
+    city = uk.get("city")
+    pc = uk.get("postcode")
+    base = (r.get("route_reason") or "").strip()
+    if lt == "mixed" and city and pc:
+        r["route_reason"] = _join_route_reason(
+            base,
+            "Both city and postcode context were detected, "
+            "which is useful for more precise local analysis later.",
+        )
+    elif lt == "city" and city:
+        r["route_reason"] = _join_route_reason(
+            base,
+            f"A UK city context ({city}) was detected, "
+            "so this can later be used for area-level analysis.",
+        )
+    elif lt == "postcode" and pc:
+        r["route_reason"] = _join_route_reason(
+            base,
+            f"A UK postcode ({pc}) was detected, "
+            "so this can later be used for more targeted area analysis.",
+        )
+    else:
+        return r
+    rc = float(r.get("route_confidence") or 0.5)
+    r["route_confidence"] = round(min(0.95, rc + 0.02), 2)
+    return r
+
+
+def decide_analysis_route(context: dict[str, Any]) -> dict[str, Any]:
+    uk = context.get("uk_location_context") or {}
+    route = _decide_analysis_route_core(context)
+    return _enhance_route_with_uk(route, uk)
+
+
 def _property_missing(pip: dict[str, Any]) -> list[str]:
     miss: list[str] = []
     if pip.get("detected_price") is None:
@@ -250,6 +310,7 @@ def build_analysis_entry_result(
     missing = list(route.get("missing_inputs") or [])
     next_mod = route.get("next_module_target") or "none"
     pref = context.get("property_reference") or property_reference
+    uk = context.get("uk_location_context") or {}
 
     next_action = ""
     if missing:
@@ -301,6 +362,33 @@ def build_analysis_entry_result(
         line = ""
 
     route_based = line.strip()
+
+    if uk.get("is_supported_uk_context"):
+        summary["uk_location_context"] = {
+            "city": uk.get("city"),
+            "postcode": uk.get("postcode"),
+            "location_type": uk.get("location_type"),
+        }
+        uk_extra = ""
+        lt = uk.get("location_type")
+        if lt == "mixed" and uk.get("city") and uk.get("postcode"):
+            uk_extra = (
+                "Both city and postcode context were detected, "
+                "which is useful for more precise local analysis later."
+            )
+        elif lt == "city" and uk.get("city"):
+            uk_extra = (
+                "A UK city context was detected, so this can later be used for area-level analysis."
+            )
+        elif lt == "postcode" and uk.get("postcode"):
+            uk_extra = (
+                "A postcode was detected, so this can later be used for more targeted area analysis."
+            )
+        if uk_extra:
+            if next_action:
+                next_action = f"{next_action} {uk_extra}"
+            else:
+                next_action = uk_extra
 
     return {
         "route_summary": summary,
