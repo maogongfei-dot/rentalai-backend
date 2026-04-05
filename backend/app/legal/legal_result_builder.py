@@ -7,6 +7,7 @@ from typing import Any
 from .compliance_engine import build_disclaimer
 from .compliance_types import ComplianceAnalysisResult
 from .output_formatter import build_overall_output
+from .phase0_natural_display import build_phase0_readable_report
 from .phase0_unified_display import (
     build_phase0_unified_from_compliance_result,
     build_phase0_unified_from_legal_response,
@@ -35,6 +36,7 @@ def build_legal_analysis_response(result: ComplianceAnalysisResult) -> dict[str,
         },
     }
     out["phase0_unified"] = build_phase0_unified_from_compliance_result(result)
+    out["phase0_natural_text"] = build_phase0_readable_report(out["phase0_unified"])
     return out
 
 
@@ -63,6 +65,7 @@ def build_empty_legal_response(
         },
     }
     empty["phase0_unified"] = build_phase0_unified_from_legal_response(empty)
+    empty["phase0_natural_text"] = build_phase0_readable_report(empty["phase0_unified"])
     return empty
 
 
@@ -93,4 +96,5 @@ def build_error_legal_response(
         },
     }
     err["phase0_unified"] = build_phase0_unified_from_legal_response(err)
+    err["phase0_natural_text"] = build_phase0_readable_report(err["phase0_unified"])
     return err

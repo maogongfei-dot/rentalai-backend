@@ -23,6 +23,8 @@ from .output_formatter import (
     format_risk_label,
     normalize_explanation_text,
 )
+from .phase0_entry import run_phase0_analysis
+from .phase0_natural_display import build_phase0_readable_report
 from .phase0_unified_display import (
     build_phase0_unified_from_compliance_result,
     build_phase0_unified_from_legal_response,
@@ -58,6 +60,8 @@ __all__ = [
     "normalize_explanation_text",
     "normalize_raw_risk_level",
     "normalize_text",
+    "run_phase0_analysis",
+    "build_phase0_readable_report",
     "build_phase0_unified_from_compliance_result",
     "build_phase0_unified_from_legal_response",
     "build_risk_badge",
