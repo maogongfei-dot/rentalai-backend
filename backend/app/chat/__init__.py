@@ -18,6 +18,7 @@ from .analysis_route import (
     decide_analysis_route,
 )
 from .location import build_uk_location_context
+from .presentation import build_chat_display_bundle
 from .preference_detection import detect_user_preferences
 from .query_scope import classify_query_scope
 from .router import handle_chat_request
@@ -29,6 +30,7 @@ __all__ = [
     "build_property_reference",
     "classify_intent",
     "decide_analysis_route",
+    "build_chat_display_bundle",
     "build_uk_location_context",
     "classify_query_scope",
     "detect_user_preferences",

@@ -44,6 +44,7 @@ from .analysis_route import (
     empty_analysis_route,
 )
 from .location import build_uk_location_context, empty_uk_location_context
+from .presentation import build_chat_display_bundle
 
 MODULE_ID = "chat_router"
 
@@ -130,7 +131,7 @@ def _failure_empty() -> dict[str, Any]:
     scope_block = _scope_fields(invalid_scope)
     pi_empty = parse_property_input("")
     pi_ref_empty = build_property_reference(pi_empty)
-    return {
+    empty_result: dict[str, Any] = {
         "module": MODULE_ID,
         "success": False,
         "intent": "invalid_input",
@@ -163,6 +164,10 @@ def _failure_empty() -> dict[str, Any]:
         "supports_uk_wide_routing": True,
         **scope_block,
     }
+    disp = build_chat_display_bundle(empty_result)
+    empty_result["display_text"] = disp["display_text"]
+    empty_result["display_sections"] = disp["display_sections"]
+    return empty_result
 
 
 def _prepend_related_lead(response: str, scope_info: dict[str, Any]) -> str:
@@ -334,6 +339,9 @@ def _finish_chat_response(
     out = _with_preferences(out, trimmed, pref_det)
     out = _append_uk_location_hint(out)
     out = _append_property_hint(out, pi_parsed)
+    disp = build_chat_display_bundle(out)
+    out["display_text"] = disp["display_text"]
+    out["display_sections"] = disp["display_sections"]
     return out
 
 

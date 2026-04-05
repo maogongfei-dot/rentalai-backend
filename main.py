@@ -5,6 +5,7 @@ Usage (from repo root):
   python main.py "Is my deposit protected?"
   python main.py
   python main.py --phase8
+  python main.py --phase9
 """
 
 from __future__ import annotations
@@ -18,6 +19,14 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.app.chat import handle_chat_request
+
+_PHASE9_DISPLAY_TESTS = (
+    "Is this deposit clause risky?",
+    "Compare my current place in Leeds with this property at B15 2TT",
+    "Manchester M1 4BT",
+    "I want something cheap and safe",
+    "I want to buy a house in London",
+)
 
 _PHASE8_UK_LOCATION_TESTS = (
     "Manchester",
@@ -35,6 +44,18 @@ def main() -> None:
         except Exception:
             pass
     argv = sys.argv[1:]
+    if argv and argv[0] in ("--phase9", "--display-tests"):
+        for text in _PHASE9_DISPLAY_TESTS:
+            print("=" * 72)
+            print("INPUT:", text)
+            result = handle_chat_request(text)
+            print("--- display_text ---")
+            print(result.get("display_text") or "")
+            print("--- display_sections ---")
+            print(json.dumps(result.get("display_sections") or {}, indent=2, ensure_ascii=False))
+            print("--- response_text (unchanged field) ---")
+            print(result.get("response_text") or "")
+        return
     if argv and argv[0] in ("--phase8", "--loc-tests", "--uk-location-tests"):
         for text in _PHASE8_UK_LOCATION_TESTS:
             print("=" * 72)
@@ -81,6 +102,10 @@ def main() -> None:
     print("intent:", result.get("intent"))
     print("source_module:", result.get("source_module"))
     print("risk_tier:", result.get("risk_tier"))
+    print("--- display_text ---")
+    print(result.get("display_text") or "")
+    print("--- display_sections ---")
+    print(json.dumps(result.get("display_sections") or {}, indent=2, ensure_ascii=False))
     print("--- response_text ---")
     print(result.get("response_text") or "")
     print("--- followup_suggestions ---")
