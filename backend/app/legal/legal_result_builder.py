@@ -7,6 +7,10 @@ from typing import Any
 from .compliance_engine import build_disclaimer
 from .compliance_types import ComplianceAnalysisResult
 from .output_formatter import build_overall_output
+from .phase0_unified_display import (
+    build_phase0_unified_from_compliance_result,
+    build_phase0_unified_from_legal_response,
+)
 
 
 def build_legal_analysis_response(result: ComplianceAnalysisResult) -> dict[str, Any]:
@@ -18,7 +22,7 @@ def build_legal_analysis_response(result: ComplianceAnalysisResult) -> dict[str,
         "summary_plain": overall_block["summary_plain"],
         "disclaimer": overall_block["disclaimer"],
     }
-    return {
+    out: dict[str, Any] = {
         "module": "legal_compliance",
         "has_legal_disclaimer": True,
         "overall": overall_inner,
@@ -30,6 +34,8 @@ def build_legal_analysis_response(result: ComplianceAnalysisResult) -> dict[str,
             "rule_count": len(rule_results),
         },
     }
+    out["phase0_unified"] = build_phase0_unified_from_compliance_result(result)
+    return out
 
 
 def build_empty_legal_response(
@@ -37,7 +43,7 @@ def build_empty_legal_response(
     source_type: str = "contract_clause",
 ) -> dict[str, Any]:
     disclaimer = build_disclaimer()
-    return {
+    empty: dict[str, Any] = {
         "module": "legal_compliance",
         "has_legal_disclaimer": True,
         "overall": {
@@ -56,6 +62,8 @@ def build_empty_legal_response(
             "rule_count": 0,
         },
     }
+    empty["phase0_unified"] = build_phase0_unified_from_legal_response(empty)
+    return empty
 
 
 def build_error_legal_response(
@@ -64,7 +72,7 @@ def build_error_legal_response(
     source_type: str = "contract_clause",
 ) -> dict[str, Any]:
     disclaimer = build_disclaimer()
-    return {
+    err: dict[str, Any] = {
         "module": "legal_compliance",
         "has_legal_disclaimer": True,
         "overall": {
@@ -84,3 +92,5 @@ def build_error_legal_response(
             "error_message": error_message,
         },
     }
+    err["phase0_unified"] = build_phase0_unified_from_legal_response(err)
+    return err

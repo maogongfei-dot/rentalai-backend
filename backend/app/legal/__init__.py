@@ -23,6 +23,13 @@ from .output_formatter import (
     format_risk_label,
     normalize_explanation_text,
 )
+from .phase0_unified_display import (
+    build_phase0_unified_from_compliance_result,
+    build_phase0_unified_from_legal_response,
+    build_risk_badge,
+    format_phase0_display_text,
+    normalize_raw_risk_level,
+)
 from .rules_registry import get_rule as get_rule
 from .rules_registry import get_ruleset as get_ruleset
 from .rules_schema import LegalRule, LegalRuleSet, RuleCheckExample
@@ -49,5 +56,10 @@ __all__ = [
     "get_rule",
     "get_ruleset",
     "normalize_explanation_text",
+    "normalize_raw_risk_level",
     "normalize_text",
+    "build_phase0_unified_from_compliance_result",
+    "build_phase0_unified_from_legal_response",
+    "build_risk_badge",
+    "format_phase0_display_text",
 ]
