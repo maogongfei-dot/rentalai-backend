@@ -36,6 +36,13 @@ from .property_input import (
     parse_property_input,
     property_input_voice_line,
 )
+from .analysis_route import (
+    build_analysis_entry_result,
+    compute_analysis_readiness,
+    decide_analysis_route,
+    empty_analysis_entry,
+    empty_analysis_route,
+)
 
 MODULE_ID = "chat_router"
 
@@ -140,6 +147,11 @@ def _failure_empty() -> dict[str, Any]:
         "property_input_detected": pi_empty.get("is_property_reference", False),
         "property_input_parsed": pi_empty,
         "property_reference": pi_ref_empty,
+        "analysis_route": empty_analysis_route(),
+        "analysis_entry_result": empty_analysis_entry(),
+        "analysis_readiness": "pending",
+        "next_analysis_action": "",
+        "route_based_response_text": "",
         **scope_block,
     }
 
@@ -168,15 +180,69 @@ def _attach_property_input(
 def _append_property_hint(result: dict[str, Any], pi_parsed: dict[str, Any]) -> dict[str, Any]:
     if result.get("intent") == "property_comparison":
         return result
+    ar = result.get("analysis_route") or {}
+    if ar.get("route_type") in ("property_analysis_candidate", "area_analysis_candidate"):
+        if (result.get("route_based_response_text") or "").strip():
+            return result
+    rb = (result.get("route_based_response_text") or "").strip()
+    rt_body = result.get("response_text") or ""
+    if rb and rb in rt_body:
+        return result
     hint = property_input_voice_line(pi_parsed)
     if not hint:
         return result
-    rt = result.get("response_text") or ""
-    if hint in rt:
+    if hint in rt_body:
         return result
     out = dict(result)
-    out["response_text"] = f"{rt.rstrip()}\n\n{hint}"
+    out["response_text"] = f"{rt_body.rstrip()}\n\n{hint}"
     return out
+
+
+def _apply_analysis_route(
+    out: dict[str, Any],
+    trimmed: str,
+    pi_parsed: dict[str, Any],
+    pi_ref: dict[str, Any],
+    scope_info: dict[str, Any],
+) -> dict[str, Any]:
+    """Attach analysis_route / entry result and prepend route-based copy when appropriate."""
+    ctx: dict[str, Any] = {
+        "intent": out.get("intent"),
+        "scope_info": scope_info,
+        "property_input_parsed": pi_parsed,
+        "property_reference": pi_ref,
+        "comparison_inputs": out.get("comparison_inputs"),
+        "comparison_result": out.get("comparison_result"),
+        "user_text": trimmed,
+    }
+    route = decide_analysis_route(ctx)
+    entry = build_analysis_entry_result(route, ctx, pi_ref)
+    readiness = compute_analysis_readiness(route, entry, out.get("comparison_result"))
+    o = dict(out)
+    o["analysis_route"] = route
+    o["analysis_entry_result"] = entry
+    o["analysis_readiness"] = readiness
+    o["next_analysis_action"] = entry.get("next_analysis_action") or ""
+    o["route_based_response_text"] = entry.get("route_based_response_text") or ""
+
+    rtxt = (entry.get("route_based_response_text") or "").strip()
+    intent = o.get("intent")
+    scope = o.get("scope")
+    body = (o.get("response_text") or "").strip()
+
+    if intent == "legal_risk" or scope == "out_of_scope":
+        return o
+    if not rtxt or rtxt in body:
+        return o
+
+    rt = route.get("route_type")
+    if rt in (
+        "property_analysis_candidate",
+        "area_analysis_candidate",
+        "property_comparison",
+    ):
+        o["response_text"] = f"{rtxt}\n\n{body}".strip()
+    return o
 
 
 def _finish_chat_response(
@@ -189,6 +255,7 @@ def _finish_chat_response(
 ) -> dict[str, Any]:
     out = _merge_followup(_merge_scope_into(base, scope_info), bundle)
     out = _attach_property_input(out, pi_parsed, pi_ref)
+    out = _apply_analysis_route(out, trimmed, pi_parsed, pi_ref, scope_info)
     out = _with_preferences(out, trimmed)
     out = _append_property_hint(out, pi_parsed)
     return out

@@ -13,15 +13,21 @@ from .property_input import (
     build_property_reference,
     parse_property_input,
 )
+from .analysis_route import (
+    build_analysis_entry_result,
+    decide_analysis_route,
+)
 from .preference_detection import detect_user_preferences
 from .query_scope import classify_query_scope
 from .router import handle_chat_request
 
 __all__ = [
+    "build_analysis_entry_result",
     "build_chat_followup_bundle",
     "build_comparison_response_text",
     "build_property_reference",
     "classify_intent",
+    "decide_analysis_route",
     "classify_query_scope",
     "detect_user_preferences",
     "extract_property_comparison_inputs",
