@@ -37,6 +37,17 @@ def main() -> None:
         print("No input. Pass text as args or stdin.")
         return
     result = handle_chat_request(text)
+    pip = result.get("property_input_parsed") or {}
+    if pip:
+        print("input_type:", pip.get("input_type"))
+        print("detected_links:", pip.get("detected_links"))
+        print("detected_postcodes:", pip.get("detected_postcodes"))
+        print("property_reference:", json.dumps(result.get("property_reference") or {}, indent=2, ensure_ascii=False))
+        print("property_input_detected:", result.get("property_input_detected"))
+    print("scope:", result.get("scope"), "| handling:", result.get("scope_handling"))
+    print("scope_confidence:", result.get("scope_confidence"))
+    print("matched_scope_keywords:", result.get("matched_scope_keywords"))
+    print("scope_message:", repr(result.get("scope_message") or ""))
     print("intent:", result.get("intent"))
     print("source_module:", result.get("source_module"))
     print("risk_tier:", result.get("risk_tier"))
@@ -53,6 +64,13 @@ def main() -> None:
     print("user_signals_summary:", result.get("user_signals_summary") or "")
     print("--- detected_preferences ---")
     print(json.dumps(result.get("detected_preferences") or {}, indent=2, ensure_ascii=False))
+    cr = result.get("comparison_result")
+    if cr:
+        print("--- comparison ---")
+        print("comparison_inputs:", json.dumps(result.get("comparison_inputs") or {}, indent=2, ensure_ascii=False))
+        print("comparison_summary:", cr.get("comparison_summary"))
+        print("comparison_points:", json.dumps(cr.get("comparison_points") or [], indent=2, ensure_ascii=False))
+        print("missing_information:", cr.get("missing_information"))
 
 
 if __name__ == "__main__":

@@ -8,8 +8,13 @@ from __future__ import annotations
 
 # Phrases / tokens (lowercased substring match unless noted).
 INTENT_PROPERTY_COMPARISON = (
+    "compare ",
     "compare properties",
     "compare these",
+    "compare my",
+    "compare two",
+    "compare this property",
+    "with this property",
     "which property",
     "which flat",
     "which house",
@@ -17,6 +22,15 @@ INTENT_PROPERTY_COMPARISON = (
     " versus ",
     " vs ",
     "better deal",
+    "comparison",
+    "better than",
+    "which is better",
+    "this one or that one",
+    "current place",
+    "current flat",
+    "current house",
+    "the one i live in now",
+    "that property",
 )
 
 INTENT_LEGAL_RISK = (
@@ -82,8 +96,8 @@ INTENT_AREA_INFO = (
 )
 
 INTENT_ORDER: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("property_comparison", INTENT_PROPERTY_COMPARISON),
     ("legal_risk", INTENT_LEGAL_RISK),
+    ("property_comparison", INTENT_PROPERTY_COMPARISON),
     ("bills_cost", INTENT_BILLS_COST),
     ("property_analysis", INTENT_PROPERTY_ANALYSIS),
     ("area_info", INTENT_AREA_INFO),

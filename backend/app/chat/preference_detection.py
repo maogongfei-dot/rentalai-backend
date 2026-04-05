@@ -8,7 +8,7 @@ import re
 from typing import Any
 
 # UK cities / areas (lowercase substring match on normalized text).
-_KNOWN_LOCATIONS: tuple[str, ...] = (
+KNOWN_UK_CITIES: tuple[str, ...] = (
     "london",
     "manchester",
     "birmingham",
@@ -213,7 +213,7 @@ def _student_first_pos(low: str) -> int | None:
 def _extract_locations(low: str) -> list[str]:
     found: list[str] = []
     seen: set[str] = set()
-    for loc in _KNOWN_LOCATIONS:
+    for loc in KNOWN_UK_CITIES:
         if loc in low:
             title = loc.title() if " " not in loc else " ".join(w.title() for w in loc.split())
             if title not in seen:

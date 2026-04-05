@@ -19,6 +19,23 @@ from .preference_detection import (
     detect_user_preferences,
     preference_voice_line,
 )
+from .query_scope import (
+    build_scope_message,
+    classify_query_scope,
+    scope_handling_label,
+)
+from .comparison import (
+    build_comparison_response_text,
+    build_property_snapshot_from_side,
+    coerce_comparison_inputs,
+    extract_property_comparison_inputs,
+    run_basic_property_comparison,
+)
+from .property_input import (
+    build_property_reference,
+    parse_property_input,
+    property_input_voice_line,
+)
 
 MODULE_ID = "chat_router"
 
@@ -59,6 +76,23 @@ def _merge_followup(base: dict[str, Any], bundle: dict[str, Any]) -> dict[str, A
     return out
 
 
+def _scope_fields(scope_info: dict[str, Any]) -> dict[str, Any]:
+    sc = scope_info.get("scope") or "rental_related"
+    return {
+        "scope": sc,
+        "scope_handling": scope_handling_label(sc),
+        "scope_message": build_scope_message(sc, list(scope_info.get("matched_keywords") or [])),
+        "scope_confidence": scope_info.get("confidence"),
+        "matched_scope_keywords": list(scope_info.get("matched_keywords") or []),
+    }
+
+
+def _merge_scope_into(base: dict[str, Any], scope_info: dict[str, Any]) -> dict[str, Any]:
+    out = dict(base)
+    out.update(_scope_fields(scope_info))
+    return out
+
+
 def _with_preferences(result: dict[str, Any], trimmed: str) -> dict[str, Any]:
     """Attach structured preferences; optional one-line acknowledgement in response_text."""
     det = detect_user_preferences(trimmed)
@@ -80,14 +114,16 @@ def _failure_empty() -> dict[str, Any]:
     inv = build_invalid_input_bundle()
     pref_empty = detect_user_preferences("")
     po_empty: list[str] = list(pref_empty.get("priority_order") or [])
+    invalid_scope = classify_query_scope("")
+    scope_block = _scope_fields(invalid_scope)
+    pi_empty = parse_property_input("")
+    pi_ref_empty = build_property_reference(pi_empty)
     return {
         "module": MODULE_ID,
         "success": False,
         "intent": "invalid_input",
         "input_text": "",
-        "response_text": (
-            "I could not process the request because no valid input was provided."
-        ),
+        "response_text": "I could not understand the request.",
         "source_module": None,
         "source_result": None,
         "suggested_followup": inv["next_step_prompt"],
@@ -99,20 +135,129 @@ def _failure_empty() -> dict[str, Any]:
         "detected_preferences": pref_empty,
         "priority_order": po_empty,
         "user_signals_summary": build_user_signals_summary(po_empty),
+        "comparison_inputs": None,
+        "comparison_result": None,
+        "property_input_detected": pi_empty.get("is_property_reference", False),
+        "property_input_parsed": pi_empty,
+        "property_reference": pi_ref_empty,
+        **scope_block,
     }
+
+
+def _prepend_related_lead(response: str, scope_info: dict[str, Any]) -> str:
+    if scope_info.get("scope") != "rental_related":
+        return response
+    lead = build_scope_message("rental_related", list(scope_info.get("matched_keywords") or []))
+    if not lead.strip():
+        return response
+    return f"{lead}\n\n{response.rstrip()}"
+
+
+def _attach_property_input(
+    base: dict[str, Any],
+    pi_parsed: dict[str, Any],
+    pi_ref: dict[str, Any],
+) -> dict[str, Any]:
+    out = dict(base)
+    out["property_input_detected"] = pi_parsed.get("is_property_reference", False)
+    out["property_input_parsed"] = pi_parsed
+    out["property_reference"] = pi_ref
+    return out
+
+
+def _append_property_hint(result: dict[str, Any], pi_parsed: dict[str, Any]) -> dict[str, Any]:
+    if result.get("intent") == "property_comparison":
+        return result
+    hint = property_input_voice_line(pi_parsed)
+    if not hint:
+        return result
+    rt = result.get("response_text") or ""
+    if hint in rt:
+        return result
+    out = dict(result)
+    out["response_text"] = f"{rt.rstrip()}\n\n{hint}"
+    return out
+
+
+def _finish_chat_response(
+    base: dict[str, Any],
+    scope_info: dict[str, Any],
+    bundle: dict[str, Any],
+    trimmed: str,
+    pi_parsed: dict[str, Any],
+    pi_ref: dict[str, Any],
+) -> dict[str, Any]:
+    out = _merge_followup(_merge_scope_into(base, scope_info), bundle)
+    out = _attach_property_input(out, pi_parsed, pi_ref)
+    out = _with_preferences(out, trimmed)
+    out = _append_property_hint(out, pi_parsed)
+    return out
 
 
 def handle_chat_request(user_text: str) -> dict[str, Any]:
     """
     Single entry for the chat orchestrator. Routes to Phase 0 for legal/contract queries.
 
-    Example: ``result = handle_chat_request("Is my deposit protected?")``
+    Flow: scope → intent → modules. Out-of-scope queries skip Phase 0.
     """
     trimmed = (user_text or "").strip()
     if not trimmed:
         return _failure_empty()
 
+    pi_parsed = parse_property_input(trimmed)
+    pi_ref = build_property_reference(pi_parsed)
+
+    scope_info = classify_query_scope(trimmed)
+    scope = scope_info.get("scope") or "rental_related"
+
+    if scope == "out_of_scope":
+        sm = build_scope_message("out_of_scope", list(scope_info.get("matched_keywords") or []))
+        bundle = build_chat_followup_bundle("general_unknown", source_result=None)
+        base = {
+            "module": MODULE_ID,
+            "success": True,
+            "intent": "out_of_scope",
+            "input_text": trimmed,
+            "response_text": sm,
+            "source_module": None,
+            "source_result": None,
+            "comparison_inputs": None,
+            "comparison_result": None,
+            "suggested_followup": (
+                "Ask about renting, tenancy agreements, deposits, or bills if you would like to continue."
+            ),
+            "available_next_modules": AVAILABLE_NEXT_MODULES,
+        }
+        return _finish_chat_response(base, scope_info, bundle, trimmed, pi_parsed, pi_ref)
+
     intent = classify_intent(trimmed)
+
+    if intent == "property_comparison":
+        inputs = extract_property_comparison_inputs(trimmed)
+        if not inputs["is_comparison"]:
+            inputs = coerce_comparison_inputs(trimmed)
+        sa = build_property_snapshot_from_side(inputs["property_a"])
+        sb = build_property_snapshot_from_side(inputs["property_b"])
+        prefs = detect_user_preferences(trimmed)
+        comp = run_basic_property_comparison(sa, sb, prefs)
+        response = build_comparison_response_text(comp)
+        bundle = build_chat_followup_bundle("property_comparison", source_result=None)
+        response = append_guidance_footer(response, str(bundle.get("response_closing") or ""))
+        response = _prepend_related_lead(response, scope_info)
+        base = {
+            "module": MODULE_ID,
+            "success": True,
+            "intent": "property_comparison",
+            "input_text": trimmed,
+            "response_text": response,
+            "source_module": "property_comparison",
+            "source_result": comp,
+            "comparison_inputs": inputs,
+            "comparison_result": comp,
+            "suggested_followup": str(comp.get("next_step_hint") or ""),
+            "available_next_modules": AVAILABLE_NEXT_MODULES,
+        }
+        return _finish_chat_response(base, scope_info, bundle, trimmed, pi_parsed, pi_ref)
 
     if intent == "legal_risk":
         p0 = run_phase0_analysis(trimmed)
@@ -122,6 +267,7 @@ def handle_chat_request(user_text: str) -> dict[str, Any]:
         follow = str(p0.get("suggested_followup") or "")
         bundle = build_chat_followup_bundle("legal_risk", source_result=p0)
         response = append_guidance_footer(response, str(bundle.get("response_closing") or ""))
+        response = _prepend_related_lead(response, scope_info)
         base = {
             "module": MODULE_ID,
             "success": True,
@@ -130,14 +276,17 @@ def handle_chat_request(user_text: str) -> dict[str, Any]:
             "response_text": response,
             "source_module": "phase0_legal_risk",
             "source_result": p0,
+            "comparison_inputs": None,
+            "comparison_result": None,
             "suggested_followup": follow,
             "available_next_modules": AVAILABLE_NEXT_MODULES,
         }
-        return _with_preferences(_merge_followup(base, bundle), trimmed)
+        return _finish_chat_response(base, scope_info, bundle, trimmed, pi_parsed, pi_ref)
 
     msg = _PLACEHOLDER_COPY.get(intent, _PLACEHOLDER_COPY["general_unknown"])
     bundle = build_chat_followup_bundle(intent, source_result=None)
     msg = append_guidance_footer(msg, str(bundle.get("response_closing") or ""))
+    msg = _prepend_related_lead(msg, scope_info)
     base = {
         "module": MODULE_ID,
         "success": True,
@@ -146,9 +295,11 @@ def handle_chat_request(user_text: str) -> dict[str, Any]:
         "response_text": msg,
         "source_module": None,
         "source_result": None,
+        "comparison_inputs": None,
+        "comparison_result": None,
         "suggested_followup": (
             "Ask about a contract clause or deposit if you want a rules-based check today."
         ),
         "available_next_modules": AVAILABLE_NEXT_MODULES,
     }
-    return _with_preferences(_merge_followup(base, bundle), trimmed)
+    return _finish_chat_response(base, scope_info, bundle, trimmed, pi_parsed, pi_ref)
