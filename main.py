@@ -8,6 +8,7 @@ Usage (from repo root):
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -38,8 +39,20 @@ def main() -> None:
     result = handle_chat_request(text)
     print("intent:", result.get("intent"))
     print("source_module:", result.get("source_module"))
+    print("risk_tier:", result.get("risk_tier"))
     print("--- response_text ---")
     print(result.get("response_text") or "")
+    print("--- followup_suggestions ---")
+    for i, line in enumerate(result.get("followup_suggestions") or [], 1):
+        print(f"  {i}. {line}")
+    print("next_step_prompt:", result.get("next_step_prompt") or "")
+    caps = result.get("available_capabilities") or []
+    if caps:
+        print("available_capabilities:", ", ".join(caps))
+    print("priority_order:", result.get("priority_order"))
+    print("user_signals_summary:", result.get("user_signals_summary") or "")
+    print("--- detected_preferences ---")
+    print(json.dumps(result.get("detected_preferences") or {}, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
