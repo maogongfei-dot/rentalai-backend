@@ -10,6 +10,17 @@ Usage (from repo root):
   python main.py --demo              # runs built-in E2E cases below
   python main.py --phase8            # UK location regression (uses same print layout)
   python main.py --phase9            # display regression (uses same print layout)
+  python main.py --contract          # Phase 3: contract mode (shortcut for --mode contract)
+  python main.py --mode contract     # explicit contract analysis mode
+  python main.py --mode property "…" # explicit property / chat analysis (handle_chat_request)
+  python main.py --auto-test         # Phase 3: rule-based intent detection (contract vs property)
+  python main.py --contract-norm-test  # Phase 3: contract input normalizer smoke (two samples)
+  python main.py --contract-actions-test  # Phase 3: action suggestions + synthetic failure envelope
+  python main.py --missing-clause-test    # Phase 3: missing clause checker (sparse vs full text)
+  python main.py --flagged-clause-test    # Phase 3: risk sentence locator (flagged segments)
+  python main.py --verdict-test           # Phase 3: final verdict (high vs low+incomplete)
+  python main.py --contract-demo          # Phase 3: standalone contract analysis demo (two samples)
+  python main.py --contract-batch-test    # Phase 3: contract_test_runner (batch + assertions)
 """
 
 from __future__ import annotations
@@ -24,6 +35,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.app.chat import handle_chat_request
+from modules.contract.contract_handler import handle_contract_input
+from modules.contract.contract_service import (
+    build_contract_result,
+    build_contract_verdict,
+    contract_normalized_text,
+    detect_missing_contract_clauses,
+    extract_flagged_clauses,
+    print_contract_result as print_contract_formatted_appendix,
+)
 
 # ---------------------------------------------------------------------------
 # Phase 1 Part 10 — Demo test inputs (contract / comparison / area / prefs / OOB)
@@ -54,6 +74,41 @@ _PHASE8_UK_LOCATION_TESTS = (
 
 _DEFAULT_DETAIL = "No additional details available."
 _PARTIAL = "Partial analysis only."
+
+# Phase 3 Part 8 — CLI analysis mode (property = chat/property pipeline; contract = contract_handler)
+MODE_PROPERTY = "property"
+MODE_CONTRACT = "contract"
+_DEFAULT_CONTRACT_SAMPLE = (
+    "The landlord may increase rent with notice. "
+    "The tenant must pay a non-refundable fee."
+)
+
+# Phase 3 Part 9 — rule-based intent (no LLM)
+_CONTRACT_INTENT_KEYWORDS: tuple[str, ...] = (
+    "contract",
+    "agreement",
+    "clause",
+    "tenant",
+    "landlord",
+    "deposit",
+    "rent increase",
+    "legal",
+)
+_CONTRACT_INTENT_LONG_TEXT_LEN = 200
+
+
+def detect_intent(user_input: str) -> str:
+    """
+    Return ``MODE_CONTRACT`` or ``MODE_PROPERTY`` using simple keyword / length rules.
+    """
+    s = str(user_input) if not isinstance(user_input, str) else user_input
+    if len(s) > _CONTRACT_INTENT_LONG_TEXT_LEN:
+        return MODE_CONTRACT
+    low = s.lower()
+    for kw in _CONTRACT_INTENT_KEYWORDS:
+        if kw in low:
+            return MODE_CONTRACT
+    return MODE_PROPERTY
 
 
 def _safe_str(value: Any, default: str = _DEFAULT_DETAIL) -> str:
@@ -180,6 +235,155 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
     print(_format_raw_debug(result))
 
 
+def run_contract_pipeline_for_text(text: str, *, show_mode_banner: bool = True) -> None:
+    """Contract mode: CLI framing + ``handle_contract_input`` + formatted appendix."""
+    normalized = contract_normalized_text(text)
+    if show_mode_banner:
+        print("======== ANALYSIS MODE: contract ========")
+    print("Normalized contract text:", normalized[:200])
+    print("======== CONTRACT INPUT ========")
+    print(normalized if normalized else _DEFAULT_DETAIL)
+    print()
+    final_output = handle_contract_input(text)
+    print()
+    print_contract_formatted_appendix(
+        {
+            "ok": final_output.get("ok"),
+            "summary": final_output.get("summary"),
+            "details": final_output.get("details"),
+            "error": final_output.get("error"),
+        }
+    )
+
+
+from modules.contract.contract_test_runner import run_contract_batch_test, run_contract_demo
+
+
+def run_contract_integration_test() -> None:
+    """Phase 3 — smoke test: contract mode with built-in sample text."""
+    run_contract_pipeline_for_text(_DEFAULT_CONTRACT_SAMPLE)
+
+
+def run_property_pipeline_for_text(text: str, *, show_mode_banner: bool = True) -> None:
+    """Property mode: existing chat / property analysis (unchanged behaviour)."""
+    if show_mode_banner:
+        print("======== ANALYSIS MODE: property ========")
+    try:
+        result = handle_chat_request(text)
+    except Exception as exc:
+        print("======== USER INPUT ========")
+        print(text)
+        print()
+        print(f"ERROR: {exc}")
+        return
+    print_demo_result(result, text)
+
+
+def run_auto_routed_pipeline(text: str) -> None:
+    """Phase 3 Part 9: detect intent, then contract or property pipeline."""
+    intent = detect_intent(text)
+    print("Detected mode:", intent)
+    if intent == MODE_CONTRACT:
+        run_contract_pipeline_for_text(text, show_mode_banner=False)
+    else:
+        run_property_pipeline_for_text(text, show_mode_banner=False)
+
+
+def run_contract_actions_smoke_test() -> None:
+    """Phase 3 Part 12: synthetic failure envelope; use ``python main.py --contract`` for live high-risk actions."""
+    print("=== Part 12: actions (failure envelope) ===\n")
+    fo = build_contract_result({"ok": False, "error": "Synthetic test error"}, "")
+    print("Module:", fo["module"])
+    print("OK:", fo["ok"])
+    print("Error:", fo.get("error"))
+    print("Actions:")
+    for a in fo["actions"]:
+        print("-", a)
+    print("Missing clauses:")
+    for item in fo.get("missing_clauses") or []:
+        print("-", item)
+    print("Flagged clauses:")
+    for item in fo.get("flagged_clauses") or []:
+        print("-", item)
+    v = fo.get("verdict") or {}
+    print("Verdict:", v.get("status"), "|", v.get("title"))
+
+
+def run_verdict_smoke_test() -> None:
+    """Part 15: synthetic final_output shapes — high_risk vs review_needed (low + gaps)."""
+    high = {
+        "ok": True,
+        "summary": {"risk_level": "high"},
+        "missing_clauses": [],
+        "flagged_clauses": [],
+    }
+    low_gaps = {
+        "ok": True,
+        "summary": {"risk_level": "low"},
+        "missing_clauses": ["a", "b", "c"],
+        "flagged_clauses": [],
+    }
+    print("=== Part 15: high risk verdict ===\n", build_contract_verdict(high))
+    print("\n=== Part 15: low risk + 3 missing (review_needed) ===\n", build_contract_verdict(low_gaps))
+
+
+def run_flagged_clause_smoke_test() -> None:
+    """Part 14: high-signal text vs calmer text."""
+    risky = (
+        "The tenant must pay a non-refundable fee. "
+        "The landlord may terminate the agreement immediately."
+    )
+    calm = "The property is at 1 Example Street. The tenancy starts on 1 June."
+    print("=== Part 14: risky sample (expect flagged segments) ===\n")
+    print(extract_flagged_clauses(contract_normalized_text(risky)))
+    print("\n=== Part 14: calmer sample (expect few or none) ===\n")
+    print(extract_flagged_clauses(contract_normalized_text(calm)))
+
+
+def run_missing_clause_smoke_test() -> None:
+    """Part 13: sparse vs fuller contract text — missing list should shrink."""
+    sparse = "The landlord may increase rent with notice."
+    full = (
+        "Rent is £1000 monthly. Deposit £800. Notice period 2 months. "
+        "Termination and end of tenancy. Repair and maintenance. Admin fee £50."
+    )
+    print("=== Part 13: sparse text (expect several gaps) ===\n")
+    print(detect_missing_contract_clauses(contract_normalized_text(sparse)))
+    print("\n=== Part 13: fuller text (expect fewer or none) ===\n")
+    print(detect_missing_contract_clauses(contract_normalized_text(full)))
+
+
+def run_contract_normalizer_smoke_test() -> None:
+    """Phase 3 Part 10: short clause + messy whitespace; both should route as contract."""
+    cases = (
+        "The landlord may increase rent with notice.",
+        "The landlord    may increase rent.\n\nThe tenant must pay deposit.",
+    )
+    print("=== Contract normalizer smoke test (Part 10) ===\n")
+    for raw in cases:
+        print("*" * 72)
+        print("Detected mode:", detect_intent(raw))
+        run_contract_pipeline_for_text(raw, show_mode_banner=False)
+        print()
+
+
+def run_intent_auto_test() -> None:
+    """Two samples: contract-like keywords vs short property query."""
+    contract_like = (
+        "This tenancy agreement sets the deposit at £800. "
+        "The landlord may give notice under the contract clause."
+    )
+    property_like = "Cheap 2-bed flat M1 4BT near station"
+    print("=== Intent auto-test (Part 9) ===\n")
+    for label, sample in (("contract sample", contract_like), ("property sample", property_like)):
+        print("*" * 72)
+        print(label + ":")
+        print(sample[:120] + ("..." if len(sample) > 120 else ""))
+        intent = detect_intent(sample)
+        print("Detected mode:", intent)
+        print()
+
+
 def run_demo_batch(cases: tuple[str, ...], title: str) -> None:
     print(title)
     print()
@@ -220,6 +424,68 @@ def main() -> None:
         run_demo_batch(_PHASE8_UK_LOCATION_TESTS, "UK location regression (--phase8)")
         return
 
+    if argv and argv[0] in ("--auto-test", "--intent-test", "--phase3-intent"):
+        run_intent_auto_test()
+        return
+
+    if argv and argv[0] in ("--contract-norm-test", "--phase3-part10"):
+        run_contract_normalizer_smoke_test()
+        return
+
+    if argv and argv[0] in ("--contract-actions-test", "--phase3-part12"):
+        run_contract_actions_smoke_test()
+        return
+
+    if argv and argv[0] in ("--missing-clause-test", "--phase3-part13"):
+        run_missing_clause_smoke_test()
+        return
+
+    if argv and argv[0] in ("--flagged-clause-test", "--phase3-part14"):
+        run_flagged_clause_smoke_test()
+        return
+
+    if argv and argv[0] in ("--verdict-test", "--phase3-part15"):
+        run_verdict_smoke_test()
+        return
+
+    if argv and argv[0] in ("--contract-demo", "--phase3-part17"):
+        run_contract_demo()
+        return
+
+    if argv and argv[0] in ("--contract-batch-test", "--phase3-part18"):
+        run_contract_batch_test()
+        return
+
+    if argv and argv[0] == "--mode":
+        if len(argv) < 2:
+            print("Usage: python main.py --mode contract [optional contract text...]")
+            print("       python main.py --mode property [optional message...]")
+            return
+        mode = argv[1].lower()
+        rest = argv[2:]
+        if mode == MODE_CONTRACT:
+            text = " ".join(rest).strip() if rest else _DEFAULT_CONTRACT_SAMPLE
+            run_contract_pipeline_for_text(text)
+            return
+        if mode == MODE_PROPERTY:
+            text = " ".join(rest).strip() if rest else ""
+            if not text:
+                try:
+                    text = input("Enter message (property mode): ").strip()
+                except EOFError:
+                    text = ""
+            if not text:
+                print("No input. Example: python main.py --mode property \"M1 4BT\"")
+                return
+            run_property_pipeline_for_text(text)
+            return
+        print(f"Unknown --mode value: {argv[1]!r}. Use {MODE_CONTRACT!r} or {MODE_PROPERTY!r}.")
+        return
+
+    if argv and argv[0] in ("--contract", "--phase3-contract"):
+        run_contract_integration_test()
+        return
+
     if argv:
         text = " ".join(argv)
     else:
@@ -232,18 +498,20 @@ def main() -> None:
         print("No input. Examples:")
         print('  python main.py "Is this deposit clause safe?"')
         print("  python main.py --demo")
+        print("  python main.py --contract")
+        print("  python main.py --mode contract")
+        print('  python main.py --mode property "M1 4BT"')
+        print("  python main.py --auto-test   # intent: contract vs property")
+        print("  python main.py --contract-norm-test")
+        print("  python main.py --contract-actions-test")
+        print("  python main.py --missing-clause-test")
+        print("  python main.py --flagged-clause-test")
+        print("  python main.py --verdict-test")
+        print("  python main.py --contract-demo")
+        print("  python main.py --contract-batch-test")
         return
 
-    try:
-        result = handle_chat_request(text)
-    except Exception as exc:
-        print("======== USER INPUT ========")
-        print(text)
-        print()
-        print(f"ERROR: {exc}")
-        return
-
-    print_demo_result(result, text)
+    run_auto_routed_pipeline(text)
 
 
 if __name__ == "__main__":
