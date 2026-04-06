@@ -73,6 +73,7 @@ def format_contract_output(result: dict[str, Any]) -> dict[str, Any]:
         "summary": {
             "risk_level": risk.get("risk_level"),
             "overall_explanation": expl.get("overall_explanation"),
+            "human_explanation": expl.get("human_explanation"),
         },
         "details": {
             "parsed": data.get("parsed"),
@@ -313,6 +314,9 @@ def format_contract_result(formatted: dict[str, Any]) -> str:
         summary = {}
     lines.append(f"Risk level: {_safe_str(summary.get('risk_level'), 'none')}")
     lines.append(f"Explanation: {_safe_str(summary.get('overall_explanation'), _DEFAULT_DETAIL)}")
+    he = summary.get("human_explanation")
+    if isinstance(he, str) and he.strip():
+        lines.append(f"Human explanation: {he.strip()}")
 
     details = formatted.get("details") or {}
     if not isinstance(details, dict):
