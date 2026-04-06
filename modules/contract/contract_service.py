@@ -67,13 +67,15 @@ def format_contract_output(result: dict[str, Any]) -> dict[str, Any]:
     expl = data.get("explanations")
     if not isinstance(expl, dict):
         expl = {}
+    # Phase 4 Part 2 — mirror ``result["data"]["explanations"]["human_explanation"]`` into summary
+    human_explanation = expl.get("human_explanation")
     return {
         "ok": True,
         "module": CONTRACT_MODULE_NAME,
         "summary": {
             "risk_level": risk.get("risk_level"),
             "overall_explanation": expl.get("overall_explanation"),
-            "human_explanation": expl.get("human_explanation"),
+            "human_explanation": human_explanation,
         },
         "details": {
             "parsed": data.get("parsed"),
@@ -191,9 +193,10 @@ def build_contract_verdict(final_output: dict[str, Any]) -> dict[str, str]:
     if not final_output.get("ok"):
         return {
             "status": "error",
-            "title": "Analysis failed",
+            "title": "We could not analyze this contract",
             "message": (
-                "The contract could not be analyzed. Please review the input text and try again."
+                "The contract text could not be analyzed clearly. Please check the input and "
+                "try again with a clearer clause or a longer section."
             ),
         }
     summary = final_output.get("summary")
@@ -210,45 +213,45 @@ def build_contract_verdict(final_output: dict[str, Any]) -> dict[str, str]:
     if risk_level == "high":
         return {
             "status": "high_risk",
-            "title": "High contract risk",
+            "title": "This contract needs careful review",
             "message": (
-                "This contract contains high-risk terms. Do not sign before reviewing the "
-                "flagged clauses carefully."
+                "Some terms in this contract look high risk. You should review the flagged "
+                "clauses carefully before signing anything."
             ),
         }
     if risk_level == "medium":
         return {
             "status": "review_needed",
-            "title": "Careful review needed",
+            "title": "This contract may need clarification",
             "message": (
-                "This contract contains some risky or unclear terms. Review the flagged "
-                "clauses before proceeding."
+                "Some parts of this contract look unclear or potentially risky. It would be "
+                "safer to review those clauses before you proceed."
             ),
         }
     if risk_level == "low":
         if len(missing_clauses) >= 3 or len(flagged_clauses) >= 2:
             return {
                 "status": "review_needed",
-                "title": "Low risk but incomplete",
+                "title": "This contract looks lower risk, but still needs review",
                 "message": (
-                    "The contract seems lower risk overall, but some important clauses may be "
-                    "missing or unclear."
+                    "The overall risk looks lower, but some important terms may be missing or "
+                    "unclear. It is still worth checking the details carefully."
                 ),
             }
         return {
             "status": "acceptable_with_review",
-            "title": "Generally acceptable",
+            "title": "This contract looks generally acceptable",
             "message": (
-                "No major contract risk was detected, but you should still review the key terms "
-                "before signing."
+                "No major risk was detected in this contract, but you should still review the "
+                "key terms before signing."
             ),
         }
     return {
         "status": "manual_review",
-        "title": "Manual review recommended",
+        "title": "This contract needs manual review",
         "message": (
-            "The result is not fully clear. Please review the explanation, flagged clauses, "
-            "and missing clauses manually."
+            "The result is not fully clear yet. Please review the explanation, flagged clauses, "
+            "and missing terms carefully."
         ),
     }
 
@@ -314,9 +317,7 @@ def format_contract_result(formatted: dict[str, Any]) -> str:
         summary = {}
     lines.append(f"Risk level: {_safe_str(summary.get('risk_level'), 'none')}")
     lines.append(f"Explanation: {_safe_str(summary.get('overall_explanation'), _DEFAULT_DETAIL)}")
-    he = summary.get("human_explanation")
-    if isinstance(he, str) and he.strip():
-        lines.append(f"Human explanation: {he.strip()}")
+    lines.append(f"Human explanation: {summary.get('human_explanation')}")
 
     details = formatted.get("details") or {}
     if not isinstance(details, dict):

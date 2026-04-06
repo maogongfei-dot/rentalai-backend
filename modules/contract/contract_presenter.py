@@ -25,9 +25,7 @@ def format_contract_result_text(final_output: dict[str, Any]) -> str:
             summary = {}
         lines.append(f"Risk level: {summary.get('risk_level')}")
         lines.append(f"Explanation: {summary.get('overall_explanation')}")
-        hum = summary.get("human_explanation")
-        if isinstance(hum, str) and hum.strip():
-            lines.append(f"Human explanation: {hum.strip()}")
+        lines.append(f"Human explanation: {summary.get('human_explanation')}")
         lines.append("Actions:")
         for action in final_output.get("actions") or []:
             lines.append(f"- {action}")
