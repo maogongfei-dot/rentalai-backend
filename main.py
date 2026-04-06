@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import json
 import sys
+import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +38,7 @@ if str(ROOT) not in sys.path:
 
 from backend.app.chat import handle_chat_request
 from modules.contract.contract_handler import handle_contract_input
+from utils.system_logger import log_system_result
 from modules.contract.contract_service import (
     build_contract_result,
     build_contract_verdict,
@@ -100,15 +103,24 @@ _CONTRACT_INTENT_LONG_TEXT_LEN = 200
 system_result: dict[str, Any] | None = None
 
 
-def build_system_result(module_name: str, result: dict[str, Any]) -> dict[str, Any]:
+def build_system_result(
+    module_name: str, result: dict[str, Any], source: str = "unknown"
+) -> dict[str, Any]:
     """
     Wrap a module-specific result dict for the main system (UI / API / history hooks).
 
     Inner ``result`` is unchanged; this layer only adds a stable outer shape.
+    ``source`` tags how the input reached the main flow (Phase 3 Part 33).
+    ``request_id`` / ``timestamp`` are fresh on each call (Phase 3 Part 34).
     """
+    request_id = str(uuid.uuid4())
+    timestamp = datetime.utcnow().isoformat()
     return {
         "ok": result.get("ok"),
         "module": module_name,
+        "source": source,
+        "request_id": request_id,
+        "timestamp": timestamp,
         "result": result,
         "error": result.get("error"),
     }
@@ -252,7 +264,9 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
     print(_format_raw_debug(result))
 
 
-def run_contract_pipeline_for_text(text: str, *, show_mode_banner: bool = True) -> None:
+def run_contract_pipeline_for_text(
+    text: str, *, show_mode_banner: bool = True, source: str = "unknown"
+) -> None:
     """Contract mode: CLI framing + ``handle_contract_input`` + formatted appendix."""
     global system_result
     normalized = contract_normalized_text(text)
@@ -263,7 +277,7 @@ def run_contract_pipeline_for_text(text: str, *, show_mode_banner: bool = True) 
     print(normalized if normalized else _DEFAULT_DETAIL)
     print()
     contract_result = handle_contract_input(text)
-    system_result = build_system_result("contract", contract_result)
+    system_result = build_system_result("contract", contract_result, source=source)
     print()
     print_contract_formatted_appendix(
         {
@@ -283,7 +297,9 @@ def run_contract_integration_test() -> None:
     run_contract_pipeline_for_text(_DEFAULT_CONTRACT_SAMPLE)
 
 
-def run_property_pipeline_for_text(text: str, *, show_mode_banner: bool = True) -> None:
+def run_property_pipeline_for_text(
+    text: str, *, show_mode_banner: bool = True, source: str = "unknown"
+) -> None:
     """Property mode: existing chat / property analysis (unchanged behaviour)."""
     global system_result
     if show_mode_banner:
@@ -292,18 +308,18 @@ def run_property_pipeline_for_text(text: str, *, show_mode_banner: bool = True) 
         property_result = handle_chat_request(text)
     except Exception as exc:
         system_result = build_system_result(
-            "property", {"ok": False, "error": str(exc)}
+            "property", {"ok": False, "error": str(exc)}, source=source
         )
         print("======== USER INPUT ========")
         print(text)
         print()
         print(f"ERROR: {exc}")
         return
-    system_result = build_system_result("property", property_result)
+    system_result = build_system_result("property", property_result, source=source)
     print_demo_result(property_result, text)
 
 
-def run_main_flow(user_input: str) -> dict[str, Any]:
+def run_main_flow(user_input: str, source: str = "unknown") -> dict[str, Any]:
     """
     Unified entry: intent detection → contract or property pipeline → unified ``system_result``.
 
@@ -314,11 +330,16 @@ def run_main_flow(user_input: str) -> dict[str, Any]:
     intent = detect_intent(user_input)
     print("Detected mode:", intent)
     if intent == MODE_CONTRACT:
-        run_contract_pipeline_for_text(user_input, show_mode_banner=False)
+        run_contract_pipeline_for_text(user_input, show_mode_banner=False, source=source)
     else:
-        run_property_pipeline_for_text(user_input, show_mode_banner=False)
+        run_property_pipeline_for_text(user_input, show_mode_banner=False, source=source)
     if system_result is None:
-        return build_system_result("property", {"ok": False, "error": "no system result"})
+        sr = build_system_result(
+            "property", {"ok": False, "error": "no system result"}, source=source
+        )
+        log_system_result(sr)
+        return sr
+    log_system_result(system_result)
     return system_result
 
 
@@ -441,6 +462,68 @@ def run_demo_batch(cases: tuple[str, ...], title: str) -> None:
         print_demo_result(result, text)
 
 
+def launch_main(user_input: str | None = None) -> dict[str, Any]:
+    """
+    Process entrypoint (Phase 3 Part 30–33).
+
+    - With CLI arguments, delegates to ``main()`` and returns ``system_result`` when set.
+    - With explicit ``user_input``, runs ``run_main_flow`` with ``source="direct_input"``.
+    - With no arguments and no ``user_input``, multiline input (``END``) then ``source="cli_multiline"``.
+    """
+    argv = sys.argv[1:]
+
+    if user_input is not None:
+        if sys.platform == "win32":
+            try:
+                sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+        sr = run_main_flow(user_input, source="direct_input")
+        print("Launcher source:", sr.get("source"))
+        print("Launcher module:", sr.get("module"))
+        print("Launcher ok:", sr.get("ok"))
+        return sr
+
+    if argv:
+        main()
+        return (
+            system_result
+            if system_result is not None
+            else build_system_result(
+                "property", {"ok": False, "error": "no system result"}, source="unknown"
+            )
+        )
+
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+    print("Enter your text for analysis.")
+    print("You can paste multiple lines.")
+    print("Type END on a new line to finish input.")
+    print("- Paste a contract clause or tenancy text for contract analysis")
+    print("- Or enter a property/rental description for property analysis")
+    lines: list[str] = []
+    while True:
+        try:
+            line = input()
+        except EOFError:
+            break
+        if line.strip() == "END":
+            break
+        lines.append(line)
+    interactive_input = "\n".join(lines).strip()
+    if not interactive_input:
+        print("Empty input received.")
+    sr = run_main_flow(interactive_input, source="cli_multiline")
+    print("Launcher source:", sr.get("source"))
+    print("Launcher module:", sr.get("module"))
+    print("Launcher ok:", sr.get("ok"))
+    return sr
+
+
 def main() -> None:
     if sys.platform == "win32":
         try:
@@ -549,8 +632,8 @@ def main() -> None:
         print("  python main.py --contract-batch-test")
         return
 
-    run_main_flow(text)
+    run_main_flow(text, source="cli_argv")
 
 
 if __name__ == "__main__":
-    main()
+    launch_main()
