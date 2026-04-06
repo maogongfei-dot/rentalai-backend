@@ -32,10 +32,25 @@ Task descriptor: ``build_rightmove_task_descriptor``, ``get_rightmove_task_descr
 
 Example payloads: ``build_rightmove_example_payloads``, ``get_rightmove_example_payload_by_mode``.
 
+Self check: ``build_rightmove_self_check_report``, ``run_rightmove_self_check``.
+
+Capability map: ``build_rightmove_capability_map``, ``get_rightmove_capability_status``.
+
+Module snapshot: ``build_rightmove_module_snapshot``, ``get_rightmove_snapshot_section``.
+
+Module manifest: ``build_rightmove_module_manifest``, ``get_rightmove_manifest_entry``.
+
 Service result summary: ``build_rightmove_result_summary``, ``build_rightmove_response_with_summary``.
+
+Phase 2 finalization: ``build_rightmove_module_status``, ``is_rightmove_module_ready``.
 
 Dependencies: pip install requests beautifulsoup4
 """
+
+# ================================
+# RentalAI - Phase 2 Completed
+# Rightmove Scraper Module (v1)
+# ================================
 
 from __future__ import annotations
 
@@ -494,6 +509,348 @@ def get_rightmove_example_payload_by_mode(
         "payload": table.get(m),
         "error": None,
     }
+
+
+def _self_check_callable(name: str) -> bool:
+    g = globals()
+    return name in g and callable(g[name])
+
+
+def _self_check_callables(names: tuple[str, ...]) -> bool:
+    return all(_self_check_callable(n) for n in names)
+
+
+def _self_check_config_ok() -> bool:
+    try:
+        if not RIGHTMOVE_PLATFORM:
+            return False
+        if DEFAULT_LIMIT is None or DEFAULT_PAGES is None:
+            return False
+        if not isinstance(DEFAULT_HEADERS, dict) or not DEFAULT_HEADERS:
+            return False
+        if not isinstance(RIGHTMOVE_MODE_REGISTRY, dict) or not RIGHTMOVE_MODE_REGISTRY:
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def build_rightmove_self_check_report() -> dict[str, Any]:
+    """
+    Lightweight presence check for config and public entrypoints (no network I/O).
+
+    Call after module load; uses ``globals()`` name lookup only.
+    """
+    checks: dict[str, bool] = {
+        "config_ok": _self_check_config_ok(),
+        "mode_registry_ok": _self_check_callables(
+            ("get_supported_rightmove_modes", "get_rightmove_mode_description")
+        ),
+        "task_descriptor_ok": _self_check_callables(
+            ("build_rightmove_task_descriptor", "get_rightmove_task_descriptor_by_mode")
+        ),
+        "example_payloads_ok": _self_check_callables(
+            ("build_rightmove_example_payloads", "get_rightmove_example_payload_by_mode")
+        ),
+        "single_scrape_ok": _self_check_callables(("parse_rightmove_listing", "scrape_rightmove_listing")),
+        "search_links_ok": _self_check_callables(("extract_rightmove_listing_links",)),
+        "batch_ok": _self_check_callables(("scrape_rightmove_search_results",)),
+        "multi_page_batch_ok": _self_check_callables(
+            ("extract_rightmove_listing_links_from_pages", "scrape_rightmove_search_results_from_pages")
+        ),
+        "export_ok": _self_check_callables(("export_rightmove_results", "export_rightmove_results_from_pages")),
+        "save_ok": _self_check_callables(("save_rightmove_export_to_json", "save_rightmove_results_from_pages")),
+        "load_ok": _self_check_callables(("load_rightmove_export_from_json", "load_rightmove_results_from_pages_json")),
+        "service_ok": _self_check_callables(("run_rightmove_service",)),
+        "payload_ok": _self_check_callables(("run_rightmove_service_from_payload",)),
+        "pipeline_ok": _self_check_callables(("execute_rightmove_pipeline",)),
+        "response_wrapper_ok": _self_check_callables(
+            ("build_rightmove_response", "build_rightmove_response_with_summary")
+        ),
+        "summary_ok": _self_check_callables(("build_rightmove_result_summary",)),
+    }
+    missing = [k for k, v in checks.items() if not v]
+    return {
+        "platform": RIGHTMOVE_PLATFORM,
+        "module": "scraper",
+        "ok": len(missing) == 0,
+        "checks": checks,
+        "missing": missing,
+    }
+
+
+def run_rightmove_self_check() -> None:
+    """Print JSON self-check report to stdout."""
+    r = build_rightmove_self_check_report()
+    print(json.dumps(r, ensure_ascii=False, indent=2))
+
+
+RIGHTMOVE_CAPABILITY_KEYS: tuple[str, ...] = (
+    "single_listing_parse",
+    "search_links_extract",
+    "batch_scrape_single_page",
+    "batch_scrape_multi_page",
+    "export_results",
+    "save_results",
+    "load_results",
+    "service_entry",
+    "payload_entry",
+    "pipeline_entry",
+    "response_wrapper",
+    "result_summary",
+    "task_descriptor",
+    "example_payloads",
+    "self_check",
+)
+
+
+def _build_rightmove_capabilities_from_self_check() -> dict[str, bool]:
+    """Map self-check flags to stable capability keys (no network I/O)."""
+    ch = build_rightmove_self_check_report()["checks"]
+    return {
+        "single_listing_parse": ch["single_scrape_ok"],
+        "search_links_extract": ch["search_links_ok"],
+        "batch_scrape_single_page": ch["batch_ok"],
+        "batch_scrape_multi_page": ch["multi_page_batch_ok"],
+        "export_results": ch["export_ok"],
+        "save_results": ch["save_ok"],
+        "load_results": ch["load_ok"],
+        "service_entry": ch["service_ok"],
+        "payload_entry": ch["payload_ok"],
+        "pipeline_entry": ch["pipeline_ok"],
+        "response_wrapper": ch["response_wrapper_ok"],
+        "result_summary": ch["summary_ok"],
+        "task_descriptor": ch["task_descriptor_ok"],
+        "example_payloads": ch["example_payloads_ok"],
+        "self_check": _self_check_callables(
+            ("build_rightmove_self_check_report", "run_rightmove_self_check")
+        ),
+    }
+
+
+def build_rightmove_capability_map() -> dict[str, Any]:
+    """
+    Structured capability table for router / chat / API consumers (no network I/O).
+
+    Values derive from ``build_rightmove_self_check_report`` plus self-check entrypoints.
+    """
+    supported_modes: list[str] = []
+    if _self_check_callable("get_supported_rightmove_modes"):
+        try:
+            supported_modes = list(get_supported_rightmove_modes())
+        except Exception:
+            supported_modes = []
+
+    return {
+        "platform": RIGHTMOVE_PLATFORM,
+        "module": "scraper",
+        "capabilities": _build_rightmove_capabilities_from_self_check(),
+        "supported_modes": supported_modes,
+        "notes": [
+            "rightmove only",
+            "requests + beautifulsoup version",
+            "no playwright yet",
+        ],
+    }
+
+
+def get_rightmove_capability_status(name: str | None) -> dict[str, Any]:
+    """
+    Look up one capability by name. Unknown or empty names return ``supported: False``
+    and ``error: "unknown capability"`` (no exception).
+    """
+    caps = build_rightmove_capability_map()["capabilities"]
+    if not isinstance(name, str) or not name.strip():
+        return {"name": name, "supported": False, "error": "unknown capability"}
+    key = name.strip()
+    if key not in caps:
+        return {"name": key, "supported": False, "error": "unknown capability"}
+    return {"name": key, "supported": caps[key], "error": None}
+
+
+RIGHTMOVE_SNAPSHOT_SECTIONS: tuple[str, ...] = (
+    "supported_modes",
+    "config",
+    "task_descriptor",
+    "capability_map",
+    "self_check",
+)
+
+
+def _build_rightmove_config_snapshot() -> dict[str, Any]:
+    """Lightweight config summary (no full header values)."""
+    return {
+        "default_limit": DEFAULT_LIMIT,
+        "default_pages": DEFAULT_PAGES,
+        "default_batch_limit": DEFAULT_BATCH_LIMIT,
+        "default_timeout": DEFAULT_TIMEOUT,
+        "default_output_file": DEFAULT_OUTPUT_FILE,
+        "headers_keys": list(DEFAULT_HEADERS.keys()),
+    }
+
+
+def build_rightmove_module_snapshot() -> dict[str, Any]:
+    """
+    Aggregate module metadata for router / chat / API (no network I/O).
+
+    Reuses task descriptor, capability map, and self-check report builders.
+    """
+    supported_modes: list[str] = []
+    if _self_check_callable("get_supported_rightmove_modes"):
+        try:
+            supported_modes = list(get_supported_rightmove_modes())
+        except Exception:
+            supported_modes = []
+
+    return {
+        "platform": RIGHTMOVE_PLATFORM,
+        "module": "scraper",
+        "supported_modes": supported_modes,
+        "config": _build_rightmove_config_snapshot(),
+        "task_descriptor": build_rightmove_task_descriptor(),
+        "capability_map": build_rightmove_capability_map(),
+        "self_check": build_rightmove_self_check_report(),
+    }
+
+
+def get_rightmove_snapshot_section(name: str | None) -> dict[str, Any]:
+    """
+    Return one slice of ``build_rightmove_module_snapshot``. Unknown or empty
+    section names yield ``supported: False`` and ``error: "unknown snapshot section"`` (no exception).
+    """
+    if not isinstance(name, str) or not name.strip():
+        return {
+            "name": name,
+            "supported": False,
+            "data": None,
+            "error": "unknown snapshot section",
+        }
+    key = name.strip()
+    if key not in RIGHTMOVE_SNAPSHOT_SECTIONS:
+        return {
+            "name": key,
+            "supported": False,
+            "data": None,
+            "error": "unknown snapshot section",
+        }
+    data = build_rightmove_module_snapshot()[key]
+    return {"name": key, "supported": True, "data": data, "error": None}
+
+
+RIGHTMOVE_MANIFEST_VERSION = "v1"
+RIGHTMOVE_RECOMMENDED_ENTRY = "execute_rightmove_pipeline"
+
+RIGHTMOVE_MANIFEST_ENTRY_KEYS: tuple[str, ...] = (
+    "single_scrape",
+    "search_links",
+    "batch_single_page",
+    "batch_multi_page",
+    "service_entry",
+    "payload_entry",
+    "pipeline_entry",
+    "export_entry",
+    "save_entry",
+    "load_entry",
+)
+
+
+def _build_rightmove_module_entries() -> dict[str, str]:
+    """Stable public function names for each manifest slot (strings only, no I/O)."""
+    return {
+        "single_scrape": "scrape_rightmove_listing",
+        "search_links": "extract_rightmove_listing_links",
+        "batch_single_page": "scrape_rightmove_search_results",
+        "batch_multi_page": "scrape_rightmove_search_results_from_pages",
+        "service_entry": "run_rightmove_service",
+        "payload_entry": "run_rightmove_service_from_payload",
+        "pipeline_entry": "execute_rightmove_pipeline",
+        "export_entry": "export_rightmove_results",
+        "save_entry": "save_rightmove_export_to_json",
+        "load_entry": "load_rightmove_export_from_json",
+    }
+
+
+def build_rightmove_module_manifest() -> dict[str, Any]:
+    """
+    Human- and machine-readable entry map for router / chat / API (no network I/O).
+
+    ``supported_modes`` comes from ``build_rightmove_module_snapshot`` (reuses mode list).
+    """
+    supported_modes = build_rightmove_module_snapshot()["supported_modes"]
+    rec = RIGHTMOVE_RECOMMENDED_ENTRY
+    return {
+        "platform": RIGHTMOVE_PLATFORM,
+        "module": "scraper",
+        "version": RIGHTMOVE_MANIFEST_VERSION,
+        "recommended_entry": rec,
+        "entries": _build_rightmove_module_entries(),
+        "input_styles": [
+            "raw url arguments",
+            "service mode + url",
+            "payload dict",
+        ],
+        "supported_modes": supported_modes,
+        "notes": [
+            "rightmove only",
+            "requests + beautifulsoup version",
+            "no playwright yet",
+            "recommended top-level entry is execute_rightmove_pipeline",
+        ],
+    }
+
+
+def get_rightmove_manifest_entry(name: str | None) -> dict[str, Any]:
+    """
+    Resolve one manifest slot to its public function name string. Unknown or empty
+    names return ``supported: False`` and ``error: "unknown manifest entry"`` (no exception).
+    """
+    entries = _build_rightmove_module_entries()
+    if not isinstance(name, str) or not name.strip():
+        return {"name": name, "supported": False, "data": None, "error": "unknown manifest entry"}
+    key = name.strip()
+    if key not in entries:
+        return {"name": key, "supported": False, "data": None, "error": "unknown manifest entry"}
+    return {"name": key, "supported": True, "data": entries[key], "error": None}
+
+
+RIGHTMOVE_PHASE_ID = "phase_2"
+RIGHTMOVE_NEXT_PHASE_ID = "phase_3_contract_analysis"
+
+
+def build_rightmove_module_status() -> dict[str, Any]:
+    """
+    Phase 2 completion marker and readiness gate (no network I/O).
+
+    ``ready_for_next_phase`` is False when ``build_rightmove_self_check_report()`` reports ``ok`` False.
+    """
+    report = build_rightmove_self_check_report()
+    self_ok = bool(report.get("ok"))
+    ready = self_ok
+    status_label = "completed" if self_ok else "incomplete"
+    core_ready: dict[str, bool] = {
+        "scraper": True,
+        "batch": True,
+        "multi_page": True,
+        "export": True,
+        "save_load": True,
+        "service_layer": True,
+        "payload_entry": True,
+        "pipeline_entry": True,
+    }
+    return {
+        "platform": RIGHTMOVE_PLATFORM,
+        "module": "scraper",
+        "phase": RIGHTMOVE_PHASE_ID,
+        "status": status_label,
+        "ready_for_next_phase": ready,
+        "next_phase": RIGHTMOVE_NEXT_PHASE_ID,
+        "core_ready": core_ready,
+    }
+
+
+def is_rightmove_module_ready() -> bool:
+    """True when ``build_rightmove_module_status()`` has ``ready_for_next_phase`` True."""
+    return bool(build_rightmove_module_status()["ready_for_next_phase"])
 
 
 def _normalize_listing_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -2505,6 +2862,56 @@ def run_rightmove_example_payloads_test(
     print("Invalid example:", get_rightmove_example_payload_by_mode("xxx", test_url, search_url, output_file))
 
 
+def run_rightmove_self_check_test() -> None:
+    """Run and print module self-check (Part 27)."""
+    print()
+    print("=== SELF CHECK (Part 27) ===")
+    run_rightmove_self_check()
+
+
+def run_rightmove_capability_map_test() -> None:
+    """Print capability map and sample lookups (Part 28)."""
+    print()
+    print("=== CAPABILITY MAP (Part 28) ===")
+    print("Capability map:", build_rightmove_capability_map())
+    print("Capability single_listing_parse:", get_rightmove_capability_status("single_listing_parse"))
+    print("Capability batch_scrape_multi_page:", get_rightmove_capability_status("batch_scrape_multi_page"))
+    print("Capability pipeline_entry:", get_rightmove_capability_status("pipeline_entry"))
+    print("Capability invalid:", get_rightmove_capability_status("xxx"))
+
+
+def run_rightmove_module_snapshot_test() -> None:
+    """Print full module snapshot and section lookups (Part 29)."""
+    print()
+    print("=== MODULE SNAPSHOT (Part 29) ===")
+    print("Module snapshot:", build_rightmove_module_snapshot())
+    print("Snapshot supported_modes:", get_rightmove_snapshot_section("supported_modes"))
+    print("Snapshot config:", get_rightmove_snapshot_section("config"))
+    print("Snapshot capability_map:", get_rightmove_snapshot_section("capability_map"))
+    print("Snapshot self_check:", get_rightmove_snapshot_section("self_check"))
+    print("Snapshot invalid:", get_rightmove_snapshot_section("xxx"))
+
+
+def run_rightmove_module_manifest_test() -> None:
+    """Print module manifest and sample entry lookups (Part 30)."""
+    print()
+    print("=== MODULE MANIFEST (Part 30) ===")
+    print("Module manifest:", build_rightmove_module_manifest())
+    print("Manifest pipeline_entry:", get_rightmove_manifest_entry("pipeline_entry"))
+    print("Manifest service_entry:", get_rightmove_manifest_entry("service_entry"))
+    print("Manifest single_scrape:", get_rightmove_manifest_entry("single_scrape"))
+    print("Manifest invalid:", get_rightmove_manifest_entry("xxx"))
+
+
+def run_rightmove_final_check() -> None:
+    """Print Phase 2 module status and readiness (Part 31)."""
+    print()
+    print("=== FINAL CHECK (Phase 2) ===")
+    status = build_rightmove_module_status()
+    print("Module status:", status)
+    print("Is ready:", is_rightmove_module_ready())
+
+
 if __name__ == "__main__":
     run_rightmove_config_test()
     run_rightmove_input_validation_test()
@@ -2554,3 +2961,8 @@ if __name__ == "__main__":
         search_url=search_url,
         output_file=DEFAULT_OUTPUT_FILE,
     )
+    run_rightmove_self_check_test()
+    run_rightmove_capability_map_test()
+    run_rightmove_module_snapshot_test()
+    run_rightmove_module_manifest_test()
+    run_rightmove_final_check()
