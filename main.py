@@ -96,6 +96,23 @@ _CONTRACT_INTENT_KEYWORDS: tuple[str, ...] = (
 )
 _CONTRACT_INTENT_LONG_TEXT_LEN = 200
 
+# Phase 3 Part 27–28 — last routed pipeline outcome (unified shell from ``build_system_result``)
+system_result: dict[str, Any] | None = None
+
+
+def build_system_result(module_name: str, result: dict[str, Any]) -> dict[str, Any]:
+    """
+    Wrap a module-specific result dict for the main system (UI / API / history hooks).
+
+    Inner ``result`` is unchanged; this layer only adds a stable outer shape.
+    """
+    return {
+        "ok": result.get("ok"),
+        "module": module_name,
+        "result": result,
+        "error": result.get("error"),
+    }
+
 
 def detect_intent(user_input: str) -> str:
     """
@@ -237,6 +254,7 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
 
 def run_contract_pipeline_for_text(text: str, *, show_mode_banner: bool = True) -> None:
     """Contract mode: CLI framing + ``handle_contract_input`` + formatted appendix."""
+    global system_result
     normalized = contract_normalized_text(text)
     if show_mode_banner:
         print("======== ANALYSIS MODE: contract ========")
@@ -244,14 +262,15 @@ def run_contract_pipeline_for_text(text: str, *, show_mode_banner: bool = True) 
     print("======== CONTRACT INPUT ========")
     print(normalized if normalized else _DEFAULT_DETAIL)
     print()
-    final_output = handle_contract_input(text)
+    contract_result = handle_contract_input(text)
+    system_result = build_system_result("contract", contract_result)
     print()
     print_contract_formatted_appendix(
         {
-            "ok": final_output.get("ok"),
-            "summary": final_output.get("summary"),
-            "details": final_output.get("details"),
-            "error": final_output.get("error"),
+            "ok": contract_result.get("ok"),
+            "summary": contract_result.get("summary"),
+            "details": contract_result.get("details"),
+            "error": contract_result.get("error"),
         }
     )
 
@@ -266,27 +285,46 @@ def run_contract_integration_test() -> None:
 
 def run_property_pipeline_for_text(text: str, *, show_mode_banner: bool = True) -> None:
     """Property mode: existing chat / property analysis (unchanged behaviour)."""
+    global system_result
     if show_mode_banner:
         print("======== ANALYSIS MODE: property ========")
     try:
-        result = handle_chat_request(text)
+        property_result = handle_chat_request(text)
     except Exception as exc:
+        system_result = build_system_result(
+            "property", {"ok": False, "error": str(exc)}
+        )
         print("======== USER INPUT ========")
         print(text)
         print()
         print(f"ERROR: {exc}")
         return
-    print_demo_result(result, text)
+    system_result = build_system_result("property", property_result)
+    print_demo_result(property_result, text)
+
+
+def run_main_flow(user_input: str) -> dict[str, Any]:
+    """
+    Unified entry: intent detection → contract or property pipeline → unified ``system_result``.
+
+    Reuses ``run_contract_pipeline_for_text`` / ``run_property_pipeline_for_text`` so CLI output
+    and handler/presenter behaviour stay unchanged (Phase 3 Part 29).
+    """
+    global system_result
+    intent = detect_intent(user_input)
+    print("Detected mode:", intent)
+    if intent == MODE_CONTRACT:
+        run_contract_pipeline_for_text(user_input, show_mode_banner=False)
+    else:
+        run_property_pipeline_for_text(user_input, show_mode_banner=False)
+    if system_result is None:
+        return build_system_result("property", {"ok": False, "error": "no system result"})
+    return system_result
 
 
 def run_auto_routed_pipeline(text: str) -> None:
-    """Phase 3 Part 9: detect intent, then contract or property pipeline."""
-    intent = detect_intent(text)
-    print("Detected mode:", intent)
-    if intent == MODE_CONTRACT:
-        run_contract_pipeline_for_text(text, show_mode_banner=False)
-    else:
-        run_property_pipeline_for_text(text, show_mode_banner=False)
+    """Phase 3 Part 9 / 29: thin wrapper around ``run_main_flow`` (legacy name)."""
+    run_main_flow(text)
 
 
 def run_contract_actions_smoke_test() -> None:
@@ -511,7 +549,7 @@ def main() -> None:
         print("  python main.py --contract-batch-test")
         return
 
-    run_auto_routed_pipeline(text)
+    run_main_flow(text)
 
 
 if __name__ == "__main__":

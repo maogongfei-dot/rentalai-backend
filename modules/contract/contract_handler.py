@@ -15,6 +15,8 @@ def handle_contract_input(text: str) -> dict[str, Any]:
     Run contract analysis and print the standard result block.
 
     Empty ``text`` is passed through to ``run_contract_analysis`` unchanged.
+    Returns the same ``final_output`` dict (ok, module, summary, details, actions,
+    missing_clauses, flagged_clauses, verdict, error) for callers / main system wiring.
     """
     final_output = run_contract_analysis(text)
     print_contract_result(final_output)
