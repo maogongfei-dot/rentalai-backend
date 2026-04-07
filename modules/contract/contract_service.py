@@ -31,6 +31,12 @@ from modules.contract.contract_presenter import (
     build_urgency_reason,
 )
 
+from modules.contract.timeline_action_plan import (
+    build_action_timeline,
+    build_timeline_reason,
+    build_human_timeline_notice,
+)
+
 # Phase 3 Part 11 — standardized envelope ``module`` field
 CONTRACT_MODULE_NAME = "contract"
 
