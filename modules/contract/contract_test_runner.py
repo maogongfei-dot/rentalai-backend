@@ -12,15 +12,23 @@ from typing import Any
 
 from modules.contract.contract_presenter import (
     build_analysis_completeness,
+    build_blocking_factors,
     build_confidence_reason,
     build_direct_answer,
     build_direct_answer_short,
     build_final_display,
     build_human_confidence_notice,
+    build_human_decision_factors_notice,
     build_human_missing_info_guidance,
+    build_human_urgency_notice,
+    build_key_decision_drivers,
     build_missing_information,
+    build_priority_actions,
     build_recommended_decision,
     build_result_confidence,
+    build_supporting_factors,
+    build_urgency_level,
+    build_urgency_reason,
     format_contract_result_text,
     print_contract_result,
 )
@@ -481,3 +489,181 @@ def run_contract_confidence_test() -> None:
     print("result_confidence:", hi.get("result_confidence"))
     print_contract_result(hi)
     print("=== End confidence demo ===")
+
+
+def _synthetic_low_urgency_envelope() -> dict[str, Any]:
+    """Pipeline rarely yields proceed+low risk; this envelope exercises urgency_level=low paths."""
+    return {
+        "ok": True,
+        "module": "contract",
+        "summary": {
+            "risk_level": "low",
+            "overall_explanation": "（演示）低风险、可继续推进的示例。",
+            "human_explanation": "",
+        },
+        "verdict": {"status": "acceptable_with_review", "title": "", "message": ""},
+        "details": {},
+        "actions": [],
+        "missing_clauses": [],
+        "flagged_clauses": [],
+        "recommended_decision": "proceed",
+        "analysis_completeness": "high",
+        "human_next_steps": ["先核对租期与押金条款。", "保留重要沟通记录。"],
+        "human_evidence_checklist": [],
+        "human_risk_warning": "",
+        "missing_information": [],
+        "human_missing_info_guidance": "",
+        "direct_answer": "",
+        "direct_answer_short": "",
+        "result_confidence": "medium",
+        "confidence_reason": "",
+        "human_confidence_notice": "",
+    }
+
+
+def run_contract_urgency_test() -> None:
+    """Phase 4 Part 9 — urgency_level / urgency_reason / priority_actions / human_urgency_notice."""
+    assert build_urgency_level({}) == "medium"
+    assert isinstance(build_urgency_reason({}), str)
+    assert isinstance(build_priority_actions({}), list)
+    assert len(build_priority_actions({})) <= 3
+    assert isinstance(build_human_urgency_notice({}), str)
+
+    dup_case = {
+        "ok": True,
+        "recommended_decision": "caution",
+        "human_next_steps": ["先保存合同。", "先保存合同。", "先标出条款。", "第四条再读一遍。"],
+    }
+    pa_dup = build_priority_actions(dup_case)
+    assert len(pa_dup) <= 3
+    assert len(pa_dup) == len(set(pa_dup))
+
+    pause_high_risk_low_info = {
+        "ok": True,
+        "recommended_decision": "pause",
+        "analysis_completeness": "low",
+        "summary": {"risk_level": "high"},
+        "human_next_steps": [],
+        "human_risk_warning": "材料不齐时先别急着升级。",
+    }
+    assert build_urgency_level(pause_high_risk_low_info) == "medium"
+
+    low_syn = _synthetic_low_urgency_envelope()
+    assert build_urgency_level(low_syn) == "low"
+    low_syn["urgency_level"] = build_urgency_level(low_syn)
+    low_syn["urgency_reason"] = build_urgency_reason(low_syn)
+    low_syn["priority_actions"] = build_priority_actions(low_syn)
+    low_syn["human_urgency_notice"] = build_human_urgency_notice(low_syn)
+    low_syn["final_display"] = build_final_display(low_syn)
+    fd_lo = low_syn.get("final_display") or {}
+    assert fd_lo.get("urgency_block") == "可按正常节奏处理"
+    assert len(fd_lo.get("priority_actions_block") or []) <= 3
+    txt_lo = format_contract_result_text(low_syn)
+    assert "可按正常节奏处理" in txt_lo
+    assert "处理紧急度：" in txt_lo
+    assert "urgency_level" not in txt_lo
+
+    high_text = (
+        "The tenant must pay a non-refundable fee. "
+        "The landlord may terminate the agreement immediately without notice."
+    )
+    hi = run_contract_analysis(high_text)
+    assert hi.get("urgency_level") == "high"
+    fd_hi = hi.get("final_display") or {}
+    assert fd_hi.get("urgency_block") == "需要尽快处理"
+    assert isinstance(fd_hi.get("priority_actions_block"), list)
+    assert len((fd_hi.get("priority_actions_block") or [])) <= 3
+    txt_hi = format_contract_result_text(hi)
+    assert "需要尽快处理" in txt_hi
+    assert "优先先做这几件事：" in txt_hi
+    assert "urgency_level" not in txt_hi
+
+    med = run_contract_analysis("Rent is £500 monthly. Deposit £400.")
+    assert med.get("urgency_level") in ("high", "medium", "low")
+
+    print()
+    print("=== Urgency demo — low (synthetic proceed + low risk, shows 可按正常节奏处理) ===")
+    print("urgency_level (envelope):", low_syn.get("urgency_level"))
+    print_contract_result(low_syn)
+    print()
+    print("=== Urgency demo — high (live pipeline, escalate-style wording) ===")
+    print("urgency_level:", hi.get("urgency_level"))
+    print_contract_result(hi)
+    print("=== End urgency demo ===")
+
+
+def run_contract_decision_factors_test() -> None:
+    """Phase 4 Part 10 — supporting_factors / blocking_factors / key_decision_drivers / notice."""
+    assert build_supporting_factors({}) == []
+    assert build_blocking_factors({}) == []
+    assert len(build_key_decision_drivers({})) == 0
+    assert isinstance(build_human_decision_factors_notice({}), str)
+
+    dup_sf = {
+        "ok": True,
+        "recommended_decision": "caution",
+        "direct_answer": "x",
+        "verdict": {"status": "review_needed"},
+        "human_next_steps": ["a"],
+        "summary": {"risk_level": "medium"},
+    }
+    sf = build_supporting_factors(dup_sf)
+    assert len(sf) == len(set(sf))
+    assert 2 <= len(sf) <= 5
+
+    pause_case = {
+        "ok": True,
+        "recommended_decision": "pause",
+        "analysis_completeness": "low",
+        "missing_information": ["租金条款"],
+        "result_confidence": "low",
+        "human_next_steps": [],
+    }
+    bf_pause = build_blocking_factors(pause_case)
+    assert bf_pause
+    assert any("缺口" in x or "完整" in x for x in bf_pause)
+
+    esc_case = {
+        "ok": True,
+        "recommended_decision": "escalate",
+        "summary": {"risk_level": "high"},
+        "human_risk_warning": "不要拖太久",
+        "flagged_clauses": ["x"],
+        "urgency_level": "high",
+    }
+    bf_esc = build_blocking_factors(esc_case)
+    assert bf_esc
+    assert any("正式" in x or "风险" in x for x in bf_esc)
+
+    kd = build_key_decision_drivers(esc_case)
+    assert len(kd) <= 3
+
+    pause_live = run_contract_analysis("deposit")
+    assert pause_live.get("recommended_decision") == "pause"
+    fd_p = pause_live.get("final_display") or {}
+    assert isinstance(fd_p.get("supporting_factors_block"), list)
+    assert isinstance(fd_p.get("blocking_factors_block"), list)
+    assert len(fd_p.get("key_drivers_block") or []) <= 3
+
+    esc_text = (
+        "The tenant must pay a non-refundable fee. "
+        "The landlord may terminate the agreement immediately without notice."
+    )
+    esc_live = run_contract_analysis(esc_text)
+    assert esc_live.get("recommended_decision") == "escalate"
+    txt_e = format_contract_result_text(esc_live)
+    assert "为什么是这个结果：" in txt_e
+    assert "当前对你有利的因素：" in txt_e
+    assert "当前卡住你的因素：" in txt_e
+    assert "判断说明：" in txt_e
+    assert "supporting_factors" not in txt_e
+
+    print()
+    print("=== Decision factors demo — pause (short input) ===")
+    print("recommended_decision:", pause_live.get("recommended_decision"))
+    print_contract_result(pause_live)
+    print()
+    print("=== Decision factors demo — escalate (high-risk wording) ===")
+    print("recommended_decision:", esc_live.get("recommended_decision"))
+    print_contract_result(esc_live)
+    print("=== End decision factors demo ===")

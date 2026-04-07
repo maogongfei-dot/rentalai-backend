@@ -19,7 +19,9 @@ def handle_contract_input(text: str, *, print_result: bool = True) -> dict[str, 
     missing_clauses, flagged_clauses, verdict, human_* fields, ``final_display``,
     analysis_completeness / missing_information / human_missing_info_guidance,
     recommended_decision / direct_answer / direct_answer_short,
-    result_confidence / confidence_reason / human_confidence_notice, error)
+    result_confidence / confidence_reason / human_confidence_notice,
+    urgency_level / urgency_reason / priority_actions / human_urgency_notice,
+    supporting_factors / blocking_factors / key_decision_drivers / human_decision_factors_notice, error)
     for callers / main system wiring.
 
     ``print_result=False`` skips printing so callers can enrich ``final_display`` (e.g. meta) first.

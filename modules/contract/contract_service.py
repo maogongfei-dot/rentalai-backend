@@ -12,15 +12,23 @@ from typing import Any
 from modules.contract.contract_api import analyze_contract
 from modules.contract.contract_presenter import (
     build_analysis_completeness,
+    build_blocking_factors,
     build_confidence_reason,
     build_direct_answer,
     build_direct_answer_short,
     build_final_display,
     build_human_confidence_notice,
+    build_human_decision_factors_notice,
     build_human_missing_info_guidance,
+    build_human_urgency_notice,
+    build_key_decision_drivers,
     build_missing_information,
+    build_priority_actions,
     build_recommended_decision,
     build_result_confidence,
+    build_supporting_factors,
+    build_urgency_level,
+    build_urgency_reason,
 )
 
 # Phase 3 Part 11 — standardized envelope ``module`` field
@@ -552,6 +560,14 @@ def build_contract_result(result: dict[str, Any], normalized_text: str) -> dict[
     draft_output["result_confidence"] = build_result_confidence(draft_output)
     draft_output["confidence_reason"] = build_confidence_reason(draft_output)
     draft_output["human_confidence_notice"] = build_human_confidence_notice(draft_output)
+    draft_output["urgency_level"] = build_urgency_level(draft_output)
+    draft_output["urgency_reason"] = build_urgency_reason(draft_output)
+    draft_output["priority_actions"] = build_priority_actions(draft_output)
+    draft_output["human_urgency_notice"] = build_human_urgency_notice(draft_output)
+    draft_output["supporting_factors"] = build_supporting_factors(draft_output)
+    draft_output["blocking_factors"] = build_blocking_factors(draft_output)
+    draft_output["key_decision_drivers"] = build_key_decision_drivers(draft_output)
+    draft_output["human_decision_factors_notice"] = build_human_decision_factors_notice(draft_output)
     draft_output["final_display"] = build_final_display(draft_output)
     return draft_output
 

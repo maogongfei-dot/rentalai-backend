@@ -21,6 +21,8 @@ Usage (from repo root):
   python main.py --verdict-test           # Phase 3: final verdict (high vs low+incomplete)
   python main.py --contract-demo          # Phase 3: standalone contract analysis demo (two samples)
   python main.py --contract-batch-test    # Phase 3: contract_test_runner (batch + assertions)
+  python main.py --contract-urgency-test  # Phase 4 Part 9: urgency & priority (demo + assertions)
+  python main.py --contract-decision-factors-test  # Phase 4 Part 10: supporting / blocking factors
 """
 
 from __future__ import annotations
@@ -317,10 +319,12 @@ from modules.contract.contract_test_runner import (
     run_contract_batch_test,
     run_contract_completeness_test,
     run_contract_confidence_test,
+    run_contract_decision_factors_test,
     run_contract_demo,
     run_contract_direct_answer_test,
     run_contract_final_display_test,
     run_contract_human_output_test,
+    run_contract_urgency_test,
 )
 
 
@@ -629,6 +633,14 @@ def main() -> None:
         run_contract_confidence_test()
         return
 
+    if argv and argv[0] in ("--contract-urgency-test", "--phase4-part9"):
+        run_contract_urgency_test()
+        return
+
+    if argv and argv[0] in ("--contract-decision-factors-test", "--phase4-part10"):
+        run_contract_decision_factors_test()
+        return
+
     if argv and argv[0] == "--mode":
         if len(argv) < 2:
             print("Usage: python main.py --mode contract [optional contract text...]")
@@ -687,6 +699,8 @@ def main() -> None:
         print("  python main.py --contract-completeness-test   # Phase 4: completeness / missing info")
         print("  python main.py --contract-direct-answer-test   # Phase 4: direct answer / decision")
         print("  python main.py --contract-confidence-test   # Phase 4: result confidence layer")
+        print("  python main.py --contract-urgency-test   # Phase 4 Part 9: urgency & priority")
+        print("  python main.py --contract-decision-factors-test   # Phase 4 Part 10: decision factors")
         return
 
     run_main_flow(text, source="cli_argv")

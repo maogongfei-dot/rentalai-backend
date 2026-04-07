@@ -102,6 +102,21 @@ def _copy_str_list(raw: Any, max_n: int = 8) -> list[str]:
     return out
 
 
+def _dedupe_lines(lines: list[str], max_n: int = 8) -> list[str]:
+    """Preserve order, drop duplicates (normalized strip)."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for s in lines:
+        t = s.strip()
+        if not t or t in seen:
+            continue
+        seen.add(t)
+        out.append(t)
+        if len(out) >= max_n:
+            break
+    return out
+
+
 def _extract_contract_text_length(envelope: dict[str, Any]) -> int:
     """Best-effort length from parsed output and optional user/description fields."""
     if not isinstance(envelope, dict):
@@ -469,6 +484,286 @@ def build_human_confidence_notice(system_result: dict[str, Any]) -> str:
     return "请不要只凭这次结果做最终决定，先补齐信息与材料后再判断。"
 
 
+def _urgency_label_zh(level: str) -> str:
+    return {"high": "需要尽快处理", "medium": "建议尽快关注", "low": "可按正常节奏处理"}.get(
+        (level or "").lower(), ""
+    )
+
+
+def _urgency_boost_from_actions(actions: list[Any], steps: list[Any]) -> bool:
+    en_kw = (
+        "urgent",
+        "immediately",
+        "as soon",
+        "complaint",
+        "tribunal",
+        "legal",
+        "report",
+        "ombudsman",
+    )
+    zh_kw = ("尽快", "升级", "投诉", "申诉", "立即", "马上")
+    parts: list[str] = []
+    for a in actions or []:
+        if isinstance(a, str):
+            parts.append(a.lower())
+    for s in steps or []:
+        if isinstance(s, str):
+            parts.append(s)
+    blob = " ".join(parts).lower()
+    if any(k in blob for k in en_kw):
+        return True
+    full = "".join(parts)
+    return any(k in full for k in zh_kw)
+
+
+def build_urgency_level(system_result: dict[str, Any]) -> str:
+    """English enum high | medium | low — time sensitivity (distinct from risk magnitude)."""
+    if not isinstance(system_result, dict) or system_result.get("ok") is not True:
+        return "medium"
+    rd = (system_result.get("recommended_decision") or "").lower()
+    summary = system_result.get("summary") if isinstance(system_result.get("summary"), dict) else {}
+    rl = summary.get("risk_level")
+    comp = (system_result.get("analysis_completeness") or "low").lower()
+    if comp not in ("high", "medium", "low"):
+        comp = "low"
+    hw = _fd_str(system_result.get("human_risk_warning"))
+    actions = system_result.get("actions") or []
+    steps = system_result.get("human_next_steps") or []
+
+    if rd == "escalate":
+        return "high"
+    if rd == "pause" and comp == "low":
+        return "medium"
+    if any(k in hw for k in ("拖", "被动", "尽快")):
+        return "high"
+    if _urgency_boost_from_actions(
+        actions if isinstance(actions, list) else [],
+        steps if isinstance(steps, list) else [],
+    ):
+        return "high"
+    if rd == "caution" and rl in ("high", "medium"):
+        return "medium"
+    if rd == "proceed" and rl == "low":
+        return "low"
+    if rd == "pause":
+        return "medium"
+    return "medium"
+
+
+def build_urgency_reason(system_result: dict[str, Any]) -> str:
+    """One sentence: why this urgency level."""
+    if not isinstance(system_result, dict) or system_result.get("ok") is not True:
+        return "当前无法判断处理紧急度。"
+    ul = build_urgency_level(system_result)
+    if ul == "high":
+        return (
+            "因为存在较明显风险或需要尽快推进的处理路径，继续拖延可能让后续更被动，建议尽快处理。"
+        )
+    if ul == "medium":
+        return "目前问题值得尽快关注，但暂时还没有到必须立刻升级处理的程度。"
+    return "从当前信息看，更需要先确认与整理，可按正常节奏推进。"
+
+
+def _default_priority_actions(system_result: dict[str, Any]) -> list[str]:
+    rd = (system_result.get("recommended_decision") or "").lower()
+    if rd == "escalate":
+        return ["先整理关键材料与沟通记录，再按更正式的路径推进。"]
+    if rd == "pause":
+        return ["先确认合同条款与信息缺口，再决定下一步。"]
+    if rd == "caution":
+        return ["先把有疑虑的条款单独标出，再与对方书面确认。"]
+    return ["先把租金、押金、通知期等关键条款核对清楚。"]
+
+
+def build_priority_actions(system_result: dict[str, Any]) -> list[str]:
+    """Top 1–3 actionable lines from ``human_next_steps`` (short), or rule-based fallback."""
+    if not isinstance(system_result, dict) or system_result.get("ok") is not True:
+        return []
+    raw = _copy_str_list(system_result.get("human_next_steps"), 8)
+    if not raw:
+        alt = _copy_str_list(system_result.get("recommended_actions"))
+        raw = alt[:8] if alt else []
+    if not raw:
+        return _default_priority_actions(system_result)[:3]
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for s in raw:
+        line = s.strip()
+        if len(line) > 44:
+            line = line[:41] + "…"
+        if line and line not in seen:
+            seen.add(line)
+            out.append(line)
+        if len(out) >= 3:
+            break
+    return out
+
+
+def build_human_urgency_notice(system_result: dict[str, Any]) -> str:
+    """Short user reminder for pacing (not legal advice)."""
+    if not isinstance(system_result, dict) or system_result.get("ok") is not True:
+        return "请先完成分析，再安排处理节奏。"
+    ul = build_urgency_level(system_result)
+    if ul == "high":
+        return "这类情况不建议一直拖着，最好先把关键动作做起来。"
+    if ul == "medium":
+        return "可以先按步骤处理，不必过度慌张，但也不要完全忽略。"
+    return "目前更适合先整理材料和确认条款，再决定是否升级处理。"
+
+
+def _summary_has_human_explanation(system_result: dict[str, Any]) -> bool:
+    s = system_result.get("summary") if isinstance(system_result.get("summary"), dict) else {}
+    he = s.get("human_explanation") if isinstance(s, dict) else None
+    return isinstance(he, str) and bool(he.strip())
+
+
+def build_supporting_factors(system_result: dict[str, Any]) -> list[str]:
+    """Positive reasons that support the current recommendation (2–5 lines, deduped)."""
+    if not isinstance(system_result, dict) or system_result.get("ok") is not True:
+        return []
+    out: list[str] = []
+    rd = (system_result.get("recommended_decision") or "").lower()
+    if rd not in ("proceed", "caution", "pause", "escalate"):
+        rd = build_recommended_decision(system_result)
+
+    v = system_result.get("verdict") if isinstance(system_result.get("verdict"), dict) else {}
+    if v.get("status") or v.get("title"):
+        out.append("已有系统性的结论方向，便于你对照处理。")
+    if _fd_str(system_result.get("direct_answer")):
+        out.append("已给出可直接阅读的判断摘要。")
+    if _summary_has_human_explanation(system_result):
+        out.append("对条款与背景有进一步说明，便于理解。")
+
+    steps = _copy_str_list(system_result.get("human_next_steps"), 3)
+    if steps:
+        out.append("已经列出可执行的下一步动作。")
+    ev = _copy_str_list(system_result.get("human_evidence_checklist"), 2)
+    if ev:
+        out.append("已提示可准备的材料方向。")
+
+    ac = (system_result.get("analysis_completeness") or "low").lower()
+    if ac in ("medium", "high"):
+        out.append("当前输入信息足以支撑初步判断。")
+
+    rc = (system_result.get("result_confidence") or "low").lower()
+    if rc in ("medium", "high"):
+        out.append("结果可参考度达到中等或以上。")
+
+    fc = system_result.get("flagged_clauses") or []
+    if isinstance(fc, list) and fc:
+        out.append("已标出需要留意的原文片段，问题方向更清楚。")
+
+    summary = system_result.get("summary") if isinstance(system_result.get("summary"), dict) else {}
+    rl = summary.get("risk_level") if isinstance(summary, dict) else None
+    if rd in ("proceed", "caution") and rl in ("low", "medium"):
+        out.append("整体仍可把重点放在核对与留痕，而不是完全无从下手。")
+
+    if rd == "escalate":
+        out.append("风险点已集中呈现，便于决定是否走更正式路径。")
+
+    return _dedupe_lines(out, 5)
+
+
+def build_blocking_factors(system_result: dict[str, Any]) -> list[str]:
+    """Factors that hold back or require pause / caution / escalate (2–5 lines, deduped)."""
+    if not isinstance(system_result, dict) or system_result.get("ok") is not True:
+        return []
+    out: list[str] = []
+    rd = (system_result.get("recommended_decision") or "").lower()
+    if rd not in ("proceed", "caution", "pause", "escalate"):
+        rd = build_recommended_decision(system_result)
+
+    mi = system_result.get("missing_information") or []
+    if isinstance(mi, list) and any(isinstance(x, str) and x.strip() for x in mi):
+        out.append("若干关键信息仍有缺口，会限制一次性判断。")
+
+    ac = (system_result.get("analysis_completeness") or "low").lower()
+    if ac == "low":
+        out.append("整体信息完整度偏低，结论只能作方向参考。")
+
+    rc = (system_result.get("result_confidence") or "low").lower()
+    if rc == "low":
+        out.append("本次结果参考度有限，不宜单独作为最终依据。")
+
+    hw = _fd_str(system_result.get("human_risk_warning"))
+    if any(k in hw for k in ("拖", "被动", "尽快", "务必")):
+        out.append("风险侧提醒较明确，不宜当作可忽略的小问题。")
+
+    summary = system_result.get("summary") if isinstance(system_result.get("summary"), dict) else {}
+    rl = summary.get("risk_level") if isinstance(summary, dict) else None
+    sev = (summary.get("severity") or "").lower() if isinstance(summary, dict) else ""
+    if rl == "high" or sev in ("critical", "severe"):
+        out.append("风险信号偏高，继续推进前需要先压住关键不确定点。")
+
+    fc = system_result.get("flagged_clauses") or []
+    if isinstance(fc, list) and fc:
+        out.append("仍有条款或表述需要逐项核对，不能凭印象带过。")
+
+    if rd == "pause":
+        out.append("系统判断尚未满足直接推进的条件。")
+    if rd == "escalate":
+        out.append("仅靠日常沟通可能不足以覆盖当前风险，需要更正式的处理空间。")
+
+    ul = (system_result.get("urgency_level") or "").lower()
+    if ul not in ("high", "medium", "low"):
+        ul = build_urgency_level(system_result)
+    if ul == "high":
+        out.append("处理节奏上更紧迫，阻碍点不先处理会更被动。")
+
+    return _dedupe_lines(out, 5)
+
+
+def build_key_decision_drivers(system_result: dict[str, Any]) -> list[str]:
+    """At most 3 short product-style lines: why this outcome."""
+    if not isinstance(system_result, dict) or system_result.get("ok") is not True:
+        return []
+    rd = (system_result.get("recommended_decision") or "").lower()
+    if rd not in ("proceed", "caution", "pause", "escalate"):
+        rd = build_recommended_decision(system_result)
+
+    summary = system_result.get("summary") if isinstance(system_result.get("summary"), dict) else {}
+    rl = summary.get("risk_level") if isinstance(summary, dict) else None
+    ac = (system_result.get("analysis_completeness") or "low").lower()
+    if ac not in ("high", "medium", "low"):
+        ac = "low"
+
+    candidates: list[str] = []
+    if rl == "high" and rd != "proceed":
+        candidates.append("风险条款需优先确认")
+    if ac == "low" and rd in ("pause", "caution", "escalate"):
+        candidates.append("信息仍不完整")
+
+    if rd == "proceed":
+        candidates.extend(["已有较明确方向", "可先按步骤推进"])
+    elif rd == "caution":
+        candidates.extend(["需核对风险与证据", "谨慎推进更合适"])
+    elif rd == "pause":
+        candidates.extend(["关键条款未确认", "不宜匆忙决定"])
+    else:
+        candidates.extend(["风险较突出", "宜走正式处理路径"])
+
+    return _dedupe_lines(candidates, 3)
+
+
+def build_human_decision_factors_notice(system_result: dict[str, Any]) -> str:
+    """One short paragraph tying supporting vs blocking themes together."""
+    if not isinstance(system_result, dict) or system_result.get("ok") is not True:
+        return "请先完成分析，再查看判断依据说明。"
+    sf = build_supporting_factors(system_result)
+    bf = build_blocking_factors(system_result)
+    if len(bf) >= 2 and len(sf) >= 1:
+        return (
+            "这次建议综合了条款、证据完整度和后续处理空间；"
+            "对你有利的点与仍在卡住你的点并存，请按优先级逐项处理。"
+        )
+    if len(bf) >= 2:
+        return "目前阻碍你继续推进的，主要是信息不完整和关键风险尚未确认。"
+    if len(sf) >= 2 and len(bf) == 0:
+        return "当前判断主要基于已呈现条款与可执行步骤，整体方向相对清晰。"
+    return "这次建议不是只看单一风险点，而是综合考虑了条款、证据和后续处理空间。"
+
+
 def build_final_display(system_result: dict[str, Any]) -> dict[str, Any]:
     """
     Unified user-facing display object (Phase 4 Part 5).
@@ -481,9 +776,17 @@ def build_final_display(system_result: dict[str, Any]) -> dict[str, Any]:
             "direct_answer_block": "",
             "direct_answer_short_block": "",
             "decision_block": "",
+            "urgency_block": "",
+            "urgency_reason_block": "",
+            "priority_actions_block": [],
+            "urgency_notice_block": "",
             "confidence_block": "",
             "confidence_reason_block": "",
             "confidence_notice_block": "",
+            "key_drivers_block": [],
+            "supporting_factors_block": [],
+            "blocking_factors_block": [],
+            "decision_factors_notice_block": "",
             "summary_block": "",
             "risk_block": "",
             "explanation_block": "",
@@ -525,6 +828,17 @@ def build_final_display(system_result: dict[str, Any]) -> dict[str, Any]:
     da = _fd_str(system_result.get("direct_answer")) or build_direct_answer(system_result)
     das = _fd_str(system_result.get("direct_answer_short")) or build_direct_answer_short(system_result)
 
+    ul = _fd_str(system_result.get("urgency_level")).lower()
+    if ul not in ("high", "medium", "low"):
+        ul = build_urgency_level(system_result)
+    ur = _fd_str(system_result.get("urgency_reason")) or build_urgency_reason(system_result)
+    pa_raw = system_result.get("priority_actions")
+    if isinstance(pa_raw, list) and pa_raw:
+        pa = _copy_str_list([str(x) for x in pa_raw if x], 3)
+    else:
+        pa = build_priority_actions(system_result)
+    hun = _fd_str(system_result.get("human_urgency_notice")) or build_human_urgency_notice(system_result)
+
     rc = _fd_str(system_result.get("result_confidence")).lower()
     if rc not in ("high", "medium", "low"):
         rc = build_result_confidence(system_result)
@@ -533,14 +847,44 @@ def build_final_display(system_result: dict[str, Any]) -> dict[str, Any]:
         system_result
     )
 
+    sf_raw = system_result.get("supporting_factors")
+    if isinstance(sf_raw, list) and sf_raw:
+        sfb = _dedupe_lines([str(x) for x in sf_raw if x], 5)
+    else:
+        sfb = build_supporting_factors(system_result)
+
+    bf_raw = system_result.get("blocking_factors")
+    if isinstance(bf_raw, list) and bf_raw:
+        bfb = _dedupe_lines([str(x) for x in bf_raw if x], 5)
+    else:
+        bfb = build_blocking_factors(system_result)
+
+    kd_raw = system_result.get("key_decision_drivers")
+    if isinstance(kd_raw, list) and kd_raw:
+        kdb = _dedupe_lines([str(x) for x in kd_raw if x], 3)
+    else:
+        kdb = build_key_decision_drivers(system_result)
+
+    hdfn = _fd_str(system_result.get("human_decision_factors_notice")) or build_human_decision_factors_notice(
+        system_result
+    )
+
     return {
         "title": _pick_title(system_result),
         "direct_answer_block": da,
         "direct_answer_short_block": das,
         "decision_block": _decision_label_zh(rd),
+        "urgency_block": _urgency_label_zh(ul),
+        "urgency_reason_block": ur,
+        "priority_actions_block": pa,
+        "urgency_notice_block": hun,
         "confidence_block": _confidence_label_zh(rc),
         "confidence_reason_block": cre,
         "confidence_notice_block": hcn,
+        "key_drivers_block": kdb,
+        "supporting_factors_block": sfb,
+        "blocking_factors_block": bfb,
+        "decision_factors_notice_block": hdfn,
         "summary_block": _pick_summary_block(system_result),
         "risk_block": risk_block,
         "explanation_block": _pick_explanation_block(system_result),
@@ -577,6 +921,22 @@ def _format_unified_final_display(final_output: dict[str, Any], fd: dict[str, An
         lines.append("建议状态：")
         lines.append(dec)
 
+    ugb = _fd_str(fd.get("urgency_block"))
+    if ugb:
+        lines.append("")
+        lines.append("处理紧急度：")
+        lines.append(ugb)
+    urb = _fd_str(fd.get("urgency_reason_block"))
+    if urb:
+        lines.append("")
+        lines.append("紧急度说明：")
+        lines.append(urb)
+    unb = _fd_str(fd.get("urgency_notice_block"))
+    if unb:
+        lines.append("")
+        lines.append("处理提醒：")
+        lines.append(unb)
+
     cfb = _fd_str(fd.get("confidence_block"))
     if cfb:
         lines.append("")
@@ -592,6 +952,36 @@ def _format_unified_final_display(final_output: dict[str, Any], fd: dict[str, An
         lines.append("")
         lines.append("使用提醒：")
         lines.append(cnb)
+
+    kdb = fd.get("key_drivers_block")
+    kd_lines = _copy_str_list(kdb, 3) if isinstance(kdb, list) else []
+    if kd_lines:
+        lines.append("")
+        lines.append("为什么是这个结果：")
+        for s in kd_lines:
+            lines.append(f"- {s}")
+
+    sfb = fd.get("supporting_factors_block")
+    sf_lines = _copy_str_list(sfb, 5) if isinstance(sfb, list) else []
+    if sf_lines:
+        lines.append("")
+        lines.append("当前对你有利的因素：")
+        for s in sf_lines:
+            lines.append(f"- {s}")
+
+    bfb = fd.get("blocking_factors_block")
+    bf_lines = _copy_str_list(bfb, 5) if isinstance(bfb, list) else []
+    if bf_lines:
+        lines.append("")
+        lines.append("当前卡住你的因素：")
+        for s in bf_lines:
+            lines.append(f"- {s}")
+
+    dfn = _fd_str(fd.get("decision_factors_notice_block"))
+    if dfn:
+        lines.append("")
+        lines.append("判断说明：")
+        lines.append(dfn)
 
     sb = _fd_str(fd.get("summary_block"))
     if sb:
@@ -630,6 +1020,14 @@ def _format_unified_final_display(final_output: dict[str, Any], fd: dict[str, An
         lines.append("当前还缺这些信息：")
         for s in mi_lines:
             lines.append(f"- {s}")
+
+    pab = fd.get("priority_actions_block")
+    pa_lines = _copy_str_list(pab, 3) if isinstance(pab, list) else []
+    if pa_lines:
+        lines.append("")
+        lines.append("优先先做这几件事：")
+        for i, s in enumerate(pa_lines, 1):
+            lines.append(f"{i}. {s}")
 
     steps = fd.get("next_steps_block")
     step_lines = _copy_str_list(steps, max_n=12) if isinstance(steps, list) else []
@@ -715,6 +1113,27 @@ def _format_legacy_contract_result_text(final_output: dict[str, Any]) -> str:
             lines.append("建议状态：")
             lines.append(_decision_label_zh(rd))
 
+        ul = _fd_str(final_output.get("urgency_level")).lower()
+        if ul not in ("high", "medium", "low"):
+            ul = build_urgency_level(final_output)
+        ugb = _urgency_label_zh(ul)
+        if ugb:
+            lines.append("")
+            lines.append("处理紧急度：")
+            lines.append(ugb)
+        ur = _fd_str(final_output.get("urgency_reason")) or build_urgency_reason(final_output)
+        if ur:
+            lines.append("")
+            lines.append("紧急度说明：")
+            lines.append(ur)
+        hun = _fd_str(final_output.get("human_urgency_notice")) or build_human_urgency_notice(
+            final_output
+        )
+        if hun:
+            lines.append("")
+            lines.append("处理提醒：")
+            lines.append(hun)
+
         rconf = final_output.get("result_confidence")
         if isinstance(rconf, str) and rconf.lower() in ("high", "medium", "low"):
             lines.append("")
@@ -730,6 +1149,47 @@ def _format_legacy_contract_result_text(final_output: dict[str, Any]) -> str:
             lines.append("")
             lines.append("使用提醒：")
             lines.append(hcn.strip())
+
+        kd_raw = final_output.get("key_decision_drivers")
+        if isinstance(kd_raw, list) and kd_raw:
+            kd_lines = _dedupe_lines([str(x) for x in kd_raw if x], 3)
+        else:
+            kd_lines = build_key_decision_drivers(final_output)
+        if kd_lines:
+            lines.append("")
+            lines.append("为什么是这个结果：")
+            for s in kd_lines:
+                lines.append(f"- {s}")
+
+        sf_raw = final_output.get("supporting_factors")
+        if isinstance(sf_raw, list) and sf_raw:
+            sf_lines = _dedupe_lines([str(x) for x in sf_raw if x], 5)
+        else:
+            sf_lines = build_supporting_factors(final_output)
+        if sf_lines:
+            lines.append("")
+            lines.append("当前对你有利的因素：")
+            for s in sf_lines:
+                lines.append(f"- {s}")
+
+        bf_raw = final_output.get("blocking_factors")
+        if isinstance(bf_raw, list) and bf_raw:
+            bf_lines = _dedupe_lines([str(x) for x in bf_raw if x], 5)
+        else:
+            bf_lines = build_blocking_factors(final_output)
+        if bf_lines:
+            lines.append("")
+            lines.append("当前卡住你的因素：")
+            for s in bf_lines:
+                lines.append(f"- {s}")
+
+        hdfn = _fd_str(final_output.get("human_decision_factors_notice")) or build_human_decision_factors_notice(
+            final_output
+        )
+        if hdfn:
+            lines.append("")
+            lines.append("判断说明：")
+            lines.append(hdfn)
 
         hw = final_output.get("human_risk_warning")
         if isinstance(hw, str) and hw.strip():
@@ -780,6 +1240,17 @@ def _format_legacy_contract_result_text(final_output: dict[str, Any]) -> str:
                 lines.append("当前还缺这些信息：")
                 for s in mil:
                     lines.append(f"- {s}")
+
+        pa_raw = final_output.get("priority_actions")
+        if isinstance(pa_raw, list) and pa_raw:
+            pa_lines = _copy_str_list([str(x) for x in pa_raw if x], 3)
+        else:
+            pa_lines = build_priority_actions(final_output)
+        if pa_lines:
+            lines.append("")
+            lines.append("优先先做这几件事：")
+            for i, s in enumerate(pa_lines, 1):
+                lines.append(f"{i}. {s}")
 
         lines.append("Actions:")
         for action in final_output.get("actions") or []:
