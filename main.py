@@ -38,6 +38,7 @@ if str(ROOT) not in sys.path:
 
 from backend.app.chat import handle_chat_request
 from modules.contract.contract_handler import handle_contract_input
+from modules.contract.contract_presenter import print_contract_result as print_contract_user_facing
 from utils.system_logger import log_system_result
 from modules.contract.contract_service import (
     build_contract_result,
@@ -101,6 +102,25 @@ _CONTRACT_INTENT_LONG_TEXT_LEN = 200
 
 # Phase 3 Part 27–28 — last routed pipeline outcome (unified shell from ``build_system_result``)
 system_result: dict[str, Any] | None = None
+
+
+def _merge_final_display_meta(system_result: dict[str, Any]) -> None:
+    """Fill ``result.final_display.meta_block`` from the outer shell (Phase 4 Part 5)."""
+    if not isinstance(system_result, dict):
+        return
+    inner = system_result.get("result")
+    if not isinstance(inner, dict):
+        return
+    fd = inner.get("final_display")
+    if not isinstance(fd, dict):
+        return
+    meta = fd.get("meta_block")
+    if not isinstance(meta, dict):
+        meta = {}
+    meta["source"] = str(system_result.get("source") or "")
+    meta["request_id"] = str(system_result.get("request_id") or "")
+    meta["timestamp"] = str(system_result.get("timestamp") or "")
+    fd["meta_block"] = meta
 
 
 def build_system_result(
@@ -276,9 +296,13 @@ def run_contract_pipeline_for_text(
     print("======== CONTRACT INPUT ========")
     print(normalized if normalized else _DEFAULT_DETAIL)
     print()
-    contract_result = handle_contract_input(text)
+    contract_result = handle_contract_input(text, print_result=False)
     system_result = build_system_result("contract", contract_result, source=source)
+    _merge_final_display_meta(system_result)
     print()
+    print_contract_user_facing(system_result["result"])
+    print()
+    # Technical appendix (risk counts / per-clause; not the unified user block)
     print_contract_formatted_appendix(
         {
             "ok": contract_result.get("ok"),
@@ -289,7 +313,15 @@ def run_contract_pipeline_for_text(
     )
 
 
-from modules.contract.contract_test_runner import run_contract_batch_test, run_contract_demo
+from modules.contract.contract_test_runner import (
+    run_contract_batch_test,
+    run_contract_completeness_test,
+    run_contract_confidence_test,
+    run_contract_demo,
+    run_contract_direct_answer_test,
+    run_contract_final_display_test,
+    run_contract_human_output_test,
+)
 
 
 def run_contract_integration_test() -> None:
@@ -577,6 +609,26 @@ def main() -> None:
         run_contract_batch_test()
         return
 
+    if argv and argv[0] in ("--contract-human-test", "--phase4-part4"):
+        run_contract_human_output_test()
+        return
+
+    if argv and argv[0] in ("--contract-final-display-test", "--phase4-part5"):
+        run_contract_final_display_test()
+        return
+
+    if argv and argv[0] in ("--contract-completeness-test", "--phase4-part6"):
+        run_contract_completeness_test()
+        return
+
+    if argv and argv[0] in ("--contract-direct-answer-test", "--phase4-part7"):
+        run_contract_direct_answer_test()
+        return
+
+    if argv and argv[0] in ("--contract-confidence-test", "--phase4-part8"):
+        run_contract_confidence_test()
+        return
+
     if argv and argv[0] == "--mode":
         if len(argv) < 2:
             print("Usage: python main.py --mode contract [optional contract text...]")
@@ -630,6 +682,11 @@ def main() -> None:
         print("  python main.py --verdict-test")
         print("  python main.py --contract-demo")
         print("  python main.py --contract-batch-test")
+        print("  python main.py --contract-human-test   # Phase 4: human next steps / evidence / risk")
+        print("  python main.py --contract-final-display-test   # Phase 4: unified final_display block")
+        print("  python main.py --contract-completeness-test   # Phase 4: completeness / missing info")
+        print("  python main.py --contract-direct-answer-test   # Phase 4: direct answer / decision")
+        print("  python main.py --contract-confidence-test   # Phase 4: result confidence layer")
         return
 
     run_main_flow(text, source="cli_argv")

@@ -6,10 +6,30 @@ Uses ``run_contract_analysis`` from ``contract_service`` (Part 24); presenter fo
 
 from __future__ import annotations
 
+import uuid
+from datetime import datetime
 from typing import Any
 
-from modules.contract.contract_presenter import print_contract_result
-from modules.contract.contract_service import run_contract_analysis
+from modules.contract.contract_presenter import (
+    build_analysis_completeness,
+    build_confidence_reason,
+    build_direct_answer,
+    build_direct_answer_short,
+    build_final_display,
+    build_human_confidence_notice,
+    build_human_missing_info_guidance,
+    build_missing_information,
+    build_recommended_decision,
+    build_result_confidence,
+    format_contract_result_text,
+    print_contract_result,
+)
+from modules.contract.contract_service import (
+    build_human_evidence_checklist,
+    build_human_next_steps,
+    build_human_risk_warning,
+    run_contract_analysis,
+)
 
 
 def run_contract_demo() -> None:
@@ -283,3 +303,181 @@ def run_contract_batch_test() -> None:
     else:
         print()
         print("FINAL TEST STATUS: FAIL")
+
+
+def run_contract_human_output_test() -> None:
+    """
+    Phase 4 Part 4 — human_next_steps / human_evidence_checklist / human_risk_warning wiring.
+
+    Asserts stable types, safe behaviour on empty input, and prints one sample for CLI review.
+    """
+    assert build_human_next_steps({}) == []
+    assert build_human_risk_warning({}) == ""
+    assert isinstance(build_human_evidence_checklist({}), list)
+
+    empty = run_contract_analysis("")
+    assert isinstance(empty.get("human_next_steps"), list)
+    assert isinstance(empty.get("human_evidence_checklist"), list)
+    assert isinstance(empty.get("human_risk_warning"), str)
+
+    sample = (
+        "The deposit is £500. The tenant may terminate with notice. "
+        "Repair and maintenance obligations apply."
+    )
+    out = run_contract_analysis(sample)
+    assert isinstance(out.get("human_next_steps"), list)
+    assert isinstance(out.get("human_evidence_checklist"), list)
+    assert isinstance(out.get("human_risk_warning"), str)
+    assert len(out.get("human_next_steps") or []) >= 1
+
+    print()
+    print("=== Contract Human Output Smoke (Phase 4 Part 4) ===")
+    print("human_risk_warning:", (out.get("human_risk_warning") or "")[:160])
+    print("human_next_steps count:", len(out.get("human_next_steps") or []))
+    print("human_evidence_checklist count:", len(out.get("human_evidence_checklist") or []))
+    print()
+    print("--- Presenter preview ---")
+    print_contract_result(out)
+    print("--- End preview ---")
+
+
+def run_contract_final_display_test() -> None:
+    """
+    Phase 4 Part 5 — ``final_display`` dict, safe fallbacks, presenter unified vs legacy paths.
+    """
+    fd0 = build_final_display({})
+    assert isinstance(fd0, dict)
+    assert "title" in fd0 and "meta_block" in fd0
+
+    sparse = run_contract_analysis("deposit")
+    fd = sparse.get("final_display")
+    assert isinstance(fd, dict)
+    assert isinstance(fd.get("summary_block"), str)
+
+    minimal: dict[str, Any] = {"ok": True, "summary": {}, "verdict": {}}
+    assert isinstance(build_final_display(minimal).get("summary_block"), str)
+
+    legacy = dict(sparse)
+    legacy.pop("final_display", None)
+    legacy_text = format_contract_result_text(legacy)
+    assert "=== Contract Analysis Result ===" in legacy_text
+
+    rich = run_contract_analysis(
+        "The deposit is £500. Termination notice 2 months. Repair obligations."
+    )
+    rfd = rich.get("final_display")
+    if isinstance(rfd, dict) and isinstance(rfd.get("meta_block"), dict):
+        rfd["meta_block"]["source"] = "cli_test"
+        rfd["meta_block"]["request_id"] = str(uuid.uuid4())
+        rfd["meta_block"]["timestamp"] = datetime.utcnow().isoformat()
+    print()
+    print("=== Contract Final Display (Phase 4 Part 5) ===")
+    print_contract_result(rich)
+    print("=== End final display demo ===")
+
+
+def run_contract_completeness_test() -> None:
+    """Phase 4 Part 6 — analysis_completeness / missing_information / guidance."""
+    assert build_analysis_completeness({}) == "low"
+    assert build_missing_information({}) == []
+    assert build_human_missing_info_guidance({}) == ""
+
+    low = run_contract_analysis("deposit")
+    assert low.get("analysis_completeness") == "low"
+    assert isinstance(low.get("missing_information"), list)
+    assert isinstance(low.get("human_missing_info_guidance"), str)
+    fd_low = low.get("final_display") or {}
+    assert "completeness_block" in fd_low
+
+    high_text = (
+        "The tenant shall pay rent monthly. The deposit is £800 held in a scheme. "
+        "Notice period is two months. The landlord may not terminate without notice. "
+        "Repair and maintenance obligations are set out in the schedule. "
+        "Fees may apply for late payment. Termination and end of tenancy terms apply."
+    )
+    hi = run_contract_analysis(high_text)
+    assert hi.get("analysis_completeness") in ("high", "medium")
+
+    med = run_contract_analysis("Rent is £500 monthly. Deposit £400. Notice one month.")
+    assert med.get("analysis_completeness") in ("low", "medium", "high")
+
+    print()
+    print("=== Completeness demo (Phase 4 Part 6) — low input ===")
+    print("analysis_completeness:", low.get("analysis_completeness"))
+    print_contract_result(low)
+    print()
+    print("=== Completeness demo — richer input ===")
+    print("analysis_completeness:", hi.get("analysis_completeness"))
+    print_contract_result(hi)
+    print("=== End completeness demo ===")
+
+
+def run_contract_direct_answer_test() -> None:
+    """Phase 4 Part 7 — direct_answer / recommended_decision / final_display blocks."""
+    assert build_recommended_decision({}) == "pause"
+    assert isinstance(build_direct_answer({}), str)
+    assert isinstance(build_direct_answer_short({}), str)
+
+    pause_case = run_contract_analysis("deposit")
+    assert pause_case.get("recommended_decision") == "pause"
+    fd_p = pause_case.get("final_display") or {}
+    assert fd_p.get("decision_block") == "建议先暂停确认"
+    assert _fd_has_direct(pause_case)
+
+    esc_text = (
+        "The tenant must pay a non-refundable fee. "
+        "The landlord may terminate the agreement immediately without notice."
+    )
+    esc = run_contract_analysis(esc_text)
+    assert esc.get("recommended_decision") == "escalate"
+    assert (esc.get("final_display") or {}).get("decision_block") == "建议升级处理"
+
+    print()
+    print("=== Direct answer demo — pause (short input) ===")
+    print("recommended_decision:", pause_case.get("recommended_decision"))
+    print_contract_result(pause_case)
+    print()
+    print("=== Direct answer demo — escalate (high-risk wording) ===")
+    print("recommended_decision:", esc.get("recommended_decision"))
+    print_contract_result(esc)
+    print("=== End direct answer demo ===")
+
+
+def _fd_has_direct(out: dict[str, Any]) -> bool:
+    fd = out.get("final_display")
+    return isinstance(fd, dict) and bool((fd.get("direct_answer_block") or "").strip())
+
+
+def run_contract_confidence_test() -> None:
+    """Phase 4 Part 8 — result_confidence / confidence_reason / human_confidence_notice."""
+    assert build_result_confidence({}) == "low"
+    assert isinstance(build_confidence_reason({}), str)
+    assert isinstance(build_human_confidence_notice({}), str)
+
+    low = run_contract_analysis("deposit")
+    assert low.get("result_confidence") == "low"
+    assert (low.get("final_display") or {}).get("confidence_block") == "参考度较低"
+
+    high_text = (
+        "The tenant shall pay rent monthly. The deposit is £800 held in a scheme. "
+        "Notice period is two months. The landlord may not terminate without notice. "
+        "Repair and maintenance obligations are set out in the schedule. "
+        "Fees may apply for late payment. Termination and end of tenancy terms apply."
+    )
+    hi = run_contract_analysis(high_text)
+    assert hi.get("result_confidence") in ("high", "medium")
+
+    risky_short = "non-refundable fee. The landlord may terminate immediately without notice."
+    rs = run_contract_analysis(risky_short)
+    if rs.get("analysis_completeness") == "low":
+        assert rs.get("result_confidence") == "low"
+
+    print()
+    print("=== Confidence demo — low (short input) ===")
+    print("result_confidence:", low.get("result_confidence"))
+    print_contract_result(low)
+    print()
+    print("=== Confidence demo — richer input ===")
+    print("result_confidence:", hi.get("result_confidence"))
+    print_contract_result(hi)
+    print("=== End confidence demo ===")
