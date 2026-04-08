@@ -16,6 +16,7 @@ from modules.contract.contract_presenter import (
     build_confidence_reason,
     build_direct_answer,
     build_direct_answer_short,
+    build_communication_draft,
     build_final_display,
     build_human_confidence_notice,
     build_human_decision_factors_notice,
@@ -574,6 +575,10 @@ def build_contract_result(result: dict[str, Any], normalized_text: str) -> dict[
     draft_output["blocking_factors"] = build_blocking_factors(draft_output)
     draft_output["key_decision_drivers"] = build_key_decision_drivers(draft_output)
     draft_output["human_decision_factors_notice"] = build_human_decision_factors_notice(draft_output)
+    draft_output["action_timeline"] = build_action_timeline(draft_output)
+    draft_output["timeline_reason"] = build_timeline_reason(draft_output)
+    draft_output["human_timeline_notice"] = build_human_timeline_notice(draft_output)
+    draft_output["communication_draft"] = build_communication_draft(draft_output)
     draft_output["final_display"] = build_final_display(draft_output)
     return draft_output
 

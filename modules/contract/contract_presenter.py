@@ -763,6 +763,43 @@ def build_human_decision_factors_notice(system_result: dict[str, Any]) -> str:
         return "当前判断主要基于已呈现条款与可执行步骤，整体方向相对清晰。"
     return "这次建议不是只看单一风险点，而是综合考虑了条款、证据和后续处理空间。"
 
+def build_communication_draft(system_result: dict[str, Any]) -> str:
+    if not isinstance(system_result, dict):
+        return ""
+
+    ok = system_result.get("ok")
+    if ok is False:
+        return "你好，我这边查看这份合同/当前情况后，发现还有一些内容需要先确认。麻烦你把相关条款或说明再发我一份，我确认后再决定下一步，谢谢。"
+
+    rd = (system_result.get("recommended_decision") or "").lower()
+
+    flagged = system_result.get("flagged_clauses") or []
+    missing = system_result.get("missing_information") or []
+    priority = system_result.get("priority_actions") or []
+
+    flagged_lines = [str(x).strip() for x in flagged if isinstance(x, str) and str(x).strip()]
+    missing_lines = [str(x).strip() for x in missing if isinstance(x, str) and str(x).strip()]
+    priority_lines = [str(x).strip() for x in priority if isinstance(x, str) and str(x).strip()]
+
+    opener = "你好，我这边在查看这份租房合同时，有几个点想先确认一下。"
+
+    ask_parts = []
+    if flagged_lines:
+        ask_parts.append("涉及条款：" + "；".join(flagged_lines[:2]))
+    if missing_lines:
+        ask_parts.append("还缺信息：" + "；".join(missing_lines[:2]))
+    if not ask_parts and priority_lines:
+        ask_parts.append("我这边需要先处理：" + "；".join(priority_lines[:2]))
+
+    if rd == "pause":
+        ending = "在这些确认清楚之前，我这边会先暂停后续决定，麻烦你回复说明。"
+    elif rd == "escalate":
+        ending = "这个情况比较重要，希望尽快书面确认一下，方便我后续处理。"
+    else:
+        ending = "麻烦你帮我确认一下这些内容，谢谢。"
+
+    return opener + "，".join(ask_parts) + "。" + ending
+
 
 def build_final_display(system_result: dict[str, Any]) -> dict[str, Any]:
     """
@@ -779,6 +816,10 @@ def build_final_display(system_result: dict[str, Any]) -> dict[str, Any]:
             "urgency_block": "",
             "urgency_reason_block": "",
             "priority_actions_block": [],
+            "timeline_block": {},
+            "timeline_reason_block": "",
+            "timeline_notice_block": "",
+            "communication_draft_block": "",
             "urgency_notice_block": "",
             "confidence_block": "",
             "confidence_reason_block": "",
@@ -877,6 +918,10 @@ def build_final_display(system_result: dict[str, Any]) -> dict[str, Any]:
         "urgency_block": _urgency_label_zh(ul),
         "urgency_reason_block": ur,
         "priority_actions_block": pa,
+        "timeline_block": system_result.get("action_timeline"),
+        "timeline_reason_block": system_result.get("timeline_reason"),
+        "timeline_notice_block": system_result.get("human_timeline_notice"),
+        "communication_draft_block": build_communication_draft(system_result),
         "urgency_notice_block": hun,
         "confidence_block": _confidence_label_zh(rc),
         "confidence_reason_block": cre,
@@ -1028,6 +1073,48 @@ def _format_unified_final_display(final_output: dict[str, Any], fd: dict[str, An
         lines.append("优先先做这几件事：")
         for i, s in enumerate(pa_lines, 1):
             lines.append(f"{i}. {s}")
+
+    tb = fd.get("timeline_block")
+    if isinstance(tb, dict):
+        immediate_lines = _copy_str_list(tb.get("immediate"), 2)
+        today_lines = _copy_str_list(tb.get("today"), 3)
+        later_lines = _copy_str_list(tb.get("later"), 3)
+
+        if immediate_lines or today_lines or later_lines:
+            lines.append("")
+            lines.append("时间线行动计划：")
+
+            if immediate_lines:
+                lines.append("立刻先做：")
+                for i, s in enumerate(immediate_lines, 1):
+                    lines.append(f"{i}. {s}")
+
+            if today_lines:
+                lines.append("今天内：")
+                for i, s in enumerate(today_lines, 1):
+                    lines.append(f"{i}. {s}")
+
+            if later_lines:
+                lines.append("后续再做：")
+                for i, s in enumerate(later_lines, 1):
+                    lines.append(f"{i}. {s}")
+
+    trb = _fd_str(fd.get("timeline_reason_block"))
+    if trb:
+        lines.append("")
+        lines.append("这样安排的原因：")
+        lines.append(trb)
+
+    tnb = _fd_str(fd.get("timeline_notice_block"))
+    if tnb:
+        lines.append("")
+        lines.append("时间线提醒：")
+        lines.append(tnb)
+    cdb = _fd_str(fd.get("communication_draft_block"))
+    if cdb:
+        lines.append("")
+        lines.append("可直接发送的沟通话术：")
+        lines.append(cdb)
 
     steps = fd.get("next_steps_block")
     step_lines = _copy_str_list(steps, max_n=12) if isinstance(steps, list) else []
@@ -1251,6 +1338,49 @@ def _format_legacy_contract_result_text(final_output: dict[str, Any]) -> str:
             lines.append("优先先做这几件事：")
             for i, s in enumerate(pa_lines, 1):
                 lines.append(f"{i}. {s}")
+
+        tb = final_output.get("action_timeline")
+        if isinstance(tb, dict):
+            immediate_lines = _copy_str_list(tb.get("immediate"), 2)
+            today_lines = _copy_str_list(tb.get("today"), 3)
+            later_lines = _copy_str_list(tb.get("later"), 3)
+
+            if immediate_lines or today_lines or later_lines:
+                lines.append("")
+                lines.append("时间线行动计划：")
+
+                if immediate_lines:
+                    lines.append("立刻先做：")
+                    for i, s in enumerate(immediate_lines, 1):
+                        lines.append(f"{i}. {s}")
+
+                if today_lines:
+                    lines.append("今天内：")
+                    for i, s in enumerate(today_lines, 1):
+                        lines.append(f"{i}. {s}")
+
+                if later_lines:
+                    lines.append("后续再做：")
+                    for i, s in enumerate(later_lines, 1):
+                        lines.append(f"{i}. {s}")
+
+        tr = _fd_str(final_output.get("timeline_reason"))
+        if tr:
+            lines.append("")
+            lines.append("这样安排的原因：")
+            lines.append(tr)
+
+        tn = _fd_str(final_output.get("human_timeline_notice"))
+        if tn:
+            lines.append("")
+            lines.append("时间线提醒：")
+            lines.append(tn)
+
+        cd = build_communication_draft(final_output)
+        if cd:
+            lines.append("")
+            lines.append("可直接发送的沟通话术：")
+            lines.append(cd)
 
         lines.append("Actions:")
         for action in final_output.get("actions") or []:
