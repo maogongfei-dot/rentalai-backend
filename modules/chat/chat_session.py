@@ -118,6 +118,23 @@ def build_ai_reply(state: dict) -> str:
 
     return "\n".join(lines)
 
+def rerun_analysis_with_extra_info(state: dict, extra_info: str) -> dict:
+    if not extra_info.strip():
+        return state
+
+    original_input = state.get("original_input", "").strip()
+    combined_input = f"{original_input}\n补充信息：{extra_info.strip()}"
+
+    state["original_input"] = combined_input
+
+    analysis_input_text = build_analysis_input_text(state)
+    analysis_result = analyze_contract_pipeline(analysis_input_text)
+
+    state["analysis_input_text"] = analysis_input_text
+    state["analysis_result"] = analysis_result
+
+    return state
+
 def run_followup_prompt() -> str:
     print("")
     followup = input("是否继续补充更多信息？（有/没有）：").strip()
@@ -126,7 +143,10 @@ def run_followup_prompt() -> str:
         extra_info = input("请输入你要补充的信息：").strip()
         return extra_info
 
-    return ""
+    if followup in ["没有", "没", "不用", "不需要"]:
+        return ""
+
+    return followup
 
 def run_chat_session():
     state = None
@@ -160,9 +180,10 @@ def run_chat_session():
     extra_info = run_followup_prompt()
 
     if extra_info:
+        state = rerun_analysis_with_extra_info(state, extra_info)
         print("")
-        print("你补充的信息是：")
-        print(extra_info)
-
+        print("=== 补充信息后的重新分析结果 ===")
+        print(build_ai_reply(state))
+        
 if __name__ == "__main__":
     run_chat_session()
