@@ -668,14 +668,3 @@ def run_contract_decision_factors_test() -> None:
     print_contract_result(esc_live)
     print("=== End decision factors demo ===")
 
-from modules.contract.contract_service import build_contract_result
-from modules.contract.contract_presenter import format_contract_result_text
-
-test_input = {
-    "text": "房东要求提前支付6个月房租，并且不允许退还押金"
-}
-
-result = build_contract_result(test_input, test_input["text"])
-
-from modules.contract.contract_presenter import format_contract_result_text
-print(format_contract_result_text(result))

@@ -12,9 +12,10 @@ from typing import Dict, List
 
 
 REQUIRED_FIELDS = [
-    "issue_type",   # 问题类型
-    "has_contract", # 是否有合同
-    "amount",       # 涉及金额（押金等）
+    "budget",        # 预算
+    "location",      # 区域
+    "bedrooms",      # 房间需求
+    "move_in_date",  # 入住时间
 ]
 
 
@@ -62,14 +63,17 @@ def generate_questions(missing_fields: List[str]) -> List[str]:
     questions = []
 
     for field in missing_fields:
-        if field == "issue_type":
-            questions.append("你遇到的问题是什么类型？（押金/涨租/赶人/维修等）")
+        if field == "budget":
+            questions.append("你这次预算大概是多少？一个月房租能接受到多少？")
 
-        elif field == "has_contract":
-            questions.append("你有签合同吗？（有/没有）")
+        elif field == "location":
+            questions.append("你想住在哪个区域？有城市、区域或者 postcode 吗？")
 
-        elif field == "amount":
-            questions.append("涉及金额是多少？（例如押金£500）")
+        elif field == "bedrooms":
+            questions.append("你需要几居？是自己住还是合租？")
+
+        elif field == "move_in_date":
+            questions.append("你大概什么时候入住？")
 
     return questions
 

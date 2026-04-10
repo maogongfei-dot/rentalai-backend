@@ -18,26 +18,33 @@ def parse_user_answer(state: Dict, user_answer: str) -> Dict:
 
     answer_lower = answer.lower()
 
-    # 1. issue_type
-    if "押金" in answer:
-        state["collected_info"]["issue_type"] = "deposit"
-    elif "涨租" in answer:
-        state["collected_info"]["issue_type"] = "rent_increase"
-    elif "赶" in answer or "搬走" in answer:
-        state["collected_info"]["issue_type"] = "eviction"
-    elif "维修" in answer or "坏了" in answer or "修" in answer:
-        state["collected_info"]["issue_type"] = "repair"
-
-    # 2. has_contract
-    if "有合同" in answer or answer in ["有", "有的"]:
-        state["collected_info"]["has_contract"] = "yes"
-    elif "没合同" in answer or "没有合同" in answer or answer in ["没有", "没", "无"]:
-        state["collected_info"]["has_contract"] = "no"
-
-    # 3. amount
+    # 1. budget
     amount_value = extract_amount(answer)
     if amount_value is not None:
-        state["collected_info"]["amount"] = amount_value
+        state["collected_info"]["budget"] = amount_value
+
+    # 2. location
+    if any(x in answer for x in ["伦敦", "曼城", "伯明翰", "利兹", "London", "Manchester", "Birmingham", "Leeds"]):
+        state["collected_info"]["location"] = answer
+
+    if any(ch.isdigit() for ch in answer) and any(ch.isalpha() for ch in answer):
+        state["collected_info"]["location"] = answer
+
+    # 3. bedrooms
+    if "一居" in answer or "1居" in answer or "1 bed" in answer.lower():
+        state["collected_info"]["bedrooms"] = "1"
+    elif "两居" in answer or "2居" in answer or "2 bed" in answer.lower():
+        state["collected_info"]["bedrooms"] = "2"
+    elif "三居" in answer or "3居" in answer or "3 bed" in answer.lower():
+        state["collected_info"]["bedrooms"] = "3"
+    elif "合租" in answer:
+        state["collected_info"]["bedrooms"] = "shared"
+    elif "自己住" in answer:
+        state["collected_info"]["bedrooms"] = "private"
+
+    # 4. move_in_date
+    if any(x in answer for x in ["马上", "尽快", "下周", "下个月", "这个月", "月底"]):
+        state["collected_info"]["move_in_date"] = answer
 
     return state
 

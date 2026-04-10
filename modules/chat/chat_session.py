@@ -16,7 +16,7 @@ if PROJECT_ROOT not in sys.path:
 from chat_entry import chat_entry
 from question_engine import update_state_with_questions
 from user_input_parser import parse_user_answer
-from modules.contract.contract_pipeline import analyze_contract_pipeline
+
 
 def build_analysis_input_text(state: dict) -> str:
     collected_info = state.get("collected_info", {})
@@ -127,6 +127,8 @@ def rerun_analysis_with_extra_info(state: dict, extra_info: str) -> dict:
 
     state["original_input"] = combined_input
 
+    from modules.contract.contract_pipeline import analyze_contract_pipeline
+
     analysis_input_text = build_analysis_input_text(state)
     analysis_result = analyze_contract_pipeline(analysis_input_text)
 
@@ -161,14 +163,28 @@ def run_chat_session():
         if not state["questions"]:
             break
 
-        current_question = state["questions"][0]
-        print(f"AI提问：{current_question}")
+        questions = state.get("questions", [])
+
+        if questions:
+            if len(state.get("conversation_history", [])) <= 1:
+                user_text = state.get("original_input", "").strip()
+
+                if "租房" in user_text:
+                    print("AI：好的，我先了解一下你的需求 👍")
+                else:
+                    print("AI：好的，我先问你几个关键问题")
+
+            # 一次问最多2个问题
+            combined_questions = " ".join(questions[:2])
+            print(f"AI：{combined_questions}")
 
         user_answer = input("你的回答：").strip()
         state = parse_user_answer(state, user_answer)
         state = update_state_with_questions(state)
 
     if state["status"] == "ready":
+        from modules.contract.contract_pipeline import analyze_contract_pipeline
+
         analysis_input_text = build_analysis_input_text(state)
         analysis_result = analyze_contract_pipeline(analysis_input_text)
         state["analysis_input_text"] = analysis_input_text
