@@ -101,20 +101,24 @@ def build_ai_reply(state: dict) -> str:
         suggestion = "先整理合同、付款记录、沟通记录。"
 
     lines = []
-    lines.append("=== AI 对话分析结果 ===")
-    lines.append(f"问题类型：{issue_type_map.get(issue_type, issue_type)}")
-    lines.append(f"是否有合同：{has_contract_map.get(has_contract, has_contract)}")
-    lines.append(f"涉及金额：£{amount}" if isinstance(amount, int) else f"涉及金额：{amount}")
-    lines.append(f"风险等级：{risk_level_map.get(risk_level, risk_level)}")
+
+    lines.append("AI总结：")
     lines.append("")
-    lines.append("结论：")
-    lines.append(conclusion)
+    lines.append("我帮你整理了一下当前情况👇")
     lines.append("")
-    lines.append("下一步建议：")
+
+    lines.append(f"- 类型：{issue_type_map.get(issue_type, issue_type)}")
+    lines.append(f"- 合同：{has_contract_map.get(has_contract, has_contract)}")
+    lines.append(f"- 金额：£{amount}" if isinstance(amount, int) else f"- 金额：{amount}")
+    lines.append(f"- 风险：{risk_level_map.get(risk_level, risk_level)}")
+
+    lines.append("")
+    lines.append("建议你这样做：")
     lines.append(suggestion)
+
     lines.append("")
     lines.append("说明：")
-    lines.append("系统已识别到与当前问题相关的风险点，建议你先按上面的步骤整理材料，再继续处理。")
+    lines.append(human_explanation_raw)
 
     return "\n".join(lines)
 
