@@ -20,105 +20,40 @@ from user_input_parser import parse_user_answer
 
 def build_analysis_input_text(state: dict) -> str:
     collected_info = state.get("collected_info", {})
-
-    issue_type = collected_info.get("issue_type", "unknown")
-    has_contract = collected_info.get("has_contract", "unknown")
-    amount = collected_info.get("amount", "unknown")
     original_input = state.get("original_input", "")
 
+    budget = collected_info.get("budget", "unknown")
+    location = collected_info.get("location", "unknown")
+    bedrooms = collected_info.get("bedrooms", "unknown")
+    move_in_date = collected_info.get("move_in_date", "unknown")
+
     lines = [
-        f"Issue type: {issue_type}",
-        f"Has contract: {has_contract}",
-        f"Amount: £{amount}" if isinstance(amount, int) else f"Amount: {amount}",
-        f"User problem: {original_input}",
+        f"Budget: £{budget}" if isinstance(budget, int) else f"Budget: {budget}",
+        f"Location: {location}",
+        f"Bedrooms: {bedrooms}",
+        f"Move-in date: {move_in_date}",
+        f"User request: {original_input}",
     ]
 
     return "\n".join(lines)
 
-
 def build_ai_reply(state: dict) -> str:
-    analysis_result = state.get("analysis_result")
+    collected_info = state.get("collected_info", {})
 
-    if not isinstance(analysis_result, dict):
-        return "系统暂时无法生成分析结果。"
-
-    if analysis_result.get("ok") is not True:
-        error = analysis_result.get("error") or "未知错误"
-        return f"分析失败：{error}"
-
-    data = analysis_result.get("data") or {}
-    risk = data.get("risk") or {}
-    explanations = data.get("explanations") or {}
-
-    issue_type = state.get("collected_info", {}).get("issue_type", "unknown")
-    amount = state.get("collected_info", {}).get("amount", "未知")
-    has_contract = state.get("collected_info", {}).get("has_contract", "未知")
-
-    risk_level = risk.get("risk_level", "unknown")
-
-    human_explanation_raw = (
-        explanations.get("human_explanation")
-        or explanations.get("overall_explanation")
-        or "暂无说明"
-    )
-
-    issue_type_map = {
-        "deposit": "押金问题",
-        "rent_increase": "涨租问题",
-        "eviction": "赶人/解约问题",
-        "repair": "维修问题",
-    }
-
-    risk_level_map = {
-        "high": "高风险",
-        "medium": "中风险",
-        "low": "低风险",
-        "unknown": "未知风险",
-    }
-
-    has_contract_map = {
-        "yes": "有合同",
-        "no": "没有合同",
-        "未知": "未知",
-    }
-
-    if risk_level == "high":
-        conclusion = "这件事风险比较高，建议不要只口头沟通，最好尽快整理材料。"
-    elif risk_level == "medium":
-        conclusion = "这件事有一定风险，建议先核对关键信息，再决定下一步。"
-    else:
-        conclusion = "目前看风险不算最高，但仍建议继续留痕并核对关键点。"
-
-    if issue_type == "deposit":
-        suggestion = "整理押金金额、合同条款、聊天记录、转账记录。"
-    elif issue_type == "rent_increase":
-        suggestion = "整理涨租通知、原租金、合同租金条款。"
-    elif issue_type == "eviction":
-        suggestion = "整理房东通知内容、时间线、合同终止条款。"
-    elif issue_type == "repair":
-        suggestion = "整理房屋问题照片、报修记录、房东回复记录。"
-    else:
-        suggestion = "先整理合同、付款记录、沟通记录。"
+    budget = collected_info.get("budget", "unknown")
+    location = collected_info.get("location", "unknown")
+    bedrooms = collected_info.get("bedrooms", "unknown")
+    move_in_date = collected_info.get("move_in_date", "unknown")
 
     lines = []
-
     lines.append("AI总结：")
     lines.append("")
-    lines.append("我帮你整理了一下当前情况👇")
+    lines.append("我帮你整理了一下你的租房需求👇")
     lines.append("")
-
-    lines.append(f"- 类型：{issue_type_map.get(issue_type, issue_type)}")
-    lines.append(f"- 合同：{has_contract_map.get(has_contract, has_contract)}")
-    lines.append(f"- 金额：£{amount}" if isinstance(amount, int) else f"- 金额：{amount}")
-    lines.append(f"- 风险：{risk_level_map.get(risk_level, risk_level)}")
-
-    lines.append("")
-    lines.append("建议你这样做：")
-    lines.append(suggestion)
-
-    lines.append("")
-    lines.append("说明：")
-    lines.append(human_explanation_raw)
+    lines.append(f"- 预算：£{budget}" if isinstance(budget, int) else f"- 预算：{budget}")
+    lines.append(f"- 区域：{location}")
+    lines.append(f"- 房型：{bedrooms}")
+    lines.append(f"- 入住时间：{move_in_date}")
 
     return "\n".join(lines)
 
@@ -128,16 +63,13 @@ def rerun_analysis_with_extra_info(state: dict, extra_info: str) -> dict:
 
     original_input = state.get("original_input", "").strip()
     combined_input = f"{original_input}\n补充信息：{extra_info.strip()}"
-
     state["original_input"] = combined_input
 
-    from modules.contract.contract_pipeline import analyze_contract_pipeline
+    state = parse_user_answer(state, extra_info)
+    state = update_state_with_questions(state)
 
-    analysis_input_text = build_analysis_input_text(state)
-    analysis_result = analyze_contract_pipeline(analysis_input_text)
-
-    state["analysis_input_text"] = analysis_input_text
-    state["analysis_result"] = analysis_result
+    if state["status"] == "ready":
+        state["status"] = "done"
 
     return state
 
@@ -182,21 +114,26 @@ def run_chat_session():
             # 一次问最多2个问题
             combined_questions = " ".join(questions[:2])
             print(f"AI：{combined_questions}")
+            state["conversation_history"].append({
+                "role": "assistant",
+                "content": combined_questions
+            })
 
         user_answer = input("你的回答：").strip()
         state = parse_user_answer(state, user_answer)
         state = update_state_with_questions(state)
 
     if state["status"] == "ready":
-        from modules.contract.contract_pipeline import analyze_contract_pipeline
-
-        analysis_input_text = build_analysis_input_text(state)
-        analysis_result = analyze_contract_pipeline(analysis_input_text)
-        state["analysis_input_text"] = analysis_input_text
-        state["analysis_result"] = analysis_result
+        state["analysis_input_text"] = build_analysis_input_text(state)
+        state["analysis_result"] = {"ok": True, "data": {}}
         state["status"] = "done"
 
-    print("\n" + build_ai_reply(state))
+    final_reply = build_ai_reply(state)
+    print("\n" + final_reply)
+    state["conversation_history"].append({
+        "role": "assistant",
+        "content": final_reply
+    })
 
     extra_info = run_followup_prompt()
 
@@ -204,7 +141,12 @@ def run_chat_session():
         state = rerun_analysis_with_extra_info(state, extra_info)
         print("")
         print("=== 补充信息后的重新分析结果 ===")
-        print(build_ai_reply(state))
+        rerun_reply = build_ai_reply(state)
+        print(rerun_reply)
+        state["conversation_history"].append({
+            "role": "assistant",
+            "content": rerun_reply
+        })
         
 if __name__ == "__main__":
     run_chat_session()
