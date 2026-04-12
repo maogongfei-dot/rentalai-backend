@@ -29,34 +29,20 @@ def detect_missing_fields(state: Dict) -> List[str]:
     return missing
 
 def generate_next_question(state: dict) -> str:
-    """
-    更自然的聊天式提问（Phase 6）
-    """
-
-    # 已有信息
-    data = state.get("collected_data", {})
-
-    # === 顺序提问 ===
+    data = state.get("collected_info", {})
 
     if "budget" not in data:
         return "你这次大概预算是多少？一个月房租大概能接受到多少？"
 
     if "location" not in data:
-        return "你想住在哪个区域？有大概的城市或者postcode吗？"
+        return "你想住在哪个区域？有大概的城市或者 postcode 吗？"
 
     if "bedrooms" not in data:
-        return "是准备自己住，还是合租？大概需要几间房？"
-
-    if "commute" not in data:
-        return "平时通勤有要求吗？比如到市中心或者公司大概多久能接受？"
-
-    if "furnishing" not in data:
-        return "你是希望带家具的，还是空房也可以？"
+        return "你需要几居？是自己住还是合租？"
 
     if "move_in_date" not in data:
-        return "大概什么时候可以入住？有比较急吗？"
+        return "你大概什么时候入住？"
 
-    # === 如果都问完 ===
     return None
 
 def generate_questions(missing_fields: List[str]) -> List[str]:
@@ -80,12 +66,15 @@ def generate_questions(missing_fields: List[str]) -> List[str]:
 
 def update_state_with_questions(state: Dict) -> Dict:
     missing_fields = detect_missing_fields(state)
-    questions = generate_questions(missing_fields)
+    next_question = generate_next_question(state)
 
     state["missing_fields"] = missing_fields
-    state["questions"] = questions
 
-    if not missing_fields:
+    if next_question:
+        state["questions"] = [next_question]
+        state["status"] = "collecting"
+    else:
+        state["questions"] = []
         state["status"] = "ready"
 
     return state
