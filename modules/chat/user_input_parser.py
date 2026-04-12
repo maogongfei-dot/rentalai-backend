@@ -78,6 +78,22 @@ def extract_move_in_value(text: str):
         r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\b",
         text_lower
     )
+    if en_date_match:
+        return en_date_match.group(1).title()
+    return None
+
+field_update_keywords = {
+    "budget": ["预算", "租金", "价格", "budget", "price", "pcm"],
+    "location": ["区域", "地区", "位置", "location", "area", "postcode", "zone"],
+    "bedrooms": ["几居", "卧室", "bedroom", "bed", "room", "studio", "合租", "shared"],
+    "move_in_date": ["入住", "搬", "move", "move in", "入住时间", "下周", "下个月", "月底", "月初", "月中", "月末"]
+}
+
+def is_field_update(field_name: str, answer: str) -> bool:
+    answer_lower = answer.lower()
+    is_update = any(k in answer_lower for k in ["改", "换", "不要", "算了", "重新", "改成", "change", "update", "instead", "actually"])
+    keywords = field_update_keywords.get(field_name, [])
+    return is_update and any(k in answer_lower or k in answer for k in keywords)
 
 def parse_user_answer(state: Dict, user_answer: str) -> Dict:
     """
@@ -95,61 +111,34 @@ def parse_user_answer(state: Dict, user_answer: str) -> Dict:
             "role": "user",
             "content": answer
         })
-    answer_lower = answer.lower()
 
-    update_keywords = [
-        "改", "换", "不要", "算了", "重新", "改成",
-        "change", "update", "instead", "actually"
-    ]
-
-    is_update = any(k in answer for k in update_keywords) or any(k in answer_lower for k in update_keywords)
-
-    field_update_keywords = {
-        "budget": ["预算", "租金", "price", "budget"],
-        "location": ["区域", "位置", "location", "london", "manchester", "postcode", "zone"],
-        "bedrooms": ["几居", "bed", "bedroom", "studio", "room", "合租", "shared"],
-        "move_in_date": ["入住", "搬", "move", "move in", "入住时间", "下周", "下个月", "月底", "月初"]
-    }
-
-field_update_keywords = {
-    "budget": ["预算", "租金", "价格", "budget", "price", "pcm"],
-    "location": ["区域", "地区", "位置", "location", "area", "postcode"],
-    "bedrooms": ["几居", "卧室", "bedroom", "bed", "room", "studio", "shared"],
-    "move_in_date": ["入住", "搬", "move", "move in", "入住时间", "下周", "下个月", "月初", "月中", "月末"]
-}
-
-def is_field_update(field_name: str, answer: str) -> bool:
-    answer_lower = answer.lower()
-    is_update = any(k in answer_lower for k in ["改", "换", "update", "change"])
-
-    keywords = field_update_keywords.get(field_name, [])
-    return is_update and any(k in answer_lower or k in answer for k in keywords)
+    collected_info = state.setdefault("collected_info", {})
 
     # 1. budget
     amount_value = extract_amount(answer)
     if amount_value is not None:
-        if is_field_update("budget") or "budget" not in state["collected_info"]:
-            state["collected_info"]["budget"] = amount_value
+        if is_field_update("budget", answer) or "budget" not in collected_info:
+            collected_info["budget"] = amount_value
 
-   # 2. location
+    # 2. location
     location_value = extract_location_value(answer)
-
     if location_value is not None:
-        if is_field_update("location") or "location" not in state["collected_info"]:
-            state["collected_info"]["location"] = location_value
-    
-    # 3. bedrooms（升级版）
-    bedrooms_value = extract_bedrooms(answer)
+        if is_field_update("location", answer) or "location" not in collected_info:
+            collected_info["location"] = location_value
 
+    # 3. bedrooms
+    bedrooms_value = extract_bedrooms(answer)
     if bedrooms_value is not None:
-        if is_field_update("bedrooms") or "bedrooms" not in state["collected_info"]:
-            state["collected_info"]["bedrooms"] = bedrooms_value
+        if is_field_update("bedrooms", answer) or "bedrooms" not in collected_info:
+            collected_info["bedrooms"] = bedrooms_value
+
     # 4. move_in_date
     move_in_value = extract_move_in_value(answer)
-
     if move_in_value is not None:
-        if is_field_update("move_in_date") or "move_in_date" not in state["collected_info"]:
-            state["collected_info"]["move_in_date"] = move_in_value
+        if is_field_update("move_in_date", answer) or "move_in_date" not in collected_info:
+            collected_info["move_in_date"] = move_in_value
+
+    return state
 
 
 def extract_amount(text: str):
