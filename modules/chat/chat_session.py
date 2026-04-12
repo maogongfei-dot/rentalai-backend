@@ -161,6 +161,7 @@ def run_chat_session():
 
     user_first_input = input("用户输入：").strip()
     state = chat_entry(user_first_input)
+    state = parse_user_answer(state, user_first_input)
     state = update_state_with_questions(state)
 
     while state["status"] != "ready":

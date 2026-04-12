@@ -1,7 +1,83 @@
 # modules/chat/user_input_parser.py
 
 from typing import Dict
+import re
 from modules.query_parser import extract_bedrooms
+
+def extract_location_value(text: str):
+    text_strip = text.strip()
+    text_lower = text_strip.lower()
+
+    city_map = {
+        "london": "London",
+        "manchester": "Manchester",
+        "birmingham": "Birmingham",
+        "leeds": "Leeds",
+        "伦敦": "伦敦",
+        "曼城": "曼城",
+        "伯明翰": "伯明翰",
+        "利兹": "利兹",
+        "东伦敦": "东伦敦",
+        "西伦敦": "西伦敦",
+        "南伦敦": "南伦敦",
+        "北伦敦": "北伦敦",
+        "东区": "东区",
+        "西区": "西区",
+        "南区": "南区",
+        "北区": "北区",
+        "市中心": "市中心",
+    }
+
+    for key, value in city_map.items():
+        if key in text_lower or key in text_strip:
+            return value
+
+    zone_match = re.search(r"\bzone\s*[1-6]\b", text_lower)
+    if zone_match:
+        return zone_match.group(0).strip().title()
+
+    cn_zone_match = re.search(r"[一二三四五六123456]区", text_strip)
+    if cn_zone_match:
+        return cn_zone_match.group(0).strip()
+
+    postcode_match = re.search(r"\b[a-z]{1,2}\d[a-z\d]?\s*\d[a-z]{2}\b", text_lower)
+    if postcode_match:
+        return postcode_match.group(0).upper().strip()
+
+    short_code_match = re.search(r"\b[a-z]{1,2}\d[a-z\d]?\b", text_lower)
+    if short_code_match:
+        return short_code_match.group(0).upper().strip()
+
+    return None
+
+def extract_move_in_value(text: str):
+    text_strip = text.strip()
+    text_lower = text_strip.lower()
+
+    exact_keywords = [
+        "马上", "尽快", "本周", "下周", "下周末", "周末",
+        "这个月", "下个月", "月底", "月初",
+        "一周后", "两周后", "今年", "明年",
+        "asap", "next week", "next month", "this month",
+        "end of month", "start of month", "immediately"
+    ]
+
+    for kw in exact_keywords:
+        if kw in text_lower or kw in text_strip:
+            return kw
+
+    month_match = re.search(r"(1[0-2]|[1-9])月", text_strip)
+    if month_match:
+        return month_match.group(0)
+
+    day_match = re.search(r"(1[0-9]|2[0-9]|3[01]|[1-9])[号日]", text_strip)
+    if day_match:
+        return day_match.group(0)
+
+    en_date_match = re.search(
+        r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\b",
+        text_lower
+    )
 
 def parse_user_answer(state: Dict, user_answer: str) -> Dict:
     """
@@ -11,89 +87,59 @@ def parse_user_answer(state: Dict, user_answer: str) -> Dict:
 
     answer = user_answer.strip()
 
-    # 记录用户回答
-    state["conversation_history"].append({
-        "role": "user",
-        "content": answer
-    })
+    # 记录用户回答（避免首句重复记录）
+    history = state.get("conversation_history", [])
 
+    if not history or history[-1].get("content") != answer:
+        state["conversation_history"].append({
+            "role": "user",
+            "content": answer
+        })
     answer_lower = answer.lower()
+
+    update_keywords = [
+        "改", "换", "不要", "算了", "重新", "改成",
+        "change", "update", "instead", "actually"
+    ]
+
+    is_update = any(k in answer for k in update_keywords) or any(k in answer_lower for k in update_keywords)
+
+    field_update_keywords = {
+        "budget": ["预算", "租金", "price", "budget"],
+        "location": ["区域", "位置", "location", "london", "manchester", "postcode", "zone"],
+        "bedrooms": ["几居", "bed", "bedroom", "studio", "room", "合租", "shared"],
+        "move_in_date": ["入住", "搬", "move", "move in", "入住时间", "下周", "下个月", "月底", "月初"]
+    }
+
+def is_field_update(field_name: str) -> bool:
+    keywords = field_update_keywords.get(field_name, [])
+    return is_update and any(k in answer_lower or k in answer for k in keywords)
 
     # 1. budget
     amount_value = extract_amount(answer)
     if amount_value is not None:
-        if "budget" not in state["collected_info"]:
-            state["collected_info"]["budget"] = amount_value   
+        if is_field_update("budget") or "budget" not in state["collected_info"]:
+            state["collected_info"]["budget"] = amount_value
 
-    # 2. location
-    city_keywords = [
-        "伦敦", "曼城", "伯明翰", "利兹",
-        "london", "manchester", "birmingham", "leeds"
-    ]
+   # 2. location
+    location_value = extract_location_value(answer)
 
-    area_keywords = [
-        "一区", "二区", "三区", "四区", "五区", "六区",
-        "zone 1", "zone 2", "zone 3", "zone 4", "zone 5", "zone 6",
-        "东伦敦", "西伦敦", "南伦敦", "北伦敦",
-        "东区", "西区", "南区", "北区",
-        "市中心", "靠近地铁", "靠近火车站", "近地铁", "近车站"
-    ]
-
-    lower_answer = answer.lower()
-
-    # 城市关键词
-    if any(x in lower_answer for x in city_keywords):
-        if "location" not in state["collected_info"]:
-            state["collected_info"]["location"] = answer
-
-    # 区域 / zone / 方位表达
-    if any(x in answer for x in area_keywords) or any(x in lower_answer for x in area_keywords):
-        if "location" not in state["collected_info"]:
-            state["collected_info"]["location"] = answer
-
-    # postcode / 混合区域文本（如 M1 4BT）
-    if any(ch.isdigit() for ch in answer) and any(ch.isalpha() for ch in answer):
-        if "location" not in state["collected_info"]:
-            state["collected_info"]["location"] = answer
-
-    # 用户用了“想住… / 在…附近 / 靠近… ”这类表达
-    location_hint_words = ["想住", "住在", "附近", "靠近", "near", "around"]
-    if any(x in answer for x in location_hint_words) or any(x in lower_answer for x in location_hint_words):
-        if "location" not in state["collected_info"]:
-            state["collected_info"]["location"] = answer
+    if location_value is not None:
+        if is_field_update("location") or "location" not in state["collected_info"]:
+            state["collected_info"]["location"] = location_value
+    
     # 3. bedrooms（升级版）
     bedrooms_value = extract_bedrooms(answer)
 
     if bedrooms_value is not None:
-        if "bedrooms" not in state["collected_info"]:
+        if is_field_update("bedrooms") or "bedrooms" not in state["collected_info"]:
             state["collected_info"]["bedrooms"] = bedrooms_value
-
     # 4. move_in_date
-    move_in_keywords = [
-        "马上", "尽快", "下周", "下个月", "这个月", "月底", "月初", "本周",
-        "入住", "搬", "搬家", "可入住", "可以入住", "两周后", "一周后",
-        "下周末", "周末", "明年", "今年"
-    ]
+    move_in_value = extract_move_in_value(answer)
 
-    month_markers = [
-        "1月", "2月", "3月", "4月", "5月", "6月",
-        "7月", "8月", "9月", "10月", "11月", "12月"
-    ]
-
-    day_markers = ["号", "日"]
-
-    if any(x in answer for x in move_in_keywords):
-        if "move_in_date" not in state["collected_info"]:
-            state["collected_info"]["move_in_date"] = answer
-    elif any(x in answer for x in month_markers):
-        if "move_in_date" not in state["collected_info"]:
-            state["collected_info"]["move_in_date"] = answer
-
-    elif any(x in answer for x in day_markers) and any(ch.isdigit() for ch in answer):
-        if "move_in_date" not in state["collected_info"]:
-            state["collected_info"]["move_in_date"] = answer
-
-    return state
+    if move_in_value is not None:
+        if is_field_update("move_in_date") or "move_in_date" not in state["collected_info"]:
+            state["collected_info"]["move_in_date"] = move_in_value
 
 
 def extract_amount(text: str):
