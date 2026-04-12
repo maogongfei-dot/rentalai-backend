@@ -111,7 +111,17 @@ def parse_user_answer(state: Dict, user_answer: str) -> Dict:
         "move_in_date": ["入住", "搬", "move", "move in", "入住时间", "下周", "下个月", "月底", "月初"]
     }
 
-def is_field_update(field_name: str) -> bool:
+field_update_keywords = {
+    "budget": ["预算", "租金", "价格", "budget", "price", "pcm"],
+    "location": ["区域", "地区", "位置", "location", "area", "postcode"],
+    "bedrooms": ["几居", "卧室", "bedroom", "bed", "room", "studio", "shared"],
+    "move_in_date": ["入住", "搬", "move", "move in", "入住时间", "下周", "下个月", "月初", "月中", "月末"]
+}
+
+def is_field_update(field_name: str, answer: str) -> bool:
+    answer_lower = answer.lower()
+    is_update = any(k in answer_lower for k in ["改", "换", "update", "change"])
+
     keywords = field_update_keywords.get(field_name, [])
     return is_update and any(k in answer_lower or k in answer for k in keywords)
 
