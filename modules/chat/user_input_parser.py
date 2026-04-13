@@ -103,9 +103,7 @@ def parse_user_answer(state: Dict, user_answer: str) -> Dict:
 
     answer = user_answer.strip()
 
-    # 记录用户回答（避免首句重复记录）
     history = state.get("conversation_history", [])
-
     if not history or history[-1].get("content") != answer:
         state["conversation_history"].append({
             "role": "user",
@@ -113,30 +111,48 @@ def parse_user_answer(state: Dict, user_answer: str) -> Dict:
         })
 
     collected_info = state.setdefault("collected_info", {})
+    current_field = state.get("current_question_field")
+
+    invalid_answers = {
+        "", "不知道", "不清楚", "不确定", "随便", "暂无", "没有", "没想好",
+        "idk", "don't know", "not sure", "unknown", "whatever"
+    }
+
+    answer_lower = answer.lower()
+    is_invalid_answer = answer_lower in invalid_answers or answer in invalid_answers
 
     # 1. budget
     amount_value = extract_amount(answer)
     if amount_value is not None:
-        if is_field_update("budget", answer) or "budget" not in collected_info:
+        if is_field_update("budget", answer) or "budget" not in collected_info or current_field == "budget":
             collected_info["budget"] = amount_value
 
     # 2. location
     location_value = extract_location_value(answer)
     if location_value is not None:
-        if is_field_update("location", answer) or "location" not in collected_info:
+        if is_field_update("location", answer) or "location" not in collected_info or current_field == "location":
             collected_info["location"] = location_value
+    elif current_field == "location" and answer and not is_invalid_answer:
+        if "location" not in collected_info or is_field_update("location", answer):
+            collected_info["location"] = answer
 
     # 3. bedrooms
     bedrooms_value = extract_bedrooms(answer)
     if bedrooms_value is not None:
-        if is_field_update("bedrooms", answer) or "bedrooms" not in collected_info:
+        if is_field_update("bedrooms", answer) or "bedrooms" not in collected_info or current_field == "bedrooms":
             collected_info["bedrooms"] = bedrooms_value
+    elif current_field == "bedrooms" and answer and not is_invalid_answer:
+        if "bedrooms" not in collected_info or is_field_update("bedrooms", answer):
+            collected_info["bedrooms"] = answer
 
     # 4. move_in_date
     move_in_value = extract_move_in_value(answer)
     if move_in_value is not None:
-        if is_field_update("move_in_date", answer) or "move_in_date" not in collected_info:
+        if is_field_update("move_in_date", answer) or "move_in_date" not in collected_info or current_field == "move_in_date":
             collected_info["move_in_date"] = move_in_value
+    elif current_field == "move_in_date" and answer and not is_invalid_answer:
+        if "move_in_date" not in collected_info or is_field_update("move_in_date", answer):
+            collected_info["move_in_date"] = answer
 
     return state
 

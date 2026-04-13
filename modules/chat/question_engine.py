@@ -66,16 +66,31 @@ def generate_questions(missing_fields: List[str]) -> List[str]:
 
 def update_state_with_questions(state: Dict) -> Dict:
     missing_fields = detect_missing_fields(state)
-    next_question = generate_next_question(state)
+    asked_fields = state.setdefault("asked_fields", [])
 
     state["missing_fields"] = missing_fields
 
-    if next_question:
-        state["questions"] = [next_question]
+    next_field = None
+    for field in missing_fields:
+        if field not in asked_fields:
+            next_field = field
+            break
+
+    if next_field is None and missing_fields:
+        next_field = missing_fields[0]
+
+    if next_field:
+        question = generate_questions([next_field])[0]
+        state["questions"] = [question]
         state["status"] = "collecting"
+        state["current_question_field"] = next_field
+
+        if next_field not in asked_fields:
+            asked_fields.append(next_field)
     else:
         state["questions"] = []
         state["status"] = "ready"
+        state["current_question_field"] = None
 
     return state
 
