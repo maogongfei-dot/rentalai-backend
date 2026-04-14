@@ -322,6 +322,222 @@ def _apply_analysis_route(
         o["response_text"] = f"{rtxt}\n\n{body}".strip()
     return o
 
+def _build_decision_block(result: dict[str, Any]) -> dict[str, Any]:
+    intent = result.get("intent") or "general_unknown"
+    scope = result.get("scope") or "rental_related"
+    readiness = result.get("analysis_readiness") or "pending"
+    route = result.get("analysis_route") or {}
+    route_type = route.get("route_type") or "general_chat_only"
+    missing_inputs = list(route.get("missing_inputs") or [])
+    next_analysis_action = str(result.get("next_analysis_action") or "").strip()
+    suggested_followup = str(result.get("suggested_followup") or "").strip()
+    next_step_prompt = str(result.get("next_step_prompt") or "").strip()
+
+    def pick_action(*values: str) -> str:
+        for value in values:
+            text = str(value or "").strip()
+            if text:
+                return text
+        return ""
+
+    if scope == "out_of_scope":
+        return {
+            "decision_status": "redirect",
+            "decision_title": "Outside RentalAI Focus",
+            "decision_summary": "This request is outside the main rental workflow.",
+            "decision_action": pick_action(
+                suggested_followup,
+                next_step_prompt,
+                "Ask about renting, tenancy, deposits, bills, or comparing rental options.",
+            ),
+        }
+
+    if intent == "legal_risk":
+        source_result = result.get("source_result") or {}
+        risk_level = str(source_result.get("risk_level") or "").lower()
+
+        if risk_level == "high":
+            return {
+                "decision_status": "caution",
+                "decision_title": "High Legal Risk Detected",
+                "decision_summary": "The wording suggests a higher-risk tenancy issue.",
+                "decision_action": pick_action(
+                    suggested_followup,
+                    next_step_prompt,
+                    "Review the clause carefully and prepare the next legal or evidence step.",
+                ),
+            }
+
+        if risk_level == "medium":
+            return {
+                "decision_status": "review",
+                "decision_title": "Review Recommended",
+                "decision_summary": "Some tenancy wording may need closer review.",
+                "decision_action": pick_action(
+                    suggested_followup,
+                    next_step_prompt,
+                    "Check the clause details and clarify any missing context.",
+                ),
+            }
+
+        if risk_level == "low":
+            return {
+                "decision_status": "proceed_lightly",
+                "decision_title": "Low Immediate Risk",
+                "decision_summary": "No strong legal warning is visible from the current rule-based check.",
+                "decision_action": pick_action(
+                    suggested_followup,
+                    next_step_prompt,
+                    "You can continue reviewing details or compare with another property.",
+                ),
+            }
+
+        return {
+            "decision_status": "review",
+            "decision_title": "Legal Review Started",
+            "decision_summary": "A tenancy-related check was completed, but more detail may improve confidence.",
+            "decision_action": pick_action(
+                suggested_followup,
+                next_step_prompt,
+                "Share more contract wording if you want a stronger review.",
+            ),
+        }
+
+    if route_type == "property_comparison":
+        comp = result.get("comparison_result") or {}
+        missing = list(comp.get("missing_information") or [])
+
+        if missing:
+            return {
+                "decision_status": "partial_compare",
+                "decision_title": "Partial Comparison Ready",
+                "decision_summary": "A side-by-side comparison is available, but some important details are still missing.",
+                "decision_action": pick_action(
+                    next_analysis_action,
+                    suggested_followup,
+                    next_step_prompt,
+                    "Add the missing rent, bills, or postcode details to improve the comparison.",
+                ),
+            }
+
+        return {
+            "decision_status": "comparison_ready",
+            "decision_title": "Comparison Ready",
+            "decision_summary": "The comparison route is active and usable from the details already shared.",
+            "decision_action": pick_action(
+                next_analysis_action,
+                suggested_followup,
+                next_step_prompt,
+                "Review the differences and decide which property fits your priorities better.",
+            ),
+        }
+
+    if route_type == "property_analysis_candidate":
+        if readiness == "ready":
+            return {
+                "decision_status": "ready",
+                "decision_title": "Property Analysis Ready",
+                "decision_summary": "The current input is strong enough to move into property-style analysis.",
+                "decision_action": pick_action(
+                    next_analysis_action,
+                    next_step_prompt,
+                    suggested_followup,
+                    "Proceed with deeper property review when that module is connected.",
+                ),
+            }
+
+        if readiness == "partial":
+            fallback = (
+                "Add " + ", ".join(missing_inputs[:3]) + "."
+                if missing_inputs else
+                "Add a bit more property detail to strengthen the next step."
+            )
+            return {
+                "decision_status": "needs_more_input",
+                "decision_title": "Property Analysis Partially Ready",
+                "decision_summary": "This already looks like a property case, but a few key inputs are still missing.",
+                "decision_action": pick_action(
+                    next_analysis_action,
+                    next_step_prompt,
+                    suggested_followup,
+                    fallback,
+                ),
+            }
+
+    if route_type == "area_analysis_candidate":
+        if readiness == "ready":
+            return {
+                "decision_status": "ready",
+                "decision_title": "Area Analysis Ready",
+                "decision_summary": "The current input is suitable for postcode or area-level analysis.",
+                "decision_action": pick_action(
+                    next_analysis_action,
+                    next_step_prompt,
+                    suggested_followup,
+                    "Proceed with deeper area review when that module is connected.",
+                ),
+            }
+
+        if readiness == "partial":
+            fallback = (
+                "Add " + ", ".join(missing_inputs[:3]) + "."
+                if missing_inputs else
+                "Add a postcode or clearer area detail."
+            )
+            return {
+                "decision_status": "needs_more_input",
+                "decision_title": "Area Analysis Partially Ready",
+                "decision_summary": "Area routing is working, but one or two location details would improve the result.",
+                "decision_action": pick_action(
+                    next_analysis_action,
+                    next_step_prompt,
+                    suggested_followup,
+                    fallback,
+                ),
+            }
+
+    if readiness == "pending":
+        return {
+            "decision_status": "pending",
+            "decision_title": "More Context Needed",
+            "decision_summary": "The request is still too broad for a stronger rental decision.",
+            "decision_action": pick_action(
+                next_analysis_action,
+                next_step_prompt,
+                suggested_followup,
+                "Share a postcode, address, listing text, or contract clause.",
+            ),
+        }
+
+    if readiness == "partial":
+        fallback = (
+            "Add " + ", ".join(missing_inputs[:3]) + "."
+            if missing_inputs else
+            "Add more specific rental details."
+        )
+        return {
+            "decision_status": "needs_more_input",
+            "decision_title": "Partially Ready",
+            "decision_summary": "The workflow has identified a likely path, but more detail would improve the next step.",
+            "decision_action": pick_action(
+                next_analysis_action,
+                next_step_prompt,
+                suggested_followup,
+                fallback,
+            ),
+        }
+
+    return {
+        "decision_status": "ready",
+        "decision_title": "Ready For Next Step",
+        "decision_summary": "The request has enough structure to continue through the rental workflow.",
+        "decision_action": pick_action(
+            next_analysis_action,
+            next_step_prompt,
+            suggested_followup,
+            "Continue with the next recommended rental step.",
+        ),
+    }
 
 def _finish_chat_response(
     base: dict[str, Any],
@@ -339,6 +555,7 @@ def _finish_chat_response(
     out = _with_preferences(out, trimmed, pref_det)
     out = _append_uk_location_hint(out)
     out = _append_property_hint(out, pi_parsed)
+    out["decision"] = _build_decision_block(out)
     disp = build_chat_display_bundle(out)
     out["display_text"] = disp["display_text"]
     out["display_sections"] = disp["display_sections"]

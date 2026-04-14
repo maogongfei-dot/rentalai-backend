@@ -9,6 +9,7 @@ from typing import Any
 
 # Section titles — keep stable for CLI and future UI mapping.
 TITLE_SUMMARY = "【Summary】"
+TITLE_DECISION = "【Decision】"
 TITLE_FOUND = "【What I Found】"
 TITLE_KEY = "【Key Points】"
 TITLE_NEXT = "【What You Can Do Next】"
@@ -332,15 +333,31 @@ def build_display_sections(chat_result: dict[str, Any]) -> dict[str, Any]:
     Empty lists mean “skip rendering that block” in the formatted text.
     """
     branch = _pick_branch(chat_result)
+    decision_lines = _build_decision_lines(chat_result)
+
     if branch == "out_of_scope":
-        return _build_out_of_scope_sections(chat_result)
+        out = _build_out_of_scope_sections(chat_result)
+        out["decision"] = decision_lines
+        return out
+
     if branch == "legal_risk":
-        return _build_legal_sections(chat_result)
+        out = _build_legal_sections(chat_result)
+        out["decision"] = decision_lines
+        return out
+
     if branch == "property_comparison":
-        return _build_comparison_sections(chat_result)
+        out = _build_comparison_sections(chat_result)
+        out["decision"] = decision_lines
+        return out
+
     if branch == "analysis_candidate":
-        return _build_analysis_candidate_sections(chat_result)
-    return _build_default_sections(chat_result)
+        out = _build_analysis_candidate_sections(chat_result)
+        out["decision"] = decision_lines
+        return out
+
+    out = _build_default_sections(chat_result)
+    out["decision"] = decision_lines
+    return out
 
 
 def render_display_text(sections: dict[str, Any]) -> str:
@@ -350,6 +367,12 @@ def render_display_text(sections: dict[str, Any]) -> str:
     s = _clean_str(sections.get("summary"))
     if s:
         parts.append(f"{TITLE_SUMMARY}\n{s}")
+    
+    decision_lines = sections.get("decision") or []
+    if isinstance(decision_lines, list) and decision_lines:
+        body = "\n".join(f"- {_clean_str(x)}" for x in decision_lines if _clean_str(x))
+        if body:
+            parts.append(f"{TITLE_DECISION}\n{body}")
 
     found = sections.get("what_i_found") or []
     if isinstance(found, list) and found:
@@ -385,6 +408,25 @@ def render_display_text(sections: dict[str, Any]) -> str:
 
     return "\n\n".join(parts).strip()
 
+def _build_decision_lines(chat_result: dict[str, Any]) -> list[str]:
+    decision = chat_result.get("decision") or {}
+    if not isinstance(decision, dict) or not decision:
+        return []
+
+    lines: list[str] = []
+
+    title = _clean_str(decision.get("decision_title"))
+    summary = _clean_str(decision.get("decision_summary"))
+    action = _clean_str(decision.get("decision_action"))
+
+    if title:
+        lines.append(title)
+    if summary:
+        lines.append(summary)
+    if action:
+        lines.append(f"Next: {action}")
+
+    return lines[:3]
 
 def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
     """
@@ -397,6 +439,7 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
         "display_text": display_text,
         "display_sections": {
             "summary": sections.get("summary") or "",
+            "decision": list(sections.get("decision") or []),
             "what_i_found": list(sections.get("what_i_found") or []),
             "key_points": list(sections.get("key_points") or []),
             "next_steps": list(sections.get("next_steps") or []),
