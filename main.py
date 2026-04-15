@@ -586,7 +586,7 @@ def main() -> None:
 
     argv = sys.argv[1:]
 
-    if argv and argv[0] in ("--demo", "--e2e", "--phase10"):
+    if argv and argv[0] in ("--demo", "--e2e"):
         run_demo_batch(DEMO_TEST_INPUTS, "RentalAI E2E Demo (Phase 1 Part 10)")
         return
 
