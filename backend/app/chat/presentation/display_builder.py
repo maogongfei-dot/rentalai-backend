@@ -415,14 +415,22 @@ def _build_decision_lines(chat_result: dict[str, Any]) -> list[str]:
 
     lines: list[str] = []
 
+    status = _clean_str(decision.get("decision_status"))
     title = _clean_str(decision.get("decision_title"))
     summary = _clean_str(decision.get("decision_summary"))
     action = _clean_str(decision.get("decision_action"))
 
     if title:
-        lines.append(title)
+        if status:
+            lines.append(f"{title} ({status})")
+        else:
+            lines.append(title)
+    elif status:
+        lines.append(status)
+
     if summary:
         lines.append(summary)
+
     if action:
         lines.append(f"Next: {action}")
 
@@ -435,8 +443,21 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
     """
     sections = build_display_sections(chat_result)
     display_text = render_display_text(sections)
+
+    decision = chat_result.get("decision") or {}
+    display_order = [
+        "summary",
+        "decision",
+        "what_i_found",
+        "key_points",
+        "next_steps",
+        "alternative_help",
+        "followups",
+    ]
+
     return {
         "display_text": display_text,
+        "display_order": display_order,
         "display_sections": {
             "summary": sections.get("summary") or "",
             "decision": list(sections.get("decision") or []),
@@ -445,5 +466,10 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
             "next_steps": list(sections.get("next_steps") or []),
             "followups": list(sections.get("followups") or []),
             "alternative_help": list(sections.get("alternative_help") or []),
+        },
+        "display_meta": {
+            "has_decision": bool(decision),
+            "decision_status": _clean_str(decision.get("decision_status")),
+            "decision_title": _clean_str(decision.get("decision_title")),
         },
     }

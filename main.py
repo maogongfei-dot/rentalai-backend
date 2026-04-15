@@ -273,6 +273,15 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
     print("======== ANALYSIS ROUTE ========")
     print(_format_analysis_route(result))
 
+    decision = result.get("decision") or {}
+    if isinstance(decision, dict) and decision:
+        print()
+        print("======== DECISION ========")
+        print(f"Status: {_safe_str(decision.get('decision_status'), _DEFAULT_DETAIL)}")
+        print(f"Title: {_safe_str(decision.get('decision_title'), _DEFAULT_DETAIL)}")
+        print(f"Summary: {_safe_str(decision.get('decision_summary'), _DEFAULT_DETAIL)}")
+        print(f"Action: {_safe_str(decision.get('decision_action'), _DEFAULT_DETAIL)}")
+
     print()
     print("======== MAIN RESPONSE ========")
     print(_format_main_response(result))
@@ -574,8 +583,8 @@ def main() -> None:
         return
 
     if argv and argv[0] in ("--phase9", "--display-tests"):
-        run_demo_batch(_PHASE9_DISPLAY_TESTS, "Display layer regression (--phase9)")
-        return
+        run_demo_batch(_PHASE9_DISPLAY_TESTS, "Phase 9 decision/display regression (--phase9)")
+        return 
 
     if argv and argv[0] in ("--phase8", "--loc-tests", "--uk-location-tests"):
         run_demo_batch(_PHASE8_UK_LOCATION_TESTS, "UK location regression (--phase8)")
