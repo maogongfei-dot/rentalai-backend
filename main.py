@@ -716,5 +716,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    from modules.chat.chat_session import run_chat_session
-    run_chat_session()
+    main()
