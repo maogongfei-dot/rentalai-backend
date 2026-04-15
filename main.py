@@ -246,6 +246,11 @@ def _format_raw_debug(result: dict[str, Any]) -> str:
     }
     return json.dumps(blob, indent=2, ensure_ascii=False)
 
+def _format_product_output(result: dict[str, Any]) -> str:
+    product_output = result.get("product_output") or {}
+    if not isinstance(product_output, dict) or not product_output:
+        return _DEFAULT_DETAIL
+    return json.dumps(product_output, indent=2, ensure_ascii=False)
 
 def print_demo_result(result: dict[str, Any], user_text: str) -> None:
     """Unified console layout for debugging and demos."""
@@ -291,9 +296,12 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
     print(_format_followups(result))
 
     print()
+    print("======== PRODUCT OUTPUT ========")
+    print(_format_product_output(result))
+
+    print()
     print("======== RAW DEBUG (OPTIONAL) ========")
     print(_format_raw_debug(result))
-
 
 def run_contract_pipeline_for_text(
     text: str, *, show_mode_banner: bool = True, source: str = "unknown"
@@ -585,6 +593,10 @@ def main() -> None:
     if argv and argv[0] in ("--phase9", "--display-tests"):
         run_demo_batch(_PHASE9_DISPLAY_TESTS, "Phase 9 decision/display regression (--phase9)")
         return 
+
+    if argv and argv[0] in ("--phase10", "--product-output-tests"):
+        run_demo_batch(_PHASE9_DISPLAY_TESTS, "Phase 10 product output regression (--phase10)")
+        return
 
     if argv and argv[0] in ("--phase8", "--loc-tests", "--uk-location-tests"):
         run_demo_batch(_PHASE8_UK_LOCATION_TESTS, "UK location regression (--phase8)")

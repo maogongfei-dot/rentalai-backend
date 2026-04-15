@@ -539,6 +539,44 @@ def _build_decision_block(result: dict[str, Any]) -> dict[str, Any]:
         ),
     }
 
+def _build_product_output(result: dict[str, Any]) -> dict[str, Any]:
+    decision = result.get("decision") or {}
+    display_sections = result.get("display_sections") or {}
+    analysis_route = result.get("analysis_route") or {}
+
+    return {
+        "status": "ok" if result.get("success") else "error",
+        "intent": result.get("intent") or "",
+        "scope": result.get("scope") or "",
+        "scope_handling": result.get("scope_handling") or "",
+        "analysis_readiness": result.get("analysis_readiness") or "",
+        "route_type": analysis_route.get("route_type") or "",
+        "route_confidence": analysis_route.get("route_confidence"),
+        "decision": {
+            "status": decision.get("decision_status") or "",
+            "title": decision.get("decision_title") or "",
+            "summary": decision.get("decision_summary") or "",
+            "action": decision.get("decision_action") or "",
+        },
+        "sections": {
+            "summary": display_sections.get("summary") or "",
+            "decision": list(display_sections.get("decision") or []),
+            "what_i_found": list(display_sections.get("what_i_found") or []),
+            "key_points": list(display_sections.get("key_points") or []),
+            "next_steps": list(display_sections.get("next_steps") or []),
+            "followups": list(display_sections.get("followups") or []),
+            "alternative_help": list(display_sections.get("alternative_help") or []),
+        },
+        "next_actions": list(display_sections.get("next_steps") or []),
+        "followups": list(display_sections.get("followups") or []),
+        "meta": {
+            "module": result.get("module") or "",
+            "source_module": result.get("source_module") or "",
+            "available_next_modules": list(result.get("available_next_modules") or []),
+            "available_capabilities": list(result.get("available_capabilities") or []),
+        },
+    }
+
 def _finish_chat_response(
     base: dict[str, Any],
     scope_info: dict[str, Any],
@@ -559,8 +597,10 @@ def _finish_chat_response(
     disp = build_chat_display_bundle(out)
     out["display_text"] = disp["display_text"]
     out["display_sections"] = disp["display_sections"]
+    out["display_order"] = disp.get("display_order") or []
+    out["display_meta"] = disp.get("display_meta") or {}
+    out["product_output"] = _build_product_output(out)
     return out
-
 
 def handle_chat_request(user_text: str) -> dict[str, Any]:
     """
