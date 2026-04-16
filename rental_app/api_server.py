@@ -1,17 +1,46 @@
-# P2 Phase1–4: RentalAI HTTP API（FastAPI）
-# 推荐本地一键启动（Phase4）: python run.py
-# 亦可: python api_server.py（与本文件末尾 __main__ 一致，见 uvicorn.run）
-# 等价: uvicorn api_server:app --reload --host 127.0.0.1 --port 8000
-# 生产/PaaS: uvicorn api_server:app --host 0.0.0.0 --port $PORT
-# 需在 rental_app 目录下执行（或设置 rootDir），以便正确 import web_bridge
+"""RentalAI **当前主后端入口**（FastAPI 应用定义处）。
 
+本文件聚合**当前主产品**的后端能力：REST/JSON API、静态资源挂载、认证与中间件等，是 FastAPI Web
+主线的中心模块。
+
+**入口角色（与 run.py / app.py / app_web.py 区分）**
+
+- **``run.py``：** 本地**推荐**的一键启动入口；典型用法 ``cd rental_app && python run.py``。
+- **``api_server.py``（本文件）：** 定义 ASGI ``app``；可直接 ``uvicorn api_server:app`` 运行，也可经
+  ``run.py`` 间接拉起（行为以工作目录与路径一致为前提）。
+- **``app.py``：** **部署 shim**（供部分平台/导入场景指向 ``app``），**不是**日常主开发入口说明的替代。
+- **``app_web.py``：** 旧的 / 辅助 **Streamlit UI**，**不是**当前主产品界面入口。
+
+**产品结构**
+
+- **RentAI：** 长期租房**主系统**。
+- **ShortRentAI：** 平台内**短租扩展板块**；**不替代** RentAI，与主系统并行扩展。
+
+**产品线分层（代码内注释约定）**
+
+路由注释区分 **RentAI**（当前实现重心：长租与常规租房分析主干）、**ShortRentAI**（未来扩展锚点）与**平台共用能力**（鉴权、历史、合同等）；仅作协作说明，不改变接口契约。
+
+**其它启动方式（等价前提）**
+
+亦可 ``python api_server.py``（见文件末尾 ``__main__``）、或 ``uvicorn api_server:app``；生产常见
+``--host 0.0.0.0 --port $PORT``。需在能正确解析 ``rental_app`` 包路径的工作目录下执行，见下文启动引导。
+
+历史迭代（如 P2 Phase）体现在路由与实现注释中。
+"""
 from __future__ import annotations
 
 import os
 import sys
 from pathlib import Path
 
-# Match run.py: load .env + cwd before config (stdlib, no python-dotenv).
+# -----------------------------------------------------------------------------
+# 启动引导（与 run.py 对齐）
+# -----------------------------------------------------------------------------
+# 在 import config、web_bridge 等业务包之前：解析 .env，使端口/密钥等与本地 run.py 一致（stdlib 实现，
+# 不依赖 python-dotenv）。同时将 cwd 与 sys.path[0] 固定到本仓库的 rental_app 根目录，这样从任意 cwd 执行
+# ``uvicorn api_server:app`` 时，相对路径与 ``import web_bridge`` 等行为与 ``cd rental_app && python run.py``
+# 保持一致，避免「只改了 run 却没改直接 uvicorn」时的环境差异。
+# -----------------------------------------------------------------------------
 
 
 def _load_env_file(path: Path) -> None:
@@ -117,12 +146,15 @@ _api_failures = FailureTracker(threshold=3, source="api-server")
 init_records_db()
 _task_store = TaskStore()
 
+# 当前主后端 ASGI 应用：新 API、新页面挂载与中间件默认挂在此 ``app`` 上，而不是挂到 app_web.py（Streamlit）。
 app = FastAPI(
     title="RentalAI API",
     description="P2 Phase5 — modular endpoints + /analyze-batch (standard recommendations)",
     version="0.6.0",
 )
 
+# 主前端静态页根目录：当前主产品 HTML（index、assistant、各功能页）均位于 web_public/，
+# 由下述若干 @app.get 路由逐个返回 FileResponse；未在下方映射的路径若需页面应优先加 HTML 至此目录。
 _WEB_PUBLIC_DIR = Path(__file__).resolve().parent / "web_public"
 
 _cors_origins, _cors_allow_credentials = get_cors_origins()
@@ -294,6 +326,18 @@ def _append_high_safety_note(explain: dict[str, Any], prefs: dict[str, Any]) -> 
     explain["risk_flags"] = rf
 
 
+# =============================================================================
+# HTTP 路由 — 当前主产品清单（只读注释：分组说明产品职责，不改变路由行为）
+# 产品线：RentAI 为当前后端实现重心（长租 / 常规租房分析主链）；ShortRentAI 为规划中的短租子板块，
+#        以独立注释块标出「未来接入点」。平台级模块（鉴权、历史、合同）对两侧统一服务。
+# 阅读顺序：基础设施 → 用户与云历史 → RentAI 房源分析/推荐 → 合同（共用）→ 异步任务与落库 → 收藏/对比
+#            → 主前端 HTML（web_public）→ 静态资源挂载
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 基础设施：存活探针与运维观测（非业务功能入口）
+# -----------------------------------------------------------------------------
 @app.get("/health")
 def health():
     return {
@@ -305,6 +349,7 @@ def health():
     }
 
 
+# 内部连续失败计数（告警辅助）；正常主用户看房/分析流程不依赖此接口。
 @app.get("/alerts")
 def alerts_status():
     """Current consecutive-failure counts per endpoint (resets on success)."""
@@ -315,6 +360,10 @@ def alerts_status():
     }
 
 
+# -----------------------------------------------------------------------------
+# 用户系统：注册 / 登录 / 登出（JSON 用户库 + Bearer 会话；与 web_public 登录页配合）
+# 平台共用能力：会话与身份模型服务于 RentAI 与 ShortRentAI 两侧业务，而非单一子板块独占。
+# -----------------------------------------------------------------------------
 @app.post("/auth/register")
 def auth_register(body: AuthRequest):
     """Register into JSON persistence (``persistence_users.json``); response includes legacy token fields."""
@@ -399,6 +448,10 @@ def _parse_analysis_history_type_query(raw: Optional[str]) -> tuple[Optional[str
     return None, "type must be property or contract"
 
 
+# -----------------------------------------------------------------------------
+# 历史记录 API：服务端 JSON「云历史」（需登录 Bearer；query userId 为旧客户端兼容）
+# 平台共用能力：同一套历史读写供 RentAI / ShortRentAI 相关记录复用，具体业务类型由数据字段与查询参数区分。
+# -----------------------------------------------------------------------------
 @app.get("/api/analysis/history/records")
 def api_analysis_history_records(
     request: Request,
@@ -543,6 +596,7 @@ def api_analysis_history_clear(request: Request):
     }
 
 
+# 当前登录用户摘要（与 token 配套；主流程「登录态」以此为准之一）
 @app.get("/auth/me")
 def auth_me(request: Request):
     """Resolve bearer token to a minimal public profile (JSON user store)."""
@@ -572,6 +626,9 @@ def auth_me(request: Request):
     }
 
 
+# -----------------------------------------------------------------------------
+# 测试 / 占位鉴权（内存 mock，不签发持久 token；主产品以 /auth/* 为准，本组非主流程依赖）
+# -----------------------------------------------------------------------------
 @app.post("/api/auth/minimal/register")
 def api_auth_minimal_register(body: MinimalAuthBody):
     """
@@ -592,6 +649,22 @@ def api_auth_minimal_login(body: MinimalAuthBody):
     return JSONResponse(status_code=status, content=content)
 
 
+# =============================================================================
+# RentAI 主流程 — 房源分析、推荐、市场行情与自然语言编排（长租 / 常规租房为当前默认语义）
+# =============================================================================
+# 本节路由构成当前**主分析主干**：以长期租赁与常规找房场景为默认输入与数据口径；新增找房域能力优先在本节
+# 内迭代，并与前端 `/`、`/assistant`、`/ai-result` 等主流程页对齐。
+#
+# ----- ShortRentAI future integration point（未来接入点）-----
+# 后续可在不替换本条 RentAI 主链的前提下，于此区域相邻位置增加并行路由或在上游编排层做意图分流：
+#   · ShortRentAI 为 RentAI 平台内的**短租扩展板块**，**不替代**主系统。
+#   · 规划能力包括：SpareRoom 等数据接入；短租 / 合租 / 灵活租期的专用分析或筛选；
+#     房东自发布房源；图片 / 视频 / 2D / 3D / VR 等媒体上传与展示；
+#     与**信任及人工核实系统**的登记与展示联动。
+# 落地前仅以注释维持扩展锚点；**不改变**现有 URL、请求体与响应语义。
+# ----- end ShortRentAI future integration point -----
+#
+# --- 引擎模块化端点（RentAI：单套评分 / 拆解 / 批量；表单 → Module 管线；供 API / 旧 Streamlit 直连）---
 @app.post("/analyze")
 def analyze(body: AnalyzeRequest = AnalyzeRequest()):
     """全量分析，data 含 score / decision / analysis / user_facing / references / trace 等。"""
@@ -625,6 +698,7 @@ def analyze_batch(body: dict = Body(default_factory=dict)):
     return analyze_batch_request_body(body)
 
 
+# --- 自然语言 → 结构化推荐（RentAI Phase1 主路径之一；可选多数据源 / 多轮）---
 @app.post("/api/ai-analyze")
 def api_ai_analyze(body: dict = Body(default_factory=dict)):
     """
@@ -690,6 +764,7 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
         )
 
 
+# --- 市场行情（RentAI：长租市场清单、统计与 deal/explain；短租专用口径可在 ShortRentAI 分流后并列扩展）---
 @app.post("/api/market/combined")
 def api_market_combined(body: dict = Body(default_factory=dict)):
     """
@@ -721,6 +796,7 @@ def api_market_combined(body: dict = Body(default_factory=dict)):
         )
 
 
+# 若无 /api 前缀的重复路径（/market/*）为历史兼容别名，与 /api/market/* 等价。
 @app.post("/api/market/insight")
 @app.post("/market/insight")
 def api_market_insight(body: dict = Body(default_factory=dict)):
@@ -871,6 +947,8 @@ def api_market_explain(body: dict = Body(default_factory=dict)):
         )
 
 
+# RentAI：自然语言房源查询编排主入口（与 GET /assistant 等前端的默认主线一致）；可选写历史。
+# 推荐主路径为 POST /api/ai/query；/ai/query、/market/ask 为旧客户端兼容别名（语义同一）。
 @app.post("/api/ai/query")
 @app.post("/ai/query")
 @app.post("/market/ask")
@@ -933,6 +1011,12 @@ def api_ai_query(request: Request, body: dict = Body(default_factory=dict)):
         )
 
 
+# =============================================================================
+# 合同分析：文本 / 文件 / Phase3 管线并存（平台共用能力，非 RentAI 独占）
+# =============================================================================
+# 长租与短租合约均可能请求本族接口；web_public 合同页与下列路由共同构成「合同分支」后端。
+# ShortRentAI 场景下的租约形态差异，可在 Phase3 层或上游参数中扩展，而不另立互斥入口（除非产品明确要求）。
+# =============================================================================
 class ContractAnalyzeTextBody(BaseModel):
     """POST /api/contract/analyze-text — 纯文本合同风险扫描（rule-based）。"""
 
@@ -940,6 +1024,7 @@ class ContractAnalyzeTextBody(BaseModel):
     contract_text: str = Field(default="", description="Full or partial tenancy contract text")
 
 
+# Phase B 轻量规则扫描（旧管线）；与 Phase 3 完整分析并存。产品主展示/Explain 优先走 phase3 与 /api/contract/analysis/*。
 @app.post("/api/contract/analyze-text")
 def api_contract_analyze_text(body: ContractAnalyzeTextBody = Body(...)):
     """
@@ -1465,6 +1550,7 @@ async def api_contract_analyze_pdf(file: UploadFile | None = File(None)):
 _HOUSE_IMPORT_MAX_BYTES = max(1, int(os.environ.get("RENTALAI_HOUSE_IMPORT_MAX_BYTES", str(5 * 1024 * 1024))))
 
 
+# 房源数据批量导入（JSON/CSV）；运营/调试辅助为主，主用户链路可不经过此接口。
 @app.post("/api/houses/import")
 async def api_houses_import(
     file: UploadFile | None = File(None),
@@ -1540,6 +1626,10 @@ async def api_houses_import(
 
     return {"ok": True, "result": out["result"]}
 
+
+# =============================================================================
+# 异步任务与持久化记录：多源抓取长任务、SQLite 任务/分析/收藏等（与 Streamlit / 后台 pilot 共用）
+# =============================================================================
 
 # ---------------------------------------------------------------------------
 # Async task endpoints (P9 Phase3 skeleton)
@@ -1789,6 +1879,7 @@ def _run_analysis_task(task_id: str, params: dict[str, Any]) -> None:
         )
 
 
+# 提交长耗时异步任务（多源抓取 + 批量分析）；结果轮询 GET /tasks/{task_id}。
 @app.post("/tasks")
 def create_task(request: Request, body: AnalyzeRealRequest = AnalyzeRealRequest()):
     """Submit a multi-source scrape + analyze job.  Returns immediately with a task_id.
@@ -1839,6 +1930,7 @@ def task_stats(request: Request):
     return _task_store.stats(user_id=user_id)
 
 
+# 内部队列/Worker 粗粒度观测；排障与 pilot 用，主用户看房流程可不依赖。
 @app.get("/tasks/system")
 def task_system_status(request: Request):
     """Minimal queue + worker observability for ops checks."""
@@ -1886,6 +1978,8 @@ def get_task(request: Request, task_id: str):
     return out
 
 
+# --- 落库只读查询：任务 / 分析记录 / UI 历史快照 / 房源记录（Bearer；与前端「历史」能力配合）---
+# 平台共用：SQLite 记录层对 RentAI 异步任务与后续 ShortRentAI 落库约定兼容，以类型字段区分业务来源。
 @app.get("/records/tasks")
 def list_record_tasks(request: Request, limit: int = 30):
     """Minimal query endpoint for persisted task records."""
@@ -2070,6 +2164,11 @@ def list_record_properties(request: Request, limit: int = 30):
     }
 
 
+# =============================================================================
+# 收藏与对比：登录用户写入 SQLite；POST /compare 为多条房源对比（Explain 摘要）
+# 平台共用：房源收藏与对比能力适用于 RentAI 推荐结果及未来 ShortRentAI 列表，共用数据层与鉴权。
+# =============================================================================
+
 class FavoriteCreate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -2207,6 +2306,12 @@ def compare_listings(request: Request, body: CompareRequest):
     return {"comparison": _build_compare_result(props)}
 
 
+# =============================================================================
+# 主产品 HTML 页面入口（web_public）：用户从浏览器进入的第一界面为 GET / → index.html；
+# 下列路径与静态文件名一一对应，业务数据多由前端 sessionStorage/localStorage 或再调 API 注入。
+# =============================================================================
+
+# AI 需求解析后的推荐结果页（RentAI 主流程核心页面之一）
 @app.get("/ai-result")
 def web_ai_result():
     """Phase1 AI — 需求解析与推荐结果页（静态 HTML，数据由 sessionStorage 注入）。"""
@@ -2222,6 +2327,7 @@ def web_ai_result():
     return FileResponse(page)
 
 
+# 已收藏房源两两对比
 @app.get("/compare")
 def web_compare():
     """Phase1 — 收藏房源对比页（静态 HTML；数据来自 localStorage + sessionStorage）。"""
@@ -2237,6 +2343,7 @@ def web_compare():
     return FileResponse(page)
 
 
+# 合同条款分析（接 /api/contract/* 系列）
 @app.get("/contract-analysis")
 def web_contract_analysis():
     """Phase 4 — 合同分析（静态 HTML；粘贴文本 / 上传文件占位，后续接 API）。"""
@@ -2252,6 +2359,7 @@ def web_contract_analysis():
     return FileResponse(page)
 
 
+# --- 当前主产品默认落地首页（RentAI 主流程入口之一；web_public/index.html）---
 @app.get("/")
 def web_phase3_home():
     """P10 Phase3 — minimal product homepage (static HTML)."""
@@ -2267,6 +2375,7 @@ def web_phase3_home():
     return FileResponse(index)
 
 
+# 异步长任务结果展示（task_id 由客户端从路径读取）
 @app.get("/result/{task_id}")
 def web_phase3_result(task_id: str):
     """P10 Phase3 — task result page (static HTML; task_id read client-side from path)."""
@@ -2282,6 +2391,9 @@ def web_phase3_result(task_id: str):
     return FileResponse(page)
 
 
+# --- 智能助理 / 对话式统一入口（与 POST /api/ai/query 等 RentAI 编排配合；前端意图分流可在此演进）---
+# 与上文「ShortRentAI future integration point」同属产品扩展锚点：同一入口未来可路由至 ShortRentAI 管线，
+# 而不新增并列首页；当前仍以 RentAI 主流程为主。
 @app.get("/assistant")
 def web_assistant_entry():
     """Phase 4 Round7：聊天式统一入口骨架（静态 assistant.html）。"""
@@ -2297,6 +2409,7 @@ def web_assistant_entry():
     return FileResponse(page)
 
 
+# --- 历史记录相关页面：统一入口 + 列表/详情（与 /api/analysis/history/*、/records/* 等配合）---
 @app.get("/analysis-history")
 def web_analysis_history_hub():
     """Phase 4 Round6：统一分析历史入口页（骨架：房源 / 合同分区，静态 analysis_history.html）。"""
@@ -2342,6 +2455,7 @@ def web_history_detail():
     return FileResponse(page)
 
 
+# 已登录用户账户概览 / 分桶入口
 @app.get("/account")
 def web_account_page():
     """Phase 5 Round2 Step4 — minimal account / history bucket (static HTML)."""
@@ -2357,6 +2471,7 @@ def web_account_page():
     return FileResponse(page)
 
 
+# --- 账户：登录 / 注册静态表单项（配合 /auth/login、/auth/register API）---
 @app.get("/login")
 def web_phase3_login():
     """P10 Phase3 Step4 — login form (static HTML)."""
@@ -2381,6 +2496,7 @@ def web_phase3_register():
     return FileResponse(page)
 
 
+# 全局 CSS/JS/图片等：挂载 web_public/assets → URL 前缀 /assets（所有页面静态资源由此加载）
 _assets_dir = _WEB_PUBLIC_DIR / "assets"
 if _assets_dir.is_dir():
     app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="p10_phase3_assets")

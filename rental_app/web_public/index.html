@@ -1,7 +1,15 @@
 <!DOCTYPE html>
 <!--
-  RentalAI 首页：双主入口（房源/合同）+ 分析历史 + Phase7「智能入口」+ Phase5 登录/注册入口。
-  未登录可访问本页、/assistant、/ai-result、/analysis-history、/history；其它受保护路由见 auth_local.js。
+  =============================================================================
+  当前主产品首页入口（FastAPI 挂载：web_public/index.html）
+  =============================================================================
+  · 角色：用户进入 **RentAI 长租 / 常规找房主流程** 的第一站；与后端 api_server 中标注的 RentAI 主链一致。
+  · 主线：主功能双卡 → 下方「AI 租房助手 · 房源分析」表单（一句话需求）→ POST /api/ai/query → /ai-result。
+  · 并行：合同分析、智能入口(/assistant)、分析历史等，见页内分段注释。
+  · ShortRentAI（短租子板块）：规划为平台内**扩展**，**不替换**本首页主线；未来可在「主功能」区并列增加
+    短租/合租分支入口（见下方 ShortRentAI 锚点注释），不强制改 URL 结构。
+  · 访问：未登录可浏览本页、/assistant、/ai-result、/analysis-history、/history；受保护路由见 auth_local.js。
+  =============================================================================
 -->
 <html lang="zh-Hans">
   <head>
@@ -10,6 +18,7 @@
     <meta name="rentalai-api-base" content="" />
     <meta name="vite-rentalai-api-base" content="" />
     <meta name="rentalai-env" content="" />
+    <!-- 产品标题：长租决策助手（RentAI 主品牌表述）；页面即为当前默认落地首页 -->
     <title>RentalAI · AI 租房助手</title>
     <link rel="stylesheet" href="/assets/style.css" />
     <script src="/assets/api_config.js"></script>
@@ -19,21 +28,24 @@
     <script src="/assets/analysis_history_store.js"></script>
     <script src="/assets/analysis_history_persist.js"></script>
     <script src="/assets/auth_local.js"></script>
+    <!-- 顶栏：登录 / 注册 / 账户 等由脚本注入（平台通用导航；非业务表单本身） -->
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
     <main class="wrap wrap-wide">
+      <!-- 顶区账户条：登录态与快捷账户入口（RentAI / ShortRentAI 共用身份区，脚本渲染） -->
       <div
         id="home-account-strip"
         class="home-account-strip"
         role="region"
         aria-label="Account"
       ></div>
+      <!-- 访客提示区：脚本注入轻提示（与登录引导相关；非主按钮） -->
       <div
         id="guest-home-hint"
         class="guest-auth-hint-host"
         aria-live="polite"
       ></div>
-      <!-- Phase 4 Round5：主功能 + 最小产品引导（何时点左 / 何时点右）；h1 为页内首标题 -->
+      <!-- 「主功能」区：RentAI 默认双分岔（左房源 / 右合同）；页内首屏决策引导 -->
       <section class="card home-main-entries" aria-labelledby="main-entries-heading">
         <h1 id="main-entries-heading" class="section-title">主功能</h1>
         <p class="hint home-main-entries-hook">该点哪个？看你现在卡在哪一步。</p>
@@ -48,16 +60,19 @@
         <p class="hint muted small-print home-main-entries-lead">
           两条路线同属 RentalAI，可先找房再签约，也可先审合同再决定租不租。
         </p>
+        <!-- 入口：分析历史（聚合房源/合同记录；登录后可云端同步） -->
         <p class="hint small-print home-analysis-history-cta">
           <a href="/analysis-history">分析历史</a>
           <span class="hint muted">
             · Recent Analyses — 访客仅本机；登录后优先账户同步 ·
           </span>
         </p>
+        <!-- 入口：assistant / 对话式智能入口（自然语言草稿 → 再进房源或合同；属主流程旁路增强） -->
         <p class="hint small-print home-smart-entry-cta">
           <a href="/assistant">智能入口</a>
           <span class="hint muted"> · AI Assistant — Describe what you need，再选房源或合同流程</span>
         </p>
+        <!-- 双大卡片：左=房源分析主路径（锚点下至一句话表单）；右=合同分析分支 -->
         <div class="home-entry-grid" role="list">
           <a
             class="home-entry-card home-entry-card--property"
@@ -75,6 +90,7 @@
               <span class="home-entry-card-cta-label">进入房源分析</span>
             </span>
           </a>
+          <!-- 合同分析入口：独立页 /contract-analysis（与 RentAI 找房并列，非替代关系） -->
           <a
             class="home-entry-card home-entry-card--contract"
             href="/contract-analysis"
@@ -92,9 +108,10 @@
             </span>
           </a>
         </div>
+        <!-- ShortRentAI：未来可在此「主功能」栅格旁或下方增加短租/合租并列入口；与 RentAI 双卡扩展共存，不替换本页为主线。 -->
       </section>
 
-      <!-- P10-4：房源主能力 — 一句话需求 → POST /api/ai/query → /ai-result -->
+      <!-- RentAI 房源分析主区块：一句话需求 → POST /api/ai/query → /ai-result（当前默认核心转化区） -->
       <section class="card form-card" aria-labelledby="ai-rental-heading">
         <h2 id="ai-rental-heading" class="section-title">AI 租房助手 · 房源分析</h2>
         <p class="hint">用一句话描述需求，查看推荐、风险与决策建议。</p>
@@ -112,12 +129,14 @@
           placeholder="例如：Milton Keynes 一居室，月租 1200 以内…"
         ></textarea>
         <div class="actions-row">
+          <!-- 主 CTA：当前默认推荐用户进入 RentAI 分析主流程的按钮（绑定 ai_home.js） -->
           <button type="button" id="ai-go">开始分析</button>
         </div>
         <div id="ai-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
           <span id="ai-loading-text">Analyzing market...</span>
         </div>
         <p class="hint muted small-print">提示：Enter 提交 · Shift+Enter 换行</p>
+        <!-- 表单下方快捷链：assistant、合同、历史、对比（同属主产品内导航；对比依赖收藏数据） -->
         <p class="home-quick-links" aria-label="主流程与其它入口">
           <a href="/assistant">智能入口</a>
           <span class="nav-sep">·</span>
@@ -138,7 +157,7 @@
         </div>
       </section>
 
-      <!-- 如何使用（静态说明区） -->
+      <!-- 如何使用：静态步骤说明（帮助理解 RentAI 主路径，无独立跳转逻辑） -->
       <section class="card demo-how-to" aria-labelledby="how-to-heading">
         <h2 id="how-to-heading" class="section-title">如何使用</h2>
         <ol class="hint demo-how-to-list">
@@ -152,7 +171,7 @@
         </ol>
       </section>
 
-      <!-- Phase3 表单搜索：折叠，避免与 Demo 主流程抢视线 -->
+      <!-- 辅助 / 旧版入口：Phase3 表单 + Analyze（非当前默认主流程核心；与上方 AI 一句话并行保留） -->
       <details class="card form-card">
         <summary class="section-title">扩展示例：Phase3 表单搜索（可选）</summary>
         <p class="hint muted">
@@ -237,13 +256,14 @@
         </div>
 
         <div class="actions-row">
+          <!-- Phase3 次入口按钮：调用 RentalAIPhase3.startAnalyze()；非首页主 CTA -->
           <button type="button" id="go">Analyze</button>
         </div>
         <div id="load" class="hidden">Analyzing...</div>
         <div id="err" class="err hidden"></div>
       </details>
 
-      <!-- 本地 Demo：清空测试数据（仅开发演示） -->
+      <!-- 开发/演示辅助：清空本机存储（非终用户主流程必备） -->
       <p class="demo-clear-zone">
         <button type="button" id="demo-clear-storage-btn" class="demo-clear-btn">清空本地测试数据</button>
       </p>
