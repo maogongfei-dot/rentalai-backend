@@ -1,13 +1,37 @@
-# P1 Phase1–6 + P2 Phase1–4 + P4 Phase1–5 + P5 Phase1–5: Web UI（Agent 收口 + Product 层）
-# Phase4: 结果解释增强 — 推荐 / 顾虑 / 风险 / 下一步 分开展示
-# Phase5: 输入校验、示例预填、错误提示、Reset form
-# Phase6: 页面收口、统一文案、演示顺序、弱化调试区
-#
-# 启动（在 rental_app 目录下）:
-#   streamlit run app_web.py
-# 浏览器: http://localhost:8501
-#
-# 依赖: pip install -r requirements.txt  (含 streamlit)
+"""旧的 / 辅助的 RentalAI Streamlit 界面入口（历史迭代见文末简述）。
+
+定位（勿与主产品混淆）
+----------------------
+- 本文件是 **旧的 / 辅助的** Streamlit UI 入口，**不是**当前 FastAPI 主产品的前端入口。
+- **当前主产品本地推荐入口：** ``run.py``（本地以该入口为主线之一）。
+- **当前主后端应用：** ``api_server.py`` 中定义的 FastAPI 应用（ASGI）；HTTP 能力以此为中心。
+- **本文件用途：** 历史兼容、辅助演示或内部测试；**后续主线开发默认不再以本文件为核心**。
+
+为何仍保留 / 为何不是主线 / 与 run.py、api_server.py 的关系
+------------------------------------------------------------
+- **仍保留：** 维持一套可独立用 ``streamlit run`` 启动的界面，便于对照旧流程、做演示验收或内部测试，
+  而不删除已积累的表单与展示逻辑。
+- **不是主线：** 主力交付形态以 API（``api_server.py``）及围绕其的客户端/集成为主，而非以本
+  Streamlit 单页为唯一或核心产品面。
+- **与 ``run.py``：** ``run.py`` 是本地推荐的统一启动/编排入口；本文件是 **仅 Streamlit**
+  的另一条路，二者勿混为一谈。
+- **与 ``api_server.py``：** 侧栏关闭「本地引擎」时，本 UI 通过 HTTP 调用后端；该后端即为
+  ``api_server.py`` 暴露的应用。勾选本地引擎时则在进程内走分析，用于无需起 API 的快速试用。
+
+如何启动（在 ``rental_app`` 目录下）::
+
+    streamlit run app_web.py
+
+- 浏览器默认: http://localhost:8501
+- 依赖: ``pip install -r requirements.txt``（含 streamlit）
+
+实现背景（原顶部注释归档）
+--------------------------
+P1 Phase1–6 + P2 Phase1–4 + P4 Phase1–5 + P5 Phase1–5：Web UI（Agent 收口 + Product 层）；
+Phase4：结果解释增强（推荐 / 顾虑 / 风险 / 下一步分开展示）；Phase5：输入校验、示例预填、错误提示、
+Reset form；Phase6：页面收口、统一文案、演示顺序、弱化调试区。
+"""
+# 提示：主线开发与集成请以 run.py + api_server.py 为准；本文件为 Streamlit 兼容/演示/测试保留。
 
 import logging
 import os
