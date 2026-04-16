@@ -664,7 +664,8 @@ def api_auth_minimal_login(body: MinimalAuthBody):
 # 落地前仅以注释维持扩展锚点；**不改变**现有 URL、请求体与响应语义。
 # ----- end ShortRentAI future integration point -----
 #
-# --- 引擎模块化端点（RentAI：单套评分 / 拆解 / 批量；表单 → Module 管线；供 API / 旧 Streamlit 直连）---
+# --- 引擎模块化端点（RentAI：单套评分 / 拆解 / 批量；表单 → Module 管线）---
+# 辅助 / 非当前主前端默认入口：主 web 交互页默认走 POST /api/ai/query；本组供旧 Streamlit、工具链或表单直连。
 @app.post("/analyze")
 def analyze(body: AnalyzeRequest = AnalyzeRequest()):
     """全量分析，data 含 score / decision / analysis / user_facing / references / trace 等。"""
@@ -689,6 +690,7 @@ def explain_only(body: AnalyzeRequest = AnalyzeRequest()):
     return modular_analyze_response(_body_dict(body), "/explain-only")
 
 
+# 辅助 / 批量：多属性数组分析；非单用户一句话主前端默认路径。
 @app.post("/analyze-batch")
 def analyze_batch(body: dict = Body(default_factory=dict)):
     """
@@ -698,7 +700,8 @@ def analyze_batch(body: dict = Body(default_factory=dict)):
     return analyze_batch_request_body(body)
 
 
-# --- 自然语言 → 结构化推荐（RentAI Phase1 主路径之一；可选多数据源 / 多轮）---
+# --- 自然语言 → 结构化推荐（RentAI Phase1；可选多数据源 / 多轮）---
+# 辅助 / 非主前端默认链路：当前 index.html 主提交通向 POST /api/ai/query；本路由为 raw_user_query 与 Dataset 实验等场景保留。
 @app.post("/api/ai-analyze")
 def api_ai_analyze(body: dict = Body(default_factory=dict)):
     """
@@ -765,6 +768,7 @@ def api_ai_analyze(body: dict = Body(default_factory=dict)):
 
 
 # --- 市场行情（RentAI：长租市场清单、统计与 deal/explain；短租专用口径可在 ShortRentAI 分流后并列扩展）---
+# 辅助：结构化参数的市场查询；非主前端「一句话」默认主链路（主链路为同节的 POST /api/ai/query）。
 @app.post("/api/market/combined")
 def api_market_combined(body: dict = Body(default_factory=dict)):
     """
@@ -947,8 +951,16 @@ def api_market_explain(body: dict = Body(default_factory=dict)):
         )
 
 
-# RentAI：自然语言房源查询编排主入口（与 GET /assistant 等前端的默认主线一致）；可选写历史。
-# 推荐主路径为 POST /api/ai/query；/ai/query、/market/ask 为旧客户端兼容别名（语义同一）。
+# -----------------------------------------------------------------------------
+# 主产品核心分析 API（与 web_public 主前端一一对应）
+# -----------------------------------------------------------------------------
+# A. 当前主产品默认分析入口：主交互页（index.html）经 ai_home.js 仅向本路由族提交（首选 POST /api/ai/query）。
+# B. 主要承载 RentAI 主流程：长期租房与常规自然语言房源查询编排（run_housing_ai_query）。
+# C. ShortRentAI 规划为平台内扩展，宜在本函数或 orchestrator 内做参数与分支扩展，而非另行声明互斥的「全局唯二主 API」。
+# D. 短租、合租、灵活租期、SpareRoom 相关需求，可在本层或编排器增加意图识别与数据源路由后再演进，响应契约与产品对齐扩展。
+# E. 信任与人工核实系统可在后续于结果对象或并行服务中联动（例如房东评分、房屋问题、维修记录、合同风险摘要），与本入口返回形成组合交付。
+# 路由别名：/ai/query、/market/ask 为旧客户端兼容路径，语义与 /api/ai/query 相同。
+# -----------------------------------------------------------------------------
 @app.post("/api/ai/query")
 @app.post("/ai/query")
 @app.post("/market/ask")
@@ -960,14 +972,18 @@ def api_ai_query(request: Request, body: dict = Body(default_factory=dict)):
     """
     from services.chat_orchestrator import run_housing_ai_query
 
+    # 步骤一：请求体规范化并提取用户自然语言输入（兼容 query 字段）。
     if not isinstance(body, dict):
         body = {}
     try:
         ut = body.get("user_text") if body.get("user_text") is not None else body.get("query")
+        # 步骤二：调用主分析编排引擎，生成推荐与市场维度的结构化结果。
         out = run_housing_ai_query(str(ut or ""))
+        # 步骤三：解析可写入服务端分析历史的用户身份（Bearer 与 body 校验）。
         hw = resolve_history_write_user_id(request, body)
         if hw["ok"]:
             try:
+                # 步骤四（可选）：将本次运行的输入与结果摘要写入持久化历史，供账户维度回看。
                 save_analysis(
                     {
                         "user_id": hw["user_id"],
@@ -982,6 +998,7 @@ def api_ai_query(request: Request, body: dict = Body(default_factory=dict)):
                 print("Saved to cloud:", hw["user_id"])
             except Exception as e:
                 print("Cloud save failed:", str(e))
+        # 步骤五：封装 HTTP 响应，附带 history_write 元信息供前端展示写入状态。
         if isinstance(out, dict):
             payload = dict(out)
             payload["history_write"] = {
