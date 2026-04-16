@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <!--
   =============================================================================
-  当前主产品首页入口（FastAPI 挂载：web_public/index.html）
+  当前推定主交互页（房源分析提交侧）— web_public/index.html，路由 /
   =============================================================================
-  · 角色：用户进入 **RentAI 长租 / 常规找房主流程** 的第一站；与后端 api_server 中标注的 RentAI 主链一致。
-  · 主线：主功能双卡 → 下方「AI 租房助手 · 房源分析」表单（一句话需求）→ POST /api/ai/query → /ai-result。
-  · 并行：合同分析、智能入口(/assistant)、分析历史等，见页内分段注释。
-  · ShortRentAI（短租子板块）：规划为平台内**扩展**，**不替换**本首页主线；未来可在「主功能」区并列增加
-    短租/合租分支入口（见下方 ShortRentAI 锚点注释），不强制改 URL 结构。
+  · 定位说明：与「assistant / 对话入口」见下文区分。本页包含 **#ai-query + #ai-go**，由 assets/ai_home.js
+    发起 **POST /api/ai/query** 并将响应写入 sessionStorage 后跳转 **/ai-result**，属当前主产品 **RentAI**
+    找房主链的 **核心交互页之一**（另一块为结果页 ai-result.html）。
+  · 「assistant / 对话入口」对应 **独立文件 assistant.html（路由 /assistant）**：自然语言描述 + 本地意图分流，
+    **不直接调用** /api/ai/query；跳转回本页或合同页时经 sessionStorage 预填，用户仍在本页点击「开始分析」完成提交。
+  · 角色：默认落地首页 + 上述 **一语分析** 主表单所在；后续新找房能力优先在本区块与 ai_home.js 对齐。
+  · ShortRentAI：作为平台内短租 / 合租 / 灵活租期 **扩展分支**，可在本页「主功能」区或表单侧增加并列入口
+    与分流参数（见页内 ShortRentAI 注释），**不替换**本页 RentAI 长线主流程。
   · 访问：未登录可浏览本页、/assistant、/ai-result、/analysis-history、/history；受保护路由见 auth_local.js。
   =============================================================================
 -->
@@ -115,6 +118,7 @@
       <section class="card form-card" aria-labelledby="ai-rental-heading">
         <h2 id="ai-rental-heading" class="section-title">AI 租房助手 · 房源分析</h2>
         <p class="hint">用一句话描述需求，查看推荐、风险与决策建议。</p>
+        <!-- 自 /assistant 带回描述时由 assistant_prefill.js 显示提示（非错误区） -->
         <p
           id="assistant-prefill-hint"
           class="hint save-banner save-banner-ok hidden"
@@ -122,6 +126,7 @@
           aria-live="polite"
         ></p>
         <label class="field-label" for="ai-query">你的需求</label>
+        <!-- RentAI 主输入：租房需求自然语言 → 与 #ai-go 一并交由 ai_home.js 提交 -->
         <textarea
           id="ai-query"
           name="ai_query"
@@ -132,6 +137,7 @@
           <!-- 主 CTA：当前默认推荐用户进入 RentAI 分析主流程的按钮（绑定 ai_home.js） -->
           <button type="button" id="ai-go">开始分析</button>
         </div>
+        <!-- 提交后等待 API 时的加载态（结果在跳转后的 /ai-result 展示，不在本页） -->
         <div id="ai-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
           <span id="ai-loading-text">Analyzing market...</span>
         </div>
@@ -151,6 +157,7 @@
           <li>Show me cheaper 1-bed rentals near DE1 with images</li>
           <li>我想找 Milton Keynes 月租 1200 以内、通勤方便的一居室</li>
         </ul>
+        <!-- 接口失败时的错误文案区；重试仍走同一 submit -->
         <div id="ai-err" class="err hidden" role="alert"></div>
         <div id="ai-retry-row" class="actions-row hidden">
           <button type="button" id="ai-retry">重试</button>
