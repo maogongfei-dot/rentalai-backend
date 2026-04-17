@@ -399,6 +399,10 @@
     );
   }
 
+  /**
+   * 历史记录渲染主入口：
+   * 接收标准化 records 后渲染列表卡片（摘要、要点、详情展开、删除动作）。
+   */
   function renderList(container, items, emptyHint, countSourceLabel, deleteContext) {
     if (!container) return;
     container.setAttribute("aria-busy", "false");
@@ -515,6 +519,12 @@
     el.classList.remove("hidden");
   }
 
+  /**
+   * 页面级链路编排：
+   * 1) 读取来源策略与历史数据；
+   * 2) 渲染房源/合同两组历史列表；
+   * 3) 绑定刷新、删除、清空与过滤行为。
+   */
   function run() {
     if (
       window.RentalAIHistoryAccess &&
@@ -651,6 +661,7 @@
       window.RentalAIAnalysisHistorySource &&
       typeof window.RentalAIAnalysisHistorySource.loadAnalysisHistory === "function"
     ) {
+      // 历史列表获取点：统一通过 source 层加载（云端优先，本机回退）。
       window.RentalAIAnalysisHistorySource
         .loadAnalysisHistory()
         .then(function (bundle) {

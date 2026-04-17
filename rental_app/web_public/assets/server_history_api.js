@@ -47,6 +47,10 @@
    * @param {{ type?: 'property'|'contract' }} [opts] 可选按类型过滤
    * @returns {Promise<{ success?: boolean, message?: string, records?: unknown[] }>}
    */
+  /**
+   * 历史列表云端获取点：
+   * 调用 /api/analysis/history/records，后端按 Bearer 绑定用户并返回该用户历史。
+   */
   function fetchUserHistory(userId, opts) {
     opts = opts || {};
     var headers = mergeHistoryHeaders();

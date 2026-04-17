@@ -11,6 +11,12 @@
   var MODE_LOCAL_GUEST = "local_guest";
   var MODE_REMOTE_USER = "remote_user";
 
+  /**
+   * 历史来源分流点（guest vs 登录）：
+   * - 登录态：优先走云端历史 API
+   * - 访客态：仅走本机历史桶
+   * 注：此处仅负责来源策略，不做 guest→user 自动迁移。
+   */
   function resolveHistoryMode() {
     var auth = false;
     var bucket = "guest";
@@ -136,6 +142,10 @@
     return { propertyRecords: prop, contractRecords: con };
   }
 
+  /**
+   * 主产品历史列表获取入口：
+   * 统一返回 propertyRecords / contractRecords，供 history 页面直接渲染。
+   */
   function loadAnalysisHistory() {
     var info = resolveHistoryMode();
     if (info.mode === MODE_LOCAL_GUEST) {
@@ -170,6 +180,8 @@
 
     var tok =
       typeof api.getBearerTokenForHistory === "function" ? api.getBearerTokenForHistory() : null;
+    // 登录态但无 token 时回退本机：
+    // 问题标记：该场景说明“账户态标识”与“可用会话 token”可能不一致，需在上层会话流程持续收敛。
     if (!tok) {
       return Promise.resolve({
         mode: MODE_REMOTE_USER,

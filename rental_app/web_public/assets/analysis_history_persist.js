@@ -97,6 +97,12 @@
    * }} opts
    * @returns {object} 含可选 **hint**（供结果页轻提示）
    */
+  /**
+   * 主产品历史写入前端承接点（结果页调用）：
+   * - guest：写本机分桶（localStorage）
+   * - 已登录：以后端 history_write.success 为准，成功则视为云端已落库并触发刷新标记
+   * 该写入承接层同时覆盖 RentAI 与 ShortRentAI 的结果保存入口形态。
+   */
   function persistAnalysisResult(opts) {
     opts = opts || {};
     var kind = opts.kind;

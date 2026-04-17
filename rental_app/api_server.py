@@ -499,6 +499,8 @@ def api_analysis_history_records(
                 "records": [],
             },
         )
+    # 主产品历史列表读取点：
+    # 统一读取当前登录用户的云端历史（按 type 可选过滤），供前端历史页拉取后渲染列表与详情展开。
     try:
         records = list_public_records(uid_auth, record_type=flt, limit=200)
     except Exception as exc:
@@ -981,6 +983,10 @@ def api_ai_query(request: Request, body: dict = Body(default_factory=dict)):
         out = run_housing_ai_query(str(ut or ""))
         # 步骤三：解析可写入服务端分析历史的用户身份（Bearer 与 body 校验）。
         hw = resolve_history_write_user_id(request, body)
+        # 主产品历史记录写入点（房源分析）：
+        # 在主分析结果生成后写入历史；写入字段覆盖用户输入 input、分析结果 result，
+        # 并由持久层补齐 created_at 时间戳，形成可回看链路。
+        # 该写入链路属于平台共用能力，同时服务 RentAI 与 ShortRentAI。
         if hw["ok"]:
             try:
                 # 步骤四（可选）：将本次运行的输入与结果摘要写入持久化历史，供账户维度回看。
@@ -1262,6 +1268,8 @@ def api_contract_analysis_text(request: Request, body: ContractAnalysisTextApiBo
         facade = analyze_contract_text(contract_text=ct, **kw)
         ui_payload = build_contract_analysis_ui_payload(facade)
         hw = resolve_history_write_user_id(request, body.model_dump())
+        # 主产品历史记录写入点（合同分析 /text）：
+        # 写入输入文本片段 + 分析结果，时间戳在存储层生成；与房源历史共用统一读取链路。
         if hw["ok"]:
             try:
                 save_analysis(
@@ -1327,6 +1335,8 @@ def api_contract_analysis_file_path(request: Request, body: ContractAnalysisFile
         facade = analyze_contract_file(file_path=path, **kw)
         ui_payload = build_contract_analysis_ui_payload(facade)
         hw = resolve_history_write_user_id(request, body.model_dump())
+        # 主产品历史记录写入点（合同分析 /file-path）：
+        # 写入输入来源（文件路径片段）+ 结果对象，供统一历史页按用户回看。
         if hw["ok"]:
             try:
                 save_analysis(
@@ -1400,6 +1410,8 @@ async def api_contract_analysis_upload(
         )
         ui_payload = build_contract_analysis_ui_payload(facade)
         hw = resolve_history_write_user_id(request, {"userId": userId} if userId else {})
+        # 主产品历史记录写入点（合同分析 /upload）：
+        # 写入上传文件名片段 + 分析结果；若无有效登录身份则不会进入账户云历史写入。
         if hw["ok"]:
             try:
                 save_analysis(

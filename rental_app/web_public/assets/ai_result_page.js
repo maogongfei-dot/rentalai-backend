@@ -1,5 +1,11 @@
 /**
- * P10-4：ai_housing_query_last（POST /api/ai/query）+ 旧版 ai_analyze_last
+ * RentAI「需求解析结果」页（/ai_result.html）主结果渲染脚本。
+ *
+ * 主结果展示链路（当前产品）：上游在完成主分析请求后，将 JSON 写入 sessionStorage，
+ * 本脚本在页面加载时读取并渲染；不负责发起 API 或改写响应结构。
+ *
+ * 关联：P10-4（key：ai_housing_query_last，对应 POST /api/ai/query）；
+ * 兼容旧版 key：ai_analyze_last（/api/ai-analyze 形态）。
  */
 (function () {
   var HOUSING_KEY = "ai_housing_query_last";
@@ -179,6 +185,7 @@
     );
   }
 
+  /** 综合结论区 HTML：star_final_verdict（与 #housing-star-verdict 对应）。 */
   function renderStarFinalVerdictHtml(v) {
     if (!v || typeof v !== "object") {
       return "<p class=\"hint\">暂无结论。</p>";
@@ -208,7 +215,18 @@
     return false;
   }
 
-  /* ---------- P10-4 housing ---------- */
+  /* ---------- P10-4 housing：当前主结果渲染（POST /api/ai/query 负载） ---------- */
+
+  /**
+   * Future expansion（结果层扩展位，产品规划说明）
+   *
+   * 未来可在本结果层承接 ShortRentAI 等独立结果块，与现有 housing 区块并列渲染；
+   * 可扩展维度包括但不限于：房东信息、房屋质量、信任评分、维修频率、人工核实标签；
+   * 可扩展合同风险摘要，并与平台信用信息联动展示。
+   * 上述能力优先在本页结果层增量承接，而非另起完全独立的结果页，以保持用户动线一致。
+   */
+
+  /** 将主分析 API 返回的 housing 负载渲染至 #housing-mode 各区块。 */
   function renderHousing(data) {
     var housingEl = document.getElementById("housing-mode");
     var legacyEl = document.getElementById("legacy-mode");
@@ -217,6 +235,7 @@
 
     var geoOk = hasSearchableGeo(data);
 
+    /* 地理/检索前置条件与空结果：异常提示与空状态（含部分风险提示语义）。 */
     var missEl = document.getElementById("housing-missing-location");
     if (missEl) {
       if (!geoOk) {
@@ -266,6 +285,7 @@
       }
     }
 
+    /* 风险提示：pipeline 分步骤异常（errors 键值列表）。 */
     var errBox = document.getElementById("housing-errors");
     if (errBox) {
       var errs = data.errors || {};
@@ -286,6 +306,7 @@
       }
     }
 
+    /* 需求解析摘要：用户输入与规范化条件（解释说明 · 查询侧）。 */
     var pq = data.parsed_query || {};
     var nf = data.normalized_filters || {};
     var fl = nf.filters || {};
@@ -350,6 +371,7 @@
         "</dl>";
     }
 
+    /* 市场统计与市场摘要：解释说明 · 数据侧。 */
     var ms = data.market_stats || {};
     var msum = data.market_summary || {};
     var mEl = document.getElementById("housing-market-summary");
@@ -386,6 +408,7 @@
         "</p>";
     }
 
+    /* 核心推荐结果：选房推荐（星级房源卡片 + 单行建议，属主结论/推荐展示主区）。 */
     var expl = data.explanations || {};
     var items = Array.isArray(expl.items) ? expl.items : [];
     var top5 = items.slice(0, 5);
@@ -408,6 +431,7 @@
       } else {
         dealsEl.innerHTML = top5
           .map(function (it) {
+            /* 建议动作：每套房源 deal-card-tip（one_line_suggestion）。 */
             var href = safeListingUrl(it.listing_url || "");
             var btn = href
               ? "<a class=\"btn-deal-view\" href=\"" +
@@ -449,12 +473,14 @@
       }
     }
 
+    /* 核心结论：综合结论（星标终局 verdict，含「最推荐/价优/稳妥」与总体建议）。 */
     var rep = data.recommendation_report || {};
     var vEl = document.getElementById("housing-star-verdict");
     if (vEl) {
       vEl.innerHTML = renderStarFinalVerdictHtml(rep.star_final_verdict);
     }
 
+    /* 解释说明：市场印象（叙事摘要 market_snapshot_zh）。 */
     var rEl = document.getElementById("housing-report");
     if (rEl) {
       var snap = rep.market_snapshot_zh;
@@ -468,6 +494,7 @@
       }
     }
 
+    /* 历史记录写入后的展示回流：持久化结果提示条（云端同步 / 本机回退等）。 */
     try {
       if (
         window.RentalAIAnalysisHistoryPersist &&
@@ -492,7 +519,7 @@
     } catch (eHist) {}
   }
 
-  /* ---------- Legacy ai-analyze ---------- */
+  /* ---------- Legacy：旧版 /api/ai-analyze 形态；辅助兼容，非当前主结果渲染主线 ---------- */
   var LABELS = {
     raw_user_query: "原始输入",
     city: "城市",
@@ -511,6 +538,7 @@
     notes: "备注",
   };
 
+  /** 旧版分析负载渲染：structured_query + recommendations 列表（非 POST /api/ai/query 主链路）。 */
   function renderLegacy(data) {
     var housingEl = document.getElementById("housing-mode");
     var legacyEl = document.getElementById("legacy-mode");
@@ -599,6 +627,7 @@
       var loc = [r.postcode, r.area].filter(Boolean).join(" · ") || "地区 —";
       var score =
         r.final_score != null ? "总分 " + Number(r.final_score).toFixed(1) : "";
+      /* 旧版推荐卡片：解释说明 / 风险提示 / 决策标签（非 housing 主链路）。 */
       var explainHtml = "";
       if (r.explain) {
         explainHtml += "<div class='explain-main'>" + escapeHtml(r.explain) + "</div>";
@@ -689,7 +718,13 @@
     } catch (eHistL2) {}
   }
 
-  /* ---------- Load ---------- */
+  /* ---------- Load：结果数据进入本页（sessionStorage → 渲染） ---------- */
+
+  /*
+   * 此处接收当前主分析 API 返回结果：上游已将 POST /api/ai/query 的响应 JSON 存入
+   * sessionStorage（key：ai_housing_query_last）。此为 RentAI 主结果展示链路的一部分
+   * （结果页消费侧）；本脚本仅读取并渲染，不修改接口契约。
+   */
   var rawH = sessionStorage.getItem(HOUSING_KEY);
   var dataH = null;
   try {
@@ -698,6 +733,7 @@
     dataH = null;
   }
 
+  /* 主链路失败态：主分析未成功时的结果区展示（仍属 housing 容器内）。 */
   if (dataH && dataH.success === false) {
     var housingEl0 = document.getElementById("housing-mode");
     var legacyEl0 = document.getElementById("legacy-mode");
@@ -723,6 +759,7 @@
   ) {
     renderHousing(dataH);
   } else {
+    /* 无主分析负载时回退：读取旧版 key（非当前主结果主线）。 */
     var rawL = sessionStorage.getItem(LEGACY_KEY);
     var dataL = null;
     try {
@@ -733,7 +770,7 @@
     renderLegacy(dataL);
   }
 
-  /* ---------- Save ---------- */
+  /* ---------- Save：用户手动「保存本次分析」至本机历史（辅助能力，非 API 结果解析） ---------- */
   (function registerAnalysisHistorySave() {
     var saveBtn = document.querySelector(".save-analysis-btn");
     if (!saveBtn) return;

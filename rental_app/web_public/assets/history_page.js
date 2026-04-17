@@ -14,6 +14,10 @@
       .replace(/"/g, "&quot;");
   }
 
+  /**
+   * 旧版历史列表渲染点（/history）：
+   * 渲染后每条通过 task_id 跳转 /result/{task_id}，用于“点击历史还原结果页”。
+   */
   function renderRows(items) {
     var tbody = document.getElementById("history-tbody");
     var empty = document.getElementById("history-empty");
@@ -57,6 +61,10 @@
     });
   }
 
+  /**
+   * 旧版历史列表获取点：
+   * 调用 /records/ui-history（Bearer 必需）读取当前用户已保存的历史快照列表。
+   */
   function loadHistory() {
     var load = document.getElementById("history-loading");
     var err = document.getElementById("history-error");
