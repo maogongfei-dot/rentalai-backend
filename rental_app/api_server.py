@@ -153,6 +153,21 @@ app = FastAPI(
     version="0.6.0",
 )
 
+# =========================
+# 用户识别逻辑（Phase 3 核心入口）
+# =========================
+def get_current_user_id(request: Request) -> str:
+    """
+    获取当前用户ID：
+    - 优先使用 Header: X-User-Id（登录用户）
+    - 否则返回 'guest'（游客）
+    """
+    user_id = request.headers.get("X-User-Id")
+    if user_id:
+        return user_id
+
+    return "guest"
+
 # 主前端静态页根目录：当前主产品 HTML（index、assistant、各功能页）均位于 web_public/，
 # 由下述若干 @app.get 路由逐个返回 FileResponse；未在下方映射的路径若需页面应优先加 HTML 至此目录。
 _WEB_PUBLIC_DIR = Path(__file__).resolve().parent / "web_public"
