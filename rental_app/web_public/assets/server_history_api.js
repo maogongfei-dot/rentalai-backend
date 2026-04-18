@@ -1,7 +1,7 @@
 /**
  * Phase 5 Round3/4 + Round5 Step3/4 — GET /api/analysis/history/records
- * 云端读取统一带 Authorization: Bearer（rentalaiMergeAuthHeaders / rentalai_bearer）。
- * userId query 可选，须与 token 用户一致。响应体可含 _httpStatus / _authError 供上层区分 401/403。
+ * 云端读取：Authorization: Bearer（已登录）+ X-Guest-Session（游客隔离；登录亦可带，后端以 Bearer 为准）。
+ * userId query 须与当前历史作用域一致（已登录=账户 id；未登录=guest:<session>）。响应可含 _httpStatus / _authError。
  */
 (function (global) {
   function apiUrl(path) {
@@ -31,7 +31,30 @@
     var h = {};
     var tok = getBearerTokenForHistory();
     if (tok) h["Authorization"] = "Bearer " + tok;
+    if (!h["X-Guest-Session"] && typeof global.rentalaiGetOrCreateGuestSessionId === "function") {
+      h["X-Guest-Session"] = global.rentalaiGetOrCreateGuestSessionId();
+    }
     return h;
+  }
+
+  /**
+   * 历史请求作用域 userId（query）：有 Bearer 时用调用方传入的 bucket（须与账户一致）；
+   * 无 Bearer 时用 guest:<session>，避免与后端 effective_user_id 不一致导致 403。
+   */
+  function normalizeHistoryQueryUserId(passedUid) {
+    var tok = getBearerTokenForHistory();
+    if (tok) {
+      return (passedUid || "").trim();
+    }
+    try {
+      var P = global.RentalAIAnalysisHistoryPersist;
+      if (P && typeof P.getHistoryScopeUserIdForApi === "function") {
+        return P.getHistoryScopeUserIdForApi();
+      }
+    } catch (e) {}
+    return typeof global.rentalaiBuildGuestHistoryUserId === "function"
+      ? global.rentalaiBuildGuestHistoryUserId()
+      : "guest:anonymous";
   }
 
   function fetchCredentials() {
@@ -55,7 +78,7 @@
     opts = opts || {};
     var headers = mergeHistoryHeaders();
     var q = new URLSearchParams();
-    var uid = (userId || "").trim();
+    var uid = normalizeHistoryQueryUserId(userId);
     if (uid) q.set("userId", uid);
     if (opts.type) q.set("type", String(opts.type));
     if (opts.cacheBust) q.set("_t", String(Date.now()));

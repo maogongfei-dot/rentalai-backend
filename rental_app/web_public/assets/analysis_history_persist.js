@@ -17,11 +17,30 @@
     return { isAuthenticated: false, userId: null };
   }
 
-  /** 供 JSON body / FormData：已登录返回 userId，否则 null（后端记 guest）。 */
+  /**
+   * 供分析 POST 的 JSON body / FormData「写入」侧：已登录返回真实 userId；未登录返回 null
+   *（body 不带 userId 时后端 resolve_history_user_id 为字面 guest，与无 Bearer 写入分支一致）。
+   * 游客会话隔离依赖 X-Guest-Session（见 rentalaiMergeAuthHeaders）；勿在 body 传 guest:… 以免与后端「无 Bearer 且 claimed 须为 guest」冲突。
+   */
   function getHistoryUserIdForApi() {
     var u = loadU();
     if (!u || !u.isAuthenticated || !u.userId) return null;
     return String(u.userId).trim().slice(0, 128) || null;
+  }
+
+  /**
+   * 历史读取 / 删除 / 清空 / GET query 等作用域：已登录为 rentalai_user_id；未登录为 guest:<session>，
+   * 与后端 resolve_history_read_user_id 一致；登录用户与游客历史不合并。
+   */
+  function getHistoryScopeUserIdForApi() {
+    var u = loadU();
+    if (u && u.isAuthenticated && u.userId) {
+      return String(u.userId).trim().slice(0, 128) || null;
+    }
+    if (typeof global.rentalaiBuildGuestHistoryUserId === "function") {
+      return global.rentalaiBuildGuestHistoryUserId();
+    }
+    return "guest:anonymous";
   }
 
   function isGuestForHistory() {
@@ -210,6 +229,7 @@
 
   global.RentalAIAnalysisHistoryPersist = {
     getHistoryUserIdForApi: getHistoryUserIdForApi,
+    getHistoryScopeUserIdForApi: getHistoryScopeUserIdForApi,
     getBearerTokenForApi: getBearerTokenForApi,
     mergeAuthHeadersForFetch: mergeAuthHeadersForFetch,
     isGuestForHistory: isGuestForHistory,

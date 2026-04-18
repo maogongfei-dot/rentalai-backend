@@ -111,6 +111,7 @@ from persistence.history_read_service import (
     list_public_records,
 )
 from persistence.auth_http_helpers import (
+    resolve_history_read_user_id,
     resolve_history_write_user_id,
     resolve_user_id_from_auth_header,
 )
@@ -484,9 +485,9 @@ def api_analysis_history_records(
     """
     Phase 5 Round3 Step4 + Round5 Step3 — Read server-side JSON analysis history.
 
-    **Auth:** ``Authorization: Bearer <token>`` required (session placeholder from login).
-    Effective bucket id is the authenticated user id from the token; optional ``userId`` query
-    must match when provided (legacy clients).
+    **Scope:** Logged-in callers read history for the Bearer user id; guests read their own
+    guest-session bucket (``guest:<session>`` from ``X-Guest-Session``). The two are not merged.
+    Optional ``userId`` query must match that effective scope when provided (legacy clients).
     """
     flt, err = _parse_analysis_history_type_query(record_type)
     if err:
@@ -494,30 +495,26 @@ def api_analysis_history_records(
             status_code=400,
             content={"success": False, "message": err, "records": []},
         )
-    uid_auth = resolve_user_id_from_auth_header(request)
-    if not uid_auth:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "success": False,
-                "message": "需要登录才能使用云历史。请使用 Authorization: Bearer <token>（登录后获取）。",
-                "records": [],
-            },
-        )
+    # 历史读取逻辑：
+    # - Bearer 存在时，严格读取当前登录用户自己的历史
+    # - 无 Bearer 时，读取当前游客会话自己的历史
+    # - 登录用户与游客历史不合并
+    effective_user_id = resolve_history_read_user_id(request)
+
     q_uid = str(userId or "").strip()
-    if q_uid and q_uid != uid_auth:
+    if q_uid and q_uid != effective_user_id:
         return JSONResponse(
             status_code=403,
             content={
                 "success": False,
-                "message": "userId query does not match authenticated user.",
+                "message": "userId query does not match current history scope.",
                 "records": [],
             },
         )
     # 主产品历史列表读取点：
     # 统一读取当前登录用户的云端历史（按 type 可选过滤），供前端历史页拉取后渲染列表与详情展开。
     try:
-        records = list_public_records(uid_auth, record_type=flt, limit=200)
+        records = list_public_records(effective_user_id, record_type=flt, limit=200)
     except Exception as exc:
         logger.exception("analysis history read failed")
         return JSONResponse(
@@ -534,20 +531,16 @@ def api_analysis_history_records(
 @app.delete("/api/analysis/history/records/{record_id}")
 def api_analysis_history_delete_record(request: Request, record_id: str):
     """
-    Phase 5 Round7 Step1 — Delete one server-side JSON history row for the **authenticated user only**.
+    Phase 5 Round7 Step1 — Delete one server-side JSON history row within the current history scope.
 
-    **Auth:** ``Authorization: Bearer <token>`` required. ``record_id`` must match a row whose
-    ``userId`` equals the token user; otherwise **404** (missing) or **403** (other user's row).
+    **Scope:** Logged-in callers delete only from their Bearer user bucket; guests only from their
+    guest-session bucket. ``record_id`` must belong to that scope; otherwise **404** or **403**.
     """
-    uid_auth = resolve_user_id_from_auth_header(request)
-    if not uid_auth:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "success": False,
-                "message": "需要登录才能使用云历史。请使用 Authorization: Bearer <token>（登录后获取）。",
-            },
-        )
+    # 用户绑定逻辑：
+    # 删除时只允许操作当前历史作用域内的数据：
+    # - 登录用户删自己的 user_id 桶
+    # - 游客删自己的 guest:<session> 桶
+    uid_auth = resolve_history_read_user_id(request)
     rid = str(record_id or "").strip()
     if not rid:
         return JSONResponse(
@@ -584,20 +577,14 @@ def api_analysis_history_delete_record(request: Request, record_id: str):
 @app.delete("/api/analysis/history/clear")
 def api_analysis_history_clear(request: Request):
     """
-    Phase 5 Round7 Step2 — Remove **all** server-side JSON analysis history rows for the
-    authenticated user only. Other users' rows are unchanged.
+    Phase 5 Round7 Step2 — Remove **all** server-side JSON analysis history rows for the current
+    scope only (Bearer user bucket or guest-session bucket). Other users' rows are unchanged.
 
-    **Auth:** ``Authorization: Bearer <token>`` required.
+    Logged-in and guest histories are separate and not merged across login.
     """
-    uid_auth = resolve_user_id_from_auth_header(request)
-    if not uid_auth:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "success": False,
-                "message": "需要登录才能使用云历史。请使用 Authorization: Bearer <token>（登录后获取）。",
-            },
-        )
+    # 历史清空逻辑：
+    # 仅清空当前用户自己的历史桶，不影响其他用户 / 其他游客会话
+    uid_auth = resolve_history_read_user_id(request)
     try:
         n = clear_public_records_for_user(uid_auth)
     except Exception as exc:
