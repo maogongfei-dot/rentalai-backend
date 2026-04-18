@@ -802,12 +802,25 @@
         }
         return "analysis_history";
       }
+      /**
+       * 游客历史：guest、guest:<session> 或 sanitize 后 guest_…；别再只用 === "guest"。
+       * 登录用户与游客历史不合并。
+       */
+      function isGuestBucket(bucketId) {
+        var s = String(bucketId || "").trim();
+        return (
+          !s ||
+          s === "guest" ||
+          s.indexOf("guest:") === 0 ||
+          s.indexOf("guest_") === 0
+        );
+      }
       function migrateLegacyManualIfNeeded() {
         try {
           if (
             window.RentalAIUserStore &&
             window.RentalAIUserStore.getHistoryBucketId &&
-            window.RentalAIUserStore.getHistoryBucketId() !== "guest"
+            !isGuestBucket(window.RentalAIUserStore.getHistoryBucketId())
           ) {
             return;
           }

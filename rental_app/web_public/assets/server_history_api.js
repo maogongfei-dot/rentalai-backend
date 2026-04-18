@@ -1,7 +1,8 @@
 /**
  * Phase 5 Round3/4 + Round5 Step3/4 — GET /api/analysis/history/records
- * 云端读取：Authorization: Bearer（已登录）+ X-Guest-Session（游客隔离；登录亦可带，后端以 Bearer 为准）。
- * userId query 须与当前历史作用域一致（已登录=账户 id；未登录=guest:<session>）。响应可含 _httpStatus / _authError。
+ * 登录用户读取自己账户下的历史；游客读取自己 guest:<session> 桶；两者不合并。
+ * 统一带 X-Guest-Session；已登录时亦可带，后端仍以 Bearer 解析用户为准。
+ * userId query 须与当前历史作用域一致。响应可含 _httpStatus / _authError。
  */
 (function (global) {
   function apiUrl(path) {
@@ -25,36 +26,24 @@
   }
 
   function mergeHistoryHeaders() {
-    if (typeof global.rentalaiMergeAuthHeaders === "function") {
-      return global.rentalaiMergeAuthHeaders({});
-    }
     var h = {};
-    var tok = getBearerTokenForHistory();
-    if (tok) h["Authorization"] = "Bearer " + tok;
-    if (!h["X-Guest-Session"] && typeof global.rentalaiGetOrCreateGuestSessionId === "function") {
-      h["X-Guest-Session"] = global.rentalaiGetOrCreateGuestSessionId();
+    if (typeof global.rentalaiMergeAuthHeaders === "function") {
+      h = global.rentalaiMergeAuthHeaders({});
+    } else {
+      var tok = getBearerTokenForHistory();
+      if (tok) h["Authorization"] = "Bearer " + tok;
     }
-    return h;
-  }
 
-  /**
-   * 历史请求作用域 userId（query）：有 Bearer 时用调用方传入的 bucket（须与账户一致）；
-   * 无 Bearer 时用 guest:<session>，避免与后端 effective_user_id 不一致导致 403。
-   */
-  function normalizeHistoryQueryUserId(passedUid) {
-    var tok = getBearerTokenForHistory();
-    if (tok) {
-      return (passedUid || "").trim();
-    }
+    // 游客历史读取/删除/清空也要带自己的会话桶；
+    // 登录用户与游客历史不合并，后端 Bearer 优先。
     try {
-      var P = global.RentalAIAnalysisHistoryPersist;
-      if (P && typeof P.getHistoryScopeUserIdForApi === "function") {
-        return P.getHistoryScopeUserIdForApi();
+      var S = global.RentalAIUserStore;
+      if (S && typeof S.getOrCreateGuestSessionId === "function") {
+        h["X-Guest-Session"] = S.getOrCreateGuestSessionId();
       }
     } catch (e) {}
-    return typeof global.rentalaiBuildGuestHistoryUserId === "function"
-      ? global.rentalaiBuildGuestHistoryUserId()
-      : "guest:anonymous";
+
+    return h;
   }
 
   function fetchCredentials() {
@@ -65,20 +54,27 @@
   }
 
   /**
-   * 拉取当前 Bearer 会话用户的分析历史（不传 type 则为全部类型，最多后端 limit）。
-   * @param {string} userId 与 RentalAIUserStore 分桶一致；可选写入 query 供校验
+   * 拉取分析历史（不传 type 则为全部类型，最多后端 limit）。
+   * @param {string} userId 与当前历史作用域一致；可省略，此时默认用 getCurrentHistoryScopeUserId()
    * @param {{ type?: 'property'|'contract' }} [opts] 可选按类型过滤
    * @returns {Promise<{ success?: boolean, message?: string, records?: unknown[] }>}
    */
   /**
-   * 历史列表云端获取点：
-   * 调用 /api/analysis/history/records，后端按 Bearer 绑定用户并返回该用户历史。
+   * 历史列表云端获取点：登录用户读账户历史，游客读 guest:<session>；不合并。
    */
   function fetchUserHistory(userId, opts) {
     opts = opts || {};
     var headers = mergeHistoryHeaders();
     var q = new URLSearchParams();
-    var uid = normalizeHistoryQueryUserId(userId);
+    var uid = String(userId || "").trim();
+    if (!uid) {
+      try {
+        var S = global.RentalAIUserStore;
+        if (S && typeof S.getCurrentHistoryScopeUserId === "function") {
+          uid = String(S.getCurrentHistoryScopeUserId() || "").trim();
+        }
+      } catch (e) {}
+    }
     if (uid) q.set("userId", uid);
     if (opts.type) q.set("type", String(opts.type));
     if (opts.cacheBust) q.set("_t", String(Date.now()));
@@ -139,7 +135,8 @@
   }
 
   /**
-   * Phase 5 Round7 Step3 — DELETE /api/analysis/history/records/{record_id}（须 Bearer）。
+   * Phase 5 Round7 Step3 — DELETE /api/analysis/history/records/{record_id}
+   * 删除当前历史作用域内的一条（登录=账户桶；游客=guest:<session>）。
    * @returns {Promise<{ success?: boolean, message?: string, _httpStatus?: number }>}
    */
   function deleteHistoryRecord(recordId) {
@@ -185,7 +182,8 @@
   }
 
   /**
-   * Phase 5 Round7 Step4 — DELETE /api/analysis/history/clear（须 Bearer）。
+   * Phase 5 Round7 Step4 — DELETE /api/analysis/history/clear
+   * 清空当前历史作用域内的全部记录（登录与游客桶互不干扰）。
    * @returns {Promise<{ success?: boolean, message?: string, deleted_count?: number, _httpStatus?: number }>}
    */
   function clearAllHistory() {

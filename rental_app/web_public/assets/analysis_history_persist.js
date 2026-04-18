@@ -18,14 +18,23 @@
   }
 
   /**
-   * 供分析 POST 的 JSON body / FormData「写入」侧：已登录返回真实 userId；未登录返回 null
-   *（body 不带 userId 时后端 resolve_history_user_id 为字面 guest，与无 Bearer 写入分支一致）。
-   * 游客会话隔离依赖 X-Guest-Session（见 rentalaiMergeAuthHeaders）；勿在 body 传 guest:… 以免与后端「无 Bearer 且 claimed 须为 guest」冲突。
+   * 历史写入逻辑：
+   * - 已登录：返回真实 userId
+   * - 未登录：返回 guest:<session>
+   * 这样 body 中的 userId 与后端历史分桶保持一致。
    */
   function getHistoryUserIdForApi() {
+    try {
+      var S = global.RentalAIUserStore;
+      if (S && typeof S.getCurrentHistoryScopeUserId === "function") {
+        return S.getCurrentHistoryScopeUserId();
+      }
+    } catch (e) {}
     var u = loadU();
-    if (!u || !u.isAuthenticated || !u.userId) return null;
-    return String(u.userId).trim().slice(0, 128) || null;
+    if (u && u.isAuthenticated && u.userId) {
+      return String(u.userId).trim().slice(0, 128) || null;
+    }
+    return null;
   }
 
   /**
@@ -33,6 +42,12 @@
    * 与后端 resolve_history_read_user_id 一致；登录用户与游客历史不合并。
    */
   function getHistoryScopeUserIdForApi() {
+    try {
+      var S = global.RentalAIUserStore;
+      if (S && typeof S.getCurrentHistoryScopeUserId === "function") {
+        return S.getCurrentHistoryScopeUserId();
+      }
+    } catch (e) {}
     var u = loadU();
     if (u && u.isAuthenticated && u.userId) {
       return String(u.userId).trim().slice(0, 128) || null;
@@ -70,12 +85,24 @@
    * @returns {Record<string, string>}
    */
   function mergeAuthHeadersForFetch(headers) {
-    if (typeof global.rentalaiMergeAuthHeaders === "function") {
-      return global.rentalaiMergeAuthHeaders(headers || {});
-    }
     headers = headers || {};
-    var tok = getBearerTokenForApi();
-    if (tok) headers["Authorization"] = "Bearer " + tok;
+    if (typeof global.rentalaiMergeAuthHeaders === "function") {
+      headers = global.rentalaiMergeAuthHeaders(headers);
+    } else {
+      var tok = getBearerTokenForApi();
+      if (tok) headers["Authorization"] = "Bearer " + tok;
+    }
+
+    // 游客会话隔离逻辑：
+    // 历史相关请求统一附带 X-Guest-Session；
+    // 已登录时带上也没问题，后端仍优先按 Bearer 用户识别。
+    try {
+      var S = global.RentalAIUserStore;
+      if (S && typeof S.getOrCreateGuestSessionId === "function") {
+        headers["X-Guest-Session"] = S.getOrCreateGuestSessionId();
+      }
+    } catch (e) {}
+
     return headers;
   }
 

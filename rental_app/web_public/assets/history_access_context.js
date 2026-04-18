@@ -11,6 +11,20 @@
   }
 
   /**
+   * 游客历史：guest、guest:<session> 或本机键 sanitize 后的 guest_…；别再只用 === "guest"。
+   * 登录用户与游客历史不合并。
+   */
+  function isGuestBucket(bucketId) {
+    var s = String(bucketId || "").trim();
+    return (
+      !s ||
+      s === "guest" ||
+      s.indexOf("guest:") === 0 ||
+      s.indexOf("guest_") === 0
+    );
+  }
+
+  /**
    * @returns {{
    *   mode: "guest"|"logged_in",
    *   bucketId: string,
@@ -35,7 +49,7 @@
     var bid =
       S && typeof S.getHistoryBucketId === "function" ? S.getHistoryBucketId() : "guest";
 
-    if (!s.isAuthenticated) {
+    if (!s.isAuthenticated || isGuestBucket(bid)) {
       return {
         mode: "guest",
         bucketId: bid,
@@ -44,7 +58,9 @@
         authMode: null,
         title: "访客 · guest 历史",
         detail:
-          "以下为 guest 桶，仅本机。登录后可使用与账号同步的分析历史（分析历史页优先云端）。",
+          "以下为当前访客历史作用域（" +
+          String(bid || "guest") +
+          "），仅保存在本机/当前游客会话中。登录后将使用账号自己的历史，且不会自动合并游客历史。",
       };
     }
 
@@ -68,7 +84,7 @@
   /** 单行摘要，供顶栏或调试 */
   function getCurrentHistoryBucketLabel() {
     var st = resolveHistoryAccessState();
-    if (st.mode === "guest") return "Guest 历史（guest 桶）";
+    if (st.mode === "guest") return "Guest 历史（" + String(st.bucketId || "guest") + "）";
     return "已登录：" + (st.email || st.userId || st.bucketId);
   }
 
@@ -85,7 +101,9 @@
           '<p class="history-access-banner-lead"><strong>访客 · 本机历史</strong> · <span lang="en">Viewing guest history stored on this device</span></p>' +
           '<p class="hint muted history-access-banner-sub">' +
           "未登录时，下列摘要仅保存在本浏览器，<strong>不会</strong>同步到账户云端。登录后本页将<strong>优先</strong>显示与账号同步的分析记录。" +
-          " <code class=\"history-bucket-code\">guest</code> · " +
+          ' <code class="history-bucket-code">' +
+          esc(st.bucketId || "guest") +
+          "</code> · " +
           '<a href="/login">登录</a> · <a href="/register">注册</a> · <a href="/account">账户</a>' +
           "</p>"
         );
@@ -106,7 +124,9 @@
 
     if (st.mode === "guest") {
       return (
-        '<p class="history-access-banner-lead"><strong>访客模式</strong>：正在查看 <code class="history-bucket-code">guest</code> 桶；可照常使用，数据仅本机。</p>' +
+        '<p class="history-access-banner-lead"><strong>访客模式</strong>：正在查看 <code class="history-bucket-code">' +
+        esc(st.bucketId || "guest") +
+        '</code> 桶；可照常使用，数据仅本机。</p>' +
         '<p class="hint muted history-access-banner-sub">' +
         esc(st.detail) +
         " " +

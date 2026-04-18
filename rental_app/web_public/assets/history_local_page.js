@@ -19,13 +19,31 @@
     return "analysis_history";
   }
 
-  /** guest 桶：旧 analysis_history 一次性迁入 analysis_history__guest */
+  /**
+   * 游客历史：guest、guest:<session> 或 sanitize 后 guest_…；别再只用 === "guest"。
+   * 登录用户与游客历史不合并。
+   */
+  function isGuestBucket(bucketId) {
+    var s = String(bucketId || "").trim();
+    return (
+      !s ||
+      s === "guest" ||
+      s.indexOf("guest:") === 0 ||
+      s.indexOf("guest_") === 0
+    );
+  }
+
+  /**
+   * 游客历史隔离兼容：
+   * 现在游客桶可能为 guest:<session>，因此不能只判断 !== "guest"。
+   * 只有游客作用域才执行旧键迁移。
+   */
   function migrateLegacyManualIfNeeded() {
     try {
       if (
         window.RentalAIUserStore &&
         window.RentalAIUserStore.getHistoryBucketId &&
-        window.RentalAIUserStore.getHistoryBucketId() !== "guest"
+        !isGuestBucket(window.RentalAIUserStore.getHistoryBucketId())
       ) {
         return;
       }

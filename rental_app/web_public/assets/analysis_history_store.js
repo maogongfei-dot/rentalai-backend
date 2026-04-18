@@ -17,6 +17,20 @@
     return "guest";
   }
 
+  /**
+   * 游客历史：字面 guest、guest:<session>，或 sanitize 后的 guest_… 键；别再只用 === "guest"。
+   * 登录用户与游客历史不合并。
+   */
+  function isGuestBucket(bucketId) {
+    var s = String(bucketId || "").trim();
+    return (
+      !s ||
+      s === "guest" ||
+      s.indexOf("guest:") === 0 ||
+      s.indexOf("guest_") === 0
+    );
+  }
+
   function getUnifiedStorageKey() {
     try {
       if (global.RentalAIUserStore && typeof global.RentalAIUserStore.getUnifiedHistoryStorageKey === "function") {
@@ -34,9 +48,14 @@
     return DEDUP_LEGACY + "_" + getBucketId();
   }
 
-  /** 仅 guest：旧无后缀键一次性迁到 __guest */
+  /**
+   * 游客历史隔离兼容：
+   * 现在 guest 桶可能是 guest 或 guest:<session>，
+   * 不能再只用固定字符串 "guest" 判断。
+   * 仅游客作用域下，才尝试把旧无后缀键迁移到当前游客桶。
+   */
   function migrateLegacyUnifiedIfNeeded() {
-    if (getBucketId() !== "guest") return;
+    if (!isGuestBucket(getBucketId())) return;
     var newKey = getUnifiedStorageKey();
     if (localStorage.getItem(newKey)) return;
     var legacy = localStorage.getItem(STORAGE_PREFIX);

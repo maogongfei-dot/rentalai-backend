@@ -16,6 +16,8 @@
     authType: "rentalai_auth_type",
   };
 
+  var GUEST_SESSION_KEY = "guest_session_id";
+
   function apiUrl(path) {
     return typeof global.rentalaiApiUrl === "function" ? global.rentalaiApiUrl(path) : path;
   }
@@ -222,6 +224,60 @@
     });
   }
 
+  /**
+   * 游客历史隔离逻辑：
+   * - 未登录用户不再共用一个固定 guest 桶
+   * - 每个浏览器本地生成并保存一个 guest_session_id
+   * - 后续历史读写都基于 guest:<session> 作用域
+   */
+  function getOrCreateGuestSessionId() {
+    try {
+      var existing = localStorage.getItem(GUEST_SESSION_KEY);
+      if (existing && String(existing).trim()) {
+        return String(existing).trim();
+      }
+      var generated =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : String(Date.now()) +
+            "-" +
+            Math.random().toString(16).slice(2) +
+            "-" +
+            Math.random().toString(16).slice(2);
+      localStorage.setItem(GUEST_SESSION_KEY, generated);
+      return generated;
+    } catch (e) {
+      return (
+        "fallback-" +
+        String(Date.now()) +
+        "-" +
+        Math.random().toString(16).slice(2)
+      );
+    }
+  }
+
+  function normalizeGuestSessionForHistory(raw) {
+    return String(raw || "").replace(/-/g, "").slice(0, 48) || "anonymous";
+  }
+
+  function buildGuestHistoryUserId() {
+    return "guest:" + normalizeGuestSessionForHistory(getOrCreateGuestSessionId());
+  }
+
+  /**
+   * 历史请求作用域 userId：
+   * - 已登录：真实 userId
+   * - 未登录：guest:<session>
+   * 登录用户与游客历史不合并。
+   */
+  function getCurrentHistoryScopeUserId() {
+    var s = loadUserFromStorage();
+    if (s && s.isAuthenticated && s.userId) {
+      return String(s.userId).trim().slice(0, 128) || buildGuestHistoryUserId();
+    }
+    return buildGuestHistoryUserId();
+  }
+
   /** Phase 5 Step5：localStorage 历史分桶 id（guest | 已登录 userId 净化） */
   function sanitizeHistoryBucketId(uid) {
     var s = String(uid || "").replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -231,7 +287,9 @@
 
   function getHistoryBucketId() {
     var s = loadUserFromStorage();
-    if (!s.isAuthenticated) return "guest";
+    if (!s.isAuthenticated) {
+      return sanitizeHistoryBucketId(buildGuestHistoryUserId());
+    }
     return sanitizeHistoryBucketId(s.userId);
   }
 
@@ -252,5 +310,8 @@
     getHistoryBucketId: getHistoryBucketId,
     getUnifiedHistoryStorageKey: getUnifiedHistoryStorageKey,
     getManualHistoryStorageKey: getManualHistoryStorageKey,
+    getOrCreateGuestSessionId: getOrCreateGuestSessionId,
+    buildGuestHistoryUserId: buildGuestHistoryUserId,
+    getCurrentHistoryScopeUserId: getCurrentHistoryScopeUserId,
   };
 })(window);
