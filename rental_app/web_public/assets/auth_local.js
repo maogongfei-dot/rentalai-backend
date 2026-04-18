@@ -70,10 +70,42 @@
     };
   }
 
-  /** 收藏按用户隔离：fav_list_{user_id} */
+  function getGuestSessionIdForFavorites() {
+    try {
+      if (
+        global.RentalAIUserStore &&
+        typeof global.RentalAIUserStore.getOrCreateGuestSessionId === "function"
+      ) {
+        return global.RentalAIUserStore.getOrCreateGuestSessionId();
+      }
+    } catch (e) {}
+    try {
+      var raw = localStorage.getItem("guest_session_id");
+      if (raw && String(raw).trim()) return String(raw).trim();
+    } catch (e2) {}
+    return "anonymous";
+  }
+
+  function buildGuestFavoriteScopeId() {
+    return (
+      "guest_" +
+      String(getGuestSessionIdForFavorites())
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .slice(0, 48)
+    );
+  }
+
+  /**
+   * 收藏按当前作用域隔离：
+   * - 已登录：fav_list_{user_id}
+   * - 未登录：fav_list_guest_<session>
+   * 登录用户与游客收藏不合并。
+   */
   function favStorageKey() {
     var u = getUser();
-    if (!u || !u.user_id) return "fav_list";
+    if (!u || !u.user_id) {
+      return "fav_list_" + buildGuestFavoriteScopeId();
+    }
     return "fav_list_" + u.user_id;
   }
 
@@ -264,6 +296,8 @@
     requireLogin: requireLogin,
     logout: logout,
     favStorageKey: favStorageKey,
+    getGuestSessionIdForFavorites: getGuestSessionIdForFavorites,
+    buildGuestFavoriteScopeId: buildGuestFavoriteScopeId,
     refreshIdentityUI: refreshIdentityUI,
     renderUnifiedNav: renderUnifiedNav,
     renderHomeAccountStrip: renderHomeAccountStrip,

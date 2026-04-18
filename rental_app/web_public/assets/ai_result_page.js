@@ -8,6 +8,18 @@
  * 兼容旧版 key：ai_analyze_last（/api/ai-analyze 形态）。
  */
 (function () {
+  /* 同页加载 server_favorites_api.js（仅两文件改动、不增 HTML 时）；失败则收藏走降级逻辑。 */
+  try {
+    if (typeof window.RentalAIServerFavoritesApi === "undefined") {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/assets/server_favorites_api.js", false);
+      xhr.send(null);
+      if (xhr.status === 200 && xhr.responseText) {
+        (0, Function)(xhr.responseText)();
+      }
+    }
+  } catch (eFavLoad) {}
+
   var HOUSING_KEY = "ai_housing_query_last";
   var LEGACY_KEY = "ai_analyze_last";
 
@@ -520,6 +532,69 @@
   }
 
   /* ---------- Legacy：旧版 /api/ai-analyze 形态；辅助兼容，非当前主结果渲染主线 ---------- */
+  function syncLocalFavList(propertyKey, add) {
+    var key = propertyKey != null ? String(propertyKey) : "";
+    if (!key) return;
+    try {
+      var favs = JSON.parse(localStorage.getItem(favStorageKey()) || "[]");
+      if (!Array.isArray(favs)) favs = [];
+      var ix = favs.indexOf(key);
+      if (add) {
+        if (ix < 0) favs.push(key);
+      } else if (ix >= 0) {
+        favs.splice(ix, 1);
+      }
+      localStorage.setItem(favStorageKey(), JSON.stringify(favs));
+    } catch (e) {}
+  }
+
+  /**
+   * 用 GET /favorites 结果刷新按钮：服务端为准；本地 favStorageKey 仅作回退展示。
+   * 登录用户与游客收藏不合并（后端分桶；前端 key 已由 auth_local 隔离）。
+   */
+  function syncLegacyFavoriteButtonsFromServer() {
+    var api = window.RentalAIServerFavoritesApi;
+    if (!api || typeof api.listFavorites !== "function") return;
+    api
+      .listFavorites(200)
+      .then(function (data) {
+        var rows = (data && data.favorites) || [];
+        var buttons = document.querySelectorAll("#reco-list .fav-btn");
+        for (var b = 0; b < buttons.length; b++) {
+          var btn = buttons[b];
+          var pid = (btn.getAttribute("data-property-id") || "").trim();
+          var url = (btn.getAttribute("data-listing-url") || "").trim();
+          var found = null;
+          for (var i = 0; i < rows.length; i++) {
+            var f = rows[i];
+            var fp = f.property_id != null ? String(f.property_id).trim() : "";
+            var fu = (f.listing_url || "").trim();
+            if (fp && pid && fp === pid) {
+              found = f;
+              break;
+            }
+            if (fu && url && fu === url) {
+              found = f;
+              break;
+            }
+          }
+          if (found && found.id) {
+            btn.setAttribute("data-server-favorite-id", found.id);
+            btn.innerText = "✅ 已收藏";
+          } else {
+            btn.setAttribute("data-server-favorite-id", "");
+            var idAttr = btn.getAttribute("data-id");
+            var favs = JSON.parse(localStorage.getItem(favStorageKey()) || "[]");
+            var isFav = Array.isArray(favs) && favs.includes(String(idAttr));
+            btn.innerText = isFav ? "✅ 已收藏" : "⭐ 收藏";
+          }
+        }
+      })
+      .catch(function (err) {
+        console.error(err);
+      });
+  }
+
   var LABELS = {
     raw_user_query: "原始输入",
     city: "城市",
@@ -622,6 +697,11 @@
       var li = document.createElement("li");
       li.className = "reco-item card";
       var title = r.title || r.house_label || "房源";
+      var propId = String(r.listing_id != null ? r.listing_id : r.rank);
+      var listUrl = (r.source_url || r.listing_url || r.url || "").trim();
+      var rentNum = r.rent != null ? Number(r.rent) : NaN;
+      var priceAttr = !isNaN(rentNum) ? String(rentNum) : "";
+      var pcAttr = r.postcode != null ? String(r.postcode) : "";
       var rent = r.rent != null ? "£" + r.rent + " /月" : "租金 —";
       var beds = r.bedrooms != null ? r.bedrooms + " 卧" : "卧室 —";
       var loc = [r.postcode, r.area].filter(Boolean).join(" · ") || "地区 —";
@@ -665,9 +745,19 @@
         escapeHtml(loc) +
         (score ? "<br />" + escapeHtml(score) : "") +
         explainHtml +
-        "<br/><button class='fav-btn' data-id='" +
-        (r.listing_id || r.rank) +
-        "'>" +
+        "<br/><button type='button' class='fav-btn' data-id='" +
+        escapeAttr(propId) +
+        "' data-property-id='" +
+        escapeAttr(propId) +
+        "' data-listing-url='" +
+        escapeAttr(listUrl) +
+        "' data-title='" +
+        escapeAttr(title) +
+        "' data-postcode='" +
+        escapeAttr(pcAttr) +
+        "' data-price='" +
+        escapeAttr(priceAttr) +
+        "' data-server-favorite-id=''>" +
         btnText +
         "</button>";
       if (r.source_url) {
@@ -682,17 +772,81 @@
       recoList.appendChild(li);
     });
 
-    document.addEventListener("click", function (e) {
-      if (e.target && e.target.classList.contains("fav-btn")) {
-        var id = e.target.getAttribute("data-id");
-        var favs = JSON.parse(localStorage.getItem(favStorageKey()) || "[]");
-        if (!favs.includes(id)) {
-          favs.push(id);
-          localStorage.setItem(favStorageKey(), JSON.stringify(favs));
-          e.target.innerText = "✅ 已收藏";
+    syncLegacyFavoriteButtonsFromServer();
+
+    if (!document.documentElement._rentalaiLegacyFavClickBound) {
+      document.documentElement._rentalaiLegacyFavClickBound = true;
+      document.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest(".fav-btn") : null;
+        if (!btn || !btn.classList.contains("fav-btn")) return;
+        var api = window.RentalAIServerFavoritesApi;
+        if (!api || typeof api.addFavorite !== "function") {
+          console.error("RentalAIServerFavoritesApi unavailable");
+          return;
         }
-      }
-    });
+        var sid = (btn.getAttribute("data-server-favorite-id") || "").trim();
+        var propKey = btn.getAttribute("data-id");
+        if (sid) {
+          api
+            .removeFavorite(sid)
+            .then(function () {
+              btn.setAttribute("data-server-favorite-id", "");
+              btn.innerText = "⭐ 收藏";
+              syncLocalFavList(propKey, false);
+            })
+            .catch(function (err) {
+              console.error(err);
+            });
+          return;
+        }
+        var payload = {
+          propertyId: (btn.getAttribute("data-property-id") || "").trim(),
+          listing_url: (btn.getAttribute("data-listing-url") || "").trim() || null,
+          title: (btn.getAttribute("data-title") || "").trim() || "Listing",
+          postcode: (btn.getAttribute("data-postcode") || "").trim() || null,
+        };
+        var pr = (btn.getAttribute("data-price") || "").trim();
+        if (pr) {
+          var pn = parseFloat(pr);
+          payload.price = isNaN(pn) ? null : pn;
+        }
+        api
+          .addFavorite(payload)
+          .then(function (res) {
+            var fav = res && res.favorite;
+            if (fav && fav.id) btn.setAttribute("data-server-favorite-id", fav.id);
+            btn.innerText = "✅ 已收藏";
+            syncLocalFavList(propKey, true);
+          })
+          .catch(function (err) {
+            if (err && err.status === 409 && typeof api.listFavorites === "function") {
+              api
+                .listFavorites(200)
+                .then(function (data) {
+                  var rows = (data && data.favorites) || [];
+                  var pid = (payload.propertyId || "").trim();
+                  var url = (payload.listing_url || "").trim();
+                  for (var j = 0; j < rows.length; j++) {
+                    var f = rows[j];
+                    var fp = f.property_id != null ? String(f.property_id).trim() : "";
+                    var fu = (f.listing_url || "").trim();
+                    if (f && f.id && ((pid && fp === pid) || (url && fu === url))) {
+                      btn.setAttribute("data-server-favorite-id", f.id);
+                      btn.innerText = "✅ 已收藏";
+                      syncLocalFavList(propKey, true);
+                      return;
+                    }
+                  }
+                })
+                .catch(function (e2) {
+                  console.error(e2);
+                });
+              return;
+            }
+            console.error(err);
+          });
+      });
+    }
 
     try {
       if (

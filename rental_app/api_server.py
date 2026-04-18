@@ -286,6 +286,30 @@ def _get_user_id_from_request(request: Request) -> str:
     return user_id
 
 
+def _get_favorite_scope_user_id(request: Request) -> str:
+    """
+    收藏用户绑定逻辑：
+    - 已登录：优先使用 Bearer token 解析出的真实 user_id
+    - 未登录：回退到当前游客会话 guest:<session>
+    - 若没有可用游客会话，则使用 guest:anonymous
+
+    登录用户与游客收藏不合并。
+    """
+    token = _extract_bearer_token(request)
+    if token:
+        uid = resolve_user_id(token)
+        if uid:
+            return uid
+
+    raw = (request.headers.get("X-Guest-Session") or "").strip()
+    if raw:
+        compact = "".join(ch for ch in raw if ch.isalnum())[:48]
+        if compact:
+            return "guest:" + compact
+
+    return "guest:anonymous"
+
+
 def _get_task_identity(request: Request) -> str:
     """Bearer → real user id; otherwise stable guest id from X-Guest-Session (P10 Phase7)."""
     token = _extract_bearer_token(request)
@@ -2276,7 +2300,8 @@ def _build_compare_result(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 @app.post("/favorites")
 def add_favorite(request: Request, body: FavoriteCreate):
-    user_id = _get_user_id_from_request(request)
+    # favorites 按当前收藏作用域：登录用户操作自己的收藏；游客操作 guest:<session>；两者不合并。
+    user_id = _get_favorite_scope_user_id(request)
     url = (body.listing_url or "").strip() or None
     pid = (body.property_id or "").strip() or None
     if not url and not pid:
@@ -2302,7 +2327,8 @@ def add_favorite(request: Request, body: FavoriteCreate):
 
 @app.get("/favorites")
 def list_favorites(request: Request, limit: int = 100):
-    user_id = _get_user_id_from_request(request)
+    # favorites 按当前收藏作用域：登录用户操作自己的收藏；游客操作 guest:<session>；两者不合并。
+    user_id = _get_favorite_scope_user_id(request)
     limit = min(max(limit, 1), 500)
     rows = list_favorite_records(user_id, limit=limit)
     return {
@@ -2315,7 +2341,8 @@ def list_favorites(request: Request, limit: int = 100):
 
 @app.delete("/favorites/{favorite_id}")
 def remove_favorite(request: Request, favorite_id: str):
-    user_id = _get_user_id_from_request(request)
+    # favorites 按当前收藏作用域：登录用户操作自己的收藏；游客操作 guest:<session>；两者不合并。
+    user_id = _get_favorite_scope_user_id(request)
     ok = delete_favorite_record(user_id, favorite_id)
     if not ok:
         return JSONResponse(
