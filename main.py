@@ -52,6 +52,7 @@ from modules.contract.contract_service import (
 )
 from modules.actions.action_engine import build_next_actions
 from modules.followup.followup_engine import build_followup_questions
+from modules.missing_info.missing_info_engine import build_missing_info_items
 from modules.output.response_formatter import build_final_response_text
 
 # ---------------------------------------------------------------------------
@@ -336,6 +337,7 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
     else:
         final_result["next_actions"] = build_next_actions(final_result)
     final_result["followup_questions"] = build_followup_questions(final_result)
+    final_result["missing_info_items"] = build_missing_info_items(final_result)
     formatted_response = build_final_response_text(final_result)
 
     print()
