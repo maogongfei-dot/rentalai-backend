@@ -12,6 +12,216 @@
   var S = window.RentalAIAnalysisHistoryStore;
   if (!S || typeof S.listByType !== "function") return;
 
+  try {
+    if (typeof window.RentalAIServerFavoritesApi === "undefined") {
+      var xhrF = new XMLHttpRequest();
+      xhrF.open("GET", "/assets/server_favorites_api.js", false);
+      xhrF.send(null);
+      if (xhrF.status === 200 && xhrF.responseText) {
+        (0, Function)(xhrF.responseText)();
+      }
+    }
+  } catch (eFavLoad) {}
+
+  var _uhFavBound = false;
+
+  function uhFavStorageKey() {
+    return window.RentalAILocalAuth && window.RentalAILocalAuth.favStorageKey
+      ? window.RentalAILocalAuth.favStorageKey()
+      : "fav_list";
+  }
+
+  function uhSyncLocalFavList(propertyKey, add) {
+    var key = propertyKey != null ? String(propertyKey) : "";
+    if (!key) return;
+    try {
+      var favs = JSON.parse(localStorage.getItem(uhFavStorageKey()) || "[]");
+      if (!Array.isArray(favs)) favs = [];
+      var ix = favs.indexOf(key);
+      if (add) {
+        if (ix < 0) favs.push(key);
+      } else if (ix >= 0) {
+        favs.splice(ix, 1);
+      }
+      localStorage.setItem(uhFavStorageKey(), JSON.stringify(favs));
+    } catch (e0) {}
+  }
+
+  function uhFavBtnHtmlHousing(x, i) {
+    var listUrl = (x.listing_url || "").trim();
+    var propId = String(i + 1);
+    var api = window.RentalAIServerFavoritesApi;
+    var fk =
+      api && typeof api.buildFavoriteKey === "function"
+        ? api.buildFavoriteKey({
+            listing_url: listUrl,
+            property_id: listUrl ? undefined : propId,
+            rank: i + 1,
+          })
+        : propId;
+    return (
+      '<button type="button" class="uh-fav-btn hint" data-id="' +
+      escapeAttr(propId) +
+      '" data-property-id="' +
+      escapeAttr(propId) +
+      '" data-listing-url="' +
+      escapeAttr(listUrl) +
+      '" data-title="' +
+      escapeAttr(x.title || "—") +
+      '" data-favorite-key="' +
+      escapeAttr(fk) +
+      '" data-server-favorite-id="">' +
+      "⭐ 收藏" +
+      "</button> "
+    );
+  }
+
+  function uhFavBtnHtmlLegacy(r, i) {
+    var listUrl = (r.source_url || "").trim();
+    var pid = String(r.listing_id != null ? r.listing_id : r.rank != null ? r.rank : i + 1);
+    var api = window.RentalAIServerFavoritesApi;
+    var fk =
+      api && typeof api.buildFavoriteKey === "function"
+        ? api.buildFavoriteKey({
+            listing_url: listUrl,
+            source_url: r.source_url,
+            property_id: pid,
+            listing_id: r.listing_id,
+            rank: r.rank,
+          })
+        : pid;
+    return (
+      '<button type="button" class="uh-fav-btn hint" data-id="' +
+      escapeAttr(pid) +
+      '" data-property-id="' +
+      escapeAttr(pid) +
+      '" data-listing-url="' +
+      escapeAttr(listUrl) +
+      '" data-title="' +
+      escapeAttr(r.title || "—") +
+      '" data-favorite-key="' +
+      escapeAttr(fk) +
+      '" data-server-favorite-id="">' +
+      "⭐ 收藏" +
+      "</button> "
+    );
+  }
+
+  function applyUhFavButtons(rows) {
+    rows = rows || [];
+    var api = window.RentalAIServerFavoritesApi;
+    if (!api || typeof api.favoriteMatchesIdentifiers !== "function") return;
+    var buttons = document.querySelectorAll(".uh-fav-btn");
+    for (var b = 0; b < buttons.length; b++) {
+      var btn = buttons[b];
+      var pid = (btn.getAttribute("data-property-id") || "").trim();
+      var url = (btn.getAttribute("data-listing-url") || "").trim();
+      var found = null;
+      for (var j = 0; j < rows.length; j++) {
+        if (api.favoriteMatchesIdentifiers(rows[j], pid, url)) {
+          found = rows[j];
+          break;
+        }
+      }
+      if (found && found.id) {
+        btn.setAttribute("data-server-favorite-id", found.id);
+        btn.textContent = "✅ 已收藏";
+      } else {
+        btn.setAttribute("data-server-favorite-id", "");
+        btn.textContent = "⭐ 收藏";
+      }
+    }
+  }
+
+  function hydrateUnifiedHistoryFavoriteButtons() {
+    var api = window.RentalAIServerFavoritesApi;
+    if (!api || typeof api.refreshFavoritesCache !== "function") return;
+    api
+      .refreshFavoritesCache(200)
+      .then(function (rows) {
+        if (rows) applyUhFavButtons(rows);
+      })
+      .catch(function () {});
+  }
+
+  function bindUnifiedHistoryFavoritesOnce() {
+    if (_uhFavBound) return;
+    _uhFavBound = true;
+    document.addEventListener("click", function (ev) {
+      var btn = ev.target && ev.target.closest && ev.target.closest(".uh-fav-btn");
+      if (!btn) return;
+      var api = window.RentalAIServerFavoritesApi;
+      if (!api || typeof api.addFavorite !== "function") return;
+      var sid = (btn.getAttribute("data-server-favorite-id") || "").trim();
+      var propKey = btn.getAttribute("data-id");
+      var localFavKey = (btn.getAttribute("data-favorite-key") || "").trim() || propKey;
+      if (sid) {
+        api
+          .removeFavorite(sid)
+          .then(function () {
+            btn.setAttribute("data-server-favorite-id", "");
+            btn.textContent = "⭐ 收藏";
+            uhSyncLocalFavList(localFavKey, false);
+          })
+          .catch(function (err) {
+            console.error(err);
+          });
+        return;
+      }
+      var payload = {
+        propertyId: (btn.getAttribute("data-property-id") || "").trim(),
+        listing_url: (btn.getAttribute("data-listing-url") || "").trim() || null,
+        title: (btn.getAttribute("data-title") || "").trim() || "Listing",
+      };
+      api
+        .addFavorite(payload)
+        .then(function (res) {
+          var fav = res && res.favorite;
+          if (fav && fav.id) btn.setAttribute("data-server-favorite-id", fav.id);
+          btn.textContent = "✅ 已收藏";
+          uhSyncLocalFavList(localFavKey, true);
+        })
+        .catch(function (err) {
+          if (err && err.status === 409 && typeof api.refreshFavoritesCache === "function") {
+            api
+              .refreshFavoritesCache(200)
+              .then(function (rows) {
+                if (!rows) return;
+                for (var j = 0; j < rows.length; j++) {
+                  var f = rows[j];
+                  if (
+                    f &&
+                    f.id &&
+                    api.favoriteMatchesIdentifiers(
+                      f,
+                      (payload.propertyId || "").trim(),
+                      (payload.listing_url || "").trim()
+                    )
+                  ) {
+                    btn.setAttribute("data-server-favorite-id", f.id);
+                    btn.textContent = "✅ 已收藏";
+                    uhSyncLocalFavList(localFavKey, true);
+                    return;
+                  }
+                }
+              })
+              .catch(function (e2) {
+                console.error(e2);
+              });
+            return;
+          }
+          console.error(err);
+        });
+    });
+    try {
+      window.addEventListener("rentalai-favorites-updated", function (ev) {
+        var d = ev && ev.detail;
+        var rows = d && d.favorites;
+        if (rows) applyUhFavButtons(rows);
+      });
+    } catch (e1) {}
+  }
+
   var _refreshClickBound = false;
   var _clearAllClickBound = false;
   var _deleteDelegateBound = false;
@@ -127,6 +337,7 @@
       for (var i = 0; i < deals.length; i++) {
         var x = deals[i];
         html += "<li>";
+        html += uhFavBtnHtmlHousing(x, i);
         html += "<strong>" + escapeHtml(x.title || "—") + "</strong>";
         if (x.star_rating != null) {
           html +=
@@ -167,7 +378,9 @@
       html += '<ul class="unified-history-mini-deals">';
       for (var i = 0; i < rec.length; i++) {
         var r = rec[i];
-        html += "<li><strong>" + escapeHtml(r.title || "—") + "</strong>";
+        html += "<li>";
+        html += uhFavBtnHtmlLegacy(r, i);
+        html += "<strong>" + escapeHtml(r.title || "—") + "</strong>";
         if (r.final_score != null) {
           html += ' <span class="hint muted">· 分 ' + escapeHtml(String(r.final_score)) + "</span>";
         }
@@ -427,6 +640,7 @@
     html += "</ul>";
     container.innerHTML = html;
     container.setAttribute("data-unified-history-state", "populated");
+    hydrateUnifiedHistoryFavoriteButtons();
   }
 
   function renderLoading(container) {
@@ -526,6 +740,7 @@
    * 3) 绑定刷新、删除、清空与过滤行为。
    */
   function run() {
+    bindUnifiedHistoryFavoritesOnce();
     if (
       window.RentalAIHistoryAccess &&
       typeof window.RentalAIHistoryAccess.applyBannerById === "function"

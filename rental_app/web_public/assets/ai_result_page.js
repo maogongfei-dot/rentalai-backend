@@ -549,51 +549,89 @@
   }
 
   /**
-   * 用 GET /favorites 结果刷新按钮：服务端为准；本地 favStorageKey 仅作回退展示。
-   * 登录用户与游客收藏不合并（后端分桶；前端 key 已由 auth_local 隔离）。
+   * 全站统一：用 RentalAIServerFavoritesApi 的快照行刷新 #reco-list 收藏按钮（与 compare 页同源）。
+   */
+  function applyServerRowsToRecoButtons(rows) {
+    var api = window.RentalAIServerFavoritesApi;
+    var matchFn = api && typeof api.favoriteMatchesIdentifiers === "function" ? api.favoriteMatchesIdentifiers : null;
+    rows = rows || [];
+    var buttons = document.querySelectorAll("#reco-list .fav-btn");
+    for (var b = 0; b < buttons.length; b++) {
+      var btn = buttons[b];
+      var pid = (btn.getAttribute("data-property-id") || "").trim();
+      var url = (btn.getAttribute("data-listing-url") || "").trim();
+      var found = null;
+      for (var i = 0; i < rows.length; i++) {
+        var f = rows[i];
+        if (matchFn) {
+          if (matchFn(f, pid, url)) {
+            found = f;
+            break;
+          }
+        } else {
+          var fp = f.property_id != null ? String(f.property_id).trim() : "";
+          var fu = (f.listing_url || "").trim();
+          if (fp && pid && fp === pid) {
+            found = f;
+            break;
+          }
+          if (fu && url && fu === url) {
+            found = f;
+            break;
+          }
+        }
+      }
+      if (found && found.id) {
+        btn.setAttribute("data-server-favorite-id", found.id);
+        btn.innerText = "✅ 已收藏";
+      } else {
+        btn.setAttribute("data-server-favorite-id", "");
+            var idAttr = btn.getAttribute("data-id");
+            var fkAttr = (btn.getAttribute("data-favorite-key") || "").trim();
+            var favs = JSON.parse(localStorage.getItem(favStorageKey()) || "[]");
+            var isFav =
+              Array.isArray(favs) &&
+              (favs.includes(String(idAttr)) || (fkAttr && favs.includes(fkAttr)));
+            btn.innerText = isFav ? "✅ 已收藏" : "⭐ 收藏";
+      }
+    }
+  }
+
+  /**
+   * 首次/拉取：与 server_favorites 缓存对齐；登录用户与游客收藏不合并。
    */
   function syncLegacyFavoriteButtonsFromServer() {
     var api = window.RentalAIServerFavoritesApi;
-    if (!api || typeof api.listFavorites !== "function") return;
+    if (!api) return;
+    if (typeof api.refreshFavoritesCache === "function") {
+      api
+        .refreshFavoritesCache(200)
+        .then(function (rows) {
+          if (rows) applyServerRowsToRecoButtons(rows);
+        })
+        .catch(function (err) {
+          console.error(err);
+        });
+      return;
+    }
+    if (typeof api.listFavorites !== "function") return;
     api
       .listFavorites(200)
       .then(function (data) {
-        var rows = (data && data.favorites) || [];
-        var buttons = document.querySelectorAll("#reco-list .fav-btn");
-        for (var b = 0; b < buttons.length; b++) {
-          var btn = buttons[b];
-          var pid = (btn.getAttribute("data-property-id") || "").trim();
-          var url = (btn.getAttribute("data-listing-url") || "").trim();
-          var found = null;
-          for (var i = 0; i < rows.length; i++) {
-            var f = rows[i];
-            var fp = f.property_id != null ? String(f.property_id).trim() : "";
-            var fu = (f.listing_url || "").trim();
-            if (fp && pid && fp === pid) {
-              found = f;
-              break;
-            }
-            if (fu && url && fu === url) {
-              found = f;
-              break;
-            }
-          }
-          if (found && found.id) {
-            btn.setAttribute("data-server-favorite-id", found.id);
-            btn.innerText = "✅ 已收藏";
-          } else {
-            btn.setAttribute("data-server-favorite-id", "");
-            var idAttr = btn.getAttribute("data-id");
-            var favs = JSON.parse(localStorage.getItem(favStorageKey()) || "[]");
-            var isFav = Array.isArray(favs) && favs.includes(String(idAttr));
-            btn.innerText = isFav ? "✅ 已收藏" : "⭐ 收藏";
-          }
-        }
+        applyServerRowsToRecoButtons((data && data.favorites) || []);
       })
       .catch(function (err) {
         console.error(err);
       });
   }
+
+  try {
+    window.addEventListener("rentalai-favorites-updated", function (ev) {
+      var d = ev && ev.detail;
+      var rows = d && d.favorites;
+      if (rows) applyServerRowsToRecoButtons(rows);
+    });
+  } catch (eEv) {}
 
   var LABELS = {
     raw_user_query: "原始输入",
@@ -692,7 +730,21 @@
 
     recos.forEach(function (r) {
       var favs = JSON.parse(localStorage.getItem(favStorageKey()) || "[]");
-      var isFav = favs.includes(String(r.listing_id || r.rank));
+      if (!Array.isArray(favs)) favs = [];
+      var apiK = window.RentalAIServerFavoritesApi;
+      var fkBtn =
+        apiK && typeof apiK.buildFavoriteKey === "function"
+          ? apiK.buildFavoriteKey({
+              listing_url: (r.source_url || r.listing_url || r.url || "").trim(),
+              source_url: r.source_url,
+              url: r.url,
+              property_id: String(r.listing_id != null ? r.listing_id : r.rank),
+              listing_id: r.listing_id,
+              rank: r.rank,
+            })
+          : "";
+      var isFav =
+        (fkBtn && favs.includes(fkBtn)) || favs.includes(String(r.listing_id || r.rank));
       var btnText = isFav ? "✅ 已收藏" : "⭐ 收藏";
       var li = document.createElement("li");
       li.className = "reco-item card";
@@ -757,6 +809,8 @@
         escapeAttr(pcAttr) +
         "' data-price='" +
         escapeAttr(priceAttr) +
+        "' data-favorite-key='" +
+        escapeAttr(fkBtn || propId) +
         "' data-server-favorite-id=''>" +
         btnText +
         "</button>";
@@ -786,13 +840,14 @@
         }
         var sid = (btn.getAttribute("data-server-favorite-id") || "").trim();
         var propKey = btn.getAttribute("data-id");
+        var localFavKey = (btn.getAttribute("data-favorite-key") || "").trim() || propKey;
         if (sid) {
           api
             .removeFavorite(sid)
             .then(function () {
               btn.setAttribute("data-server-favorite-id", "");
               btn.innerText = "⭐ 收藏";
-              syncLocalFavList(propKey, false);
+              syncLocalFavList(localFavKey, false);
             })
             .catch(function (err) {
               console.error(err);
@@ -816,24 +871,29 @@
             var fav = res && res.favorite;
             if (fav && fav.id) btn.setAttribute("data-server-favorite-id", fav.id);
             btn.innerText = "✅ 已收藏";
-            syncLocalFavList(propKey, true);
+            syncLocalFavList(localFavKey, true);
           })
           .catch(function (err) {
-            if (err && err.status === 409 && typeof api.listFavorites === "function") {
+            if (err && err.status === 409 && typeof api.refreshFavoritesCache === "function") {
               api
-                .listFavorites(200)
-                .then(function (data) {
-                  var rows = (data && data.favorites) || [];
-                  var pid = (payload.propertyId || "").trim();
-                  var url = (payload.listing_url || "").trim();
+                .refreshFavoritesCache(200)
+                .then(function (rows) {
+                  if (!rows) return;
                   for (var j = 0; j < rows.length; j++) {
                     var f = rows[j];
-                    var fp = f.property_id != null ? String(f.property_id).trim() : "";
-                    var fu = (f.listing_url || "").trim();
-                    if (f && f.id && ((pid && fp === pid) || (url && fu === url))) {
+                    if (
+                      f &&
+                      f.id &&
+                      typeof api.favoriteMatchesIdentifiers === "function" &&
+                      api.favoriteMatchesIdentifiers(
+                        f,
+                        (payload.propertyId || "").trim(),
+                        (payload.listing_url || "").trim()
+                      )
+                    ) {
                       btn.setAttribute("data-server-favorite-id", f.id);
                       btn.innerText = "✅ 已收藏";
-                      syncLocalFavList(propKey, true);
+                      syncLocalFavList(localFavKey, true);
                       return;
                     }
                   }

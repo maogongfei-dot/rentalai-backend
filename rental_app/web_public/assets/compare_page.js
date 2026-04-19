@@ -17,17 +17,30 @@
     loadScriptSync("/assets/server_favorites_api.js");
   }
 
-  /** 本地 fav 列表：仅作服务端失败或未加载 API 时的 fallback（与 favStorageKey 作用域一致）。 */
-  var favKey =
-    window.RentalAILocalAuth && window.RentalAILocalAuth.favStorageKey
-      ? window.RentalAILocalAuth.favStorageKey()
-      : "fav_list";
-  var favsLocal = [];
+  var raw = sessionStorage.getItem("ai_analyze_last");
+  var data;
   try {
-    favsLocal = JSON.parse(localStorage.getItem(favKey) || "[]");
-    if (!Array.isArray(favsLocal)) favsLocal = [];
-  } catch (e1) {
-    favsLocal = [];
+    data = raw ? JSON.parse(raw) : null;
+  } catch (e3) {
+    data = null;
+  }
+
+  var recos = (data && data.recommendations) || [];
+
+  var container = document.getElementById("compare-list");
+  if (!container) return;
+
+  function readLocalFavIds() {
+    var favKey =
+      window.RentalAILocalAuth && window.RentalAILocalAuth.favStorageKey
+        ? window.RentalAILocalAuth.favStorageKey()
+        : "fav_list";
+    try {
+      var favsLocal = JSON.parse(localStorage.getItem(favKey) || "[]");
+      return Array.isArray(favsLocal) ? favsLocal : [];
+    } catch (e1) {
+      return [];
+    }
   }
 
   function isGuestViewer() {
@@ -49,20 +62,11 @@
     );
   }
 
-  var raw = sessionStorage.getItem("ai_analyze_last");
-  var data;
-  try {
-    data = raw ? JSON.parse(raw) : null;
-  } catch (e3) {
-    data = null;
-  }
-
-  var recos = (data && data.recommendations) || [];
-
-  var container = document.getElementById("compare-list");
-  if (!container) return;
-
   function rowMatchesFavorite(r, f) {
+    var api = window.RentalAIServerFavoritesApi;
+    if (api && typeof api.favoriteRowMatchesReco === "function") {
+      return api.favoriteRowMatchesReco(f, r);
+    }
     var pid = String(r.listing_id != null ? r.listing_id : r.rank);
     var fp = f.property_id != null ? String(f.property_id).trim() : "";
     var url = (r.source_url || r.listing_url || r.url || "").trim();
@@ -72,7 +76,7 @@
     return false;
   }
 
-  /** 收藏列表读取逻辑：服务端 favorites 为主（当前收藏作用域由请求头决定）。 */
+  /** 收藏列表读取逻辑：与全站 RentalAIServerFavoritesApi 快照一致（跨页与结果页同步）。 */
   function selectedFromServerRows(rows) {
     return recos.filter(function (r) {
       return rows.some(function (f) {
@@ -81,16 +85,27 @@
     });
   }
 
-  /** 降级：仅用本地 property id 列表与推荐行对齐。 */
   function selectedFromLocalIds() {
+    var favsLocal = readLocalFavIds();
+    var api = window.RentalAIServerFavoritesApi;
     return recos.filter(function (r) {
-      return favsLocal.includes(String(r.listing_id || r.rank));
+      var id = String(r.listing_id != null ? r.listing_id : r.rank);
+      if (favsLocal.includes(id)) return true;
+      if (api && typeof api.buildFavoriteKey === "function") {
+        var kk = api.buildFavoriteKey({
+          listing_url: (r.source_url || r.listing_url || r.url || "").trim(),
+          source_url: r.source_url,
+          url: r.url,
+          property_id: id,
+          listing_id: r.listing_id,
+          rank: r.rank,
+        });
+        if (kk && favsLocal.includes(kk)) return true;
+      }
+      return false;
     });
   }
 
-  /**
-   * 列表与「是否已收藏」对齐 server rows：卡片集合即当前作用域内收藏与本次 session 推荐的交集。
-   */
   function renderCards(selected, bannerText) {
     container.textContent = "";
     if (bannerText) {
@@ -137,16 +152,22 @@
     });
   }
 
-  var api = window.RentalAIServerFavoritesApi;
-
-  /*
-   * 收藏列表按当前收藏作用域加载：已登录读账号收藏，未登录读 guest session 收藏；登录与游客不合并。
-   * 主数据源优先 server favorites；本地 fav_list 仅失败时 fallback。
-   */
-  if (api && typeof api.fetchFavorites === "function") {
-    api
-      .fetchFavorites(200)
-      .then(function (payload) {
+  function loadCompareFromServer() {
+    var api = window.RentalAIServerFavoritesApi;
+    if (api && typeof api.refreshFavoritesCache === "function") {
+      return api.refreshFavoritesCache(200).then(function (rows) {
+        if (rows === null) {
+          renderCards(
+            selectedFromLocalIds(),
+            "Could not load favorites. Showing offline snapshot if available."
+          );
+          return;
+        }
+        renderCards(selectedFromServerRows(rows || []));
+      });
+    }
+    if (api && typeof api.fetchFavorites === "function") {
+      return api.fetchFavorites(200).then(function (payload) {
         if (!payload || payload.success === false) {
           renderCards(
             selectedFromLocalIds(),
@@ -154,18 +175,26 @@
           );
           return;
         }
-        var rows = payload.favorites || [];
-        var selected = selectedFromServerRows(rows);
-        renderCards(selected);
-      })
-      .catch(function (err) {
-        console.error(err);
-        renderCards(
-          selectedFromLocalIds(),
-          "Could not load favorites. Showing offline snapshot if available."
-        );
+        renderCards(selectedFromServerRows(payload.favorites || []));
       });
-  } else {
+    }
     renderCards(selectedFromLocalIds());
+    return Promise.resolve();
   }
+
+  try {
+    window.addEventListener("rentalai-favorites-updated", function (ev) {
+      var rows = ev && ev.detail && ev.detail.favorites;
+      if (!rows) return;
+      renderCards(selectedFromServerRows(rows));
+    });
+  } catch (eEv) {}
+
+  loadCompareFromServer().catch(function (err) {
+    console.error(err);
+    renderCards(
+      selectedFromLocalIds(),
+      "Could not load favorites. Showing offline snapshot if available."
+    );
+  });
 })();

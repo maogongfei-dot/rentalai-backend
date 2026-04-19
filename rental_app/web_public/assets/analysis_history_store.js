@@ -198,6 +198,7 @@
       var d = td[i] || {};
       deals.push({
         title: clipStr(d.title || d.address || "—", 300),
+        listing_url: clipStr(d.listing_url || d.url || "", 800),
         star_rating: d.star_rating,
         one_line_suggestion: clipStr(d.one_line_suggestion || "", 500),
       });
@@ -229,6 +230,9 @@
         final_score: r.final_score,
         decision: r.decision,
         decision_reason: clipStr(r.decision_reason || "", 1500),
+        listing_id: r.listing_id,
+        rank: r.rank,
+        source_url: clipStr(r.source_url || r.listing_url || r.url || "", 800),
       });
     }
     var sum = data.summary || {};
