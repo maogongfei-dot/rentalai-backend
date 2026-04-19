@@ -122,10 +122,37 @@
     });
   }
 
+  /**
+   * 读取当前收藏作用域下的 favorites（GET /favorites）。
+   * 已登录：Bearer → 账号收藏；未登录：X-Guest-Session → guest session 桶；登录与游客不合并。
+   * 复用 mergeFavoritesHeaders（Authorization + X-Guest-Session）；失败时不抛错，便于列表页降级。
+   */
+  function fetchFavorites(limit) {
+    var q = typeof limit === "number" && limit > 0 ? "?limit=" + encodeURIComponent(String(limit)) : "";
+    return favoritesFetch("/favorites" + q, { method: "GET" }).then(function (res) {
+      return res
+        .json()
+        .catch(function () {
+          return {};
+        })
+        .then(function (body) {
+          body = body || {};
+          if (!res.ok) {
+            body.success = false;
+            return body;
+          }
+          body.success = true;
+          if (!body.favorites) body.favorites = [];
+          return body;
+        });
+    });
+  }
+
   global.RentalAIServerFavoritesApi = {
     mergeFavoritesHeaders: mergeFavoritesHeaders,
     addFavorite: addFavorite,
     removeFavorite: removeFavorite,
     listFavorites: listFavorites,
+    fetchFavorites: fetchFavorites,
   };
 })(window);

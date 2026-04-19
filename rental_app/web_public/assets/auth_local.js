@@ -109,6 +109,42 @@
     return "fav_list_" + u.user_id;
   }
 
+  /**
+   * 当前收藏作用域 key（与 favStorageKey 一致；本地持久化键名保持不变以免破坏已有数据）。
+   * 逻辑映射：已登录 → favorites_<userId>；未登录 → favorites_guest（物理存储仍为 fav_list_*）。
+   */
+  function getFavoriteScopeKey() {
+    return favStorageKey();
+  }
+
+  /**
+   * 登录/登出后切换收藏作用域：派发事件；对比页/结果页在无整站跳转时用 reload 立刻换桶（guest ↔ 用户互不串数据）。
+   * opts.skipReload：即将 location 跳转（如登出转 /login）时不要 reload，避免与 redirect 打架。
+   */
+  function onFavoriteAuthTransition(reason, opts) {
+    opts = opts || {};
+    var u = getUser();
+    var detail = {
+      reason: reason || "",
+      scopeKey: favStorageKey(),
+      userId: u && u.user_id ? String(u.user_id) : null,
+      isGuest: !(u && u.user_id),
+    };
+    try {
+      window.dispatchEvent(new CustomEvent("rentalai-favorite-scope-change", { detail: detail }));
+    } catch (e0) {}
+    try {
+      if (opts.skipReload) return;
+      var path = (window.location.pathname || "").replace(/\/$/, "") || "/";
+      if (
+        (reason === "login" || reason === "logout") &&
+        (path === "/compare" || path === "/ai-result")
+      ) {
+        window.location.reload();
+      }
+    } catch (e1) {}
+  }
+
   function requireLogin() {
     var path = (window.location.pathname || "").replace(/\/$/, "") || "/";
     var publicPaths = [
@@ -296,6 +332,8 @@
     requireLogin: requireLogin,
     logout: logout,
     favStorageKey: favStorageKey,
+    getFavoriteScopeKey: getFavoriteScopeKey,
+    onFavoriteAuthTransition: onFavoriteAuthTransition,
     getGuestSessionIdForFavorites: getGuestSessionIdForFavorites,
     buildGuestFavoriteScopeId: buildGuestFavoriteScopeId,
     refreshIdentityUI: refreshIdentityUI,

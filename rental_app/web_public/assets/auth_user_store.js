@@ -128,6 +128,12 @@
         localStorage.setItem(K.authType, at);
       } catch (e1) {}
       notifyAuthUiIfPresent();
+      if (
+        global.RentalAILocalAuth &&
+        typeof global.RentalAILocalAuth.onFavoriteAuthTransition === "function"
+      ) {
+        global.RentalAILocalAuth.onFavoriteAuthTransition("login");
+      }
       return loadUserFromStorage();
     }
 
@@ -149,6 +155,12 @@
       if (opts.email) user.email = opts.email;
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
       notifyAuthUiIfPresent();
+      if (
+        global.RentalAILocalAuth &&
+        typeof global.RentalAILocalAuth.onFavoriteAuthTransition === "function"
+      ) {
+        global.RentalAILocalAuth.onFavoriteAuthTransition("login");
+      }
       return loadUserFromStorage();
     }
 
@@ -184,6 +196,12 @@
         global.RentalAIAuth.clearSession();
       }
       notifyAuthUiIfPresent();
+      if (
+        global.RentalAILocalAuth &&
+        typeof global.RentalAILocalAuth.onFavoriteAuthTransition === "function"
+      ) {
+        global.RentalAILocalAuth.onFavoriteAuthTransition("logout", { skipReload: redirect });
+      }
       if (
         redirect === false &&
         global.RentalAILocalAuth &&
