@@ -50,6 +50,7 @@ from modules.contract.contract_service import (
     extract_flagged_clauses,
     print_contract_result as print_contract_formatted_appendix,
 )
+from modules.actions.action_engine import build_next_actions
 from modules.output.response_formatter import build_final_response_text
 
 # ---------------------------------------------------------------------------
@@ -327,6 +328,7 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
         "risks": ((result.get("risk_result") or {}).get("risk_markers") if isinstance(result.get("risk_result"), dict) else []),
         "reasons": ((result.get("explanation_summary") or {}).get("key_positives") if isinstance(result.get("explanation_summary"), dict) else []),
     }
+    final_result["next_actions"] = build_next_actions(final_result)
     formatted_response = build_final_response_text(final_result)
 
     print()

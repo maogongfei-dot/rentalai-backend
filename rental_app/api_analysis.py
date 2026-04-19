@@ -15,6 +15,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from modules.explain import build_explanation_result
+from modules.actions.action_engine import build_next_actions
 
 _perf_log = logging.getLogger("rentalai.perf")
 
@@ -195,6 +196,13 @@ def normalize_engine_output(engine_result: dict) -> dict:
         "reasons": reasons_for_explain[:15],
     }
     explain_result = build_explanation_result(analysis_result)
+    next_actions = build_next_actions(
+        {
+            "explain_result": explain_result,
+            "risks": analysis_result["risks"],
+            "recommendation": ((p.get("decision") or {}).get("action") if isinstance(p.get("decision"), dict) else ""),
+        }
+    )
 
     return {
         "score": engine_result.get("property_score"),
@@ -214,6 +222,7 @@ def normalize_engine_output(engine_result: dict) -> dict:
         # P4 Phase3: 前端详情页评分明细（引擎已有则透传，缺省为空 dict）
         "top_house_export": thx if isinstance(thx, dict) else {},
         "explain_result": explain_result,
+        "next_actions": next_actions if isinstance(next_actions, list) else [],
     }
 
 
