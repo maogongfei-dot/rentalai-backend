@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from modules.followup.followup_engine import build_followup_questions
 from modules.output.response_formatter import build_final_response_text
 
 # Section titles — keep stable for CLI and future UI mapping.
@@ -486,6 +487,7 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
         "reasons": ((chat_result.get("explanation_summary") or {}).get("key_positives") if isinstance(chat_result.get("explanation_summary"), dict) else []),
         "next_actions": list(sections.get("next_steps") or []),
     }
+    final_result["followup_questions"] = build_followup_questions(final_result)
     formatted_response = build_final_response_text(final_result)
     if formatted_response:
         display_text = formatted_response

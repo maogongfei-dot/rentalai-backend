@@ -16,6 +16,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from modules.explain import build_explanation_result
 from modules.actions.action_engine import build_next_actions
+from modules.followup.followup_engine import build_followup_questions
 
 _perf_log = logging.getLogger("rentalai.perf")
 
@@ -204,6 +205,13 @@ def normalize_engine_output(engine_result: dict) -> dict:
         }
     )
 
+    final_result = {
+        "explain_result": explain_result,
+        "risks": analysis_result.get("risks") or [],
+        "next_actions": next_actions if isinstance(next_actions, list) else [],
+    }
+    followup_questions = build_followup_questions(final_result)
+
     return {
         "score": engine_result.get("property_score"),
         "decision": p.get("decision") if isinstance(p.get("decision"), dict) else {},
@@ -223,6 +231,9 @@ def normalize_engine_output(engine_result: dict) -> dict:
         "top_house_export": thx if isinstance(thx, dict) else {},
         "explain_result": explain_result,
         "next_actions": next_actions if isinstance(next_actions, list) else [],
+        "followup_questions": followup_questions
+        if isinstance(followup_questions, list)
+        else [],
     }
 
 

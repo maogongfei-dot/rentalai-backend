@@ -92,6 +92,15 @@ def build_final_response_text(final_result: Dict[str, Any]) -> str:
                 lines.append(f"- {text}")
         lines.append("")
 
+    followup_questions = final_result.get("followup_questions")
+    if isinstance(followup_questions, list) and followup_questions:
+        lines.append("你还可以继续确认：")
+        for item in followup_questions:
+            text = str(item).strip()
+            if text:
+                lines.append(f"- {text}")
+        lines.append("")
+
     cleaned_lines = _trim_trailing_blank_lines(lines)
     return "\n".join(cleaned_lines).strip()
 
