@@ -456,12 +456,55 @@
     }
   }
 
+  /** Step16：标题区作用域说明（guest / 已登录），随会话切换更新 */
+  function syncComparePageHeaderScope() {
+    var hdr = document.querySelector(".page-header");
+    if (!hdr) return;
+    var lead = document.getElementById("compare-page-scope-lead");
+    if (!lead) {
+      lead = document.createElement("p");
+      lead.id = "compare-page-scope-lead";
+      lead.className = "hint muted small-print";
+      lead.setAttribute("aria-live", "polite");
+      var h1 = hdr.querySelector("h1");
+      var countEl = document.getElementById("compare-page-favorite-count");
+      if (countEl && countEl.parentNode === hdr) {
+        hdr.insertBefore(lead, countEl);
+      } else if (h1) {
+        hdr.insertBefore(lead, h1.nextSibling);
+      } else {
+        hdr.appendChild(lead);
+      }
+    }
+    if (isGuestViewer()) {
+      lead.textContent =
+        "当前作用域：访客会话 · 以下为当前浏览器游客会话下的收藏（与登录账号收藏互不合并）。登录后将切换到账号收藏桶。";
+    } else {
+      lead.textContent =
+        "当前作用域：已登录账号 · 以下为当前登录账户会话下的收藏列表（与访客会话互不合并）。";
+    }
+  }
+
+  /** Step16：空态文案与 CTA 随作用域切换 */
   function emptyStateHtml() {
+    if (isGuestViewer()) {
+      return (
+        '<p class="compare-empty-primary">暂无访客收藏。</p>' +
+        '<p class="hint muted compare-empty-hint">请先完成<strong>房源分析</strong>，在需求解析结果页对推荐房源点击「⭐ 收藏」，即可出现在此处。数据仅保存在当前浏览器游客会话。</p>' +
+        '<p class="hint compare-empty-cta">' +
+        '<a href="/#ai-rental-heading">去房源分析</a> · ' +
+        '<a href="/ai-result">需求解析结果</a> · ' +
+        '<a href="/analysis-history">分析历史</a>' +
+        "</p>"
+      );
+    }
     return (
-      "<p>" +
-      (isGuestViewer()
-        ? "No saved houses for this guest session yet."
-        : "No saved houses for this account yet.") +
+      '<p class="compare-empty-primary">当前账号暂无收藏房源。</p>' +
+      '<p class="hint muted compare-empty-hint">可在<strong>分析历史</strong>或<strong>需求解析结果页</strong>中将推荐房源加入收藏；以下为当前账号作用域。</p>' +
+      '<p class="hint compare-empty-cta">' +
+      '<a href="/analysis-history">分析历史</a> · ' +
+      '<a href="/ai-result">需求解析结果</a> · ' +
+      '<a href="/">首页</a>' +
       "</p>"
     );
   }
@@ -542,7 +585,36 @@
     );
   }
 
+  /** Step15：收藏页标题区数量 — 仅使用 RentalAIServerFavoritesApi.getFavoriteCountForCurrentScope（与列表同源）。 */
+  function syncComparePageFavoriteCount() {
+    var api = window.RentalAIServerFavoritesApi;
+    var n = 0;
+    if (api && typeof api.getFavoriteCountForCurrentScope === "function") {
+      n = api.getFavoriteCountForCurrentScope();
+    }
+    var hdr = document.querySelector(".page-header");
+    if (!hdr) return;
+    var sub = document.getElementById("compare-page-favorite-count");
+    if (!sub) {
+      sub = document.createElement("p");
+      sub.id = "compare-page-favorite-count";
+      sub.className = "hint muted small-print";
+      sub.setAttribute("aria-live", "polite");
+      var h1 = hdr.querySelector("h1");
+      var leadEl = document.getElementById("compare-page-scope-lead");
+      if (leadEl && leadEl.parentNode === hdr) {
+        hdr.insertBefore(sub, leadEl.nextSibling);
+      } else if (h1) {
+        hdr.insertBefore(sub, h1.nextSibling);
+      } else {
+        hdr.appendChild(sub);
+      }
+    }
+    sub.textContent = "共 " + n + " 条收藏（当前作用域）";
+  }
+
   function renderCards(selected, bannerText) {
+    syncComparePageHeaderScope();
     lastSelected = selected || [];
     container.textContent = "";
     if (bannerText) {
@@ -554,8 +626,10 @@
     if (!selected.length) {
       var empWrap = document.createElement("div");
       empWrap.innerHTML = emptyStateHtml();
-      var first = empWrap.firstChild;
-      if (first) container.appendChild(first);
+      while (empWrap.firstChild) {
+        container.appendChild(empWrap.firstChild);
+      }
+      syncComparePageFavoriteCount();
       return;
     }
     selected.forEach(function (r) {
@@ -599,6 +673,7 @@
 
       container.appendChild(div);
     });
+    syncComparePageFavoriteCount();
   }
 
   function loadCompareFromServer() {
@@ -641,6 +716,13 @@
     } catch (eFb) {}
     return Promise.resolve();
   }
+
+  try {
+    window.addEventListener("rentalai-favorite-scope-change", function () {
+      syncComparePageHeaderScope();
+      loadCompareFromServer().catch(function () {});
+    });
+  } catch (eScopePg) {}
 
   try {
     window.addEventListener("rentalai-favorites-updated", function (ev) {

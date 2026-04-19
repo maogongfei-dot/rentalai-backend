@@ -548,6 +548,12 @@
     return _favoritesCacheRows ? _favoritesCacheRows.slice() : null;
   }
 
+  /** Step15：与 GET /favorites 缓存一致的数量（当前作用域）；未拉取过缓存时为 0。 */
+  function getFavoriteCountForCurrentScope() {
+    var rows = getCachedFavoritesRows();
+    return rows ? rows.length : 0;
+  }
+
   /** 服务端行 ↔ 按钮上的 propertyId / listingUrl（均已纳入 buildFavoriteKey）。 */
   function favoriteMatchesIdentifiers(f, propertyId, listingUrl) {
     var kf = buildFavoriteKey({ listing_url: f.listing_url, property_id: f.property_id });
@@ -708,6 +714,7 @@
     fetchFavorites: fetchFavorites,
     refreshFavoritesCache: refreshFavoritesCache,
     getCachedFavoritesRows: getCachedFavoritesRows,
+    getFavoriteCountForCurrentScope: getFavoriteCountForCurrentScope,
     favoriteMatchesIdentifiers: favoriteMatchesIdentifiers,
     buildFavoriteKey: buildFavoriteKey,
     normalizeFavoriteKey: normalizeFavoriteKey,

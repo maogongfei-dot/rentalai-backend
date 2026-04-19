@@ -321,6 +321,75 @@
   function refreshIdentityUI() {
     renderUnifiedNav();
     renderHomeAccountStrip();
+    syncNavFavoriteCountDisplay();
+  }
+
+  /** Step15：同步加载收藏 API（供顶栏数量；与结果页/对比页同源）。 */
+  function ensureFavoritesApiLoadedSync() {
+    if (typeof global.RentalAIServerFavoritesApi !== "undefined") return;
+    try {
+      if (typeof global.rentalaiMergeAuthHeaders === "undefined") {
+        var xhr0 = new XMLHttpRequest();
+        xhr0.open("GET", "/assets/api_config.js", false);
+        xhr0.send(null);
+        if (xhr0.status === 200 && xhr0.responseText) {
+          (0, Function)(xhr0.responseText)();
+        }
+      }
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/assets/server_favorites_api.js", false);
+      xhr.send(null);
+      if (xhr.status === 200 && xhr.responseText) {
+        (0, Function)(xhr.responseText)();
+      }
+    } catch (eLoad) {}
+  }
+
+  function refreshNavCountAfterFavoritesReady() {
+    ensureFavoritesApiLoadedSync();
+    var api = global.RentalAIServerFavoritesApi;
+    if (api && typeof api.refreshFavoritesCache === "function") {
+      return api
+        .refreshFavoritesCache(200)
+        .then(function () {
+          syncNavFavoriteCountDisplay();
+        })
+        .catch(function () {
+          syncNavFavoriteCountDisplay();
+        });
+    }
+    syncNavFavoriteCountDisplay();
+    return Promise.resolve();
+  }
+
+  /** Step15：顶栏「房源对比」旁数量，仅来自 RentalAIServerFavoritesApi 缓存条数。 */
+  function syncNavFavoriteCountDisplay() {
+    var span = document.getElementById("rentalai-nav-favorites-count");
+    if (!span) return;
+    var n = 0;
+    try {
+      ensureFavoritesApiLoadedSync();
+      var api = global.RentalAIServerFavoritesApi;
+      if (api && typeof api.getFavoriteCountForCurrentScope === "function") {
+        n = api.getFavoriteCountForCurrentScope();
+      }
+    } catch (eN) {}
+    span.textContent = n > 0 ? " (" + n + ")" : "";
+  }
+
+  var _navFavoriteCountListenersBound = false;
+
+  function bindNavFavoriteCountListenersOnce() {
+    if (_navFavoriteCountListenersBound) return;
+    _navFavoriteCountListenersBound = true;
+    try {
+      window.addEventListener("rentalai-favorites-updated", function () {
+        syncNavFavoriteCountDisplay();
+      });
+      window.addEventListener("rentalai-favorite-scope-change", function () {
+        refreshNavCountAfterFavoritesReady();
+      });
+    } catch (eNav) {}
   }
 
   /** 各业务页共用的顶部导航：未登录 Login / Sign Up；已登录 email + Logout */
@@ -341,7 +410,7 @@
         '<span class="nav-sep">·</span>' +
         '<a href="/analysis-history">分析历史</a>' +
         '<span class="nav-sep">·</span>' +
-        '<a href="/compare">房源对比</a>' +
+        '<a href="/compare">房源对比<span id="rentalai-nav-favorites-count" class="hint muted nav-favorites-count" aria-live="polite"></span></a>' +
         '<span class="nav-sep">·</span>' +
         '<a href="/account">账户</a>' +
         '<span class="nav-sep">·</span>' +
@@ -368,11 +437,11 @@
       '<span class="nav-sep">·</span>' +
       '<a href="/analysis-history">分析历史</a>' +
       '<span class="nav-sep">·</span>' +
-      '<a href="/compare">房源对比</a>' +
-      '<span class="nav-sep">·</span>' +
-      '<a href="/account">账户</a>' +
-      '<span class="nav-sep">·</span>' +
-      '<span class="nav-account-email" title="Current account">' +
+        '<a href="/compare">房源对比<span id="rentalai-nav-favorites-count" class="hint muted nav-favorites-count" aria-live="polite"></span></a>' +
+        '<span class="nav-sep">·</span>' +
+        '<a href="/account">账户</a>' +
+        '<span class="nav-sep">·</span>' +
+        '<span class="nav-account-email" title="Current account">' +
       escapeHtml(who) +
       "</span>" +
       prot +
@@ -417,8 +486,10 @@
 
   function initDemoChrome() {
     function run() {
+      bindNavFavoriteCountListenersOnce();
       refreshIdentityUI();
       initDemoClearStorage();
+      refreshNavCountAfterFavoritesReady();
     }
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", run);
@@ -442,6 +513,8 @@
     refreshIdentityUI: refreshIdentityUI,
     renderUnifiedNav: renderUnifiedNav,
     renderHomeAccountStrip: renderHomeAccountStrip,
+    syncNavFavoriteCountDisplay: syncNavFavoriteCountDisplay,
+    refreshNavCountAfterFavoritesReady: refreshNavCountAfterFavoritesReady,
   };
 
   migrateLocalFavoriteListOnce();
