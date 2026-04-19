@@ -51,6 +51,7 @@ from modules.contract.contract_service import (
     print_contract_result as print_contract_formatted_appendix,
 )
 from modules.actions.action_engine import build_next_actions
+from modules.followup.followup_engine import build_followup_questions
 from modules.output.response_formatter import build_final_response_text
 
 # ---------------------------------------------------------------------------
@@ -334,6 +335,7 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
         final_result["next_actions"] = api_next
     else:
         final_result["next_actions"] = build_next_actions(final_result)
+    final_result["followup_questions"] = build_followup_questions(final_result)
     formatted_response = build_final_response_text(final_result)
 
     print()
