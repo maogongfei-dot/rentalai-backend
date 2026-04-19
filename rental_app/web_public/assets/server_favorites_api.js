@@ -598,11 +598,107 @@
     });
   }
 
+  /** Step14：清空当前作用域收藏 — 仅影响当前 Bearer / guest session 对应的服务端桶；并清空本机 fav_list_* 与 detail meta，再单次 refresh（供跨标签 storage 同步）。 */
+  function clearLocalFavoriteKeysForCurrentScope() {
+    try {
+      if (global.RentalAILocalAuth && typeof global.RentalAILocalAuth.favStorageKey === "function") {
+        global.localStorage.setItem(global.RentalAILocalAuth.favStorageKey(), "[]");
+      }
+    } catch (eLoc) {}
+    try {
+      saveFavoriteDetailMetaMap({});
+    } catch (eMeta) {}
+  }
+
+  function clearAllFavoritesForCurrentScope() {
+    return fetchFavorites(500)
+      .then(function (body) {
+        if (!body || body.success === false) {
+          clearLocalFavoriteKeysForCurrentScope();
+          invalidateFavoritesCache();
+          emitFavoritesUpdated([]);
+          return { success: false, clearedLocalOnly: true };
+        }
+        var rows = Array.isArray(body.favorites) ? body.favorites : [];
+        var chain = Promise.resolve();
+        rows.forEach(function (row) {
+          if (!row || !row.id) return;
+          chain = chain.then(function () {
+            return deleteFavoriteById(row.id).catch(function () {});
+          });
+        });
+        return chain.then(function () {
+          return refreshFavoritesCache(500).then(function (cachedRows) {
+            if (!cachedRows || cachedRows.length === 0) {
+              clearLocalFavoriteKeysForCurrentScope();
+            }
+            return { success: true, removed: rows.length };
+          });
+        });
+      })
+      .catch(function () {
+        clearLocalFavoriteKeysForCurrentScope();
+        invalidateFavoritesCache();
+        emitFavoritesUpdated([]);
+        return { success: false, clearedLocalOnly: true };
+      });
+  }
+
   try {
     window.addEventListener("rentalai-favorite-scope-change", function () {
       invalidateFavoritesCache();
     });
   } catch (eScope) {}
+
+  /** Step13：跨标签页同步 — 仅当其它标签页改了当前作用域相关的 localStorage 时，GET /favorites 重载缓存并派发 rentalai-favorites-updated（本标签页自身写入不会触发 storage）。 */
+  function currentScopeFavoriteStorageWatchKeys() {
+    var keys = [];
+    try {
+      if (global.RentalAILocalAuth && typeof global.RentalAILocalAuth.favStorageKey === "function") {
+        keys.push(global.RentalAILocalAuth.favStorageKey());
+      }
+    } catch (eW1) {}
+    keys.push(getFavoriteDetailMetaLsKey());
+    return keys;
+  }
+
+  function storageKeyMatchesCurrentFavoriteScope(storageKey) {
+    if (storageKey == null || storageKey === "") return false;
+    var watch = currentScopeFavoriteStorageWatchKeys();
+    var i;
+    for (i = 0; i < watch.length; i++) {
+      if (storageKey === watch[i]) return true;
+    }
+    return false;
+  }
+
+  function onCrossTabFavoriteStorage(ev) {
+    try {
+      if (!ev || ev.storageArea !== global.localStorage) return;
+      if (!storageKeyMatchesCurrentFavoriteScope(ev.key)) return;
+      refreshFavoritesCache(200).catch(function () {});
+    } catch (eSt) {}
+  }
+
+  var _crossTabFavoriteStorageBound = false;
+
+  function bindCrossTabFavoriteStorageOnce() {
+    if (_crossTabFavoriteStorageBound) return;
+    _crossTabFavoriteStorageBound = true;
+    global.addEventListener("storage", onCrossTabFavoriteStorage);
+  }
+
+  function unbindCrossTabFavoriteStorage() {
+    if (!_crossTabFavoriteStorageBound) return;
+    global.removeEventListener("storage", onCrossTabFavoriteStorage);
+    _crossTabFavoriteStorageBound = false;
+  }
+
+  function rehydrateFavoritesForCurrentScope() {
+    return refreshFavoritesCache(200);
+  }
+
+  bindCrossTabFavoriteStorageOnce();
 
   global.RentalAIServerFavoritesApi = {
     mergeFavoritesHeaders: mergeFavoritesHeaders,
@@ -621,5 +717,8 @@
     _internalDeleteFavoriteById: deleteFavoriteById,
     getFavoriteDetailMetaByKey: getFavoriteDetailMetaByKey,
     getFavoriteDetailMetaForFavoriteRow: getFavoriteDetailMetaForFavoriteRow,
+    rehydrateFavoritesForCurrentScope: rehydrateFavoritesForCurrentScope,
+    unbindCrossTabFavoriteStorage: unbindCrossTabFavoriteStorage,
+    clearAllFavoritesForCurrentScope: clearAllFavoritesForCurrentScope,
   };
 })(window);

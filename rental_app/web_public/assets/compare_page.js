@@ -39,6 +39,9 @@
   /** @type {Array<Object>} */
   var lastSelected = [];
 
+  /** Step12：当前打开的详情对应的 favoriteKey（规范化后）；用于收藏变化时关闭错位详情 */
+  var openDetailFavoriteKey = null;
+
   function escapeAttr(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;")
@@ -58,6 +61,56 @@
 
   function recoPid(r) {
     return String(r.listing_id != null ? r.listing_id : r.rank != null ? r.rank : "");
+  }
+
+  function parseSavedAtMs(iso) {
+    if (!iso || typeof iso !== "string") return NaN;
+    var t = Date.parse(iso);
+    return isNaN(t) ? NaN : t;
+  }
+
+  /** 最近收藏在前：有 savedAt 的优先且倒序；无时间的置后；再用 url+pid 稳定排序 */
+  function compareFavoriteRowsForComparePage(a, b) {
+    var ma = a && a._favoriteMeta && a._favoriteMeta.savedAt;
+    var mb = b && b._favoriteMeta && b._favoriteMeta.savedAt;
+    var ta = parseSavedAtMs(ma);
+    var tb = parseSavedAtMs(mb);
+    var ha = !isNaN(ta);
+    var hb = !isNaN(tb);
+    if (ha && hb && tb !== ta) return tb - ta;
+    if (ha && !hb) return -1;
+    if (!ha && hb) return 1;
+    var ka = recoUrl(a) + "\0" + recoPid(a);
+    var kb = recoUrl(b) + "\0" + recoPid(b);
+    if (ka < kb) return -1;
+    if (ka > kb) return 1;
+    return 0;
+  }
+
+  function sortCompareSelection(arr) {
+    if (!arr || !arr.length) return arr || [];
+    var copy = arr.slice();
+    copy.sort(compareFavoriteRowsForComparePage);
+    return copy;
+  }
+
+  function setOpenDetailKeyFromReco(r) {
+    var api = window.RentalAIServerFavoritesApi;
+    if (!api || typeof api.buildFavoriteKey !== "function") {
+      openDetailFavoriteKey = null;
+      return;
+    }
+    openDetailFavoriteKey = api.buildFavoriteKey({
+      listing_url: (r.source_url || r.listing_url || r.url || "").trim(),
+      source_url: r.source_url,
+      url: r.url,
+      property_id: String(r.listing_id != null ? r.listing_id : r.rank),
+      listing_id: r.listing_id,
+      rank: r.rank,
+    });
+    if (api.normalizeFavoriteKey) {
+      openDetailFavoriteKey = api.normalizeFavoriteKey(openDetailFavoriteKey);
+    }
   }
 
   function legacyTopMatchesR(r, row) {
@@ -283,6 +336,7 @@
   }
 
   function closeCompareDetail() {
+    openDetailFavoriteKey = null;
     var ov = document.getElementById("compare-detail-overlay");
     if (ov) {
       ov.style.display = "none";
@@ -290,7 +344,30 @@
     }
   }
 
+  function syncCompareDetailAfterFavoritesChange(rows) {
+    if (!openDetailFavoriteKey) return;
+    rows = rows || [];
+    var api = window.RentalAIServerFavoritesApi;
+    if (!api || typeof api.buildFavoriteKey !== "function") {
+      closeCompareDetail();
+      return;
+    }
+    var target = openDetailFavoriteKey;
+    var i;
+    for (i = 0; i < rows.length; i++) {
+      var fk = api.buildFavoriteKey({
+        listing_url: rows[i].listing_url,
+        property_id: rows[i].property_id,
+      });
+      if (api.normalizeFavoriteKey) fk = api.normalizeFavoriteKey(fk);
+      if (fk === target) return;
+      if (api.favoriteKeysEqual && api.favoriteKeysEqual(openDetailFavoriteKey, fk)) return;
+    }
+    closeCompareDetail();
+  }
+
   function openCompareDetail(r) {
+    setOpenDetailKeyFromReco(r);
     var ui = window.RentalAIUnifiedHistoryUi;
     var inner = document.getElementById("compare-detail-inner");
     if (!inner) ensureCompareDetailModal();
@@ -412,17 +489,19 @@
       for (j = 0; j < rows.length; j++) {
         built.push(mergeFavoriteServerRowWithMeta(rows[j]));
       }
-      return built;
+      return sortCompareSelection(built);
     }
-    return recos
-      .filter(function (r) {
-        return rows.some(function (f) {
-          return rowMatchesFavorite(r, f);
-        });
-      })
-      .map(function (r) {
-        return enrichRecoWithFavoriteMeta(r, rows);
-      });
+    return sortCompareSelection(
+      recos
+        .filter(function (r) {
+          return rows.some(function (f) {
+            return rowMatchesFavorite(r, f);
+          });
+        })
+        .map(function (r) {
+          return enrichRecoWithFavoriteMeta(r, rows);
+        })
+    );
   }
 
   function selectedFromLocalIds() {
@@ -436,29 +515,31 @@
         for (c = 0; c < cached.length; c++) {
           outCached.push(mergeFavoriteServerRowWithMeta(cached[c]));
         }
-        return outCached;
+        return sortCompareSelection(outCached);
       }
     }
-    return recos
-      .filter(function (r) {
-        var id = String(r.listing_id != null ? r.listing_id : r.rank);
-        if (favsLocal.includes(id)) return true;
-        if (api && typeof api.buildFavoriteKey === "function") {
-          var kk = api.buildFavoriteKey({
-            listing_url: (r.source_url || r.listing_url || r.url || "").trim(),
-            source_url: r.source_url,
-            url: r.url,
-            property_id: id,
-            listing_id: r.listing_id,
-            rank: r.rank,
-          });
-          if (kk && favsLocal.includes(kk)) return true;
-        }
-        return false;
-      })
-      .map(function (r) {
-        return enrichRecoWithMetaKey(r);
-      });
+    return sortCompareSelection(
+      recos
+        .filter(function (r) {
+          var id = String(r.listing_id != null ? r.listing_id : r.rank);
+          if (favsLocal.includes(id)) return true;
+          if (api && typeof api.buildFavoriteKey === "function") {
+            var kk = api.buildFavoriteKey({
+              listing_url: (r.source_url || r.listing_url || r.url || "").trim(),
+              source_url: r.source_url,
+              url: r.url,
+              property_id: id,
+              listing_id: r.listing_id,
+              rank: r.rank,
+            });
+            if (kk && favsLocal.includes(kk)) return true;
+          }
+          return false;
+        })
+        .map(function (r) {
+          return enrichRecoWithMetaKey(r);
+        })
+    );
   }
 
   function renderCards(selected, bannerText) {
@@ -529,9 +610,11 @@
             selectedFromLocalIds(),
             "Could not load favorites. Showing offline snapshot if available."
           );
+          syncCompareDetailAfterFavoritesChange([]);
           return;
         }
         renderCards(selectedFromServerRows(rows || []));
+        syncCompareDetailAfterFavoritesChange(rows || []);
       });
     }
     if (api && typeof api.fetchFavorites === "function") {
@@ -541,22 +624,74 @@
             selectedFromLocalIds(),
             "Could not load favorites. Showing offline snapshot if available."
           );
+          syncCompareDetailAfterFavoritesChange([]);
           return;
         }
-        renderCards(selectedFromServerRows(payload.favorites || []));
+        var favs = payload.favorites || [];
+        renderCards(selectedFromServerRows(favs));
+        syncCompareDetailAfterFavoritesChange(favs);
       });
     }
     renderCards(selectedFromLocalIds());
+    try {
+      var apiFb = window.RentalAIServerFavoritesApi;
+      if (apiFb && typeof apiFb.getCachedFavoritesRows === "function") {
+        syncCompareDetailAfterFavoritesChange(apiFb.getCachedFavoritesRows() || []);
+      }
+    } catch (eFb) {}
     return Promise.resolve();
   }
 
   try {
     window.addEventListener("rentalai-favorites-updated", function (ev) {
       var rows = ev && ev.detail && ev.detail.favorites;
-      if (!rows) return;
+      if (!rows) {
+        try {
+          var apiEv = window.RentalAIServerFavoritesApi;
+          if (apiEv && typeof apiEv.getCachedFavoritesRows === "function") {
+            rows = apiEv.getCachedFavoritesRows();
+          }
+        } catch (eEv2) {}
+      }
+      if (rows == null) return;
       renderCards(selectedFromServerRows(rows));
+      syncCompareDetailAfterFavoritesChange(rows);
     });
   } catch (eEv) {}
+
+  (function bindCompareClearAllOnce() {
+    var hdr = document.querySelector(".page-header");
+    if (!hdr || document.getElementById("compare-clear-all-wrap")) return;
+    var wrap = document.createElement("p");
+    wrap.id = "compare-clear-all-wrap";
+    wrap.className = "hint muted small-print";
+    wrap.style.marginTop = "0.35rem";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "compare-clear-all-btn";
+    btn.className = "btn-history-danger";
+    btn.textContent = "清空收藏";
+    wrap.appendChild(btn);
+    hdr.appendChild(wrap);
+    btn.addEventListener("click", function () {
+      if (!window.confirm("清空当前会话/账号下的全部收藏？")) return;
+      var api = window.RentalAIServerFavoritesApi;
+      if (!api || typeof api.clearAllFavoritesForCurrentScope !== "function") return;
+      btn.disabled = true;
+      api
+        .clearAllFavoritesForCurrentScope()
+        .then(function () {
+          btn.disabled = false;
+          closeCompareDetail();
+        })
+        .catch(function () {
+          btn.disabled = false;
+          closeCompareDetail();
+          renderCards([], null);
+          lastSelected = [];
+        });
+    });
+  })();
 
   loadCompareFromServer().catch(function (err) {
     console.error(err);
@@ -564,5 +699,6 @@
       selectedFromLocalIds(),
       "Could not load favorites. Showing offline snapshot if available."
     );
+    syncCompareDetailAfterFavoritesChange([]);
   });
 })();
