@@ -360,6 +360,39 @@ def build_display_sections(chat_result: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _format_explain_result_block_zh(er: Any) -> str:
+    """Format ``modules.explain``-shaped explain_result for chat display (Chinese labels)."""
+    if not isinstance(er, dict):
+        return ""
+    chunks: list[str] = []
+
+    sm = er.get("summary")
+    chunks.append("总结：\n" + (str(sm).strip() if sm is not None else ""))
+
+    pros_lines: list[str] = ["优点："]
+    pros = er.get("pros")
+    if isinstance(pros, list):
+        for item in pros:
+            t = str(item).strip() if item is not None else ""
+            if t:
+                pros_lines.append(f"- {t}")
+    chunks.append("\n".join(pros_lines))
+
+    cons_lines: list[str] = ["需要注意："]
+    cons = er.get("cons")
+    if isinstance(cons, list):
+        for item in cons:
+            t = str(item).strip() if item is not None else ""
+            if t:
+                cons_lines.append(f"- {t}")
+    chunks.append("\n".join(cons_lines))
+
+    rec = er.get("recommendation")
+    chunks.append("建议：\n" + (str(rec).strip() if rec is not None else ""))
+
+    return "\n\n".join(chunks).strip()
+
+
 def render_display_text(sections: dict[str, Any]) -> str:
     """Join sections with fixed titles; skip empty blocks."""
     parts: list[str] = []
@@ -443,6 +476,10 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
     """
     sections = build_display_sections(chat_result)
     display_text = render_display_text(sections)
+    explain_block = _format_explain_result_block_zh(chat_result.get("explain_result"))
+    if explain_block:
+        base = display_text.strip()
+        display_text = f"{explain_block}\n\n{base}".strip() if base else explain_block
 
     decision = chat_result.get("decision") or {}
     display_order = [

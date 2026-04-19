@@ -50,6 +50,7 @@ from modules.contract.contract_service import (
     extract_flagged_clauses,
     print_contract_result as print_contract_formatted_appendix,
 )
+from modules.output.response_formatter import build_final_response_text
 
 # ---------------------------------------------------------------------------
 # Phase 1 Part 10 — Demo test inputs (contract / comparison / area / prefs / OOB)
@@ -322,6 +323,19 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
     print()
     print("======== MAIN RESPONSE ========")
     print(_format_main_response(result))
+
+    final_result = {
+        "explain_result": result.get("explain_result"),
+        "summary": result.get("summary") or result.get("response_text") or result.get("display_text"),
+        "recommendation": (decision.get("decision_action") if isinstance(decision, dict) else None),
+        "risks": ((result.get("risk_result") or {}).get("risk_markers") if isinstance(result.get("risk_result"), dict) else []),
+        "reasons": ((result.get("explanation_summary") or {}).get("key_positives") if isinstance(result.get("explanation_summary"), dict) else []),
+    }
+    formatted_response = build_final_response_text(final_result)
+    if formatted_response:
+        print()
+        print("======== FINAL RESPONSE ========")
+        print(formatted_response)
 
     print()
     print("======== FOLLOW UPS ========")
