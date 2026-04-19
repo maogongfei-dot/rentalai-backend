@@ -109,6 +109,103 @@
     return "fav_list_" + u.user_id;
   }
 
+  /** Step9：旧版单一 key fav_list 等 → 当前作用域 fav_list_*；不合并 guest→用户，仅格式迁移。 */
+  var LEGACY_LOCAL_FAV_KEYS = ["fav_list"];
+
+  function migrateLocalFavoriteListMarkerKey(scopeKey) {
+    var s = String(scopeKey || "default").replace(/[^a-zA-Z0-9:_-]/g, "_");
+    if (s.length > 96) s = s.slice(0, 96);
+    return "rentalai_fav_ls_migrated_v1__" + s;
+  }
+
+  function canonicalListingUrlMigrate(u) {
+    var str = String(u || "").trim();
+    if (!str) return "";
+    try {
+      var x = new URL(str);
+      var path = x.pathname.replace(/\/+$/, "") || "/";
+      return String(x.origin + path + x.search).toLowerCase();
+    } catch (e0) {
+      return str.toLowerCase().replace(/\/+$/, "");
+    }
+  }
+
+  /** 与 server favoriteKey 对齐的字符串规范化（本地离线层；无 API 时自用）。 */
+  function normalizeLegacyFavoriteEntryToKey(item) {
+    if (item == null) return "";
+    if (typeof item === "string" || typeof item === "number") {
+      var z = String(item).trim();
+      if (!z) return "";
+      if (z.indexOf("u:") === 0 || z.indexOf("p:") === 0) return z;
+      if (/^https?:\/\//i.test(z)) return "u:" + canonicalListingUrlMigrate(z);
+      return "p:" + z;
+    }
+    if (typeof item === "object") {
+      var o = item;
+      if (o.favoriteKey != null && String(o.favoriteKey).trim()) {
+        return normalizeLegacyFavoriteEntryToKey(String(o.favoriteKey).trim());
+      }
+      var url = (o.listing_url || o.source_url || o.url || "").trim();
+      if (url && /^https?:\/\//i.test(url)) return "u:" + canonicalListingUrlMigrate(url);
+      var pid = o.property_id != null ? String(o.property_id).trim() : "";
+      var lid = o.listing_id != null ? String(o.listing_id).trim() : "";
+      var rk = o.rank != null ? String(o.rank).trim() : "";
+      var idpart = pid || lid || rk;
+      if (idpart) return "p:" + idpart;
+    }
+    return "";
+  }
+
+  /**
+   * 当前作用域 key 尚无收藏数组时，从 LEGACY_LOCAL_FAV_KEYS 读旧数据，规范化去重后写入当前 key；
+   * 已迁移或当前 key 已有数据则跳过；不按登录合并 guest 桶。
+   */
+  function migrateLocalFavoriteListOnce() {
+    var scopeKey = favStorageKey();
+    var markerKey = migrateLocalFavoriteListMarkerKey(scopeKey);
+    try {
+      if (localStorage.getItem(markerKey) === "1") return;
+      var existing = [];
+      try {
+        var exRaw = localStorage.getItem(scopeKey);
+        if (exRaw) existing = JSON.parse(exRaw);
+      } catch (e1) {}
+      if (Array.isArray(existing) && existing.length > 0) {
+        localStorage.setItem(markerKey, "1");
+        return;
+      }
+      var merged = [];
+      var seen = {};
+      function ingest(storageKey) {
+        if (!storageKey || storageKey === scopeKey) return;
+        var raw = localStorage.getItem(storageKey);
+        if (!raw || !String(raw).trim()) return;
+        var arr;
+        try {
+          arr = JSON.parse(raw);
+        } catch (e2) {
+          return;
+        }
+        if (!Array.isArray(arr)) return;
+        var i;
+        for (i = 0; i < arr.length; i++) {
+          var nk = normalizeLegacyFavoriteEntryToKey(arr[i]);
+          if (!nk || seen[nk]) continue;
+          seen[nk] = true;
+          merged.push(nk);
+        }
+      }
+      var li;
+      for (li = 0; li < LEGACY_LOCAL_FAV_KEYS.length; li++) {
+        ingest(LEGACY_LOCAL_FAV_KEYS[li]);
+      }
+      if (merged.length > 0) {
+        localStorage.setItem(scopeKey, JSON.stringify(merged));
+      }
+      localStorage.setItem(markerKey, "1");
+    } catch (e3) {}
+  }
+
   /**
    * 当前收藏作用域 key（与 favStorageKey 一致；本地持久化键名保持不变以免破坏已有数据）。
    * 逻辑映射：已登录 → favorites_<userId>；未登录 → favorites_guest（物理存储仍为 fav_list_*）。
@@ -134,15 +231,19 @@
       window.dispatchEvent(new CustomEvent("rentalai-favorite-scope-change", { detail: detail }));
     } catch (e0) {}
     try {
-      if (opts.skipReload) return;
-      var path = (window.location.pathname || "").replace(/\/$/, "") || "/";
-      if (
-        (reason === "login" || reason === "logout") &&
-        (path === "/compare" || path === "/ai-result")
-      ) {
-        window.location.reload();
+      if (!opts.skipReload) {
+        var path = (window.location.pathname || "").replace(/\/$/, "") || "/";
+        if (
+          (reason === "login" || reason === "logout") &&
+          (path === "/compare" || path === "/ai-result")
+        ) {
+          window.location.reload();
+        }
       }
     } catch (e1) {}
+    try {
+      migrateLocalFavoriteListOnce();
+    } catch (eMig) {}
   }
 
   function requireLogin() {
@@ -336,10 +437,14 @@
     onFavoriteAuthTransition: onFavoriteAuthTransition,
     getGuestSessionIdForFavorites: getGuestSessionIdForFavorites,
     buildGuestFavoriteScopeId: buildGuestFavoriteScopeId,
+    migrateLocalFavoriteListOnce: migrateLocalFavoriteListOnce,
+    normalizeLegacyFavoriteEntryToKey: normalizeLegacyFavoriteEntryToKey,
     refreshIdentityUI: refreshIdentityUI,
     renderUnifiedNav: renderUnifiedNav,
     renderHomeAccountStrip: renderHomeAccountStrip,
   };
+
+  migrateLocalFavoriteListOnce();
 
   requireLogin();
   initDemoChrome();

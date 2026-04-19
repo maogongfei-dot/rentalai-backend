@@ -759,6 +759,13 @@
       var loc = [r.postcode, r.area].filter(Boolean).join(" · ") || "地区 —";
       var score =
         r.final_score != null ? "总分 " + Number(r.final_score).toFixed(1) : "";
+      var explainClip = r.explain ? String(r.explain).slice(0, 900) : "";
+      var risksJsonStr = "[]";
+      try {
+        risksJsonStr = JSON.stringify((r.risks || []).slice(0, 16));
+      } catch (eRj0) {
+        risksJsonStr = "[]";
+      }
       /* 旧版推荐卡片：解释说明 / 风险提示 / 决策标签（非 housing 主链路）。 */
       var explainHtml = "";
       if (r.explain) {
@@ -811,6 +818,24 @@
         escapeAttr(priceAttr) +
         "' data-favorite-key='" +
         escapeAttr(fkBtn || propId) +
+        "' data-explain='" +
+        escapeAttr(explainClip) +
+        "' data-decision='" +
+        escapeAttr(r.decision || "") +
+        "' data-decision-reason='" +
+        escapeAttr((r.decision_reason || "").slice(0, 600)) +
+        "' data-final-score='" +
+        escapeAttr(r.final_score != null ? String(r.final_score) : "") +
+        "' data-listing-id='" +
+        escapeAttr(r.listing_id != null ? String(r.listing_id) : "") +
+        "' data-rank='" +
+        escapeAttr(r.rank != null ? String(r.rank) : "") +
+        "' data-risks-json='" +
+        escapeAttr(risksJsonStr) +
+        "' data-bedrooms='" +
+        escapeAttr(r.bedrooms != null ? String(r.bedrooms) : "") +
+        "' data-rent-num='" +
+        escapeAttr(r.rent != null ? String(r.rent) : "") +
         "' data-server-favorite-id=''>" +
         btnText +
         "</button>";
@@ -859,12 +884,60 @@
           listing_url: (btn.getAttribute("data-listing-url") || "").trim() || null,
           title: (btn.getAttribute("data-title") || "").trim() || "Listing",
           postcode: (btn.getAttribute("data-postcode") || "").trim() || null,
+          source: "ai_result",
+          sourceType: "legacy_recommendation",
         };
         var pr = (btn.getAttribute("data-price") || "").trim();
         if (pr) {
           var pn = parseFloat(pr);
           payload.price = isNaN(pn) ? null : pn;
         }
+        try {
+          var rEnt = (btn.getAttribute("data-explain") || "").trim();
+          payload.explain = rEnt || null;
+          payload.decision = (btn.getAttribute("data-decision") || "").trim() || null;
+          payload.decision_reason = (btn.getAttribute("data-decision-reason") || "").trim() || null;
+          var fs = (btn.getAttribute("data-final-score") || "").trim();
+          if (fs) {
+            var fsn = parseFloat(fs);
+            payload.final_score = isNaN(fsn) ? null : fsn;
+          }
+          var li = (btn.getAttribute("data-listing-id") || "").trim();
+          if (li) {
+            var lin = parseInt(li, 10);
+            payload.listing_id = isNaN(lin) ? li : lin;
+          }
+          var rk = (btn.getAttribute("data-rank") || "").trim();
+          if (rk) {
+            var rkn = parseInt(rk, 10);
+            payload.rank = isNaN(rkn) ? null : rkn;
+          }
+          var rs = (btn.getAttribute("data-risks-json") || "").trim();
+          if (rs) {
+            try {
+              payload.risks = JSON.parse(rs);
+            } catch (eRJ) {
+              payload.risks = [];
+            }
+          }
+          var br = (btn.getAttribute("data-bedrooms") || "").trim();
+          if (br) {
+            var brn = parseFloat(br);
+            payload.bedrooms = isNaN(brn) ? br : brn;
+          }
+          var rentA = (btn.getAttribute("data-rent-num") || "").trim();
+          if (rentA) {
+            var rentN = parseFloat(rentA);
+            payload.rent = isNaN(rentN) ? null : rentN;
+          }
+        } catch (ePay) {}
+        try {
+          var SH = window.RentalAIAnalysisHistoryStore;
+          if (SH && typeof SH.listByType === "function") {
+            var props = SH.listByType("property") || [];
+            if (props[0] && props[0].id) payload.historyEntryId = props[0].id;
+          }
+        } catch (eHi0) {}
         api
           .addFavorite(payload)
           .then(function (res) {

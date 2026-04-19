@@ -1029,6 +1029,14 @@
     });
   }
 
+  /** 供收藏对比页等复用：与列表项「查看详情」同一套 HTML（含收藏按钮骨架，依赖全站 uh-fav 委托与 hydrate）。 */
+  try {
+    window.RentalAIUnifiedHistoryUi = {
+      renderDetailBodyHtml: renderDetailBody,
+      hydrateFavoriteButtons: hydrateUnifiedHistoryFavoriteButtons,
+    };
+  } catch (eUi) {}
+
   bindDeleteDelegation();
   bindFilterOnce();
 

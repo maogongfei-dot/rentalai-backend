@@ -158,6 +158,256 @@
     return favoriteKeysEqual(kf, kr);
   }
 
+  /* ---------- Step11：客户端收藏详情元数据（localStorage，不按 favoriteKey 改规则，仅增补存储） ---------- */
+
+  var META_STR_MAX = 9000;
+
+  function getFavoriteDetailMetaLsKey() {
+    var bucket = "default";
+    try {
+      if (global.RentalAILocalAuth && typeof global.RentalAILocalAuth.favStorageKey === "function") {
+        bucket = String(global.RentalAILocalAuth.favStorageKey() || "default").replace(/[^a-zA-Z0-9:_-]/g, "_");
+      }
+    } catch (eB) {}
+    if (bucket.length > 96) bucket = bucket.slice(0, 96);
+    return "rentalai_favorite_detail_meta_v1__" + bucket;
+  }
+
+  function loadFavoriteDetailMetaMap() {
+    try {
+      var raw = localStorage.getItem(getFavoriteDetailMetaLsKey());
+      var o = raw ? JSON.parse(raw) : {};
+      return o && typeof o === "object" ? o : {};
+    } catch (e0) {
+      return {};
+    }
+  }
+
+  function saveFavoriteDetailMetaMap(map) {
+    try {
+      localStorage.setItem(getFavoriteDetailMetaLsKey(), JSON.stringify(map));
+    } catch (e1) {}
+  }
+
+  function clipStr(s, n) {
+    s = s == null ? "" : String(s);
+    n = n || 800;
+    if (s.length <= n) return s;
+    return s.slice(0, n - 1) + "…";
+  }
+
+  function clipStrArray(arr, maxItems, eachMax) {
+    if (!Array.isArray(arr)) return [];
+    var out = [];
+    var i;
+    var lim = Math.min(maxItems || 12, arr.length);
+    for (i = 0; i < lim; i++) {
+      out.push(clipStr(arr[i], eachMax || 400));
+    }
+    return out;
+  }
+
+  function minimizeDetailSnapshot(snap) {
+    if (!snap || typeof snap !== "object") return null;
+    var out;
+    try {
+      out = JSON.parse(JSON.stringify(snap));
+    } catch (eJ) {
+      return null;
+    }
+    if (out.variant === "legacy") {
+      if (Array.isArray(out.recommendations_top) && out.recommendations_top.length > 10) {
+        out.recommendations_top = out.recommendations_top.slice(0, 10);
+      }
+    }
+    if (out.variant === "housing") {
+      if (Array.isArray(out.top_deals) && out.top_deals.length > 10) {
+        out.top_deals = out.top_deals.slice(0, 10);
+      }
+      if (out.market_snapshot_zh) out.market_snapshot_zh = clipStr(out.market_snapshot_zh, 6000);
+    }
+    try {
+      if (JSON.stringify(out).length > META_STR_MAX) {
+        return {
+          variant: out.variant || "legacy",
+          summary: out.summary || {},
+          recommendations_top: Array.isArray(out.recommendations_top) ? out.recommendations_top.slice(0, 3) : [],
+        };
+      }
+    } catch (eSz) {}
+    return out;
+  }
+
+  function buildRecoMinDetailSnapshot(payload) {
+    payload = payload || {};
+    var risks = payload.risks;
+    if (typeof risks === "string") {
+      try {
+        risks = JSON.parse(risks);
+      } catch (eR) {
+        risks = [];
+      }
+    }
+    return {
+      variant: "reco_min",
+      title: clipStr(payload.title, 400),
+      rent: payload.rent != null ? payload.rent : payload.price,
+      bedrooms: payload.bedrooms,
+      postcode: payload.postcode != null ? String(payload.postcode) : null,
+      listing_url: pickListingUrl(payload),
+      explain: clipStr(payload.explain, 2500),
+      decision: payload.decision,
+      decision_reason: clipStr(payload.decision_reason, 1500),
+      risks: clipStrArray(risks, 12, 400),
+      final_score: payload.final_score,
+      listing_id: payload.listing_id != null ? payload.listing_id : payload.listingId,
+      rank: payload.rank != null ? payload.rank : null,
+    };
+  }
+
+  function historyEntryMatchesFavoritePayload(entry, payload) {
+    if (!entry || entry.type !== "property") return false;
+    var snap = entry.detail_snapshot;
+    if (!snap) return false;
+    var pid = String(payload.propertyId != null ? payload.propertyId : payload.property_id || "").trim();
+    var purl = pickListingUrl(payload);
+    var pcanonical = purl ? canonicalListingUrl(purl) : "";
+    var pt = (payload.title || "").trim();
+    if (snap.variant === "legacy") {
+      var tops = snap.recommendations_top || [];
+      var j;
+      for (j = 0; j < tops.length; j++) {
+        var row = tops[j] || {};
+        var ru = String(row.source_url || "").trim();
+        if (pcanonical && ru && canonicalListingUrl(ru) === pcanonical) return true;
+        if (pid && row.listing_id != null && String(row.listing_id) === pid) return true;
+        if (pid && row.rank != null && String(row.rank) === pid) return true;
+        var rt = String(row.title || "").trim();
+        if (pt && rt && pt === rt) return true;
+      }
+    }
+    if (snap.variant === "housing") {
+      var deals = snap.top_deals || [];
+      var k;
+      for (k = 0; k < deals.length; k++) {
+        var d = deals[k] || {};
+        var du = String(d.listing_url || d.url || "").trim();
+        if (pcanonical && du && canonicalListingUrl(du) === pcanonical) return true;
+        var dt = String(d.title || d.address || "").trim();
+        if (pt && dt && pt === dt) return true;
+      }
+    }
+    return false;
+  }
+
+  function findMatchingPropertyHistoryEntry(payload) {
+    try {
+      var S = global.RentalAIAnalysisHistoryStore;
+      if (!S) return null;
+      var hintId =
+        payload.historyEntryId ||
+        payload.history_id ||
+        payload.recordId ||
+        payload.record_id ||
+        payload.analysisId ||
+        payload.analysis_id;
+      if (hintId && typeof S.listForUser === "function") {
+        var all = S.listForUser() || [];
+        var a;
+        for (a = 0; a < all.length; a++) {
+          if (all[a] && String(all[a].id) === String(hintId)) return all[a];
+        }
+      }
+      if (typeof S.listByType !== "function") return null;
+      var props = S.listByType("property") || [];
+      var i;
+      for (i = 0; i < props.length; i++) {
+        var entry = props[i];
+        if (historyEntryMatchesFavoritePayload(entry, payload)) return entry;
+      }
+    } catch (eH) {}
+    return null;
+  }
+
+  function buildFavoriteClientMeta(fkNorm, payload, histEntry) {
+    payload = payload || {};
+    var meta = {
+      favoriteKey: fkNorm,
+      savedAt: new Date().toISOString(),
+      historyId: null,
+      recordId: null,
+      analysisId: null,
+      source: payload.source || null,
+      sourceType: payload.sourceType || payload.source_type || null,
+      serverFavoriteId: null,
+      titleHint: clipStr(payload.title, 200),
+      detailSnapshot: null,
+    };
+    if (histEntry && histEntry.id) {
+      meta.historyId = histEntry.id;
+      meta.recordId = histEntry.id;
+      meta.analysisId = histEntry.id;
+      meta.detailSnapshot = minimizeDetailSnapshot(histEntry.detail_snapshot);
+    }
+    if (!meta.detailSnapshot) {
+      meta.detailSnapshot = buildRecoMinDetailSnapshot(payload);
+    }
+    if (!meta.source) meta.source = histEntry ? "unified_history" : "favorite";
+    if (!meta.sourceType) meta.sourceType = histEntry ? "unified_property" : "legacy_recommendation";
+    try {
+      if (JSON.stringify(meta).length > META_STR_MAX + 2000) {
+        meta.detailSnapshot = buildRecoMinDetailSnapshot(payload);
+      }
+    } catch (eM) {}
+    return meta;
+  }
+
+  function mergeFavoriteDetailMeta(fkNorm, patch) {
+    var kNorm = normalizeFavoriteKey(fkNorm);
+    if (!kNorm || kNorm === "p:empty") return;
+    var map = loadFavoriteDetailMetaMap();
+    var prev = map[kNorm] || {};
+    var next = {};
+    var k;
+    for (k in prev) {
+      if (Object.prototype.hasOwnProperty.call(prev, k)) next[k] = prev[k];
+    }
+    for (k in patch) {
+      if (Object.prototype.hasOwnProperty.call(patch, k)) next[k] = patch[k];
+    }
+    next.favoriteKey = kNorm;
+    if (!next.savedAt) next.savedAt = new Date().toISOString();
+    map[kNorm] = next;
+    saveFavoriteDetailMetaMap(map);
+  }
+
+  function removeFavoriteDetailMetaByServerId(serverFavoriteId) {
+    var sid = String(serverFavoriteId || "").trim();
+    if (!sid) return;
+    var map = loadFavoriteDetailMetaMap();
+    var changed = false;
+    Object.keys(map).forEach(function (k) {
+      var m = map[k];
+      if (m && String(m.serverFavoriteId || "") === sid) {
+        delete map[k];
+        changed = true;
+      }
+    });
+    if (changed) saveFavoriteDetailMetaMap(map);
+  }
+
+  function getFavoriteDetailMetaByKey(favoriteKey) {
+    var kNorm = normalizeFavoriteKey(favoriteKey);
+    var map = loadFavoriteDetailMetaMap();
+    return map[kNorm] || null;
+  }
+
+  function getFavoriteDetailMetaForFavoriteRow(row) {
+    row = row || {};
+    var fk = buildFavoriteKey({ listing_url: row.listing_url, property_id: row.property_id });
+    return getFavoriteDetailMetaByKey(fk);
+  }
+
   function postAddFavorite(payload) {
     var body = payload && typeof payload === "object" ? payload : {};
     var fk = buildFavoriteKey({
@@ -314,7 +564,25 @@
   }
 
   function addFavoriteThenRefresh(payload) {
+    payload = payload && typeof payload === "object" ? payload : {};
+    var fkNorm = buildFavoriteKey({
+      listing_url: payload.listing_url,
+      source_url: payload.source_url,
+      url: payload.url,
+      property_id: payload.propertyId != null ? payload.propertyId : payload.property_id,
+      listing_id: payload.listing_id,
+      rank: payload.rank,
+      record_id: payload.record_id,
+      external_id: payload.external_id,
+    });
+    var histEntry = findMatchingPropertyHistoryEntry(payload);
+    var meta = buildFavoriteClientMeta(fkNorm, payload, histEntry);
+    mergeFavoriteDetailMeta(fkNorm, meta);
     return postAddFavorite(payload).then(function (data) {
+      var fav = data && data.favorite;
+      if (fav && fav.id) {
+        mergeFavoriteDetailMeta(fkNorm, { serverFavoriteId: fav.id });
+      }
       return refreshFavoritesCache(500).then(function () {
         return data;
       });
@@ -323,6 +591,7 @@
 
   function removeFavoriteThenRefresh(favoriteId) {
     return deleteFavoriteById(favoriteId).then(function (data) {
+      removeFavoriteDetailMetaByServerId(favoriteId);
       return refreshFavoritesCache(500).then(function () {
         return data;
       });
@@ -350,5 +619,7 @@
     favoriteRowMatchesReco: favoriteRowMatchesReco,
     _internalPostAddFavorite: postAddFavorite,
     _internalDeleteFavoriteById: deleteFavoriteById,
+    getFavoriteDetailMetaByKey: getFavoriteDetailMetaByKey,
+    getFavoriteDetailMetaForFavoriteRow: getFavoriteDetailMetaForFavoriteRow,
   };
 })(window);
