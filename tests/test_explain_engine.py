@@ -73,3 +73,35 @@ def test_build_explanation_result_with_string_risks():
     assert isinstance(result, dict)
     assert len(result["cons"]) > 0
     assert len(result["pros"]) > 0
+
+
+def test_build_explanation_result_with_nested_fields():
+    analysis_result = {
+        "analysis": {
+            "final_score": 78,
+        },
+        "contract_result": {
+            "risk_list": [
+                {"name": "Break clause unclear", "severity": "medium", "description": "Clause wording is vague"},
+                {"name": "Deposit protection missing", "severity": "high", "description": "No clear protection info"},
+            ]
+        },
+        "summary_result": {
+            "highlights": [
+                "地段还可以",
+                "通勤相对方便",
+            ]
+        },
+    }
+
+    result = build_explanation_result(analysis_result)
+
+    assert isinstance(result, dict)
+    assert isinstance(result["summary"], str)
+    assert isinstance(result["pros"], list)
+    assert isinstance(result["cons"], list)
+    assert isinstance(result["recommendation"], str)
+
+    assert len(result["pros"]) > 0
+    assert len(result["cons"]) > 0
+    assert "高风险" in result["recommendation"] or "先处理高风险项" in result["recommendation"]

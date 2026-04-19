@@ -544,7 +544,7 @@ def _build_product_output(result: dict[str, Any]) -> dict[str, Any]:
     display_sections = result.get("display_sections") or {}
     analysis_route = result.get("analysis_route") or {}
 
-    return {
+    out: dict[str, Any] = {
         "status": "ok" if result.get("success") else "error",
         "intent": result.get("intent") or "",
         "scope": result.get("scope") or "",
@@ -576,6 +576,10 @@ def _build_product_output(result: dict[str, Any]) -> dict[str, Any]:
             "available_capabilities": list(result.get("available_capabilities") or []),
         },
     }
+    er = result.get("explain_result")
+    if isinstance(er, dict):
+        out["explain_result"] = er
+    return out
 
 def _finish_chat_response(
     base: dict[str, Any],

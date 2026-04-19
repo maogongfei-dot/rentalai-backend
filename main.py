@@ -252,6 +252,38 @@ def _format_product_output(result: dict[str, Any]) -> str:
         return _DEFAULT_DETAIL
     return json.dumps(product_output, indent=2, ensure_ascii=False)
 
+
+def _print_explain_result_block(result: dict[str, Any]) -> None:
+    """Print modules.explain-shaped ``explain_result`` when present (summary / pros / cons / recommendation)."""
+    er = result.get("explain_result")
+    if not isinstance(er, dict):
+        return
+    print()
+    print("【Explain Summary】")
+    summary = er.get("summary")
+    print("" if summary is None else str(summary).strip())
+    print()
+    print("【Pros】")
+    pros = er.get("pros")
+    if isinstance(pros, list):
+        for item in pros:
+            text = str(item).strip() if item is not None else ""
+            if text:
+                print(f"- {text}")
+    print()
+    print("【Cons】")
+    cons = er.get("cons")
+    if isinstance(cons, list):
+        for item in cons:
+            text = str(item).strip() if item is not None else ""
+            if text:
+                print(f"- {text}")
+    print()
+    print("【Recommendation】")
+    rec = er.get("recommendation")
+    print("" if rec is None else str(rec).strip())
+
+
 def print_demo_result(result: dict[str, Any], user_text: str) -> None:
     """Unified console layout for debugging and demos."""
     city = _safe_str(result.get("city_context"), _DEFAULT_DETAIL)
@@ -298,6 +330,8 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
     print()
     print("======== PRODUCT OUTPUT ========")
     print(_format_product_output(result))
+
+    _print_explain_result_block(result)
 
     print()
     print("======== RAW DEBUG (OPTIONAL) ========")

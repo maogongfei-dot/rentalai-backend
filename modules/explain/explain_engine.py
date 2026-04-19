@@ -4,11 +4,11 @@ from typing import Any, Dict, List, Optional
 def build_explanation_result(analysis_result: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """
     输入：
-        analysis_result: {
-            "score": int | float | None,
-            "risks": list[dict | str],
-            "reasons": list[str]
-        }
+        analysis_result: 任意已有分析结果字典
+        优先尝试从中提取：
+        - score
+        - risks
+        - reasons
 
     输出：
         {
@@ -20,9 +20,9 @@ def build_explanation_result(analysis_result: Optional[Dict[str, Any]]) -> Dict[
     """
     analysis_result = analysis_result or {}
 
-    score = analysis_result.get("score")
-    risks = analysis_result.get("risks") or []
-    reasons = analysis_result.get("reasons") or []
+    score = _extract_score(analysis_result)
+    risks = _extract_risks(analysis_result)
+    reasons = _extract_reasons(analysis_result)
 
     normalized_score = _normalize_score(score)
     normalized_risks = _normalize_risks(risks)
@@ -41,6 +41,125 @@ def build_explanation_result(analysis_result: Optional[Dict[str, Any]]) -> Dict[
     }
 
 
+def _extract_score(data: Dict[str, Any]) -> Any:
+    candidate_keys = [
+        "score",
+        "final_score",
+        "total_score",
+        "overall_score",
+    ]
+
+    for key in candidate_keys:
+        if key in data:
+            return data.get(key)
+
+    nested_dict_keys = [
+        "result",
+        "analysis",
+        "analysis_result",
+        "scores",
+        "scoring",
+    ]
+
+    nested_score_keys = [
+        "score",
+        "final_score",
+        "total_score",
+        "overall_score",
+    ]
+
+    for parent_key in nested_dict_keys:
+        parent_value = data.get(parent_key)
+        if isinstance(parent_value, dict):
+            for child_key in nested_score_keys:
+                if child_key in parent_value:
+                    return parent_value.get(child_key)
+
+    return None
+
+
+def _extract_risks(data: Dict[str, Any]) -> List[Any]:
+    candidate_keys = [
+        "risks",
+        "risk_items",
+        "risk_list",
+        "issues",
+        "problems",
+    ]
+
+    for key in candidate_keys:
+        value = data.get(key)
+        if isinstance(value, list):
+            return value
+
+    nested_dict_keys = [
+        "result",
+        "analysis",
+        "analysis_result",
+        "risk_result",
+        "contract_result",
+    ]
+
+    nested_risk_keys = [
+        "risks",
+        "risk_items",
+        "risk_list",
+        "issues",
+        "problems",
+    ]
+
+    for parent_key in nested_dict_keys:
+        parent_value = data.get(parent_key)
+        if isinstance(parent_value, dict):
+            for child_key in nested_risk_keys:
+                child_value = parent_value.get(child_key)
+                if isinstance(child_value, list):
+                    return child_value
+
+    return []
+
+
+def _extract_reasons(data: Dict[str, Any]) -> List[Any]:
+    candidate_keys = [
+        "reasons",
+        "reason_list",
+        "highlights",
+        "pros",
+        "good_points",
+    ]
+
+    for key in candidate_keys:
+        value = data.get(key)
+        if isinstance(value, list):
+            return value
+
+    nested_dict_keys = [
+        "result",
+        "analysis",
+        "analysis_result",
+        "explanation",
+        "summary_result",
+    ]
+
+    nested_reason_keys = [
+        "reasons",
+        "reason_list",
+        "highlights",
+        "pros",
+        "good_points",
+    ]
+
+    for parent_key in nested_dict_keys:
+        parent_value = data.get(parent_key)
+        if isinstance(parent_value, dict):
+            for child_key in nested_reason_keys:
+                child_value = parent_value.get(child_key)
+                if isinstance(child_value, list):
+                    return child_value
+
+    return []
+
+
 def _normalize_score(score: Any) -> Optional[float]:
     if score is None:
         return None
@@ -56,9 +175,9 @@ def _normalize_risks(risks: List[Any]) -> List[Dict[str, str]]:
 
     for item in risks:
         if isinstance(item, dict):
-            title = str(item.get("title") or item.get("name") or item.get("risk") or "Unknown risk").strip()
-            level = str(item.get("level") or item.get("severity") or "medium").strip().lower()
-            detail = str(item.get("detail") or item.get("description") or "").strip()
+            title = str(item.get("title") or item.get("name") or item.get("risk") or item.get("issue") or "Unknown risk").strip()
+            level = str(item.get("level") or item.get("severity") or item.get("risk_level") or "medium").strip().lower()
+            detail = str(item.get("detail") or item.get("description") or item.get("reason") or "").strip()
         else:
             title = str(item).strip()
             level = "medium"
@@ -67,13 +186,14 @@ def _normalize_risks(risks: List[Any]) -> List[Dict[str, str]]:
         if level not in {"low", "medium", "high"}:
             level = "medium"
 
-        normalized.append(
-            {
-                "title": title,
-                "level": level,
-                "detail": detail,
-            }
-        )
+        if title:
+            normalized.append(
+                {
+                    "title": title,
+                    "level": level,
+                    "detail": detail,
+                }
+            )
 
     return normalized
 
@@ -82,7 +202,17 @@ def _normalize_reasons(reasons: List[Any]) -> List[str]:
     cleaned = []
 
     for item in reasons:
-        text = str(item).strip()
+        if isinstance(item, dict):
+            text = str(
+                item.get("text")
+                or item.get("reason")
+                or item.get("title")
+                or item.get("label")
+                or ""
+            ).strip()
+        else:
+            text = str(item).strip()
+
         if text:
             cleaned.append(text)
 
