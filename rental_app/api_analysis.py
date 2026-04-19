@@ -4,9 +4,17 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from modules.explain import build_explanation_result
 
 _perf_log = logging.getLogger("rentalai.perf")
 
@@ -152,6 +160,42 @@ def normalize_engine_output(engine_result: dict) -> dict:
     status = p.get("status") if isinstance(p.get("status"), dict) else {}
 
     thx = engine_result.get("top_house_export")
+    esum = engine_result.get("explanation_summary") if isinstance(engine_result.get("explanation_summary"), dict) else {}
+    expl = engine_result.get("explanation") if isinstance(engine_result.get("explanation"), dict) else {}
+    analysis_part = p.get("analysis") if isinstance(p.get("analysis"), dict) else {}
+
+    risks_for_explain: list[Any] = []
+    for kr in (esum.get("key_risks"), expl.get("key_risks")):
+        if isinstance(kr, list) and kr:
+            risks_for_explain = list(kr[:15])
+            break
+        if kr not in (None, "") and not isinstance(kr, list):
+            risks_for_explain = [kr]
+            break
+    if not risks_for_explain:
+        pb = analysis_part.get("primary_blockers")
+        if isinstance(pb, list) and pb:
+            risks_for_explain = list(pb[:15])
+
+    reasons_for_explain: list[str] = []
+    sup = analysis_part.get("supporting_reasons")
+    if isinstance(sup, list):
+        reasons_for_explain.extend(str(x).strip() for x in sup if str(x).strip())
+    for kp in (esum.get("key_positives"), expl.get("key_positives")):
+        if not isinstance(kp, list):
+            continue
+        for x in kp[:10]:
+            s = str(x).strip()
+            if s:
+                reasons_for_explain.append(s)
+
+    analysis_result = {
+        "score": engine_result.get("property_score"),
+        "risks": risks_for_explain,
+        "reasons": reasons_for_explain[:15],
+    }
+    explain_result = build_explanation_result(analysis_result)
+
     return {
         "score": engine_result.get("property_score"),
         "decision": p.get("decision") if isinstance(p.get("decision"), dict) else {},
@@ -169,6 +213,7 @@ def normalize_engine_output(engine_result: dict) -> dict:
         else {"status": "placeholder", "message": "No contract risk input"},
         # P4 Phase3: 前端详情页评分明细（引擎已有则透传，缺省为空 dict）
         "top_house_export": thx if isinstance(thx, dict) else {},
+        "explain_result": explain_result,
     }
 
 
@@ -973,6 +1018,7 @@ def legacy_ui_result_from_standard_envelope(envelope: dict) -> dict:
         "explanation": {},
         "risk_result": {},
         "top_house_export": {},
+        "explain_result": {},
         "_api_meta": build_meta(ep),
     }
 
@@ -1035,6 +1081,8 @@ def legacy_ui_result_from_standard_envelope(envelope: dict) -> dict:
         )
         th = data.get("top_house_export")
         out["top_house_export"] = th if isinstance(th, dict) else {}
+        ex = data.get("explain_result")
+        out["explain_result"] = ex if isinstance(ex, dict) else {}
         return out
 
     # 子接口：尽量填充可映射字段，其余留空
