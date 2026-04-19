@@ -320,10 +320,6 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
         print(f"Summary: {_safe_str(decision.get('decision_summary'), _DEFAULT_DETAIL)}")
         print(f"Action: {_safe_str(decision.get('decision_action'), _DEFAULT_DETAIL)}")
 
-    print()
-    print("======== MAIN RESPONSE ========")
-    print(_format_main_response(result))
-
     final_result = {
         "explain_result": result.get("explain_result"),
         "summary": result.get("summary") or result.get("response_text") or result.get("display_text"),
@@ -332,10 +328,16 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
         "reasons": ((result.get("explanation_summary") or {}).get("key_positives") if isinstance(result.get("explanation_summary"), dict) else []),
     }
     formatted_response = build_final_response_text(final_result)
+
+    print()
+    print("======== MAIN RESPONSE ========")
     if formatted_response:
+        print(formatted_response)
         print()
         print("======== FINAL RESPONSE ========")
         print(formatted_response)
+    else:
+        print(_format_main_response(result))
 
     print()
     print("======== FOLLOW UPS ========")

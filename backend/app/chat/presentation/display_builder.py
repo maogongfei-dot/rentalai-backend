@@ -7,6 +7,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from modules.output.response_formatter import build_final_response_text
+
 # Section titles — keep stable for CLI and future UI mapping.
 TITLE_SUMMARY = "【Summary】"
 TITLE_DECISION = "【Decision】"
@@ -476,10 +478,16 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
     """
     sections = build_display_sections(chat_result)
     display_text = render_display_text(sections)
-    explain_block = _format_explain_result_block_zh(chat_result.get("explain_result"))
-    if explain_block:
-        base = display_text.strip()
-        display_text = f"{explain_block}\n\n{base}".strip() if base else explain_block
+    final_result = {
+        "explain_result": chat_result.get("explain_result"),
+        "summary": chat_result.get("summary") or chat_result.get("response_text") or chat_result.get("display_text"),
+        "recommendation": ((chat_result.get("decision") or {}).get("decision_action") if isinstance(chat_result.get("decision"), dict) else None),
+        "risks": ((chat_result.get("risk_result") or {}).get("risk_markers") if isinstance(chat_result.get("risk_result"), dict) else []),
+        "reasons": ((chat_result.get("explanation_summary") or {}).get("key_positives") if isinstance(chat_result.get("explanation_summary"), dict) else []),
+    }
+    formatted_response = build_final_response_text(final_result)
+    if formatted_response:
+        display_text = formatted_response
 
     decision = chat_result.get("decision") or {}
     display_order = [
