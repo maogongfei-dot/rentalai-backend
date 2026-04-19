@@ -47,6 +47,8 @@
   var compareSelectedKeys = [];
   /** 批量删除进行中：抑制 rentalai-favorites-updated 中间态重绘 */
   var compareBulkDeleting = false;
+  /** Step22：管理模式「更多操作」占位菜单开关（仅页面层） */
+  var compareBulkMoreMenuOpen = false;
 
   function escapeAttr(s) {
     return String(s == null ? "" : s)
@@ -207,6 +209,24 @@
     return true;
   }
 
+  /** Step20：管理模式操作栏派生状态（基于当前展示列表 lastSelected + compareSelectedKeys） */
+  function getCompareBulkToolbarDerived() {
+    var rows = lastSelected || [];
+    var visibleKeys = compareVisibleFavoriteKeys(rows);
+    var visibleCount = visibleKeys.length;
+    var hasItems = visibleCount > 0;
+    var selectedCount = compareSelectedKeys.length;
+    var hasSelection = selectedCount > 0;
+    var isAllSelected = hasItems && compareIsAllVisibleSelected(rows);
+    return {
+      visibleCount: visibleCount,
+      hasItems: hasItems,
+      selectedCount: selectedCount,
+      hasSelection: hasSelection,
+      isAllSelected: isAllSelected,
+    };
+  }
+
   function getServerFavoriteIdForReco(r) {
     var fr = r && r._favoriteRow;
     if (fr && fr.id) return String(fr.id).trim();
@@ -239,31 +259,109 @@
     return null;
   }
 
+  /** Step24：更多操作菜单焦点收口 */
+  function compareBulkMoreFocusFirstMenuItemDeferred() {
+    setTimeout(function () {
+      var menu = document.getElementById("compare-bulk-more-menu");
+      if (!menu || menu.hidden) return;
+      var first = menu.querySelector("button[role='menuitem'], button");
+      if (first) first.focus();
+    }, 0);
+  }
+
+  function compareBulkMoreFocusMoreButtonDeferred() {
+    setTimeout(function () {
+      var b = document.getElementById("compare-bulk-more-btn");
+      if (b && compareManageMode && !b.hidden && !b.disabled) b.focus();
+    }, 0);
+  }
+
   function updateCompareBulkToolbar() {
     var delBtn = document.getElementById("compare-delete-selected-btn");
     var toggleBtn = document.getElementById("compare-manage-toggle-btn");
-    var selAllBtn = document.getElementById("compare-select-all-btn");
-    var clrSelBtn = document.getElementById("compare-clear-selection-btn");
+    var selToggle = document.getElementById("compare-select-toggle-btn");
+    var statusEl = document.getElementById("compare-bulk-selection-status");
+    var moreAnchor = document.getElementById("compare-bulk-more-anchor");
+    var moreBtn = document.getElementById("compare-bulk-more-btn");
+    var moreMenu = document.getElementById("compare-bulk-more-menu");
     if (!delBtn || !toggleBtn) return;
+    var snapMenuWasOpen = compareBulkMoreMenuOpen;
+    var derived = getCompareBulkToolbarDerived();
+    if (
+      !compareManageMode ||
+      !derived.hasSelection ||
+      compareBulkDeleting ||
+      !derived.hasItems
+    ) {
+      compareBulkMoreMenuOpen = false;
+    }
     if (compareManageMode) {
       delBtn.hidden = false;
       toggleBtn.textContent = "完成";
-      delBtn.disabled = compareSelectedKeys.length === 0;
-      if (selAllBtn && clrSelBtn) {
-        selAllBtn.hidden = false;
-        clrSelBtn.hidden = false;
-        var vis = compareVisibleFavoriteKeys(lastSelected);
-        var allSel = compareIsAllVisibleSelected(lastSelected);
-        selAllBtn.disabled = vis.length === 0 || allSel;
-        clrSelBtn.disabled = compareSelectedKeys.length === 0;
+      delBtn.disabled = !derived.hasSelection || compareBulkDeleting;
+      if (statusEl) {
+        statusEl.hidden = false;
+        statusEl.textContent = "已选择 " + derived.selectedCount + " 项";
+      }
+      if (selToggle) {
+        selToggle.hidden = false;
+        if (!derived.hasItems) {
+          selToggle.hidden = true;
+        } else {
+          selToggle.disabled = compareBulkDeleting;
+          selToggle.textContent = derived.isAllSelected ? "取消全选" : "全选";
+        }
+      }
+      if (moreAnchor) moreAnchor.hidden = false;
+      if (moreBtn) moreBtn.disabled = !derived.hasSelection || compareBulkDeleting;
+      if (delBtn && compareManageMode)
+        delBtn.setAttribute("aria-label", "删除当前选中的收藏");
+      if (selToggle && compareManageMode && !selToggle.hidden) {
+        selToggle.setAttribute(
+          "aria-label",
+          derived.isAllSelected ? "取消全选当前列表" : "全选当前列表中的收藏"
+        );
+      }
+      if (moreMenu) {
+        moreMenu.hidden = !(
+          compareBulkMoreMenuOpen &&
+          derived.hasSelection &&
+          !compareBulkDeleting
+        );
+        moreMenu.setAttribute(
+          "aria-hidden",
+          moreMenu.hidden ? "true" : "false"
+        );
+      }
+      if (moreBtn) moreBtn.setAttribute("aria-expanded", compareBulkMoreMenuOpen ? "true" : "false");
+      if (compareBulkDeleting) {
+        toggleBtn.disabled = true;
+        delBtn.disabled = true;
+        if (moreBtn) moreBtn.disabled = true;
+      } else {
+        toggleBtn.disabled = false;
       }
     } else {
       delBtn.hidden = true;
       toggleBtn.textContent = "管理";
-      if (selAllBtn && clrSelBtn) {
-        selAllBtn.hidden = true;
-        clrSelBtn.hidden = true;
+      toggleBtn.disabled = false;
+      delBtn.disabled = true;
+      compareBulkMoreMenuOpen = false;
+      if (statusEl) statusEl.hidden = true;
+      if (selToggle) selToggle.hidden = true;
+      if (moreAnchor) moreAnchor.hidden = true;
+      if (moreMenu) {
+        moreMenu.hidden = true;
+        moreMenu.setAttribute("aria-hidden", "true");
       }
+      if (moreBtn) moreBtn.setAttribute("aria-expanded", "false");
+    }
+    var manageHintEl = document.getElementById("compare-bulk-manage-hint");
+    if (manageHintEl) manageHintEl.hidden = !compareManageMode;
+    if (toggleBtn)
+      toggleBtn.setAttribute("aria-pressed", compareManageMode ? "true" : "false");
+    if (snapMenuWasOpen && !compareBulkMoreMenuOpen) {
+      compareBulkMoreFocusMoreButtonDeferred();
     }
   }
 
@@ -540,6 +638,7 @@
   }
 
   function openCompareDetail(r) {
+    if (compareManageMode) return;
     setOpenDetailKeyFromReco(r);
     var ui = window.RentalAIUnifiedHistoryUi;
     var inner = document.getElementById("compare-detail-inner");
@@ -598,6 +697,7 @@
     if (_detailClickBound) return;
     _detailClickBound = true;
     container.addEventListener("click", function (ev) {
+      if (compareManageMode) return;
       var btn = ev.target && ev.target.closest && ev.target.closest(".compare-detail-btn");
       if (!btn) return;
       ev.preventDefault();
@@ -607,6 +707,59 @@
     });
   }
   bindCompareDetailOnce();
+
+  var _compareManageCardBound = false;
+  function bindCompareManageCardToggleOnce() {
+    if (_compareManageCardBound) return;
+    _compareManageCardBound = true;
+    container.addEventListener("click", function (ev) {
+      if (!compareManageMode) return;
+      var t = ev.target;
+      if (t && t.closest && (t.closest("a") || t.closest("button"))) return;
+      if (t && t.closest && (t.closest("label") || t.closest(".compare-select-cb"))) return;
+      var card = t && t.closest && t.closest(".compare-card");
+      if (!card) return;
+      var fk = (card.getAttribute("data-favorite-key") || "").trim();
+      if (!fk) return;
+      ev.preventDefault();
+      var ix = compareSelectedKeys.indexOf(fk);
+      if (ix >= 0) compareSelectedKeys.splice(ix, 1);
+      else compareSelectedKeys.push(fk);
+      renderCards(lastSelected, null);
+    });
+  }
+  bindCompareManageCardToggleOnce();
+
+  var _compareCardKbBound = false;
+  function bindCompareManageCardKeyboardOnce() {
+    if (_compareCardKbBound) return;
+    _compareCardKbBound = true;
+    container.addEventListener("keydown", function (ev) {
+      if (!compareManageMode) return;
+      var key = ev.key || "";
+      var code = ev.code || "";
+      var isActivate =
+        key === "Enter" ||
+        key === " " ||
+        code === "Enter" ||
+        code === "Space" ||
+        ev.keyCode === 13 ||
+        ev.keyCode === 32;
+      if (!isActivate) return;
+      var el = ev.target;
+      if (el && el.closest && el.closest(".compare-select-cb")) return;
+      var card = el && el.closest && el.closest(".compare-card");
+      if (!card) return;
+      var fk = (card.getAttribute("data-favorite-key") || "").trim();
+      if (!fk) return;
+      ev.preventDefault();
+      var ix = compareSelectedKeys.indexOf(fk);
+      if (ix >= 0) compareSelectedKeys.splice(ix, 1);
+      else compareSelectedKeys.push(fk);
+      renderCards(lastSelected, null);
+    });
+  }
+  bindCompareManageCardKeyboardOnce();
 
   var _compareSelectBound = false;
   function bindCompareSelectCheckboxOnce() {
@@ -835,14 +988,47 @@
       var pid = recoPid(r);
       var srcInfo = getFavoriteSourceDisplayAndLink(r);
       var fkNorm = recoFavoriteKeyNormalized(r);
+      var pickLbl =
+        "选择：「" + String((r.title || "房源").trim()).slice(0, 80) + "」";
+      if (fkNorm) div.setAttribute("data-favorite-key", fkNorm);
+      if (compareManageMode && fkNorm) {
+        div.style.cursor = "pointer";
+        div.setAttribute("tabindex", "0");
+        div.setAttribute("role", "group");
+        div.setAttribute("aria-label", pickLbl);
+      }
       var selectRowHtml =
         compareManageMode && fkNorm
           ? '<p class="hint small-print compare-card-select-row"><label><input type="checkbox" class="compare-select-cb" data-favorite-key="' +
             escapeAttr(fkNorm) +
             '"' +
             (compareSelectedKeys.indexOf(fkNorm) >= 0 ? " checked" : "") +
-            "/> 选择</label></p>"
+            ' aria-label="' +
+            escapeAttr(pickLbl) +
+            '"/> 选择</label></p>'
           : "";
+
+      var sourceLinkHtml =
+        !compareManageMode && srcInfo.href
+          ? '<p class="hint small-print compare-card-source-link"><a href="' +
+            escapeAttr(srcInfo.href) +
+            '">' +
+            escapeHtml(srcInfo.linkLabel) +
+            "</a></p>"
+          : "";
+
+      var detailActionsHtml = !compareManageMode
+        ? '<p class="compare-card-actions">' +
+          '<button type="button" class="btn-history-primary compare-detail-btn" data-listing-url="' +
+          escapeAttr(url) +
+          '" data-pid="' +
+          escapeAttr(pid) +
+          '" data-title="' +
+          escapeAttr(r.title || "") +
+          '">' +
+          "查看详情" +
+          "</button></p>"
+        : "";
 
       div.innerHTML =
         "<h3>" +
@@ -852,13 +1038,7 @@
         '<p class="hint muted small-print compare-card-source">来源：' +
         escapeHtml(srcInfo.label) +
         "</p>" +
-        (srcInfo.href
-          ? '<p class="hint small-print compare-card-source-link"><a href="' +
-            escapeAttr(srcInfo.href) +
-            '">' +
-            escapeHtml(srcInfo.linkLabel) +
-            "</a></p>"
-          : "") +
+        sourceLinkHtml +
         "<p>租金: £" +
         (r.rent || "-") +
         "</p>" +
@@ -877,16 +1057,7 @@
         "<p>风险: " +
         (r.risks ? r.risks.join("，") : "-") +
         "</p>" +
-        '<p class="compare-card-actions">' +
-        '<button type="button" class="btn-history-primary compare-detail-btn" data-listing-url="' +
-        escapeAttr(url) +
-        '" data-pid="' +
-        escapeAttr(pid) +
-        '" data-title="' +
-        escapeAttr(r.title || "") +
-        '">' +
-        "查看详情" +
-        "</button></p>";
+        detailActionsHtml;
 
       container.appendChild(div);
     });
@@ -939,6 +1110,7 @@
     window.addEventListener("rentalai-favorite-scope-change", function () {
       compareManageMode = false;
       compareSelectedKeys = [];
+      compareBulkMoreMenuOpen = false;
       syncComparePageHeaderScope();
       loadCompareFromServer().catch(function () {});
     });
@@ -1003,11 +1175,15 @@
     wrap.id = "compare-bulk-toolbar-wrap";
     wrap.className = "hint muted small-print";
     wrap.style.marginTop = "0.25rem";
+    wrap.setAttribute("role", "toolbar");
+    wrap.setAttribute("aria-label", "收藏列表批量操作");
     var btnManage = document.createElement("button");
     btnManage.type = "button";
     btnManage.id = "compare-manage-toggle-btn";
     btnManage.className = "btn-history-primary";
     btnManage.textContent = "管理";
+    btnManage.setAttribute("aria-pressed", "false");
+    btnManage.setAttribute("aria-label", "进入或退出管理模式，以多选与批量操作");
     var btnDel = document.createElement("button");
     btnDel.type = "button";
     btnDel.id = "compare-delete-selected-btn";
@@ -1015,44 +1191,148 @@
     btnDel.textContent = "删除选中";
     btnDel.hidden = true;
     btnDel.disabled = true;
-    var btnSelAll = document.createElement("button");
-    btnSelAll.type = "button";
-    btnSelAll.id = "compare-select-all-btn";
-    btnSelAll.className = "btn-history-primary";
-    btnSelAll.textContent = "全选";
-    btnSelAll.hidden = true;
-    btnSelAll.disabled = true;
-    var btnClrSel = document.createElement("button");
-    btnClrSel.type = "button";
-    btnClrSel.id = "compare-clear-selection-btn";
-    btnClrSel.className = "btn-history-primary";
-    btnClrSel.textContent = "取消全选";
-    btnClrSel.hidden = true;
-    btnClrSel.disabled = true;
+    btnDel.setAttribute("aria-label", "删除当前选中的收藏");
+    var statusBulk = document.createElement("span");
+    statusBulk.id = "compare-bulk-selection-status";
+    statusBulk.className = "hint muted";
+    statusBulk.setAttribute("aria-live", "polite");
+    statusBulk.setAttribute("role", "status");
+    statusBulk.setAttribute("aria-atomic", "true");
+    statusBulk.hidden = true;
+    statusBulk.textContent = "已选择 0 项";
+    var manageHint = document.createElement("span");
+    manageHint.id = "compare-bulk-manage-hint";
+    manageHint.className = "hint muted small-print";
+    manageHint.setAttribute("aria-live", "polite");
+    manageHint.setAttribute("role", "status");
+    manageHint.hidden = true;
+    manageHint.textContent = "已进入管理模式";
+    var btnSelToggle = document.createElement("button");
+    btnSelToggle.type = "button";
+    btnSelToggle.id = "compare-select-toggle-btn";
+    btnSelToggle.className = "btn-history-primary";
+    btnSelToggle.textContent = "全选";
+    btnSelToggle.hidden = true;
+    btnSelToggle.disabled = true;
+    btnSelToggle.setAttribute("aria-label", "全选当前列表中的收藏");
+    var moreAnchor = document.createElement("span");
+    moreAnchor.id = "compare-bulk-more-anchor";
+    moreAnchor.style.cssText = "position:relative;display:inline-block;vertical-align:middle";
+    moreAnchor.hidden = true;
+    var btnMore = document.createElement("button");
+    btnMore.type = "button";
+    btnMore.id = "compare-bulk-more-btn";
+    btnMore.className = "btn-history-primary";
+    btnMore.textContent = "更多操作";
+    btnMore.disabled = true;
+    btnMore.setAttribute("aria-expanded", "false");
+    btnMore.setAttribute("aria-haspopup", "menu");
+    btnMore.setAttribute("aria-controls", "compare-bulk-more-menu");
+    var moreMenu = document.createElement("div");
+    moreMenu.id = "compare-bulk-more-menu";
+    moreMenu.hidden = true;
+    moreMenu.setAttribute("role", "menu");
+    moreMenu.setAttribute("aria-labelledby", "compare-bulk-more-btn");
+    moreMenu.setAttribute("aria-hidden", "true");
+    moreMenu.style.cssText =
+      "position:absolute;left:0;top:100%;margin-top:4px;z-index:9999;min-width:11rem;padding:6px 0;background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.08)";
+    function addCompareBulkMorePlaceholderItem(label) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "hint";
+      b.setAttribute("role", "menuitem");
+      b.style.cssText =
+        "display:block;width:100%;text-align:left;padding:8px 14px;border:none;background:transparent;cursor:pointer;font:inherit";
+      b.textContent = label;
+      b.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        try {
+          console.log("[RentalAI compare] bulk more placeholder:", label);
+        } catch (eLog) {}
+        window.alert("敬请期待（" + label + " · 占位，未接入数据）");
+        compareBulkMoreMenuOpen = false;
+        updateCompareBulkToolbar();
+        compareBulkMoreFocusMoreButtonDeferred();
+      });
+      moreMenu.appendChild(b);
+    }
+    addCompareBulkMorePlaceholderItem("移至…");
+    addCompareBulkMorePlaceholderItem("添加标签…");
+    addCompareBulkMorePlaceholderItem("整理…");
+    moreAnchor.appendChild(btnMore);
+    moreAnchor.appendChild(moreMenu);
+
     wrap.appendChild(btnManage);
     wrap.appendChild(document.createTextNode(" "));
-    wrap.appendChild(btnSelAll);
+    wrap.appendChild(manageHint);
     wrap.appendChild(document.createTextNode(" "));
-    wrap.appendChild(btnClrSel);
+    wrap.appendChild(statusBulk);
+    wrap.appendChild(document.createTextNode(" "));
+    wrap.appendChild(btnSelToggle);
+    wrap.appendChild(document.createTextNode(" "));
+    wrap.appendChild(moreAnchor);
     wrap.appendChild(document.createTextNode(" "));
     wrap.appendChild(btnDel);
     hdr.appendChild(wrap);
 
-    btnSelAll.addEventListener("click", function () {
-      if (!compareManageMode) return;
-      compareSelectedKeys = compareVisibleFavoriteKeys(lastSelected).slice();
-      renderCards(lastSelected, null);
+    btnMore.addEventListener("mousedown", function (ev) {
+      ev.stopPropagation();
+    });
+    btnMore.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      if (!compareManageMode || compareBulkDeleting) return;
+      var dm = getCompareBulkToolbarDerived();
+      if (!dm.hasSelection) return;
+      var wasOpen = compareBulkMoreMenuOpen;
+      compareBulkMoreMenuOpen = !wasOpen;
+      updateCompareBulkToolbar();
+      if (wasOpen && !compareBulkMoreMenuOpen) compareBulkMoreFocusMoreButtonDeferred();
+      else if (!wasOpen && compareBulkMoreMenuOpen) compareBulkMoreFocusFirstMenuItemDeferred();
     });
 
-    btnClrSel.addEventListener("click", function () {
+    function compareBulkMoreCloseIfOutside(ev) {
+      if (!compareBulkMoreMenuOpen || compareBulkDeleting) return;
       if (!compareManageMode) return;
-      compareSelectedKeys = [];
+      var a = document.getElementById("compare-bulk-more-anchor");
+      if (!a || a.hidden) return;
+      if (a.contains(ev.target)) return;
+      compareBulkMoreMenuOpen = false;
+      updateCompareBulkToolbar();
+      compareBulkMoreFocusMoreButtonDeferred();
+    }
+    document.addEventListener("mousedown", compareBulkMoreCloseIfOutside, true);
+
+    function compareBulkMoreOnEscape(ev) {
+      if (!compareBulkMoreMenuOpen || !compareManageMode) return;
+      var key = ev.key || "";
+      var code = ev.code || "";
+      if (key !== "Escape" && code !== "Escape" && ev.keyCode !== 27) return;
+      ev.preventDefault();
+      compareBulkMoreMenuOpen = false;
+      updateCompareBulkToolbar();
+      compareBulkMoreFocusMoreButtonDeferred();
+    }
+    document.addEventListener("keydown", compareBulkMoreOnEscape, true);
+
+    btnSelToggle.addEventListener("click", function () {
+      if (!compareManageMode || compareBulkDeleting) return;
+      var d = getCompareBulkToolbarDerived();
+      if (!d.hasItems) return;
+      if (d.isAllSelected) {
+        compareSelectedKeys = [];
+      } else {
+        compareSelectedKeys = compareVisibleFavoriteKeys(lastSelected).slice();
+      }
       renderCards(lastSelected, null);
     });
 
     btnManage.addEventListener("click", function () {
       compareManageMode = !compareManageMode;
-      if (!compareManageMode) compareSelectedKeys = [];
+      if (compareManageMode) closeCompareDetail();
+      if (!compareManageMode) {
+        compareSelectedKeys = [];
+        compareBulkMoreMenuOpen = false;
+      }
       loadCompareFromServer().catch(function () {});
     });
 
@@ -1063,6 +1343,7 @@
       if (!api || typeof api.removeFavorite !== "function") return;
       compareBulkDeleting = true;
       btnDel.disabled = true;
+      updateCompareBulkToolbar();
       var keys = compareSelectedKeys.slice();
       var chain = Promise.resolve();
       keys.forEach(function (fk) {
@@ -1077,6 +1358,7 @@
         .then(function () {
           compareBulkDeleting = false;
           compareSelectedKeys = [];
+          compareBulkMoreMenuOpen = false;
           compareManageMode = false;
           return loadCompareFromServer();
         })
@@ -1087,6 +1369,7 @@
         .catch(function () {
           compareBulkDeleting = false;
           btnDel.disabled = false;
+          updateCompareBulkToolbar();
           loadCompareFromServer().catch(function () {});
         });
     });
