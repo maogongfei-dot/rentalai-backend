@@ -101,6 +101,15 @@ def build_final_response_text(final_result: Dict[str, Any]) -> str:
                 lines.append(f"- {text}")
         lines.append("")
 
+    missing_info_items = final_result.get("missing_info_items")
+    if isinstance(missing_info_items, list) and missing_info_items:
+        lines.append("当前还缺：")
+        for item in missing_info_items:
+            text = str(item).strip()
+            if text:
+                lines.append(f"- {text}")
+        lines.append("")
+
     cleaned_lines = _trim_trailing_blank_lines(lines)
     return "\n".join(cleaned_lines).strip()
 

@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from modules.followup.followup_engine import build_followup_questions
+from modules.missing_info.missing_info_engine import build_missing_info_items
 from modules.output.response_formatter import build_final_response_text
 
 # Section titles — keep stable for CLI and future UI mapping.
@@ -488,6 +489,7 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
         "next_actions": list(sections.get("next_steps") or []),
     }
     final_result["followup_questions"] = build_followup_questions(final_result)
+    final_result["missing_info_items"] = build_missing_info_items(final_result)
     formatted_response = build_final_response_text(final_result)
     if formatted_response:
         display_text = formatted_response

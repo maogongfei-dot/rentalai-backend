@@ -17,6 +17,7 @@ if str(_REPO_ROOT) not in sys.path:
 from modules.explain import build_explanation_result
 from modules.actions.action_engine import build_next_actions
 from modules.followup.followup_engine import build_followup_questions
+from modules.missing_info.missing_info_engine import build_missing_info_items
 
 _perf_log = logging.getLogger("rentalai.perf")
 
@@ -212,6 +213,20 @@ def normalize_engine_output(engine_result: dict) -> dict:
     }
     followup_questions = build_followup_questions(final_result)
 
+    uf = p.get("user_facing") if isinstance(p.get("user_facing"), dict) else {}
+    summary_for_missing = str(uf.get("summary") or "").strip()
+    final_result_for_missing = {
+        "explain_result": explain_result,
+        "risks": analysis_result.get("risks") or [],
+        "reasons": analysis_result.get("reasons") or [],
+        "next_actions": next_actions if isinstance(next_actions, list) else [],
+        "followup_questions": followup_questions
+        if isinstance(followup_questions, list)
+        else [],
+        "summary": summary_for_missing,
+    }
+    missing_info_items = build_missing_info_items(final_result_for_missing)
+
     return {
         "score": engine_result.get("property_score"),
         "decision": p.get("decision") if isinstance(p.get("decision"), dict) else {},
@@ -233,6 +248,9 @@ def normalize_engine_output(engine_result: dict) -> dict:
         "next_actions": next_actions if isinstance(next_actions, list) else [],
         "followup_questions": followup_questions
         if isinstance(followup_questions, list)
+        else [],
+        "missing_info_items": missing_info_items
+        if isinstance(missing_info_items, list)
         else [],
     }
 
