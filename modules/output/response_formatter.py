@@ -110,6 +110,19 @@ def build_final_response_text(final_result: Dict[str, Any]) -> str:
                 lines.append(f"- {text}")
         lines.append("")
 
+    decision_result = final_result.get("decision_result")
+    if isinstance(decision_result, dict) and decision_result:
+        lines.append("最终判断：")
+        label = str(decision_result.get("label") or "").strip()
+        reason = str(decision_result.get("reason") or "").strip()
+        confidence = str(decision_result.get("confidence") or "").strip()
+        action_hint = str(decision_result.get("action_hint") or "").strip()
+        lines.append(f"- 状态：{label}")
+        lines.append(f"- 原因：{reason}")
+        lines.append(f"- 置信度：{confidence}")
+        lines.append(f"- 行动提示：{action_hint}")
+        lines.append("")
+
     cleaned_lines = _trim_trailing_blank_lines(lines)
     return "\n".join(cleaned_lines).strip()
 
