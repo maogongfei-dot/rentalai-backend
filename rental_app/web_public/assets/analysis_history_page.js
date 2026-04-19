@@ -612,6 +612,26 @@
     );
   }
 
+  /** Step17：收藏页「返回分析历史」深链 ?entry=<recordId>，与 uh-detail-* id 后缀规则一致 */
+  function uhSanitizeDetailIdSuffix(raw) {
+    return String(raw != null ? raw : "").replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
+
+  function tryScrollToUnifiedHistoryEntryFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      var raw = params.get("entry");
+      if (!raw || !String(raw).trim()) return;
+      var suffix = uhSanitizeDetailIdSuffix(String(raw).trim());
+      if (!suffix) return;
+      var el = document.getElementById("uh-detail-" + suffix);
+      if (!el || typeof el.scrollIntoView !== "function") return;
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      var details = el.closest && el.closest("details.unified-history-details");
+      if (details && !details.open) details.open = true;
+    } catch (eUhEntry) {}
+  }
+
   /**
    * 历史记录渲染主入口：
    * 接收标准化 records 后渲染列表卡片（摘要、要点、详情展开、删除动作）。
@@ -641,6 +661,7 @@
     container.innerHTML = html;
     container.setAttribute("data-unified-history-state", "populated");
     hydrateUnifiedHistoryFavoriteButtons();
+    tryScrollToUnifiedHistoryEntryFromQuery();
   }
 
   function renderLoading(container) {

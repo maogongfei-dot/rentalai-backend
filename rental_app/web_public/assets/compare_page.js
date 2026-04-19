@@ -42,6 +42,12 @@
   /** Step12：当前打开的详情对应的 favoriteKey（规范化后）；用于收藏变化时关闭错位详情 */
   var openDetailFavoriteKey = null;
 
+  /** Step18：收藏页多选管理（仅存页面层，不写全局 store） */
+  var compareManageMode = false;
+  var compareSelectedKeys = [];
+  /** 批量删除进行中：抑制 rentalai-favorites-updated 中间态重绘 */
+  var compareBulkDeleting = false;
+
   function escapeAttr(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;")
@@ -61,6 +67,61 @@
 
   function recoPid(r) {
     return String(r.listing_id != null ? r.listing_id : r.rank != null ? r.rank : "");
+  }
+
+  /** Step17：基于 client meta（source / sourceType / historyId）生成来源文案与站内返回链接 */
+  function getFavoriteSourceDisplayAndLink(r) {
+    var meta = (r && r._favoriteMeta) || {};
+    var src = meta.source != null ? String(meta.source).trim() : "";
+    var st = meta.sourceType != null ? String(meta.sourceType).trim() : "";
+    var hid =
+      (r && r._historyId) ||
+      meta.historyId ||
+      meta.recordId ||
+      meta.analysisId ||
+      "";
+    hid = hid != null ? String(hid).trim() : "";
+
+    var label = "收藏项（来源未标注）";
+    var href = "/analysis-history";
+    var linkLabel = "前往分析历史";
+
+    if (src === "ai_result") {
+      label = "需求解析结果页";
+      href = "/ai-result";
+      linkLabel = "返回结果页";
+    } else if (src === "unified_history" || st === "unified_property") {
+      label = "统一分析历史";
+      href = hid ? "/analysis-history?entry=" + encodeURIComponent(hid) : "/analysis-history";
+      linkLabel = hid ? "在分析历史中定位" : "前往分析历史";
+    } else if (hid) {
+      label = "分析历史（已关联记录）";
+      href = "/analysis-history?entry=" + encodeURIComponent(hid);
+      linkLabel = "在分析历史中定位";
+    } else if (src === "favorite" || src === "unified_history") {
+      label = "收藏保存";
+      href = "/analysis-history";
+      linkLabel = "前往分析历史";
+    }
+
+    return { label: label, href: href, linkLabel: linkLabel };
+  }
+
+  function compareDetailSourceStripHtml(r) {
+    var info = getFavoriteSourceDisplayAndLink(r);
+    return (
+      '<div class="compare-detail-source-strip hint muted small-print" style="margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid rgba(0,0,0,.06)">' +
+      "来源：" +
+      escapeHtml(info.label) +
+      (info.href
+        ? ' · <a href="' +
+          escapeAttr(info.href) +
+          '">' +
+          escapeHtml(info.linkLabel) +
+          "</a>"
+        : "") +
+      "</div>"
+    );
   }
 
   function parseSavedAtMs(iso) {
@@ -92,6 +153,118 @@
     var copy = arr.slice();
     copy.sort(compareFavoriteRowsForComparePage);
     return copy;
+  }
+
+  function recoFavoriteKeyNormalized(r) {
+    var api = window.RentalAIServerFavoritesApi;
+    if (!api || typeof api.buildFavoriteKey !== "function") return "";
+    var k = api.buildFavoriteKey({
+      listing_url: (r.source_url || r.listing_url || r.url || "").trim(),
+      source_url: r.source_url,
+      url: r.url,
+      property_id: String(r.listing_id != null ? r.listing_id : r.rank),
+      listing_id: r.listing_id,
+      rank: r.rank,
+    });
+    if (api.normalizeFavoriteKey) k = api.normalizeFavoriteKey(k);
+    return k ? String(k).trim() : "";
+  }
+
+  function pruneCompareSelectedKeys(rows) {
+    var keep = {};
+    var i;
+    for (i = 0; i < (rows || []).length; i++) {
+      var kk = recoFavoriteKeyNormalized(rows[i]);
+      if (kk) keep[kk] = true;
+    }
+    compareSelectedKeys = compareSelectedKeys.filter(function (k) {
+      return keep[k];
+    });
+  }
+
+  /** Step19：当前列表可见项的 favoriteKey（与渲染顺序一致，去重） */
+  function compareVisibleFavoriteKeys(rows) {
+    rows = rows || [];
+    var out = [];
+    var seen = {};
+    var j;
+    for (j = 0; j < rows.length; j++) {
+      var k = recoFavoriteKeyNormalized(rows[j]);
+      if (!k || seen[k]) continue;
+      seen[k] = true;
+      out.push(k);
+    }
+    return out;
+  }
+
+  function compareIsAllVisibleSelected(rows) {
+    var vk = compareVisibleFavoriteKeys(rows);
+    if (!vk.length) return false;
+    var i;
+    for (i = 0; i < vk.length; i++) {
+      if (compareSelectedKeys.indexOf(vk[i]) < 0) return false;
+    }
+    return true;
+  }
+
+  function getServerFavoriteIdForReco(r) {
+    var fr = r && r._favoriteRow;
+    if (fr && fr.id) return String(fr.id).trim();
+    var api = window.RentalAIServerFavoritesApi;
+    if (!api || typeof api.buildFavoriteKey !== "function") return "";
+    var fk = recoFavoriteKeyNormalized(r);
+    if (!fk) return "";
+    var rows = typeof api.getCachedFavoritesRows === "function" ? api.getCachedFavoritesRows() : null;
+    if (!rows || !rows.length) return "";
+    var j;
+    for (j = 0; j < rows.length; j++) {
+      var row = rows[j];
+      if (!row || !row.id) continue;
+      var rk = api.buildFavoriteKey({ listing_url: row.listing_url, property_id: row.property_id });
+      if (api.normalizeFavoriteKey) rk = api.normalizeFavoriteKey(rk);
+      if (rk === fk || (api.favoriteKeysEqual && api.favoriteKeysEqual(fk, rk)))
+        return String(row.id).trim();
+    }
+    return "";
+  }
+
+  function findRecoByFavoriteKey(fkNorm) {
+    var want = (fkNorm || "").trim();
+    if (!want) return null;
+    var list = lastSelected || [];
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (recoFavoriteKeyNormalized(list[i]) === want) return list[i];
+    }
+    return null;
+  }
+
+  function updateCompareBulkToolbar() {
+    var delBtn = document.getElementById("compare-delete-selected-btn");
+    var toggleBtn = document.getElementById("compare-manage-toggle-btn");
+    var selAllBtn = document.getElementById("compare-select-all-btn");
+    var clrSelBtn = document.getElementById("compare-clear-selection-btn");
+    if (!delBtn || !toggleBtn) return;
+    if (compareManageMode) {
+      delBtn.hidden = false;
+      toggleBtn.textContent = "完成";
+      delBtn.disabled = compareSelectedKeys.length === 0;
+      if (selAllBtn && clrSelBtn) {
+        selAllBtn.hidden = false;
+        clrSelBtn.hidden = false;
+        var vis = compareVisibleFavoriteKeys(lastSelected);
+        var allSel = compareIsAllVisibleSelected(lastSelected);
+        selAllBtn.disabled = vis.length === 0 || allSel;
+        clrSelBtn.disabled = compareSelectedKeys.length === 0;
+      }
+    } else {
+      delBtn.hidden = true;
+      toggleBtn.textContent = "管理";
+      if (selAllBtn && clrSelBtn) {
+        selAllBtn.hidden = true;
+        clrSelBtn.hidden = true;
+      }
+    }
   }
 
   function setOpenDetailKeyFromReco(r) {
@@ -383,10 +556,11 @@
     if (!entry) entry = historyEntryFromFavoriteMeta(r);
     if (!entry) entry = minimalHistoryEntryFromReco(r);
     if (ui && typeof ui.renderDetailBodyHtml === "function") {
-      inner.innerHTML = ui.renderDetailBodyHtml(entry);
+      inner.innerHTML = compareDetailSourceStripHtml(r) + ui.renderDetailBodyHtml(entry);
       if (typeof ui.hydrateFavoriteButtons === "function") ui.hydrateFavoriteButtons();
     } else {
       inner.innerHTML =
+        compareDetailSourceStripHtml(r) +
         '<p class="hint muted">详情模块未加载。</p>' +
         "<p><strong>" +
         escapeHtml(r.title || "房源") +
@@ -433,6 +607,26 @@
     });
   }
   bindCompareDetailOnce();
+
+  var _compareSelectBound = false;
+  function bindCompareSelectCheckboxOnce() {
+    if (_compareSelectBound) return;
+    _compareSelectBound = true;
+    container.addEventListener("change", function (ev) {
+      var t = ev.target;
+      if (!t || !t.classList || !t.classList.contains("compare-select-cb")) return;
+      var fk = (t.getAttribute("data-favorite-key") || "").trim();
+      if (!fk) return;
+      var ix = compareSelectedKeys.indexOf(fk);
+      if (t.checked) {
+        if (ix < 0) compareSelectedKeys.push(fk);
+      } else if (ix >= 0) {
+        compareSelectedKeys.splice(ix, 1);
+      }
+      updateCompareBulkToolbar();
+    });
+  }
+  bindCompareSelectCheckboxOnce();
 
   function readLocalFavIds() {
     var favKey =
@@ -616,6 +810,7 @@
   function renderCards(selected, bannerText) {
     syncComparePageHeaderScope();
     lastSelected = selected || [];
+    pruneCompareSelectedKeys(lastSelected);
     container.textContent = "";
     if (bannerText) {
       var pe = document.createElement("p");
@@ -630,6 +825,7 @@
         container.appendChild(empWrap.firstChild);
       }
       syncComparePageFavoriteCount();
+      updateCompareBulkToolbar();
       return;
     }
     selected.forEach(function (r) {
@@ -637,11 +833,32 @@
       div.className = "compare-card";
       var url = recoUrl(r);
       var pid = recoPid(r);
+      var srcInfo = getFavoriteSourceDisplayAndLink(r);
+      var fkNorm = recoFavoriteKeyNormalized(r);
+      var selectRowHtml =
+        compareManageMode && fkNorm
+          ? '<p class="hint small-print compare-card-select-row"><label><input type="checkbox" class="compare-select-cb" data-favorite-key="' +
+            escapeAttr(fkNorm) +
+            '"' +
+            (compareSelectedKeys.indexOf(fkNorm) >= 0 ? " checked" : "") +
+            "/> 选择</label></p>"
+          : "";
 
       div.innerHTML =
         "<h3>" +
         (r.title || "房源") +
         "</h3>" +
+        selectRowHtml +
+        '<p class="hint muted small-print compare-card-source">来源：' +
+        escapeHtml(srcInfo.label) +
+        "</p>" +
+        (srcInfo.href
+          ? '<p class="hint small-print compare-card-source-link"><a href="' +
+            escapeAttr(srcInfo.href) +
+            '">' +
+            escapeHtml(srcInfo.linkLabel) +
+            "</a></p>"
+          : "") +
         "<p>租金: £" +
         (r.rent || "-") +
         "</p>" +
@@ -674,6 +891,7 @@
       container.appendChild(div);
     });
     syncComparePageFavoriteCount();
+    updateCompareBulkToolbar();
   }
 
   function loadCompareFromServer() {
@@ -719,6 +937,8 @@
 
   try {
     window.addEventListener("rentalai-favorite-scope-change", function () {
+      compareManageMode = false;
+      compareSelectedKeys = [];
       syncComparePageHeaderScope();
       loadCompareFromServer().catch(function () {});
     });
@@ -726,6 +946,7 @@
 
   try {
     window.addEventListener("rentalai-favorites-updated", function (ev) {
+      if (compareBulkDeleting) return;
       var rows = ev && ev.detail && ev.detail.favorites;
       if (!rows) {
         try {
@@ -771,6 +992,102 @@
           closeCompareDetail();
           renderCards([], null);
           lastSelected = [];
+        });
+    });
+  })();
+
+  (function bindCompareBulkManageOnce() {
+    var hdr = document.querySelector(".page-header");
+    if (!hdr || document.getElementById("compare-bulk-toolbar-wrap")) return;
+    var wrap = document.createElement("p");
+    wrap.id = "compare-bulk-toolbar-wrap";
+    wrap.className = "hint muted small-print";
+    wrap.style.marginTop = "0.25rem";
+    var btnManage = document.createElement("button");
+    btnManage.type = "button";
+    btnManage.id = "compare-manage-toggle-btn";
+    btnManage.className = "btn-history-primary";
+    btnManage.textContent = "管理";
+    var btnDel = document.createElement("button");
+    btnDel.type = "button";
+    btnDel.id = "compare-delete-selected-btn";
+    btnDel.className = "btn-history-danger";
+    btnDel.textContent = "删除选中";
+    btnDel.hidden = true;
+    btnDel.disabled = true;
+    var btnSelAll = document.createElement("button");
+    btnSelAll.type = "button";
+    btnSelAll.id = "compare-select-all-btn";
+    btnSelAll.className = "btn-history-primary";
+    btnSelAll.textContent = "全选";
+    btnSelAll.hidden = true;
+    btnSelAll.disabled = true;
+    var btnClrSel = document.createElement("button");
+    btnClrSel.type = "button";
+    btnClrSel.id = "compare-clear-selection-btn";
+    btnClrSel.className = "btn-history-primary";
+    btnClrSel.textContent = "取消全选";
+    btnClrSel.hidden = true;
+    btnClrSel.disabled = true;
+    wrap.appendChild(btnManage);
+    wrap.appendChild(document.createTextNode(" "));
+    wrap.appendChild(btnSelAll);
+    wrap.appendChild(document.createTextNode(" "));
+    wrap.appendChild(btnClrSel);
+    wrap.appendChild(document.createTextNode(" "));
+    wrap.appendChild(btnDel);
+    hdr.appendChild(wrap);
+
+    btnSelAll.addEventListener("click", function () {
+      if (!compareManageMode) return;
+      compareSelectedKeys = compareVisibleFavoriteKeys(lastSelected).slice();
+      renderCards(lastSelected, null);
+    });
+
+    btnClrSel.addEventListener("click", function () {
+      if (!compareManageMode) return;
+      compareSelectedKeys = [];
+      renderCards(lastSelected, null);
+    });
+
+    btnManage.addEventListener("click", function () {
+      compareManageMode = !compareManageMode;
+      if (!compareManageMode) compareSelectedKeys = [];
+      loadCompareFromServer().catch(function () {});
+    });
+
+    btnDel.addEventListener("click", function () {
+      if (!compareSelectedKeys.length) return;
+      if (!window.confirm("删除选中的 " + compareSelectedKeys.length + " 条收藏？")) return;
+      var api = window.RentalAIServerFavoritesApi;
+      if (!api || typeof api.removeFavorite !== "function") return;
+      compareBulkDeleting = true;
+      btnDel.disabled = true;
+      var keys = compareSelectedKeys.slice();
+      var chain = Promise.resolve();
+      keys.forEach(function (fk) {
+        chain = chain.then(function () {
+          var rec = findRecoByFavoriteKey(fk);
+          var sid = rec ? getServerFavoriteIdForReco(rec) : "";
+          if (!sid) return Promise.resolve();
+          return api.removeFavorite(sid).catch(function () {});
+        });
+      });
+      chain
+        .then(function () {
+          compareBulkDeleting = false;
+          compareSelectedKeys = [];
+          compareManageMode = false;
+          return loadCompareFromServer();
+        })
+        .then(function () {
+          btnDel.disabled = false;
+          updateCompareBulkToolbar();
+        })
+        .catch(function () {
+          compareBulkDeleting = false;
+          btnDel.disabled = false;
+          loadCompareFromServer().catch(function () {});
         });
     });
   })();
