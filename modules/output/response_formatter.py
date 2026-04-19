@@ -83,6 +83,15 @@ def build_final_response_text(final_result: Dict[str, Any]) -> str:
         lines.append(str(recommendation).strip())
         lines.append("")
 
+    next_actions = final_result.get("next_actions")
+    if isinstance(next_actions, list) and next_actions:
+        lines.append("下一步建议：")
+        for item in next_actions:
+            text = str(item).strip()
+            if text:
+                lines.append(f"- {text}")
+        lines.append("")
+
     cleaned_lines = _trim_trailing_blank_lines(lines)
     return "\n".join(cleaned_lines).strip()
 

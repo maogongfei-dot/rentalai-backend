@@ -484,6 +484,7 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
         "recommendation": ((chat_result.get("decision") or {}).get("decision_action") if isinstance(chat_result.get("decision"), dict) else None),
         "risks": ((chat_result.get("risk_result") or {}).get("risk_markers") if isinstance(chat_result.get("risk_result"), dict) else []),
         "reasons": ((chat_result.get("explanation_summary") or {}).get("key_positives") if isinstance(chat_result.get("explanation_summary"), dict) else []),
+        "next_actions": list(sections.get("next_steps") or []),
     }
     formatted_response = build_final_response_text(final_result)
     if formatted_response:

@@ -328,7 +328,12 @@ def print_demo_result(result: dict[str, Any], user_text: str) -> None:
         "risks": ((result.get("risk_result") or {}).get("risk_markers") if isinstance(result.get("risk_result"), dict) else []),
         "reasons": ((result.get("explanation_summary") or {}).get("key_positives") if isinstance(result.get("explanation_summary"), dict) else []),
     }
-    final_result["next_actions"] = build_next_actions(final_result)
+    po = result.get("product_output")
+    api_next = po.get("next_actions") if isinstance(po, dict) else None
+    if isinstance(api_next, list) and api_next:
+        final_result["next_actions"] = api_next
+    else:
+        final_result["next_actions"] = build_next_actions(final_result)
     formatted_response = build_final_response_text(final_result)
 
     print()
