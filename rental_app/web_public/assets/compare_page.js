@@ -276,6 +276,227 @@
     }, 0);
   }
 
+  /** Step29：退出管理模式后焦点回到「管理」入口，避免落在已隐藏控件上 */
+  function compareFocusManageToggleDeferred() {
+    setTimeout(function () {
+      var b = document.getElementById("compare-manage-toggle-btn");
+      if (b && !b.hidden && !b.disabled) b.focus();
+    }, 0);
+  }
+
+  /** Step29：退出管理模式统一收口（选中、更多菜单、Undo、反馈与定时器） */
+  function compareExitManageMode(opts) {
+    opts = opts || {};
+    compareManageMode = false;
+    compareSelectedKeys = [];
+    compareBulkMoreMenuOpen = false;
+    if (!opts.keepUndo) {
+      compareUndoHardInvalidate();
+    }
+    updateCompareBulkToolbar();
+    renderCards(lastSelected, null);
+    if (opts.focusManageToggle !== false) {
+      compareFocusManageToggleDeferred();
+    }
+  }
+
+  /** Step26：管理模式批量操作最小页面内反馈（单条、自动消失） */
+  var compareBulkFeedbackTimer = null;
+  /** Step27：最近一次批量删除的撤销缓存（仅内存，页面层） */
+  var compareUndoBulkEntries = null;
+  var compareUndoExpiryTimer = null;
+  /** Step28：Undo 作用域与删除后快照（防跨作用域/脏恢复） */
+  var compareUndoScopeKeyStored = null;
+  var compareUndoPostDeleteSig = null;
+
+  function compareUndoScopeKeyNow() {
+    try {
+      if (window.RentalAILocalAuth && typeof window.RentalAILocalAuth.getFavoriteScopeKey === "function") {
+        return String(window.RentalAILocalAuth.getFavoriteScopeKey());
+      }
+    } catch (eSk) {}
+    return "";
+  }
+
+  function compareFavoriteDetailMetaLsKeyPage() {
+    var bucket = "default";
+    try {
+      if (window.RentalAILocalAuth && typeof window.RentalAILocalAuth.favStorageKey === "function") {
+        bucket = String(window.RentalAILocalAuth.favStorageKey() || "default").replace(/[^a-zA-Z0-9:_-]/g, "_");
+      }
+    } catch (eB) {}
+    if (bucket.length > 96) bucket = bucket.slice(0, 96);
+    return "rentalai_favorite_detail_meta_v1__" + bucket;
+  }
+
+  function compareUndoStorageKeyMatches(evKey) {
+    if (!evKey) return false;
+    try {
+      if (window.RentalAILocalAuth && typeof window.RentalAILocalAuth.favStorageKey === "function") {
+        if (evKey === window.RentalAILocalAuth.favStorageKey()) return true;
+      }
+    } catch (e1) {}
+    return evKey === compareFavoriteDetailMetaLsKeyPage();
+  }
+
+  function compareFingerprintFavoritesCache() {
+    var api = window.RentalAIServerFavoritesApi;
+    if (!api || typeof api.getCachedFavoritesRows !== "function") return "";
+    var rows = api.getCachedFavoritesRows() || [];
+    var ids = [];
+    var i;
+    for (i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].id != null) ids.push(String(rows[i].id));
+    }
+    ids.sort();
+    return String(rows.length) + ":" + ids.join(",");
+  }
+
+  function compareHideUndoFeedbackBar() {
+    compareClearBulkFeedbackTimer();
+    var el = document.getElementById("compare-bulk-action-feedback");
+    if (el) {
+      el.hidden = true;
+      el.innerHTML = "";
+    }
+  }
+
+  function compareUndoHardInvalidate() {
+    compareClearUndoState();
+    compareHideUndoFeedbackBar();
+  }
+
+  function compareClearUndoExpiryTimer() {
+    if (compareUndoExpiryTimer != null) {
+      clearTimeout(compareUndoExpiryTimer);
+      compareUndoExpiryTimer = null;
+    }
+  }
+
+  function compareClearUndoState() {
+    compareUndoBulkEntries = null;
+    compareUndoScopeKeyStored = null;
+    compareUndoPostDeleteSig = null;
+    compareClearUndoExpiryTimer();
+  }
+
+  function compareClearBulkFeedbackTimer() {
+    if (compareBulkFeedbackTimer != null) {
+      clearTimeout(compareBulkFeedbackTimer);
+      compareBulkFeedbackTimer = null;
+    }
+  }
+
+  function buildUndoAddPayloadFromReco(rec) {
+    rec = rec || {};
+    var fr = rec._favoriteRow;
+    if (fr) {
+      return {
+        propertyId: fr.property_id != null ? String(fr.property_id).trim() : "",
+        listing_url: (fr.listing_url || "").trim() || null,
+        title: ((fr.title || "").trim() || "Listing"),
+        price: fr.price != null ? fr.price : null,
+        postcode: fr.postcode != null ? fr.postcode : null,
+      };
+    }
+    return {
+      propertyId: recoPid(rec),
+      listing_url: recoUrl(rec) || null,
+      title: ((rec.title || "").trim() || "Listing"),
+      price: rec.rent != null ? rec.rent : null,
+      postcode: rec.postcode != null ? rec.postcode : null,
+    };
+  }
+
+  function compareShowBulkFeedback(text) {
+    compareClearBulkFeedbackTimer();
+    compareUndoHardInvalidate();
+    var el = document.getElementById("compare-bulk-action-feedback");
+    if (!el) return;
+    el.innerHTML = "";
+    el.textContent = text != null ? String(text) : "";
+    el.hidden = false;
+    compareBulkFeedbackTimer = setTimeout(function () {
+      compareBulkFeedbackTimer = null;
+      if (el) el.hidden = true;
+    }, 2800);
+  }
+
+  function compareShowBulkDeleteFeedbackWithUndo(deletedCount) {
+    compareClearBulkFeedbackTimer();
+    var el = document.getElementById("compare-bulk-action-feedback");
+    if (!el) return;
+    el.innerHTML = "";
+    el.appendChild(document.createTextNode("已删除 " + deletedCount + " 条收藏 · "));
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn-history-primary compare-bulk-undo-btn";
+    btn.style.marginLeft = "0.35rem";
+    btn.style.verticalAlign = "baseline";
+    btn.textContent = "撤销";
+    btn.setAttribute("aria-label", "撤销刚才删除的收藏");
+    el.appendChild(btn);
+    el.hidden = false;
+    compareBulkFeedbackTimer = setTimeout(function () {
+      compareBulkFeedbackTimer = null;
+      if (el) {
+        el.hidden = true;
+        el.innerHTML = "";
+      }
+    }, 8000);
+  }
+
+  function compareStartUndoExpiryTimer() {
+    compareClearUndoExpiryTimer();
+    compareUndoExpiryTimer = setTimeout(function () {
+      compareUndoExpiryTimer = null;
+      compareClearUndoState();
+      var el = document.getElementById("compare-bulk-action-feedback");
+      var ub = el && el.querySelector(".compare-bulk-undo-btn");
+      if (ub && !ub.disabled) {
+        ub.disabled = true;
+        ub.textContent = "撤销已过期";
+      }
+    }, 4500);
+  }
+
+  function compareExecuteUndoBulkDelete() {
+    var batch = compareUndoBulkEntries;
+    if (!batch || !batch.length) return;
+    if (compareUndoScopeKeyNow() !== compareUndoScopeKeyStored) {
+      compareUndoHardInvalidate();
+      return;
+    }
+    var curFp = compareFingerprintFavoritesCache();
+    if (compareUndoPostDeleteSig != null && curFp !== compareUndoPostDeleteSig) {
+      compareUndoHardInvalidate();
+      return;
+    }
+    var api = window.RentalAIServerFavoritesApi;
+    if (!api || typeof api.addFavorite !== "function") return;
+    compareClearUndoState();
+    compareClearBulkFeedbackTimer();
+    var elFb = document.getElementById("compare-bulk-action-feedback");
+    if (elFb) {
+      elFb.hidden = true;
+      elFb.innerHTML = "";
+    }
+    var chain = Promise.resolve();
+    batch.forEach(function (entry) {
+      chain = chain.then(function () {
+        return api.addFavorite(entry.payload).catch(function () {});
+      });
+    });
+    return chain
+      .then(function () {
+        compareShowBulkFeedback("已恢复刚才删除的收藏");
+        return loadCompareFromServer();
+      })
+      .catch(function () {
+        loadCompareFromServer().catch(function () {});
+      });
+  }
+
   function updateCompareBulkToolbar() {
     var delBtn = document.getElementById("compare-delete-selected-btn");
     var toggleBtn = document.getElementById("compare-manage-toggle-btn");
@@ -1108,19 +1329,31 @@
 
   try {
     window.addEventListener("rentalai-favorite-scope-change", function () {
-      compareManageMode = false;
-      compareSelectedKeys = [];
-      compareBulkMoreMenuOpen = false;
+      compareExitManageMode({});
       syncComparePageHeaderScope();
       loadCompareFromServer().catch(function () {});
     });
   } catch (eScopePg) {}
 
   try {
+    window.addEventListener("storage", function (ev) {
+      if (!ev || ev.storageArea !== localStorage) return;
+      if (!compareUndoStorageKeyMatches(ev.key)) return;
+      compareUndoHardInvalidate();
+    });
+  } catch (eStUndo) {}
+
+  try {
     window.addEventListener("rentalai-favorites-updated", function (ev) {
       if (compareBulkDeleting) return;
+      if (compareUndoPostDeleteSig != null) {
+        var curFpEv = compareFingerprintFavoritesCache();
+        if (curFpEv !== compareUndoPostDeleteSig) {
+          compareUndoHardInvalidate();
+        }
+      }
       var rows = ev && ev.detail && ev.detail.favorites;
-      if (!rows) {
+      if (rows === undefined || rows === null) {
         try {
           var apiEv = window.RentalAIServerFavoritesApi;
           if (apiEv && typeof apiEv.getCachedFavoritesRows === "function") {
@@ -1128,7 +1361,7 @@
           }
         } catch (eEv2) {}
       }
-      if (rows == null) return;
+      if (!rows) rows = [];
       renderCards(selectedFromServerRows(rows));
       syncCompareDetailAfterFavoritesChange(rows);
     });
@@ -1150,6 +1383,7 @@
     hdr.appendChild(wrap);
     btn.addEventListener("click", function () {
       if (!window.confirm("清空当前会话/账号下的全部收藏？")) return;
+      compareUndoHardInvalidate();
       var api = window.RentalAIServerFavoritesApi;
       if (!api || typeof api.clearAllFavoritesForCurrentScope !== "function") return;
       btn.disabled = true;
@@ -1246,10 +1480,7 @@
       b.textContent = label;
       b.addEventListener("click", function (ev) {
         ev.stopPropagation();
-        try {
-          console.log("[RentalAI compare] bulk more placeholder:", label);
-        } catch (eLog) {}
-        window.alert("敬请期待（" + label + " · 占位，未接入数据）");
+        compareShowBulkFeedback("「" + label + "」即将上线（占位）");
         compareBulkMoreMenuOpen = false;
         updateCompareBulkToolbar();
         compareBulkMoreFocusMoreButtonDeferred();
@@ -1274,6 +1505,23 @@
     wrap.appendChild(document.createTextNode(" "));
     wrap.appendChild(btnDel);
     hdr.appendChild(wrap);
+    var feedbackBar = document.createElement("p");
+    feedbackBar.id = "compare-bulk-action-feedback";
+    feedbackBar.className = "hint muted small-print";
+    feedbackBar.style.marginTop = "0.2rem";
+    feedbackBar.setAttribute("role", "status");
+    feedbackBar.setAttribute("aria-live", "polite");
+    feedbackBar.setAttribute("aria-atomic", "true");
+    feedbackBar.hidden = true;
+    feedbackBar.textContent = "";
+    hdr.appendChild(feedbackBar);
+
+    hdr.addEventListener("click", function (ev) {
+      var ub = ev.target.closest && ev.target.closest(".compare-bulk-undo-btn");
+      if (!ub || ub.disabled) return;
+      ev.preventDefault();
+      compareExecuteUndoBulkDelete();
+    });
 
     btnMore.addEventListener("mousedown", function (ev) {
       ev.stopPropagation();
@@ -1320,19 +1568,24 @@
       if (!d.hasItems) return;
       if (d.isAllSelected) {
         compareSelectedKeys = [];
+        renderCards(lastSelected, null);
+        compareShowBulkFeedback("已清空选择");
       } else {
         compareSelectedKeys = compareVisibleFavoriteKeys(lastSelected).slice();
+        renderCards(lastSelected, null);
+        compareShowBulkFeedback("已全选当前列表");
       }
-      renderCards(lastSelected, null);
     });
 
     btnManage.addEventListener("click", function () {
-      compareManageMode = !compareManageMode;
-      if (compareManageMode) closeCompareDetail();
       if (!compareManageMode) {
-        compareSelectedKeys = [];
-        compareBulkMoreMenuOpen = false;
+        compareManageMode = true;
+        closeCompareDetail();
+        loadCompareFromServer().catch(function () {});
+        return;
       }
+      compareExitManageMode({});
+      compareShowBulkFeedback("已退出管理模式");
       loadCompareFromServer().catch(function () {});
     });
 
@@ -1341,10 +1594,18 @@
       if (!window.confirm("删除选中的 " + compareSelectedKeys.length + " 条收藏？")) return;
       var api = window.RentalAIServerFavoritesApi;
       if (!api || typeof api.removeFavorite !== "function") return;
+      compareClearUndoState();
       compareBulkDeleting = true;
       btnDel.disabled = true;
       updateCompareBulkToolbar();
       var keys = compareSelectedKeys.slice();
+      var undoSnapshots = [];
+      var kui;
+      for (kui = 0; kui < keys.length; kui++) {
+        undoSnapshots.push({
+          payload: buildUndoAddPayloadFromReco(findRecoByFavoriteKey(keys[kui])),
+        });
+      }
       var chain = Promise.resolve();
       keys.forEach(function (fk) {
         chain = chain.then(function () {
@@ -1357,14 +1618,21 @@
       chain
         .then(function () {
           compareBulkDeleting = false;
-          compareSelectedKeys = [];
-          compareBulkMoreMenuOpen = false;
-          compareManageMode = false;
+          compareUndoBulkEntries = undoSnapshots;
+          compareUndoScopeKeyStored = compareUndoScopeKeyNow();
+          compareExitManageMode({ keepUndo: true, focusManageToggle: false });
           return loadCompareFromServer();
         })
         .then(function () {
           btnDel.disabled = false;
           updateCompareBulkToolbar();
+          compareUndoPostDeleteSig = compareFingerprintFavoritesCache();
+          if (compareUndoScopeKeyNow() !== compareUndoScopeKeyStored) {
+            compareShowBulkFeedback("已删除 " + keys.length + " 条收藏");
+            return;
+          }
+          compareShowBulkDeleteFeedbackWithUndo(keys.length);
+          compareStartUndoExpiryTimer();
         })
         .catch(function () {
           compareBulkDeleting = false;

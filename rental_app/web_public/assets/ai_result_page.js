@@ -629,7 +629,14 @@
     window.addEventListener("rentalai-favorites-updated", function (ev) {
       var d = ev && ev.detail;
       var rows = d && d.favorites;
-      if (rows) applyServerRowsToRecoButtons(rows);
+      if (rows === undefined || rows === null) {
+        var apiR = window.RentalAIServerFavoritesApi;
+        if (apiR && typeof apiR.getCachedFavoritesRows === "function") {
+          rows = apiR.getCachedFavoritesRows();
+        }
+      }
+      if (!rows) rows = [];
+      applyServerRowsToRecoButtons(rows);
     });
   } catch (eEv) {}
 
