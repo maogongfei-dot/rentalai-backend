@@ -20,6 +20,14 @@ TITLE_KEY = "【Key Points】"
 TITLE_NEXT = "【Next Step】"
 TITLE_FOLLOW = "【You Can Also Ask】"
 TITLE_INSTEAD = "【What I Can Help With Instead】"
+TITLE_RISK_CLAUSES = "【Risk Clauses】"
+TITLE_NEED_CONFIRM = "【Need To Confirm】"
+TITLE_ASK_LANDLORD = "【Questions To Ask Landlord】"
+
+NO_MAJOR_RISK_TEXT = (
+    "No major risk was found from the available text, but you should still confirm rent, "
+    "deposit, bills, repair responsibility, and break clause before signing."
+)
 
 
 def _clean_str(x: Any) -> str:
@@ -110,63 +118,101 @@ def _clean_list(items: Any, limit: int = 10) -> list[str]:
     return out
 
 
+def _risk_conclusion_line(raw_level: str) -> str:
+    rl = _clean_str(raw_level).lower()
+    if rl == "high":
+        return "Overall this looks high risk from a rental-contract perspective."
+    if rl == "medium":
+        return "Overall this looks medium risk and needs careful checks before signing."
+    if rl == "low":
+        return "Overall this looks low risk from the wording provided."
+    return "Overall risk needs further confirmation from the available wording."
+
+
+def _clean_legal_list(items: Any, *, drop_prefixes: tuple[str, ...] = ()) -> list[str]:
+    out: list[str] = []
+    for raw in items or []:
+        t = _clean_str(raw)
+        if not t:
+            continue
+        low = t.lower()
+        if any(low.startswith(p.lower()) for p in drop_prefixes):
+            continue
+        if t not in out:
+            out.append(t)
+    return out
+
+
+def _build_landlord_questions(need_to_confirm: list[str], risk_clauses: list[str]) -> list[str]:
+    questions: list[str] = []
+    for item in need_to_confirm[:4]:
+        q = item.rstrip(".?")
+        questions.append(f"Can you confirm in writing: {q}?")
+    if not questions:
+        for item in risk_clauses[:2]:
+            q = item.rstrip(".?")
+            questions.append(f"Could you clarify this clause in writing: {q}?")
+    return questions[:5]
+
+
 def _build_legal_sections(r: dict[str, Any]) -> dict[str, Any]:
     p0 = r.get("source_result") or {}
     norm = p0.get("normalized_result") or {}
+    raw_level = _clean_str(norm.get("raw_level") or p0.get("risk_level") or "unknown")
     summary_line = _clean_str(norm.get("summary"))
-    badge = _clean_str(norm.get("risk_badge")) or _clean_str(p0.get("risk_badge"))
-    if summary_line and badge:
-        summary = f"{badge} — {summary_line}"
-    elif summary_line:
-        summary = summary_line
-    elif badge:
-        summary = f"{badge} Deposit and tenancy rules were checked against the built-in rule set."
+    conclusion = _risk_conclusion_line(raw_level)
+    if summary_line:
+        summary = f"{conclusion} {summary_line}"
     else:
-        summary = _first_sentence(r.get("response_text") or "") or (
-            "Your clause was screened for common rental risk patterns."
-        )
+        summary = conclusion
 
-    found: list[str] = []
-    for line in norm.get("key_reasons") or []:
-        t = _clean_str(line)
-        if t and t not in found:
-            found.append(t)
-    if not found:
-        found = _split_bullets(p0.get("display_text") or "")[:4]
-    if not found:
-        found = [_first_sentence(r.get("response_text") or "", 400) or "See Summary for the headline view."]
+    reasons = _clean_legal_list(norm.get("key_reasons") or [])
+    risk_clauses = _clean_legal_list(reasons, drop_prefixes=("Flag:",))
+    if summary_line and summary_line in risk_clauses:
+        risk_clauses = [x for x in risk_clauses if x != summary_line]
+    if not risk_clauses and raw_level == "low":
+        risk_clauses = [NO_MAJOR_RISK_TEXT]
+    elif not risk_clauses:
+        risk_clauses = ["I need a bit more specific clause wording to identify clear risk clauses."]
 
-    key_pts: list[str] = []
-    for line in (norm.get("legal_basis") or [])[:5]:
-        t = _clean_str(line)
-        if t:
-            key_pts.append(t)
-    if len(key_pts) < 2:
-        for line in (norm.get("recommended_actions") or [])[:3]:
-            t = _clean_str(line)
-            if t and t not in key_pts:
-                key_pts.append(t)
+    need_to_confirm = _clean_legal_list(norm.get("legal_basis") or [])
+    if len(need_to_confirm) < 3:
+        for line in _clean_legal_list(norm.get("recommended_actions") or []):
+            if line not in need_to_confirm:
+                need_to_confirm.append(line)
+    if len(need_to_confirm) < 5:
+        for fallback in (
+            "Confirm monthly rent amount and payment date in writing.",
+            "Confirm deposit amount and protection scheme details.",
+            "Confirm which bills are included or excluded.",
+            "Confirm repair and maintenance responsibility.",
+            "Confirm break clause and notice terms.",
+        ):
+            if fallback not in need_to_confirm:
+                need_to_confirm.append(fallback)
+            if len(need_to_confirm) >= 5:
+                break
+
+    questions = _build_landlord_questions(need_to_confirm, risk_clauses)
 
     next_steps: list[str] = []
-    for line in (norm.get("recommended_actions") or []):
-        t = _clean_str(line)
-        if t and t not in next_steps:
-            next_steps.append(t)
+    next_steps.append("Ask the landlord or agent to confirm the points above in writing.")
+    next_steps.append("Update the draft wording before you sign anything.")
+    next_steps.append("If any clause still looks unclear or one-sided, get independent housing advice.")
     sf = _clean_str(p0.get("suggested_followup") or r.get("suggested_followup"))
     if sf and sf not in next_steps:
         next_steps.append(sf)
-    nsp = _clean_str(r.get("next_step_prompt"))
-    if nsp and nsp not in next_steps and len(next_steps) < 6:
-        next_steps.append(nsp)
-
-    follow = [_clean_str(x) for x in (r.get("followup_suggestions") or []) if _clean_str(x)]
 
     return {
+        "layout": "legal_contract_advisor",
         "summary": summary,
-        "what_i_found": found[:5],
-        "key_points": key_pts[:6] if key_pts else [],
+        "risk_clauses": risk_clauses[:6],
+        "need_to_confirm": need_to_confirm[:6],
+        "questions_to_ask_landlord": questions[:6],
+        "what_i_found": risk_clauses[:6],
+        "key_points": need_to_confirm[:6],
         "next_steps": next_steps[:8],
-        "followups": follow[:10],
+        "followups": [],
         "alternative_help": [],
     }
 
@@ -352,7 +398,7 @@ def _pick_branch(r: dict[str, Any]) -> str:
     if r.get("scope") == "out_of_scope":
         return "out_of_scope"
     intent = r.get("intent") or ""
-    if intent in ("half_related", "insufficient_info"):
+    if intent in ("half_related", "insufficient_info", "invalid_input"):
         return "fallback"
     if intent == "legal_risk":
         return "legal_risk"
@@ -437,6 +483,35 @@ def _format_explain_result_block_zh(er: Any) -> str:
 
 def render_display_text(sections: dict[str, Any]) -> str:
     """Join sections with fixed advisor-style titles and natural fallbacks."""
+    if _clean_str(sections.get("layout")) == "legal_contract_advisor":
+        summary = _clean_str(sections.get("summary")) or "Overall risk needs further confirmation."
+        risk_clauses = _clean_list(sections.get("risk_clauses") or [], limit=8)
+        need_confirm = _clean_list(sections.get("need_to_confirm") or [], limit=8)
+        ask_landlord = _clean_list(sections.get("questions_to_ask_landlord") or [], limit=8)
+        next_steps = _clean_list(sections.get("next_steps") or [], limit=8)
+
+        if not risk_clauses:
+            risk_clauses = [NO_MAJOR_RISK_TEXT]
+        if not need_confirm:
+            need_confirm = [
+                "Confirm rent, deposit, bills, repair responsibility, and break clause in writing."
+            ]
+        if not ask_landlord:
+            ask_landlord = ["Can you confirm all key tenancy terms in writing before I sign?"]
+        if not next_steps:
+            next_steps = [
+                "Collect written confirmations first, then review the final draft before signing."
+            ]
+
+        parts = [
+            f"{TITLE_SUMMARY}\n{summary}",
+            f"{TITLE_RISK_CLAUSES}\n" + "\n".join(f"- {x}" for x in risk_clauses),
+            f"{TITLE_NEED_CONFIRM}\n" + "\n".join(f"- {x}" for x in need_confirm),
+            f"{TITLE_ASK_LANDLORD}\n" + "\n".join(f"- {x}" for x in ask_landlord),
+            f"{TITLE_NEXT}\n" + "\n".join(f"{i}. {x}" for i, x in enumerate(next_steps, 1)),
+        ]
+        return "\n\n".join(parts).strip()
+
     parts: list[str] = []
 
     s = _clean_str(sections.get("summary"))
@@ -548,7 +623,11 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
         "display_text": display_text,
         "display_order": display_order,
         "display_sections": {
+            "layout": sections.get("layout") or "",
             "summary": sections.get("summary") or "",
+            "risk_clauses": list(sections.get("risk_clauses") or []),
+            "need_to_confirm": list(sections.get("need_to_confirm") or []),
+            "questions_to_ask_landlord": list(sections.get("questions_to_ask_landlord") or []),
             "decision": list(sections.get("decision") or []),
             "what_i_found": list(sections.get("what_i_found") or []),
             "key_points": list(sections.get("key_points") or []),

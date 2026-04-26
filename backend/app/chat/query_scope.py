@@ -247,7 +247,10 @@ def build_scope_message(scope: str, matched_keywords: list[str]) -> str:
     if scope == "invalid":
         return "I could not understand the request."
     if scope == "rental_related":
-        return "I can help from a rental perspective, but I may need a bit more detail."
+        return (
+            "I can help from a rental perspective, but I may need a bit more detail. "
+            "You can share the rent, postcode, bills, property link, or contract wording."
+        )
 
     return (
         "I mainly help with renting, housing, and contracts. "

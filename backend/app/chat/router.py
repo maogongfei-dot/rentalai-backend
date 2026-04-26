@@ -52,7 +52,14 @@ OUT_OF_SCOPE_REPLY = (
     "I mainly help with renting, housing, and contracts. "
     "If you have a rental question, I can give you a detailed answer."
 )
-HALF_RELATED_REPLY = "I can help from a rental perspective, but I may need a bit more detail."
+HALF_RELATED_REPLY = (
+    "I can help from a rental perspective, but I may need a bit more detail. "
+    "You can share the rent, postcode, bills, property link, or contract wording."
+)
+UNRECOGNIZED_REPLY = (
+    "I do not have enough detail yet to give you a strong answer. "
+    "You can share the rent, postcode, bills, or contract wording."
+)
 
 # Modules not wired in this version (for discovery / future orchestration).
 AVAILABLE_NEXT_MODULES = [
@@ -121,7 +128,12 @@ def _with_preferences(
     out["detected_preferences"] = det
     out["priority_order"] = po
     out["user_signals_summary"] = summary
-    if po:
+    if po and out.get("intent") not in (
+        "out_of_scope",
+        "half_related",
+        "insufficient_info",
+        "invalid_input",
+    ):
         voice = preference_voice_line(po)
         rt = out.get("response_text") or ""
         if voice and voice not in rt:
@@ -142,7 +154,7 @@ def _failure_empty() -> dict[str, Any]:
         "success": False,
         "intent": "invalid_input",
         "input_text": "",
-        "response_text": "I could not understand the request.",
+        "response_text": UNRECOGNIZED_REPLY,
         "source_module": None,
         "source_result": None,
         "suggested_followup": inv["next_step_prompt"],
@@ -221,7 +233,12 @@ def _attach_uk_location(
 
 
 def _append_uk_location_hint(result: dict[str, Any]) -> dict[str, Any]:
-    if result.get("intent") == "legal_risk" or result.get("scope") == "out_of_scope":
+    if result.get("intent") in (
+        "legal_risk",
+        "half_related",
+        "insufficient_info",
+        "invalid_input",
+    ) or result.get("scope") == "out_of_scope":
         return result
     uk = result.get("uk_location_context") or {}
     if not uk.get("is_supported_uk_context"):
@@ -261,7 +278,12 @@ def _append_uk_location_hint(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def _append_property_hint(result: dict[str, Any], pi_parsed: dict[str, Any]) -> dict[str, Any]:
-    if result.get("intent") == "property_comparison":
+    if result.get("intent") in (
+        "property_comparison",
+        "half_related",
+        "insufficient_info",
+        "invalid_input",
+    ) or result.get("scope") == "out_of_scope":
         return result
     ar = result.get("analysis_route") or {}
     if ar.get("route_type") in ("property_analysis_candidate", "area_analysis_candidate"):
@@ -589,13 +611,17 @@ def _build_product_output(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_missing_fields_prompt(missing_fields: list[str]) -> str:
-    if not missing_fields:
-        return (
-            "I can help, but I need a bit more rental detail first "
-            "(rent, location, postcode, bills, or contract wording)."
-        )
-    top = ", ".join(missing_fields[:3])
-    return f"I can help, but I need a bit more detail first. Could you share {top}?"
+    _ = missing_fields
+    return HALF_RELATED_REPLY
+
+
+def _looks_unrecognized(text: str) -> bool:
+    t = (text or "").strip()
+    if not t:
+        return True
+    alnum_count = sum(1 for ch in t if ch.isalnum())
+    token_count = len([tok for tok in t.split() if tok.strip()])
+    return alnum_count < 3 or token_count == 0
 
 def _finish_chat_response(
     base: dict[str, Any],
@@ -631,6 +657,26 @@ def handle_chat_request(user_text: str) -> dict[str, Any]:
     trimmed = (user_text or "").strip()
     if not trimmed:
         return _failure_empty()
+    if _looks_unrecognized(trimmed):
+        pi_parsed = parse_property_input(trimmed)
+        pi_ref = build_property_reference(pi_parsed)
+        scope_info = classify_query_scope(trimmed)
+        bundle = build_chat_followup_bundle("general_unknown", source_result=None)
+        base = {
+            "module": MODULE_ID,
+            "success": True,
+            "intent": "invalid_input",
+            "input_text": trimmed,
+            "response_text": UNRECOGNIZED_REPLY,
+            "source_module": None,
+            "source_result": None,
+            "comparison_inputs": None,
+            "comparison_result": None,
+            "suggested_followup": "Share rental details and I can help directly.",
+            "available_next_modules": AVAILABLE_NEXT_MODULES,
+            "missing_key_fields": ["rent", "postcode", "bills", "contract"],
+        }
+        return _finish_chat_response(base, scope_info, bundle, trimmed, pi_parsed, pi_ref)
 
     pi_parsed = parse_property_input(trimmed)
     pi_ref = build_property_reference(pi_parsed)
