@@ -13,11 +13,11 @@ from modules.missing_info.missing_info_engine import build_missing_info_items
 from modules.output.response_formatter import build_final_response_text
 
 # Section titles — keep stable for CLI and future UI mapping.
-TITLE_SUMMARY = "【Summary】"
+TITLE_SUMMARY = "【Conclusion】"
 TITLE_DECISION = "【Decision】"
 TITLE_FOUND = "【What I Found】"
 TITLE_KEY = "【Key Points】"
-TITLE_NEXT = "【What You Can Do Next】"
+TITLE_NEXT = "【Next Step】"
 TITLE_FOLLOW = "【You Can Also Ask】"
 TITLE_INSTEAD = "【What I Can Help With Instead】"
 
@@ -95,6 +95,19 @@ def _uk_bullets(uk: dict[str, Any]) -> list[str]:
 
 def _route_brief(ar: dict[str, Any]) -> str:
     return _clean_str(ar.get("route_reason"))
+
+
+def _clean_list(items: Any, limit: int = 10) -> list[str]:
+    if not isinstance(items, list):
+        return []
+    out: list[str] = []
+    for x in items:
+        t = _clean_str(x)
+        if t:
+            out.append(t)
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _build_legal_sections(r: dict[str, Any]) -> dict[str, Any]:
@@ -399,50 +412,50 @@ def _format_explain_result_block_zh(er: Any) -> str:
 
 
 def render_display_text(sections: dict[str, Any]) -> str:
-    """Join sections with fixed titles; skip empty blocks."""
+    """Join sections with fixed advisor-style titles and natural fallbacks."""
     parts: list[str] = []
 
     s = _clean_str(sections.get("summary"))
-    if s:
-        parts.append(f"{TITLE_SUMMARY}\n{s}")
-    
-    decision_lines = sections.get("decision") or []
-    if isinstance(decision_lines, list) and decision_lines:
-        body = "\n".join(f"- {_clean_str(x)}" for x in decision_lines if _clean_str(x))
-        if body:
-            parts.append(f"{TITLE_DECISION}\n{body}")
+    decision_lines = _clean_list(sections.get("decision") or [], limit=3)
+    if not s and decision_lines:
+        s = decision_lines[0]
+    if not s:
+        s = "I do not have enough detail yet."
+    parts.append(f"{TITLE_SUMMARY}\n{s}")
 
-    found = sections.get("what_i_found") or []
-    if isinstance(found, list) and found:
-        body = "\n".join(f"- {_clean_str(x)}" for x in found if _clean_str(x))
-        if body:
-            parts.append(f"{TITLE_FOUND}\n{body}")
+    found = _clean_list(sections.get("what_i_found") or [], limit=8)
+    if not found and decision_lines:
+        found = decision_lines
+    if not found:
+        found = ["I do not have enough detail yet."]
+    parts.append(f"{TITLE_FOUND}\n" + "\n".join(f"- {x}" for x in found))
 
-    keys = sections.get("key_points") or []
-    if isinstance(keys, list) and keys:
-        body = "\n".join(f"- {_clean_str(x)}" for x in keys if _clean_str(x))
-        if body:
-            parts.append(f"{TITLE_KEY}\n{body}")
+    keys = _clean_list(sections.get("key_points") or [], limit=10)
+    if not keys:
+        alt = _clean_list(sections.get("alternative_help") or [], limit=4)
+        if alt:
+            keys = alt
+    if not keys:
+        keys = [
+            "You can share the rent, postcode, bills, or contract wording for a stronger answer."
+        ]
+    parts.append(f"{TITLE_KEY}\n" + "\n".join(f"- {x}" for x in keys))
 
-    nxt = sections.get("next_steps") or []
-    if isinstance(nxt, list) and nxt:
-        lines = []
-        for i, x in enumerate((x for x in nxt if _clean_str(x)), 1):
-            lines.append(f"{i}. {_clean_str(x)}")
-        if lines:
-            parts.append(f"{TITLE_NEXT}\n" + "\n".join(lines))
+    nxt = _clean_list(sections.get("next_steps") or [], limit=8)
+    if not nxt:
+        nxt = [
+            "Share the rent, postcode, bills, or contract wording and I will give you a clearer recommendation."
+        ]
+    parts.append(f"{TITLE_NEXT}\n" + "\n".join(f"{i}. {x}" for i, x in enumerate(nxt, 1)))
 
-    alt = sections.get("alternative_help") or []
-    if isinstance(alt, list) and alt:
-        body = "\n".join(f"- {_clean_str(x)}" for x in alt if _clean_str(x))
-        if body:
-            parts.append(f"{TITLE_INSTEAD}\n{body}")
-
-    fol = sections.get("followups") or []
-    if isinstance(fol, list) and fol:
-        body = "\n".join(f"- {_clean_str(x)}" for x in fol if _clean_str(x))
-        if body:
-            parts.append(f"{TITLE_FOLLOW}\n{body}")
+    fol = _clean_list(sections.get("followups") or [], limit=10)
+    if not fol:
+        fol = [
+            "Should I compare two rental options for you?",
+            "Do you want me to check a contract clause?",
+            "Do you want a quick risk check for your current plan?",
+        ]
+    parts.append(f"{TITLE_FOLLOW}\n" + "\n".join(f"- {x}" for x in fol))
 
     return "\n\n".join(parts).strip()
 
@@ -492,9 +505,9 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
     final_result["followup_questions"] = build_followup_questions(final_result)
     final_result["missing_info_items"] = build_missing_info_items(final_result)
     final_result["decision_result"] = build_decision_result(final_result)
-    formatted_response = build_final_response_text(final_result)
-    if formatted_response:
-        display_text = formatted_response
+    # Keep final response generation for compatibility, but keep display_text
+    # in the unified advisor-style structure from render_display_text.
+    build_final_response_text(final_result)
 
     decision = chat_result.get("decision") or {}
     display_order = [
