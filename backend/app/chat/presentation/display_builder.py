@@ -32,6 +32,7 @@ TITLE_CHEAPEST_OPTION = "【Cheapest Option】"
 TITLE_LOWEST_RISK_OPTION = "【Lowest Risk Option】"
 TITLE_WATCH_OUT = "【Watch Out】"
 TITLE_FINAL_ADVICE = "【Final Advice】"
+TITLE_REPUTATION_CHECK = "【Reputation Check】"
 
 NO_MAJOR_RISK_TEXT = (
     "No major risk was found from the available text, but you should still confirm rent, "
@@ -42,6 +43,9 @@ SINGLE_PROPERTY_COMPARE_TEXT = (
 )
 COMPARE_NEED_MORE_TEXT = (
     "To compare properties better, please share rent, postcode, bills, bedroom count, and commute preference."
+)
+NO_REPUTATION_DATA_TEXT = (
+    "No reputation data is available yet for this address, building, or agency."
 )
 
 
@@ -264,6 +268,27 @@ def _build_final_summary_fields(r: dict[str, Any], sections: dict[str, Any]) -> 
         "main_risks": main_risks,
         "what_to_do_next": what_to_do_next,
     }
+
+
+def _reputation_lines(reputation_result: Any) -> list[str]:
+    if not isinstance(reputation_result, dict):
+        return []
+    level = _clean_str(reputation_result.get("reputation_level")) or "Unknown"
+    summary = _clean_str(reputation_result.get("summary"))
+    tags = _clean_list(reputation_result.get("risk_tags") or [], limit=6)
+    action = _clean_str(reputation_result.get("suggested_action"))
+    if level == "Unknown":
+        summary = NO_REPUTATION_DATA_TEXT
+    lines = [f"Reputation level: {level}"]
+    if summary:
+        lines.append(f"Summary: {summary}")
+    if tags:
+        lines.append("Risk tags: " + ", ".join(tags))
+    else:
+        lines.append("Risk tags: none identified yet")
+    if action:
+        lines.append(f"Suggested action: {action}")
+    return lines
 
 
 def _build_legal_sections(r: dict[str, Any]) -> dict[str, Any]:
@@ -763,15 +788,20 @@ def render_display_text(sections: dict[str, Any]) -> str:
         advice = _clean_str(sections.get("final_advice")) or "Share more detail before making a final pick."
         if not watch:
             watch = ["No major warning found yet, but confirm key costs and terms in writing."]
+        rep_lines = _reputation_lines(sections.get("reputation_result"))
         parts = [
             f"{TITLE_BEST_OPTION}\n{best}",
             f"{TITLE_CHEAPEST_OPTION}\n{cheap}",
             f"{TITLE_LOWEST_RISK_OPTION}\n{low_risk}",
             f"{TITLE_WATCH_OUT}\n" + "\n".join(f"- {x}" for x in watch),
             f"{TITLE_FINAL_ADVICE}\n{advice}",
+            (
+                f"{TITLE_REPUTATION_CHECK}\n" + "\n".join(f"- {x}" for x in rep_lines)
+                if rep_lines else ""
+            ),
             f"{TITLE_SUMMARY}\n{_clean_str(sections.get('summary'))}",
         ]
-        return "\n\n".join(parts).strip()
+        return "\n\n".join(p for p in parts if p.strip()).strip()
 
     if _clean_str(sections.get("layout")) == "legal_contract_advisor":
         summary = _clean_str(sections.get("summary")) or "Overall risk needs further confirmation."
@@ -802,19 +832,24 @@ def render_display_text(sections: dict[str, Any]) -> str:
             main_risks = [NO_MAJOR_RISK_TEXT]
         if not what_to_do_next:
             what_to_do_next = next_steps
+        rep_lines = _reputation_lines(sections.get("reputation_result"))
 
         parts = [
             f"{TITLE_FINAL_RECOMMENDATION}\n{final_label}",
             f"{TITLE_WHY}\n" + "\n".join(f"- {x}" for x in why),
             f"{TITLE_MAIN_RISKS}\n" + "\n".join(f"- {x}" for x in main_risks),
             f"{TITLE_WHAT_TO_DO_NEXT}\n" + "\n".join(f"- {x}" for x in what_to_do_next),
+            (
+                f"{TITLE_REPUTATION_CHECK}\n" + "\n".join(f"- {x}" for x in rep_lines)
+                if rep_lines else ""
+            ),
             f"{TITLE_SUMMARY}\n{summary}",
             f"{TITLE_RISK_CLAUSES}\n" + "\n".join(f"- {x}" for x in risk_clauses),
             f"{TITLE_NEED_CONFIRM}\n" + "\n".join(f"- {x}" for x in need_confirm),
             f"{TITLE_ASK_LANDLORD}\n" + "\n".join(f"- {x}" for x in ask_landlord),
             f"{TITLE_NEXT}\n" + "\n".join(f"{i}. {x}" for i, x in enumerate(next_steps, 1)),
         ]
-        return "\n\n".join(parts).strip()
+        return "\n\n".join(p for p in parts if p.strip()).strip()
 
     parts: list[str] = []
     final_label = _clean_str(sections.get("final_recommendation")) or "Need More Information"
@@ -827,11 +862,14 @@ def render_display_text(sections: dict[str, Any]) -> str:
         main_risks = ["No major risk identified yet from the available details."]
     if not what_to_do_next:
         what_to_do_next = ["Share rent, postcode, bills, or contract wording."]
+    rep_lines = _reputation_lines(sections.get("reputation_result"))
 
     parts.append(f"{TITLE_FINAL_RECOMMENDATION}\n{final_label}")
     parts.append(f"{TITLE_WHY}\n" + "\n".join(f"- {x}" for x in why))
     parts.append(f"{TITLE_MAIN_RISKS}\n" + "\n".join(f"- {x}" for x in main_risks))
     parts.append(f"{TITLE_WHAT_TO_DO_NEXT}\n" + "\n".join(f"- {x}" for x in what_to_do_next))
+    if rep_lines:
+        parts.append(f"{TITLE_REPUTATION_CHECK}\n" + "\n".join(f"- {x}" for x in rep_lines))
 
     s = _clean_str(sections.get("summary"))
     decision_lines = _clean_list(sections.get("decision") or [], limit=3)
@@ -911,6 +949,7 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
     Does not replace ``response_text``; add alongside it.
     """
     sections = build_display_sections(chat_result)
+    sections["reputation_result"] = chat_result.get("reputation_result")
     display_text = render_display_text(sections)
     final_result = {
         "explain_result": chat_result.get("explain_result"),
@@ -956,6 +995,7 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
             "why": list(sections.get("why") or []),
             "main_risks": list(sections.get("main_risks") or []),
             "what_to_do_next": list(sections.get("what_to_do_next") or []),
+            "reputation_result": sections.get("reputation_result"),
             "summary": sections.get("summary") or "",
             "risk_clauses": list(sections.get("risk_clauses") or []),
             "need_to_confirm": list(sections.get("need_to_confirm") or []),

@@ -4,9 +4,11 @@ Phase 1 chat router skeleton: intent routing + Phase 0 legal hook (no LLM).
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ..legal.phase0_entry import run_phase0_analysis
+from ..reputation import analyze_reputation
 
 from .followup_builder import (
     append_guidance_footer,
@@ -594,6 +596,7 @@ def _build_product_output(result: dict[str, Any]) -> dict[str, Any]:
             "next_steps": list(display_sections.get("next_steps") or []),
             "followups": list(display_sections.get("followups") or []),
             "alternative_help": list(display_sections.get("alternative_help") or []),
+            "reputation_result": display_sections.get("reputation_result"),
         },
         "next_actions": list(display_sections.get("next_steps") or []),
         "followups": list(display_sections.get("followups") or []),
@@ -615,6 +618,59 @@ def _build_missing_fields_prompt(missing_fields: list[str]) -> str:
     return HALF_RELATED_REPLY
 
 
+def _extract_reputation_query(
+    user_text: str,
+    pi_parsed: dict[str, Any],
+    pi_ref: dict[str, Any],
+) -> str | None:
+    text = (user_text or "").strip()
+    if not text:
+        return None
+    addresses = list(pi_parsed.get("detected_addresses") or [])
+    postcodes = list(pi_parsed.get("detected_postcodes") or [])
+    if addresses:
+        return addresses[0]
+    if postcodes:
+        return postcodes[0]
+    if pi_ref.get("address_text"):
+        return str(pi_ref["address_text"])
+    if pi_ref.get("postcode"):
+        return str(pi_ref["postcode"])
+
+    # Agency style: "<Name> Lettings", "<Name> Estate Agents", "<Name> Agency"
+    agency = re.search(
+        r"\b([A-Z][A-Za-z&'’\-\s]{2,50}\s(?:Lettings|Estate Agents|Agency))\b",
+        text,
+    )
+    if agency:
+        return agency.group(1).strip()
+
+    # Building style: "<Name> Court/Tower/House/Apartments/Building"
+    building = re.search(
+        r"\b([A-Z][A-Za-z0-9'’\-\s]{2,50}\s(?:Court|Tower|House|Apartments|Building))\b",
+        text,
+    )
+    if building:
+        return building.group(1).strip()
+    return None
+
+
+def _attach_reputation(
+    out: dict[str, Any],
+    trimmed: str,
+    pi_parsed: dict[str, Any],
+    pi_ref: dict[str, Any],
+) -> dict[str, Any]:
+    query = _extract_reputation_query(trimmed, pi_parsed, pi_ref)
+    if not query:
+        return dict(out)
+    rep = analyze_reputation(query)
+    o = dict(out)
+    o["reputation_query"] = query
+    o["reputation_result"] = rep
+    return o
+
+
 def _looks_unrecognized(text: str) -> bool:
     t = (text or "").strip()
     if not t:
@@ -633,6 +689,7 @@ def _finish_chat_response(
 ) -> dict[str, Any]:
     out = _merge_followup(_merge_scope_into(base, scope_info), bundle)
     out = _attach_property_input(out, pi_parsed, pi_ref)
+    out = _attach_reputation(out, trimmed, pi_parsed, pi_ref)
     pref_det = detect_user_preferences(trimmed)
     out = _attach_uk_location(out, trimmed, pi_parsed, pi_ref, pref_det)
     out = _apply_analysis_route(out, trimmed, pi_parsed, pi_ref, scope_info)
