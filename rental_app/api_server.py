@@ -2401,6 +2401,21 @@ def web_compare():
     return FileResponse(page)
 
 
+# 声誉 / 中介核查占位（Phase 5 Step 1；静态页，不调用 AI）
+@app.get("/reputation")
+def web_reputation_placeholder():
+    page = _WEB_PUBLIC_DIR / "reputation.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/reputation.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
 # 合同条款分析（接 /api/contract/* 系列）
 @app.get("/contract-analysis")
 def web_contract_analysis():

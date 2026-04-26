@@ -21,8 +21,7 @@
     <meta name="rentalai-api-base" content="" />
     <meta name="vite-rentalai-api-base" content="" />
     <meta name="rentalai-env" content="" />
-    <!-- 产品标题：长租决策助手（RentAI 主品牌表述）；页面即为当前默认落地首页 -->
-    <title>RentalAI · AI 租房助手</title>
+    <title>RentalAI · UK rental decision assistant</title>
     <link rel="stylesheet" href="/assets/style.css" />
     <script src="/assets/api_config.js"></script>
   </head>
@@ -48,9 +47,40 @@
         class="guest-auth-hint-host"
         aria-live="polite"
       ></div>
+
+      <!-- Phase 5 / Step 1: product marketing hero (SaaS landing; no API calls) -->
+      <section
+        class="card saas-hero"
+        aria-labelledby="saas-hero-title"
+        lang="en-GB"
+      >
+        <p class="saas-hero-kicker">RentalAI</p>
+        <h1 id="saas-hero-title" class="saas-hero-title">
+          AI-powered rental decision assistant for tenants in the UK
+        </h1>
+        <p class="saas-hero-lead">
+          Plan viewings, compare listings, and understand your tenancy — before you sign.
+        </p>
+        <ul class="saas-feature-grid" aria-label="Core features">
+          <li class="saas-feature-item">Contract risk analysis</li>
+          <li class="saas-feature-item">Property comparison</li>
+          <li class="saas-feature-item">Location insight</li>
+          <li class="saas-feature-item">Reputation check</li>
+          <li class="saas-feature-item">Repair and tenant guidance</li>
+        </ul>
+        <div class="saas-cta-row" role="group" aria-label="Primary actions">
+          <a class="saas-btn saas-btn--primary" href="#ai-rental-heading"
+            >Start Analysis</a
+          >
+          <a class="saas-btn" href="/contract-analysis">Check Contract</a>
+          <a class="saas-btn" href="/compare">Compare Properties</a>
+          <a class="saas-btn" href="/reputation">Check Reputation</a>
+        </div>
+      </section>
+
       <!-- 「主功能」区：RentAI 默认双分岔（左房源 / 右合同）；页内首屏决策引导 -->
       <section class="card home-main-entries" aria-labelledby="main-entries-heading">
-        <h1 id="main-entries-heading" class="section-title">主功能</h1>
+        <h2 id="main-entries-heading" class="section-title">主功能</h2>
         <p class="hint home-main-entries-hook">该点哪个？看你现在卡在哪一步。</p>
         <ul class="home-entry-pick-list" aria-label="如何选择入口">
           <li>

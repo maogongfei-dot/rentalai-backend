@@ -1,6 +1,10 @@
 {
   "name": "rentalai-frontend",
   "private": true,
+  "description": "Shared React component stubs. The live RentalAI site is in rental_app/web_public (served with rental_app/api_server.py).",
+  "scripts": {
+    "preview:web": "npx --yes serve ../rental_app/web_public -l 4173"
+  },
   "devDependencies": {
     "@types/react": "^18.3.12"
   }
