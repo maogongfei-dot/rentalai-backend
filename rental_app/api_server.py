@@ -2431,6 +2431,21 @@ def web_start_analysis():
     return FileResponse(page)
 
 
+# 合同检查入口（Phase 5 Step 3；静态 + 前端 mock，不调用 /api/contract/*）
+@app.get("/check-contract")
+def web_check_contract():
+    page = _WEB_PUBLIC_DIR / "check_contract.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/check_contract.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
 # 合同条款分析（接 /api/contract/* 系列）
 @app.get("/contract-analysis")
 def web_contract_analysis():
