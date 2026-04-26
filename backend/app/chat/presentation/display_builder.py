@@ -34,6 +34,8 @@ TITLE_WATCH_OUT = "【Watch Out】"
 TITLE_FINAL_ADVICE = "【Final Advice】"
 TITLE_REPUTATION_CHECK = "【Reputation Check】"
 TITLE_LOCATION_INSIGHT = "【Location Insight】"
+TITLE_APPROVAL_CHANCE = "【Approval Chance】"
+TITLE_HOW_TO_IMPROVE = "【How To Improve】"
 
 NO_MAJOR_RISK_TEXT = (
     "No major risk was found from the available text, but you should still confirm rent, "
@@ -329,6 +331,27 @@ def _location_lines(location_info: Any) -> list[str]:
     if not lines:
         lines.append(LIMITED_LOCATION_TEXT)
     return lines
+
+
+def _tenant_approval_lines(tenant_approval_result: Any) -> dict[str, Any]:
+    out = {
+        "approval_chance": "Unknown",
+        "why": [],
+        "how_to_improve": [],
+    }
+    if not isinstance(tenant_approval_result, dict):
+        return out
+    chance = _clean_str(tenant_approval_result.get("approval_chance")) or "Unknown"
+    why = _clean_list(tenant_approval_result.get("why") or [], limit=6)
+    improve = _clean_list(tenant_approval_result.get("how_to_improve") or [], limit=6)
+    if chance == "Unknown" and not why:
+        fallback = _clean_str(tenant_approval_result.get("insufficient_detail_message"))
+        if fallback:
+            why = [fallback]
+    out["approval_chance"] = chance
+    out["why"] = why
+    out["how_to_improve"] = improve
+    return out
 
 
 def _build_legal_sections(r: dict[str, Any]) -> dict[str, Any]:
@@ -830,7 +853,11 @@ def render_display_text(sections: dict[str, Any]) -> str:
             watch = ["No major warning found yet, but confirm key costs and terms in writing."]
         rep_lines = _reputation_lines(sections.get("reputation_result"))
         loc_lines = _location_lines(sections.get("location_info"))
+        approval = _tenant_approval_lines(sections.get("tenant_approval_result"))
         parts = [
+            f"{TITLE_APPROVAL_CHANCE}\n{approval['approval_chance']}",
+            f"{TITLE_WHY}\n" + "\n".join(f"- {x}" for x in (approval["why"] or ["I need a bit more detail to estimate your approval chances. You can share income, job status, or whether you have a guarantor."])),
+            f"{TITLE_HOW_TO_IMPROVE}\n" + "\n".join(f"- {x}" for x in (approval["how_to_improve"] or ["add guarantor", "offer upfront rent", "provide payslips"])),
             f"{TITLE_BEST_OPTION}\n{best}",
             f"{TITLE_CHEAPEST_OPTION}\n{cheap}",
             f"{TITLE_LOWEST_RISK_OPTION}\n{low_risk}",
@@ -879,8 +906,12 @@ def render_display_text(sections: dict[str, Any]) -> str:
             what_to_do_next = next_steps
         rep_lines = _reputation_lines(sections.get("reputation_result"))
         loc_lines = _location_lines(sections.get("location_info"))
+        approval = _tenant_approval_lines(sections.get("tenant_approval_result"))
 
         parts = [
+            f"{TITLE_APPROVAL_CHANCE}\n{approval['approval_chance']}",
+            f"{TITLE_WHY}\n" + "\n".join(f"- {x}" for x in (approval["why"] or ["I need a bit more detail to estimate your approval chances. You can share income, job status, or whether you have a guarantor."])),
+            f"{TITLE_HOW_TO_IMPROVE}\n" + "\n".join(f"- {x}" for x in (approval["how_to_improve"] or ["add guarantor", "offer upfront rent", "provide payslips"])),
             f"{TITLE_FINAL_RECOMMENDATION}\n{final_label}",
             f"{TITLE_WHY}\n" + "\n".join(f"- {x}" for x in why),
             f"{TITLE_MAIN_RISKS}\n" + "\n".join(f"- {x}" for x in main_risks),
@@ -914,6 +945,27 @@ def render_display_text(sections: dict[str, Any]) -> str:
         what_to_do_next = ["Share rent, postcode, bills, or contract wording."]
     rep_lines = _reputation_lines(sections.get("reputation_result"))
     loc_lines = _location_lines(sections.get("location_info"))
+    approval = _tenant_approval_lines(sections.get("tenant_approval_result"))
+
+    parts.append(f"{TITLE_APPROVAL_CHANCE}\n{approval['approval_chance']}")
+    parts.append(
+        f"{TITLE_WHY}\n"
+        + "\n".join(
+            f"- {x}" for x in (
+                approval["why"] or [
+                    "I need a bit more detail to estimate your approval chances. You can share income, job status, or whether you have a guarantor."
+                ]
+            )
+        )
+    )
+    parts.append(
+        f"{TITLE_HOW_TO_IMPROVE}\n"
+        + "\n".join(
+            f"- {x}" for x in (
+                approval["how_to_improve"] or ["add guarantor", "offer upfront rent", "provide payslips"]
+            )
+        )
+    )
 
     parts.append(f"{TITLE_FINAL_RECOMMENDATION}\n{final_label}")
     parts.append(f"{TITLE_WHY}\n" + "\n".join(f"- {x}" for x in why))
@@ -1004,6 +1056,7 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
     sections = build_display_sections(chat_result)
     sections["reputation_result"] = chat_result.get("reputation_result")
     sections["location_info"] = chat_result.get("location_info")
+    sections["tenant_approval_result"] = chat_result.get("tenant_approval_result")
     display_text = render_display_text(sections)
     final_result = {
         "explain_result": chat_result.get("explain_result"),
@@ -1051,6 +1104,7 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
             "what_to_do_next": list(sections.get("what_to_do_next") or []),
             "reputation_result": sections.get("reputation_result"),
             "location_info": sections.get("location_info"),
+            "tenant_approval_result": sections.get("tenant_approval_result"),
             "summary": sections.get("summary") or "",
             "risk_clauses": list(sections.get("risk_clauses") or []),
             "need_to_confirm": list(sections.get("need_to_confirm") or []),

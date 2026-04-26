@@ -10,6 +10,7 @@ from typing import Any
 from ..legal.phase0_entry import run_phase0_analysis
 from ..map import get_location_info
 from ..reputation import analyze_reputation
+from ..tenant import estimate_approval_chance
 
 from .followup_builder import (
     append_guidance_footer,
@@ -599,6 +600,7 @@ def _build_product_output(result: dict[str, Any]) -> dict[str, Any]:
             "alternative_help": list(display_sections.get("alternative_help") or []),
             "reputation_result": display_sections.get("reputation_result"),
             "location_info": display_sections.get("location_info"),
+            "tenant_approval_result": display_sections.get("tenant_approval_result"),
         },
         "next_actions": list(display_sections.get("next_steps") or []),
         "followups": list(display_sections.get("followups") or []),
@@ -711,6 +713,12 @@ def _attach_location_info(
     return o
 
 
+def _attach_tenant_approval(out: dict[str, Any], trimmed: str) -> dict[str, Any]:
+    o = dict(out)
+    o["tenant_approval_result"] = estimate_approval_chance(trimmed)
+    return o
+
+
 def _looks_unrecognized(text: str) -> bool:
     t = (text or "").strip()
     if not t:
@@ -731,6 +739,7 @@ def _finish_chat_response(
     out = _attach_property_input(out, pi_parsed, pi_ref)
     out = _attach_reputation(out, trimmed, pi_parsed, pi_ref)
     out = _attach_location_info(out, trimmed, pi_parsed, pi_ref)
+    out = _attach_tenant_approval(out, trimmed)
     pref_det = detect_user_preferences(trimmed)
     out = _attach_uk_location(out, trimmed, pi_parsed, pi_ref, pref_det)
     out = _apply_analysis_route(out, trimmed, pi_parsed, pi_ref, scope_info)
