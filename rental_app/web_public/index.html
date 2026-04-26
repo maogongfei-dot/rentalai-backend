@@ -11,7 +11,7 @@
   · 角色：默认落地首页 + 上述 **一语分析** 主表单所在；后续新找房能力优先在本区块与 ai_home.js 对齐。
   · ShortRentAI：作为平台内短租 / 合租 / 灵活租期 **扩展分支**，可在本页「主功能」区或表单侧增加并列入口
     与分流参数（见页内 ShortRentAI 注释），**不替换**本页 RentAI 长线主流程。
-  · 访问：未登录可浏览本页、/assistant、/ai-result、/analysis-history、/history；受保护路由见 auth_local.js。
+  · 访问：未登录可浏览本页、/start（Phase5 Step2 起租分析/演示 mock）、/assistant、/ai-result、/analysis-history、/history；受保护路由见 auth_local.js。
   =============================================================================
 -->
 <html lang="zh-Hans">
@@ -69,7 +69,7 @@
           <li class="saas-feature-item">Repair and tenant guidance</li>
         </ul>
         <div class="saas-cta-row" role="group" aria-label="Primary actions">
-          <a class="saas-btn saas-btn--primary" href="#ai-rental-heading"
+          <a class="saas-btn saas-btn--primary" href="/start"
             >Start Analysis</a
           >
           <a class="saas-btn" href="/contract-analysis">Check Contract</a>
@@ -109,7 +109,7 @@
         <div class="home-entry-grid" role="list">
           <a
             class="home-entry-card home-entry-card--property"
-            href="#ai-rental-heading"
+            href="/start"
             role="listitem"
           >
             <div class="home-entry-card-body">

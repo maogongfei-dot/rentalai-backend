@@ -2416,6 +2416,21 @@ def web_reputation_placeholder():
     return FileResponse(page)
 
 
+# 租赁分析 / AI 聊天入口（Phase 5 Step 2；静态 + 前端 mock，不调用 /api/ai/*）
+@app.get("/start")
+def web_start_analysis():
+    page = _WEB_PUBLIC_DIR / "start.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/start.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
 # 合同条款分析（接 /api/contract/* 系列）
 @app.get("/contract-analysis")
 def web_contract_analysis():

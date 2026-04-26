@@ -13,6 +13,7 @@
     { "source": "/history-detail", "destination": "/history_detail.html" },
     { "source": "/register", "destination": "/register.html" },
     { "source": "/result/:path*", "destination": "/result.html" },
-    { "source": "/reputation", "destination": "/reputation.html" }
+    { "source": "/reputation", "destination": "/reputation.html" },
+    { "source": "/start", "destination": "/start.html" }
   ]
 }

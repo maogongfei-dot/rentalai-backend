@@ -2690,3 +2690,96 @@ body.placeholder-page-body {
 .saas-placeholder-card .hint {
   max-width: 40rem;
 }
+
+/* Phase 5 / Step 2: /start — AI analysis chat (mock client-side) */
+body.start-analysis-page-body {
+  max-width: min(100%, 48rem);
+}
+
+.start-analysis-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.start-analysis-header {
+  margin: 0 0 0.15rem;
+}
+
+.start-analysis-title {
+  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0.35rem 0 0.5rem;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.start-analysis-prompt {
+  max-width: 40rem;
+  color: #475569;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.start-analysis-input-card {
+  margin-top: 0.15rem;
+}
+
+.start-analysis-textarea {
+  min-height: 10rem;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+}
+
+.start-analysis-textarea:focus {
+  outline: 2px solid #0f172a;
+  outline-offset: 1px;
+  border-color: #94a3b8;
+}
+
+.start-analysis-actions {
+  margin-top: 0.65rem;
+}
+
+.start-analysis-actions .saas-btn--primary {
+  min-width: 7.5rem;
+}
+
+button.saas-btn--primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.start-analysis-mock-note {
+  margin: 0.75rem 0 0;
+}
+
+.start-analysis-result-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.start-analysis-result-body {
+  margin: 0;
+  font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #334155;
+  padding: 0.5rem 0.55rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  max-height: 24rem;
+  overflow: auto;
+}

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="rentalai-api-base" content="" />
+    <meta name="vite-rentalai-api-base" content="" />
+    <meta name="rentalai-env" content="" />
+    <title>Start your rental analysis · RentalAI</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script src="/assets/api_config.js"></script>
+  </head>
+  <body class="start-analysis-page-body">
+    <script src="/assets/auth_user_store.js"></script>
+    <script src="/assets/auth_local.js"></script>
+    <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
+    <main class="wrap wrap-wide start-analysis-main" lang="en-GB">
+      <p class="back-link">
+        <a href="/">Home</a>
+      </p>
+
+      <header class="start-analysis-header">
+        <p class="saas-hero-kicker">RentalAI</p>
+        <h1 class="start-analysis-title">Start your rental analysis</h1>
+        <p class="hint start-analysis-prompt" id="start-analysis-hint">
+          Tell RentalAI about the property, contract, rent, postcode, bills, or repair
+          issue you want to check.
+        </p>
+      </header>
+
+      <section class="card saas-hero start-analysis-input-card" aria-labelledby="start-input-label">
+        <label class="field-label" id="start-input-label" for="start-analysis-input"
+          >What would you like to analyse?</label
+        >
+        <textarea
+          id="start-analysis-input"
+          name="query"
+          rows="8"
+          class="start-analysis-textarea"
+          placeholder="E.g. 2-bed in BS1, budget £1,200, bills not included, deposit is 5 weeks’ rent, or paste a short contract clause you’re unsure about…"
+          spellcheck="true"
+        ></textarea>
+        <div class="start-analysis-actions">
+          <button type="button" class="saas-btn saas-btn--primary" id="start-analyze-btn">
+            Analyze
+          </button>
+        </div>
+        <p id="start-analysis-err" class="err hidden" role="alert" aria-live="assertive"></p>
+        <p class="hint small-print muted start-analysis-mock-note">
+          Demo mode: this step uses a local mock only — no server AI call.
+        </p>
+      </section>
+
+      <section
+        id="start-analysis-result"
+        class="card start-analysis-result-card hidden"
+        aria-live="polite"
+        aria-labelledby="start-result-heading"
+      >
+        <h2 id="start-result-heading" class="section-title">Analysis (preview)</h2>
+        <pre class="start-analysis-result-body" id="start-analysis-result-body"></pre>
+      </section>
+    </main>
+    <script src="/assets/start_analysis_page.js"></script>
+  </body>
+</html>
