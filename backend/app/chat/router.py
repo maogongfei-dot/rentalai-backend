@@ -689,12 +689,10 @@ def _extract_location_query(
         return str(pi_ref["address_text"])
     if pi_ref.get("postcode"):
         return str(pi_ref["postcode"])
-    if pi_ref.get("city"):
-        return str(pi_ref["city"])
-    if locations:
-        return str(locations[0])
-    text = (user_text or "").strip()
-    return text if text else None
+    # Phase 3 Step 2 scope: only trigger map lookup on address/postcode signals.
+    _ = locations
+    _ = user_text
+    return None
 
 
 def _attach_location_info(

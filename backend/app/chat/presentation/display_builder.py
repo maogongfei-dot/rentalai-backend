@@ -48,6 +48,7 @@ COMPARE_NEED_MORE_TEXT = (
 NO_REPUTATION_DATA_TEXT = (
     "No reputation data is available yet for this address, building, or agency."
 )
+LIMITED_LOCATION_TEXT = "Location detail is limited. Sharing a postcode can help improve the analysis."
 
 
 def _clean_str(x: Any) -> str:
@@ -252,6 +253,17 @@ def _build_final_summary_fields(r: dict[str, Any], sections: dict[str, Any]) -> 
         why.append(_first_sentence(route_reason, 140))
     if readiness in ("pending", "partial") and "not enough detail" not in " ".join(why).lower():
         why.append("Some key inputs are still missing.")
+    location_info = r.get("location_info") if isinstance(r.get("location_info"), dict) else {}
+    loc_status = _clean_str(location_info.get("status")).lower()
+    if loc_status == "ok":
+        transport = _clean_str(location_info.get("transport_hint"))
+        nearby = _clean_list(location_info.get("nearby_points") or [], limit=3)
+        if transport and "unknown" not in transport.lower():
+            why.append(f"Location suggests decent commute convenience ({transport}).")
+        if nearby:
+            why.append("Nearby facilities look practical for daily living.")
+    else:
+        why.append("Potential location risk remains uncertain without clearer postcode-level detail.")
     why = list(dict.fromkeys([w for w in why if w]))[:4]
 
     main_risks = _extract_main_risks(r, sections)
@@ -294,10 +306,10 @@ def _reputation_lines(reputation_result: Any) -> list[str]:
 
 def _location_lines(location_info: Any) -> list[str]:
     if not isinstance(location_info, dict):
-        return []
+        return [LIMITED_LOCATION_TEXT]
     status = _clean_str(location_info.get("status")).lower()
     if status != "ok":
-        return ["Location details are still unknown from the current address or postcode."]
+        return [LIMITED_LOCATION_TEXT]
     addr = _clean_str(location_info.get("normalized_address"))
     pc = _clean_str(location_info.get("postcode"))
     city = _clean_str(location_info.get("city"))
@@ -315,7 +327,7 @@ def _location_lines(location_info: Any) -> list[str]:
     if transport and transport != "Unknown":
         lines.append(f"Transport: {transport}")
     if not lines:
-        lines.append("Location details are still unknown from the current address or postcode.")
+        lines.append(LIMITED_LOCATION_TEXT)
     return lines
 
 
