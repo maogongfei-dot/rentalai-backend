@@ -287,6 +287,23 @@ def _build_out_of_scope_sections(r: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _build_fallback_sections(r: dict[str, Any]) -> dict[str, Any]:
+    summary = _clean_str(r.get("response_text")) or "I need a bit more detail to help."
+    miss = _clean_list(r.get("missing_key_fields") or [], limit=5)
+    next_steps = []
+    if miss:
+        next_steps.append(f"Share: {', '.join(miss)}.")
+    next_steps.append("Add one rental scenario and I will answer directly.")
+    return {
+        "summary": _first_sentence(summary, 420),
+        "what_i_found": [],
+        "key_points": [],
+        "next_steps": next_steps[:3],
+        "followups": [],
+        "alternative_help": [],
+    }
+
+
 def _build_default_sections(r: dict[str, Any]) -> dict[str, Any]:
     ar = r.get("analysis_route") or {}
     intent = _clean_str(r.get("intent")) or "general"
@@ -335,6 +352,8 @@ def _pick_branch(r: dict[str, Any]) -> str:
     if r.get("scope") == "out_of_scope":
         return "out_of_scope"
     intent = r.get("intent") or ""
+    if intent in ("half_related", "insufficient_info"):
+        return "fallback"
     if intent == "legal_risk":
         return "legal_risk"
     if intent == "property_comparison":
@@ -360,6 +379,11 @@ def build_display_sections(chat_result: dict[str, Any]) -> dict[str, Any]:
 
     if branch == "legal_risk":
         out = _build_legal_sections(chat_result)
+        out["decision"] = decision_lines
+        return out
+
+    if branch == "fallback":
+        out = _build_fallback_sections(chat_result)
         out["decision"] = decision_lines
         return out
 

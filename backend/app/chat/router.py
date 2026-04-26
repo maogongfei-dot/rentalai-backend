@@ -32,6 +32,7 @@ from .comparison import (
     run_basic_property_comparison,
 )
 from .property_input import (
+    assess_input_completeness,
     build_property_reference,
     parse_property_input,
     property_input_voice_line,
@@ -47,6 +48,11 @@ from .location import build_uk_location_context, empty_uk_location_context
 from .presentation import build_chat_display_bundle
 
 MODULE_ID = "chat_router"
+OUT_OF_SCOPE_REPLY = (
+    "I mainly help with renting, housing, and contracts. "
+    "If you have a rental question, I can give you a detailed answer."
+)
+HALF_RELATED_REPLY = "I can help from a rental perspective, but I may need a bit more detail."
 
 # Modules not wired in this version (for discovery / future orchestration).
 AVAILABLE_NEXT_MODULES = [
@@ -581,6 +587,16 @@ def _build_product_output(result: dict[str, Any]) -> dict[str, Any]:
         out["explain_result"] = er
     return out
 
+
+def _build_missing_fields_prompt(missing_fields: list[str]) -> str:
+    if not missing_fields:
+        return (
+            "I can help, but I need a bit more rental detail first "
+            "(rent, location, postcode, bills, or contract wording)."
+        )
+    top = ", ".join(missing_fields[:3])
+    return f"I can help, but I need a bit more detail first. Could you share {top}?"
+
 def _finish_chat_response(
     base: dict[str, Any],
     scope_info: dict[str, Any],
@@ -618,19 +634,19 @@ def handle_chat_request(user_text: str) -> dict[str, Any]:
 
     pi_parsed = parse_property_input(trimmed)
     pi_ref = build_property_reference(pi_parsed)
+    completeness = assess_input_completeness(pi_parsed, trimmed)
 
     scope_info = classify_query_scope(trimmed)
     scope = scope_info.get("scope") or "rental_related"
 
     if scope == "out_of_scope":
-        sm = build_scope_message("out_of_scope", list(scope_info.get("matched_keywords") or []))
         bundle = build_chat_followup_bundle("general_unknown", source_result=None)
         base = {
             "module": MODULE_ID,
             "success": True,
             "intent": "out_of_scope",
             "input_text": trimmed,
-            "response_text": sm,
+            "response_text": OUT_OF_SCOPE_REPLY,
             "source_module": None,
             "source_result": None,
             "comparison_inputs": None,
@@ -643,6 +659,59 @@ def handle_chat_request(user_text: str) -> dict[str, Any]:
         return _finish_chat_response(base, scope_info, bundle, trimmed, pi_parsed, pi_ref)
 
     intent = classify_intent(trimmed)
+    is_half_related = (
+        scope == "rental_related"
+        and intent == "general_unknown"
+        and not pi_parsed.get("is_property_reference")
+        and not (scope_info.get("matched_keywords") or [])
+    )
+    if is_half_related:
+        bundle = build_chat_followup_bundle("general_unknown", source_result=None)
+        base = {
+            "module": MODULE_ID,
+            "success": True,
+            "intent": "half_related",
+            "input_text": trimmed,
+            "response_text": HALF_RELATED_REPLY,
+            "source_module": None,
+            "source_result": None,
+            "comparison_inputs": None,
+            "comparison_result": None,
+            "suggested_followup": "Share a rental detail and I can give a clearer answer.",
+            "available_next_modules": AVAILABLE_NEXT_MODULES,
+        }
+        return _finish_chat_response(base, scope_info, bundle, trimmed, pi_parsed, pi_ref)
+
+    fields = completeness.get("fields_present") or {}
+    missing = list(completeness.get("missing_fields") or [])
+    insufficient_for_legal = intent == "legal_risk" and not bool(fields.get("contract"))
+    insufficient_for_comparison = intent == "property_comparison" and (
+        not bool(fields.get("rent"))
+        or (not bool(fields.get("location")) and not bool(fields.get("postcode")))
+    )
+    likely_rental_but_sparse = (
+        scope in ("rental_core", "rental_related")
+        and intent in ("general_unknown", "property_analysis", "bills_cost", "area_info")
+        and int(completeness.get("present_count") or 0) <= 1
+    )
+    if insufficient_for_legal or insufficient_for_comparison or likely_rental_but_sparse:
+        bundle = build_chat_followup_bundle("general_unknown", source_result=None)
+        base = {
+            "module": MODULE_ID,
+            "success": True,
+            "intent": "insufficient_info",
+            "input_text": trimmed,
+            "response_text": _build_missing_fields_prompt(missing),
+            "source_module": None,
+            "source_result": None,
+            "comparison_inputs": None,
+            "comparison_result": None,
+            "suggested_followup": "Share a bit more context and I will continue.",
+            "available_next_modules": AVAILABLE_NEXT_MODULES,
+            "missing_key_fields": missing,
+            "input_completeness": completeness,
+        }
+        return _finish_chat_response(base, scope_info, bundle, trimmed, pi_parsed, pi_ref)
 
     if intent == "property_comparison":
         inputs = extract_property_comparison_inputs(trimmed)

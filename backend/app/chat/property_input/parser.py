@@ -283,6 +283,57 @@ def parse_property_input(user_text: str) -> dict[str, Any]:
     }
 
 
+def assess_input_completeness(parsed: dict[str, Any], user_text: str) -> dict[str, Any]:
+    """
+    Lightweight completeness check for rental guidance gating.
+
+    Key slots:
+      - rent
+      - location (city/address)
+      - postcode
+      - bills
+      - contract
+    """
+    text = (user_text or "").strip()
+    low = _normalize(text)
+    has_rent = parsed.get("detected_price") is not None
+    has_location = bool(parsed.get("detected_locations") or parsed.get("detected_addresses"))
+    has_postcode = bool(parsed.get("detected_postcodes"))
+    has_bills = parsed.get("bills_included") is not None or any(
+        k in low for k in ("bills", "utility", "utilities", "council tax")
+    )
+    has_contract = any(
+        k in low
+        for k in (
+            "contract",
+            "tenancy agreement",
+            "clause",
+            "agreement",
+            "section 21",
+            "section 8",
+            "landlord",
+            "tenant",
+            "deposit",
+            "repairs",
+            "eviction",
+            "notice",
+        )
+    )
+    fields = {
+        "rent": has_rent,
+        "location": has_location,
+        "postcode": has_postcode,
+        "bills": has_bills,
+        "contract": has_contract,
+    }
+    missing = [k for k, v in fields.items() if not v]
+    return {
+        "fields_present": fields,
+        "missing_fields": missing,
+        "present_count": sum(1 for v in fields.values() if v),
+    }
+
+
 def build_property_reference(parsed: dict[str, Any]) -> dict[str, Any]:
     """
     Normalised listing reference for scrapers, comparison, and area modules.

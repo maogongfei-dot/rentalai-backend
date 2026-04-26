@@ -247,34 +247,9 @@ def build_scope_message(scope: str, matched_keywords: list[str]) -> str:
     if scope == "invalid":
         return "I could not understand the request."
     if scope == "rental_related":
-        return (
-            "I can give some general guidance on this, but I mainly focus on rental decisions, "
-            "contracts, and tenancy questions."
-        )
-
-    # out_of_scope — pick flavour from matches
-    low_keys = " ".join(matched_keywords).lower()
-    if any(k in low_keys for k in ("mortgage", "remortgage", "buying a house", "buy a house", "purchase")):
-        return (
-            "This looks more related to property buying or lending, which is outside my main focus. "
-            "I mainly help with renting, contracts, deposits, and everyday housing decisions. "
-            "If you have any rental-related questions, I would be happy to help."
-        )
-    if any(k in low_keys for k in ("crypto", "bitcoin", "ethereum", "nft", "stock")):
-        return (
-            "That topic sits outside what I cover day to day. "
-            "I mainly help with renting, contracts, deposits, bills, and comparing rental options. "
-            "If you want to talk through a rental or tenancy question, I am here for that."
-        )
-    if any(k in low_keys for k in ("coding", "programming", "javascript", "react", "leetcode")):
-        return (
-            "That sounds more like a tech topic than a rental workflow. "
-            "I mainly help with renting, contracts, deposits, and housing decisions. "
-            "If something rental-related comes up, feel free to ask."
-        )
+        return "I can help from a rental perspective, but I may need a bit more detail."
 
     return (
-        "That looks a little outside my main focus. "
-        "I mainly help with renting, contracts, deposits, bills, and comparing rental options. "
-        "If you have a rental or tenancy question, I would be glad to help."
+        "I mainly help with renting, housing, and contracts. "
+        "If you have a rental question, I can give you a detailed answer."
     )
