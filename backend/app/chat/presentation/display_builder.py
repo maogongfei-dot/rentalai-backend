@@ -36,6 +36,11 @@ TITLE_REPUTATION_CHECK = "【Reputation Check】"
 TITLE_LOCATION_INSIGHT = "【Location Insight】"
 TITLE_APPROVAL_CHANCE = "【Approval Chance】"
 TITLE_HOW_TO_IMPROVE = "【How To Improve】"
+TITLE_SITUATION = "【Situation】"
+TITLE_WHAT_TO_DO_NOW = "【What To Do Now】"
+TITLE_MESSAGE_TEMPLATE = "【Message Template】"
+TITLE_IF_NO_RESPONSE = "【If No Response】"
+TITLE_LANDLORD_SUPPORT = "【Landlord Support】"
 
 NO_MAJOR_RISK_TEXT = (
     "No major risk was found from the available text, but you should still confirm rent, "
@@ -352,6 +357,39 @@ def _tenant_approval_lines(tenant_approval_result: Any) -> dict[str, Any]:
     out["why"] = why
     out["how_to_improve"] = improve
     return out
+
+
+def _repair_guidance_fields(repair_guidance_result: Any) -> dict[str, Any]:
+    out = {
+        "situation": "",
+        "what_to_do_now": [],
+        "message_template": "",
+        "if_no_response": [],
+    }
+    if not isinstance(repair_guidance_result, dict):
+        return out
+    out["situation"] = _clean_str(repair_guidance_result.get("situation"))
+    out["what_to_do_now"] = _clean_list(repair_guidance_result.get("what_to_do_now") or [], limit=6)
+    out["message_template"] = _clean_str(repair_guidance_result.get("message_template"))
+    out["if_no_response"] = _clean_list(repair_guidance_result.get("if_no_response") or [], limit=6)
+    if not out["situation"]:
+        out["situation"] = _clean_str(repair_guidance_result.get("insufficient_detail_message"))
+    return out
+
+
+def _landlord_support_fields(chat_result: dict[str, Any]) -> dict[str, Any]:
+    role = _clean_str(chat_result.get("user_role")) or "tenant"
+    if role != "landlord":
+        return {"user_role": role, "landlord_support": []}
+    return {
+        "user_role": "landlord",
+        "landlord_support": [
+            "You appear to be a landlord. I can help you review tenant information, suggest contract checks, and generate simple messages.",
+            "Tenant screening checklist: income proof, employment/student status, guarantor, and references.",
+            "Contract checks: rent amount, deposit terms, repair responsibility, notice and break clause wording.",
+            "Message templates: rent reminder, repair response acknowledgement, and follow-up timeline message.",
+        ],
+    }
 
 
 def _build_legal_sections(r: dict[str, Any]) -> dict[str, Any]:
@@ -776,35 +814,41 @@ def build_display_sections(chat_result: dict[str, Any]) -> dict[str, Any]:
         out = _build_out_of_scope_sections(chat_result)
         out["decision"] = decision_lines
         out.update(_build_final_summary_fields(chat_result, out))
+        out.update(_landlord_support_fields(chat_result))
         return out
 
     if branch == "legal_risk":
         out = _build_legal_sections(chat_result)
         out["decision"] = decision_lines
         out.update(_build_final_summary_fields(chat_result, out))
+        out.update(_landlord_support_fields(chat_result))
         return out
 
     if branch == "fallback":
         out = _build_fallback_sections(chat_result)
         out["decision"] = decision_lines
         out.update(_build_final_summary_fields(chat_result, out))
+        out.update(_landlord_support_fields(chat_result))
         return out
 
     if branch == "property_comparison":
         out = _build_comparison_sections(chat_result)
         out["decision"] = decision_lines
         out.update(_build_final_summary_fields(chat_result, out))
+        out.update(_landlord_support_fields(chat_result))
         return out
 
     if branch == "analysis_candidate":
         out = _build_analysis_candidate_sections(chat_result)
         out["decision"] = decision_lines
         out.update(_build_final_summary_fields(chat_result, out))
+        out.update(_landlord_support_fields(chat_result))
         return out
 
     out = _build_default_sections(chat_result)
     out["decision"] = decision_lines
     out.update(_build_final_summary_fields(chat_result, out))
+    out.update(_landlord_support_fields(chat_result))
     return out
 
 
@@ -854,6 +898,8 @@ def render_display_text(sections: dict[str, Any]) -> str:
         rep_lines = _reputation_lines(sections.get("reputation_result"))
         loc_lines = _location_lines(sections.get("location_info"))
         approval = _tenant_approval_lines(sections.get("tenant_approval_result"))
+        repair = _repair_guidance_fields(sections.get("repair_guidance_result"))
+        landlord_support = _clean_list(sections.get("landlord_support") or [], limit=6)
         parts = [
             f"{TITLE_APPROVAL_CHANCE}\n{approval['approval_chance']}",
             f"{TITLE_WHY}\n" + "\n".join(f"- {x}" for x in (approval["why"] or ["I need a bit more detail to estimate your approval chances. You can share income, job status, or whether you have a guarantor."])),
@@ -870,6 +916,26 @@ def render_display_text(sections: dict[str, Any]) -> str:
             (
                 f"{TITLE_LOCATION_INSIGHT}\n" + "\n".join(f"- {x}" for x in loc_lines)
                 if loc_lines else ""
+            ),
+            (
+                f"{TITLE_SITUATION}\n{repair['situation']}"
+                if repair["situation"] else ""
+            ),
+            (
+                f"{TITLE_WHAT_TO_DO_NOW}\n" + "\n".join(f"- {x}" for x in repair["what_to_do_now"])
+                if repair["what_to_do_now"] else ""
+            ),
+            (
+                f"{TITLE_MESSAGE_TEMPLATE}\n{repair['message_template']}"
+                if repair["message_template"] else ""
+            ),
+            (
+                f"{TITLE_IF_NO_RESPONSE}\n" + "\n".join(f"- {x}" for x in repair["if_no_response"])
+                if repair["if_no_response"] else ""
+            ),
+            (
+                f"{TITLE_LANDLORD_SUPPORT}\n" + "\n".join(f"- {x}" for x in landlord_support)
+                if landlord_support else ""
             ),
             f"{TITLE_SUMMARY}\n{_clean_str(sections.get('summary'))}",
         ]
@@ -907,6 +973,8 @@ def render_display_text(sections: dict[str, Any]) -> str:
         rep_lines = _reputation_lines(sections.get("reputation_result"))
         loc_lines = _location_lines(sections.get("location_info"))
         approval = _tenant_approval_lines(sections.get("tenant_approval_result"))
+        repair = _repair_guidance_fields(sections.get("repair_guidance_result"))
+        landlord_support = _clean_list(sections.get("landlord_support") or [], limit=6)
 
         parts = [
             f"{TITLE_APPROVAL_CHANCE}\n{approval['approval_chance']}",
@@ -923,6 +991,26 @@ def render_display_text(sections: dict[str, Any]) -> str:
             (
                 f"{TITLE_LOCATION_INSIGHT}\n" + "\n".join(f"- {x}" for x in loc_lines)
                 if loc_lines else ""
+            ),
+            (
+                f"{TITLE_SITUATION}\n{repair['situation']}"
+                if repair["situation"] else ""
+            ),
+            (
+                f"{TITLE_WHAT_TO_DO_NOW}\n" + "\n".join(f"- {x}" for x in repair["what_to_do_now"])
+                if repair["what_to_do_now"] else ""
+            ),
+            (
+                f"{TITLE_MESSAGE_TEMPLATE}\n{repair['message_template']}"
+                if repair["message_template"] else ""
+            ),
+            (
+                f"{TITLE_IF_NO_RESPONSE}\n" + "\n".join(f"- {x}" for x in repair["if_no_response"])
+                if repair["if_no_response"] else ""
+            ),
+            (
+                f"{TITLE_LANDLORD_SUPPORT}\n" + "\n".join(f"- {x}" for x in landlord_support)
+                if landlord_support else ""
             ),
             f"{TITLE_SUMMARY}\n{summary}",
             f"{TITLE_RISK_CLAUSES}\n" + "\n".join(f"- {x}" for x in risk_clauses),
@@ -946,6 +1034,8 @@ def render_display_text(sections: dict[str, Any]) -> str:
     rep_lines = _reputation_lines(sections.get("reputation_result"))
     loc_lines = _location_lines(sections.get("location_info"))
     approval = _tenant_approval_lines(sections.get("tenant_approval_result"))
+    repair = _repair_guidance_fields(sections.get("repair_guidance_result"))
+    landlord_support = _clean_list(sections.get("landlord_support") or [], limit=6)
 
     parts.append(f"{TITLE_APPROVAL_CHANCE}\n{approval['approval_chance']}")
     parts.append(
@@ -975,6 +1065,16 @@ def render_display_text(sections: dict[str, Any]) -> str:
         parts.append(f"{TITLE_REPUTATION_CHECK}\n" + "\n".join(f"- {x}" for x in rep_lines))
     if loc_lines:
         parts.append(f"{TITLE_LOCATION_INSIGHT}\n" + "\n".join(f"- {x}" for x in loc_lines))
+    if repair["situation"]:
+        parts.append(f"{TITLE_SITUATION}\n{repair['situation']}")
+    if repair["what_to_do_now"]:
+        parts.append(f"{TITLE_WHAT_TO_DO_NOW}\n" + "\n".join(f"- {x}" for x in repair["what_to_do_now"]))
+    if repair["message_template"]:
+        parts.append(f"{TITLE_MESSAGE_TEMPLATE}\n{repair['message_template']}")
+    if repair["if_no_response"]:
+        parts.append(f"{TITLE_IF_NO_RESPONSE}\n" + "\n".join(f"- {x}" for x in repair["if_no_response"]))
+    if landlord_support:
+        parts.append(f"{TITLE_LANDLORD_SUPPORT}\n" + "\n".join(f"- {x}" for x in landlord_support))
 
     s = _clean_str(sections.get("summary"))
     decision_lines = _clean_list(sections.get("decision") or [], limit=3)
@@ -1057,6 +1157,9 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
     sections["reputation_result"] = chat_result.get("reputation_result")
     sections["location_info"] = chat_result.get("location_info")
     sections["tenant_approval_result"] = chat_result.get("tenant_approval_result")
+    sections["repair_guidance_result"] = chat_result.get("repair_guidance_result")
+    sections["user_role"] = chat_result.get("user_role") or sections.get("user_role") or "tenant"
+    sections["landlord_support"] = list(sections.get("landlord_support") or [])
     display_text = render_display_text(sections)
     final_result = {
         "explain_result": chat_result.get("explain_result"),
@@ -1105,6 +1208,9 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
             "reputation_result": sections.get("reputation_result"),
             "location_info": sections.get("location_info"),
             "tenant_approval_result": sections.get("tenant_approval_result"),
+            "repair_guidance_result": sections.get("repair_guidance_result"),
+            "user_role": sections.get("user_role") or "tenant",
+            "landlord_support": list(sections.get("landlord_support") or []),
             "summary": sections.get("summary") or "",
             "risk_clauses": list(sections.get("risk_clauses") or []),
             "need_to_confirm": list(sections.get("need_to_confirm") or []),

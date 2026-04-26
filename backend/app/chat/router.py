@@ -9,6 +9,7 @@ from typing import Any
 
 from ..legal.phase0_entry import run_phase0_analysis
 from ..map import get_location_info
+from ..repair import build_repair_guidance
 from ..reputation import analyze_reputation
 from ..tenant import estimate_approval_chance
 
@@ -601,6 +602,9 @@ def _build_product_output(result: dict[str, Any]) -> dict[str, Any]:
             "reputation_result": display_sections.get("reputation_result"),
             "location_info": display_sections.get("location_info"),
             "tenant_approval_result": display_sections.get("tenant_approval_result"),
+            "repair_guidance_result": display_sections.get("repair_guidance_result"),
+            "user_role": display_sections.get("user_role"),
+            "landlord_support": display_sections.get("landlord_support"),
         },
         "next_actions": list(display_sections.get("next_steps") or []),
         "followups": list(display_sections.get("followups") or []),
@@ -719,6 +723,38 @@ def _attach_tenant_approval(out: dict[str, Any], trimmed: str) -> dict[str, Any]
     return o
 
 
+def _attach_repair_guidance(out: dict[str, Any], trimmed: str) -> dict[str, Any]:
+    o = dict(out)
+    o["repair_guidance_result"] = build_repair_guidance(trimmed)
+    return o
+
+
+def _detect_user_role(user_text: str) -> str:
+    low = " ".join((user_text or "").lower().split())
+    landlord_signals = (
+        "i am a landlord",
+        "i'm a landlord",
+        "im a landlord",
+        "i am landlord",
+        "i want to rent out",
+        "i want to let my property",
+        "i am renting out",
+        "i'm renting out",
+        "as a landlord",
+        "landlord here",
+        "i need tenant screening",
+    )
+    return "landlord" if any(sig in low for sig in landlord_signals) else "tenant"
+
+
+def _attach_user_role(out: dict[str, Any], trimmed: str) -> dict[str, Any]:
+    o = dict(out)
+    role = _detect_user_role(trimmed)
+    o["user_role"] = role
+    o["landlord_mode"] = role == "landlord"
+    return o
+
+
 def _looks_unrecognized(text: str) -> bool:
     t = (text or "").strip()
     if not t:
@@ -740,6 +776,8 @@ def _finish_chat_response(
     out = _attach_reputation(out, trimmed, pi_parsed, pi_ref)
     out = _attach_location_info(out, trimmed, pi_parsed, pi_ref)
     out = _attach_tenant_approval(out, trimmed)
+    out = _attach_repair_guidance(out, trimmed)
+    out = _attach_user_role(out, trimmed)
     pref_det = detect_user_preferences(trimmed)
     out = _attach_uk_location(out, trimmed, pi_parsed, pi_ref, pref_det)
     out = _apply_analysis_route(out, trimmed, pi_parsed, pi_ref, scope_info)
