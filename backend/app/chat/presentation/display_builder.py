@@ -23,10 +23,25 @@ TITLE_INSTEAD = "【What I Can Help With Instead】"
 TITLE_RISK_CLAUSES = "【Risk Clauses】"
 TITLE_NEED_CONFIRM = "【Need To Confirm】"
 TITLE_ASK_LANDLORD = "【Questions To Ask Landlord】"
+TITLE_FINAL_RECOMMENDATION = "【Final Recommendation】"
+TITLE_WHY = "【Why】"
+TITLE_MAIN_RISKS = "【Main Risks】"
+TITLE_WHAT_TO_DO_NEXT = "【What To Do Next】"
+TITLE_BEST_OPTION = "【Best Option】"
+TITLE_CHEAPEST_OPTION = "【Cheapest Option】"
+TITLE_LOWEST_RISK_OPTION = "【Lowest Risk Option】"
+TITLE_WATCH_OUT = "【Watch Out】"
+TITLE_FINAL_ADVICE = "【Final Advice】"
 
 NO_MAJOR_RISK_TEXT = (
     "No major risk was found from the available text, but you should still confirm rent, "
     "deposit, bills, repair responsibility, and break clause before signing."
+)
+SINGLE_PROPERTY_COMPARE_TEXT = (
+    "I only have one property to review, so I can assess it but cannot compare it against alternatives yet."
+)
+COMPARE_NEED_MORE_TEXT = (
+    "To compare properties better, please share rent, postcode, bills, bedroom count, and commute preference."
 )
 
 
@@ -155,6 +170,102 @@ def _build_landlord_questions(need_to_confirm: list[str], risk_clauses: list[str
     return questions[:5]
 
 
+def _final_recommendation_label(r: dict[str, Any]) -> str:
+    scope = _clean_str(r.get("scope"))
+    intent = _clean_str(r.get("intent"))
+    readiness = _clean_str(r.get("analysis_readiness"))
+    decision = r.get("decision") if isinstance(r.get("decision"), dict) else {}
+    ds = _clean_str(decision.get("decision_status")).lower()
+    risk_level = _clean_str(
+        ((r.get("source_result") or {}).get("risk_level"))
+        or (((r.get("source_result") or {}).get("normalized_result") or {}).get("raw_level"))
+    ).lower()
+    if scope == "out_of_scope":
+        return "Need More Information"
+    if intent in ("invalid_input", "half_related", "insufficient_info"):
+        return "Need More Information"
+    if risk_level == "high" or ds in ("caution", "redirect"):
+        return "Not Recommended"
+    if risk_level == "medium" or ds in ("review", "needs_more_input", "partial_compare", "pending", "proceed_lightly"):
+        return "Caution"
+    if readiness in ("pending", "partial"):
+        return "Need More Information"
+    if risk_level == "low" or ds in ("ready", "comparison_ready"):
+        return "Recommended"
+    return "Need More Information"
+
+
+def _extract_main_risks(r: dict[str, Any], sections: dict[str, Any]) -> list[str]:
+    risks: list[str] = []
+    txt = " ".join(
+        [
+            _clean_str(r.get("response_text")).lower(),
+            " ".join(_clean_list((r.get("analysis_route") or {}).get("missing_inputs") or [], limit=20)).lower(),
+            " ".join(_clean_list((r.get("missing_key_fields") or []), limit=20)).lower(),
+        ]
+    )
+    if "rent" in txt and ("missing" in txt or "light on" in txt):
+        risks.append("rent too high or not confirmed")
+    if "bill" in txt or "utility" in txt or "council tax" in txt:
+        risks.append("bills unclear")
+    if _clean_str(r.get("intent")) == "legal_risk":
+        risks.append("contract risk")
+    if "postcode" in txt or "city" in txt or "area" in txt:
+        risks.append("location uncertainty")
+    if "repair" in txt or "maintenance" in txt:
+        risks.append("repair responsibility unclear")
+
+    legal_risks = _clean_list(sections.get("risk_clauses") or [], limit=6)
+    for lr in legal_risks:
+        if NO_MAJOR_RISK_TEXT.lower() in lr.lower():
+            continue
+        short = _first_sentence(lr, 120)
+        if short and short not in risks:
+            risks.append(short)
+    if not risks and _clean_str(r.get("analysis_readiness")) in ("pending", "partial"):
+        risks.append("not enough confirmed rental details yet")
+    return risks[:6]
+
+
+def _build_final_summary_fields(r: dict[str, Any], sections: dict[str, Any]) -> dict[str, Any]:
+    label = _final_recommendation_label(r)
+    why: list[str] = []
+    scope = _clean_str(r.get("scope"))
+    readiness = _clean_str(r.get("analysis_readiness"))
+    route_reason = _clean_str((r.get("analysis_route") or {}).get("route_reason"))
+    if scope == "out_of_scope":
+        why.append("The question is outside the rental-focused workflow.")
+    elif label == "Need More Information":
+        why.append("The current details are not enough for a reliable recommendation.")
+    elif label == "Not Recommended":
+        why.append("There are strong risk signals that should be resolved first.")
+    elif label == "Caution":
+        why.append("There are unresolved points that need written confirmation.")
+    elif label == "Recommended":
+        why.append("No major blocker appears from the available rental details.")
+    if route_reason:
+        why.append(_first_sentence(route_reason, 140))
+    if readiness in ("pending", "partial") and "not enough detail" not in " ".join(why).lower():
+        why.append("Some key inputs are still missing.")
+    why = list(dict.fromkeys([w for w in why if w]))[:4]
+
+    main_risks = _extract_main_risks(r, sections)
+    what_to_do_next = _clean_list(sections.get("next_steps") or [], limit=6)
+    if not what_to_do_next:
+        what_to_do_next = [
+            "ask landlord about bills",
+            "confirm deposit protection",
+            "compare another property",
+            "upload contract wording",
+        ]
+    return {
+        "final_recommendation": label,
+        "why": why,
+        "main_risks": main_risks,
+        "what_to_do_next": what_to_do_next,
+    }
+
+
 def _build_legal_sections(r: dict[str, Any]) -> dict[str, Any]:
     p0 = r.get("source_result") or {}
     norm = p0.get("normalized_result") or {}
@@ -217,6 +328,154 @@ def _build_legal_sections(r: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _winner_for(points: list[dict[str, Any]], dim: str) -> str:
+    for p in points:
+        if _clean_str(p.get("dimension")) == dim:
+            w = _clean_str(p.get("winner"))
+            return w if w in ("A", "B", "tie") else "unknown"
+    return "unknown"
+
+
+def _label_for_side(comp: dict[str, Any], side: str) -> str:
+    if side == "A":
+        return _clean_str(((comp.get("property_a") or {}).get("label"))) or "Property A"
+    if side == "B":
+        return _clean_str(((comp.get("property_b") or {}).get("label"))) or "Property B"
+    return "both options"
+
+
+def _is_single_property_case(comp: dict[str, Any]) -> bool:
+    a = comp.get("property_a") or {}
+    b = comp.get("property_b") or {}
+    b_label = _clean_str(b.get("label")).lower()
+    b_has_details = any(
+        [
+            b.get("price") is not None,
+            bool(b.get("postcode") or b.get("city")),
+            b.get("bills_included") is not None,
+            bool(b.get("features") or []),
+        ]
+    )
+    return (not b_has_details) and (b_label in ("the other property", "property b", ""))
+
+
+def _build_comparison_advisor_fields(comp: dict[str, Any]) -> dict[str, Any]:
+    points = list(comp.get("comparison_points") or [])
+    missing = _clean_list(comp.get("missing_information") or [], limit=8)
+    summary = _clean_str(comp.get("comparison_summary"))
+    single_case = _is_single_property_case(comp)
+
+    if single_case:
+        return {
+            "best_option": SINGLE_PROPERTY_COMPARE_TEXT,
+            "cheapest_option": "Not enough data to identify a cheapest alternative.",
+            "lowest_risk_option": "Not enough data to identify a lower-risk alternative.",
+            "watch_out": ["Only one property has usable details right now."],
+            "final_advice": SINGLE_PROPERTY_COMPARE_TEXT,
+        }
+
+    insufficient = len(missing) >= 3
+    if insufficient:
+        return {
+            "best_option": COMPARE_NEED_MORE_TEXT,
+            "cheapest_option": "Price comparison is still incomplete.",
+            "lowest_risk_option": "Risk comparison is still incomplete.",
+            "watch_out": [COMPARE_NEED_MORE_TEXT],
+            "final_advice": "Hold recommendation until key comparison details are complete.",
+        }
+
+    price_w = _winner_for(points, "price")
+    bills_w = _winner_for(points, "bills")
+    commute_w = _winner_for(points, "commute")
+    area_w = _winner_for(points, "area")
+    safety_w = _winner_for(points, "safety")
+
+    a_score = 0
+    b_score = 0
+    for w in (price_w, bills_w, commute_w, area_w, safety_w):
+        if w == "A":
+            a_score += 1
+        elif w == "B":
+            b_score += 1
+
+    if a_score > b_score:
+        best_side = "A"
+    elif b_score > a_score:
+        best_side = "B"
+    else:
+        best_side = "unknown"
+
+    lowest_risk_side = "unknown"
+    risk_a = 0
+    risk_b = 0
+    if bills_w == "A":
+        risk_b += 1
+    elif bills_w == "B":
+        risk_a += 1
+    if safety_w == "A":
+        risk_b += 1
+    elif safety_w == "B":
+        risk_a += 1
+    if area_w == "A":
+        risk_b += 1
+    elif area_w == "B":
+        risk_a += 1
+    if risk_a < risk_b:
+        lowest_risk_side = "A"
+    elif risk_b < risk_a:
+        lowest_risk_side = "B"
+
+    watch_out: list[str] = []
+    for m in missing[:4]:
+        watch_out.append(f"Missing detail: {m}")
+    if price_w == "unknown":
+        watch_out.append("Rent comparison is still unclear.")
+    if bills_w == "unknown":
+        watch_out.append("Bills setup is still unclear for one or both options.")
+
+    best_option = (
+        f"{_label_for_side(comp, best_side)} is the most recommended on current details."
+        if best_side in ("A", "B")
+        else "Both options are close on current details."
+    )
+    if summary:
+        best_option = f"{best_option} {summary}"
+
+    cheapest_option = (
+        f"{_label_for_side(comp, price_w)} looks cheapest from the shared rent figures."
+        if price_w in ("A", "B")
+        else "Cheapest option is unclear from current rent details."
+    )
+    lowest_risk_option = (
+        f"{_label_for_side(comp, lowest_risk_side)} looks lower risk on bills/safety/location context."
+        if lowest_risk_side in ("A", "B")
+        else "Lowest risk option is still unclear from current details."
+    )
+
+    caution_side = "unknown"
+    if lowest_risk_side == "A":
+        caution_side = "B"
+    elif lowest_risk_side == "B":
+        caution_side = "A"
+    if caution_side in ("A", "B"):
+        watch_out.insert(0, f"{_label_for_side(comp, caution_side)} needs more caution before deciding.")
+    if not watch_out:
+        watch_out = ["No major warning found, but confirm bills and contract terms in writing."]
+
+    final_advice = (
+        f"Prioritise {_label_for_side(comp, best_side)} first, then verify bills, contract wording, and commute fit."
+        if best_side in ("A", "B")
+        else "Both options need a bit more detail before a clear priority call."
+    )
+    return {
+        "best_option": best_option,
+        "cheapest_option": cheapest_option,
+        "lowest_risk_option": lowest_risk_option,
+        "watch_out": watch_out[:6],
+        "final_advice": final_advice,
+    }
+
+
 def _build_comparison_sections(r: dict[str, Any]) -> dict[str, Any]:
     comp = r.get("comparison_result") or {}
     ar = r.get("analysis_route") or {}
@@ -225,6 +484,7 @@ def _build_comparison_sections(r: dict[str, Any]) -> dict[str, Any]:
     )
     if not summary:
         summary = "A side-by-side comparison was prepared from what you shared."
+    advisor = _build_comparison_advisor_fields(comp)
 
     found = [
         _route_brief(ar),
@@ -254,7 +514,13 @@ def _build_comparison_sections(r: dict[str, Any]) -> dict[str, Any]:
     follow = [_clean_str(x) for x in (r.get("followup_suggestions") or []) if _clean_str(x)]
 
     return {
+        "layout": "property_comparison_advisor",
         "summary": summary,
+        "best_option": advisor.get("best_option") or "",
+        "cheapest_option": advisor.get("cheapest_option") or "",
+        "lowest_risk_option": advisor.get("lowest_risk_option") or "",
+        "watch_out": list(advisor.get("watch_out") or []),
+        "final_advice": advisor.get("final_advice") or "",
         "what_i_found": found,
         "key_points": key_pts[:10],
         "next_steps": next_steps[:8],
@@ -421,30 +687,36 @@ def build_display_sections(chat_result: dict[str, Any]) -> dict[str, Any]:
     if branch == "out_of_scope":
         out = _build_out_of_scope_sections(chat_result)
         out["decision"] = decision_lines
+        out.update(_build_final_summary_fields(chat_result, out))
         return out
 
     if branch == "legal_risk":
         out = _build_legal_sections(chat_result)
         out["decision"] = decision_lines
+        out.update(_build_final_summary_fields(chat_result, out))
         return out
 
     if branch == "fallback":
         out = _build_fallback_sections(chat_result)
         out["decision"] = decision_lines
+        out.update(_build_final_summary_fields(chat_result, out))
         return out
 
     if branch == "property_comparison":
         out = _build_comparison_sections(chat_result)
         out["decision"] = decision_lines
+        out.update(_build_final_summary_fields(chat_result, out))
         return out
 
     if branch == "analysis_candidate":
         out = _build_analysis_candidate_sections(chat_result)
         out["decision"] = decision_lines
+        out.update(_build_final_summary_fields(chat_result, out))
         return out
 
     out = _build_default_sections(chat_result)
     out["decision"] = decision_lines
+    out.update(_build_final_summary_fields(chat_result, out))
     return out
 
 
@@ -483,6 +755,24 @@ def _format_explain_result_block_zh(er: Any) -> str:
 
 def render_display_text(sections: dict[str, Any]) -> str:
     """Join sections with fixed advisor-style titles and natural fallbacks."""
+    if _clean_str(sections.get("layout")) == "property_comparison_advisor":
+        best = _clean_str(sections.get("best_option")) or "Best option is unclear from current details."
+        cheap = _clean_str(sections.get("cheapest_option")) or "Cheapest option is unclear."
+        low_risk = _clean_str(sections.get("lowest_risk_option")) or "Lowest risk option is unclear."
+        watch = _clean_list(sections.get("watch_out") or [], limit=8)
+        advice = _clean_str(sections.get("final_advice")) or "Share more detail before making a final pick."
+        if not watch:
+            watch = ["No major warning found yet, but confirm key costs and terms in writing."]
+        parts = [
+            f"{TITLE_BEST_OPTION}\n{best}",
+            f"{TITLE_CHEAPEST_OPTION}\n{cheap}",
+            f"{TITLE_LOWEST_RISK_OPTION}\n{low_risk}",
+            f"{TITLE_WATCH_OUT}\n" + "\n".join(f"- {x}" for x in watch),
+            f"{TITLE_FINAL_ADVICE}\n{advice}",
+            f"{TITLE_SUMMARY}\n{_clean_str(sections.get('summary'))}",
+        ]
+        return "\n\n".join(parts).strip()
+
     if _clean_str(sections.get("layout")) == "legal_contract_advisor":
         summary = _clean_str(sections.get("summary")) or "Overall risk needs further confirmation."
         risk_clauses = _clean_list(sections.get("risk_clauses") or [], limit=8)
@@ -502,8 +792,22 @@ def render_display_text(sections: dict[str, Any]) -> str:
             next_steps = [
                 "Collect written confirmations first, then review the final draft before signing."
             ]
+        final_label = _clean_str(sections.get("final_recommendation")) or "Need More Information"
+        why = _clean_list(sections.get("why") or [], limit=6)
+        main_risks = _clean_list(sections.get("main_risks") or [], limit=8)
+        what_to_do_next = _clean_list(sections.get("what_to_do_next") or [], limit=8)
+        if not why:
+            why = ["The recommendation is based on available contract wording only."]
+        if not main_risks:
+            main_risks = [NO_MAJOR_RISK_TEXT]
+        if not what_to_do_next:
+            what_to_do_next = next_steps
 
         parts = [
+            f"{TITLE_FINAL_RECOMMENDATION}\n{final_label}",
+            f"{TITLE_WHY}\n" + "\n".join(f"- {x}" for x in why),
+            f"{TITLE_MAIN_RISKS}\n" + "\n".join(f"- {x}" for x in main_risks),
+            f"{TITLE_WHAT_TO_DO_NEXT}\n" + "\n".join(f"- {x}" for x in what_to_do_next),
             f"{TITLE_SUMMARY}\n{summary}",
             f"{TITLE_RISK_CLAUSES}\n" + "\n".join(f"- {x}" for x in risk_clauses),
             f"{TITLE_NEED_CONFIRM}\n" + "\n".join(f"- {x}" for x in need_confirm),
@@ -513,6 +817,21 @@ def render_display_text(sections: dict[str, Any]) -> str:
         return "\n\n".join(parts).strip()
 
     parts: list[str] = []
+    final_label = _clean_str(sections.get("final_recommendation")) or "Need More Information"
+    why = _clean_list(sections.get("why") or [], limit=6)
+    main_risks = _clean_list(sections.get("main_risks") or [], limit=8)
+    what_to_do_next = _clean_list(sections.get("what_to_do_next") or [], limit=8)
+    if not why:
+        why = ["I need a bit more detail to give a stronger recommendation."]
+    if not main_risks:
+        main_risks = ["No major risk identified yet from the available details."]
+    if not what_to_do_next:
+        what_to_do_next = ["Share rent, postcode, bills, or contract wording."]
+
+    parts.append(f"{TITLE_FINAL_RECOMMENDATION}\n{final_label}")
+    parts.append(f"{TITLE_WHY}\n" + "\n".join(f"- {x}" for x in why))
+    parts.append(f"{TITLE_MAIN_RISKS}\n" + "\n".join(f"- {x}" for x in main_risks))
+    parts.append(f"{TITLE_WHAT_TO_DO_NEXT}\n" + "\n".join(f"- {x}" for x in what_to_do_next))
 
     s = _clean_str(sections.get("summary"))
     decision_lines = _clean_list(sections.get("decision") or [], limit=3)
@@ -610,6 +929,10 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
 
     decision = chat_result.get("decision") or {}
     display_order = [
+        "final_recommendation",
+        "why",
+        "main_risks",
+        "what_to_do_next",
         "summary",
         "decision",
         "what_i_found",
@@ -624,6 +947,15 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
         "display_order": display_order,
         "display_sections": {
             "layout": sections.get("layout") or "",
+            "best_option": sections.get("best_option") or "",
+            "cheapest_option": sections.get("cheapest_option") or "",
+            "lowest_risk_option": sections.get("lowest_risk_option") or "",
+            "watch_out": list(sections.get("watch_out") or []),
+            "final_advice": sections.get("final_advice") or "",
+            "final_recommendation": sections.get("final_recommendation") or "",
+            "why": list(sections.get("why") or []),
+            "main_risks": list(sections.get("main_risks") or []),
+            "what_to_do_next": list(sections.get("what_to_do_next") or []),
             "summary": sections.get("summary") or "",
             "risk_clauses": list(sections.get("risk_clauses") or []),
             "need_to_confirm": list(sections.get("need_to_confirm") or []),
