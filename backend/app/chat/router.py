@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from ..legal.phase0_entry import run_phase0_analysis
+from ..map import get_location_info
 from ..reputation import analyze_reputation
 
 from .followup_builder import (
@@ -597,6 +598,7 @@ def _build_product_output(result: dict[str, Any]) -> dict[str, Any]:
             "followups": list(display_sections.get("followups") or []),
             "alternative_help": list(display_sections.get("alternative_help") or []),
             "reputation_result": display_sections.get("reputation_result"),
+            "location_info": display_sections.get("location_info"),
         },
         "next_actions": list(display_sections.get("next_steps") or []),
         "followups": list(display_sections.get("followups") or []),
@@ -671,6 +673,46 @@ def _attach_reputation(
     return o
 
 
+def _extract_location_query(
+    user_text: str,
+    pi_parsed: dict[str, Any],
+    pi_ref: dict[str, Any],
+) -> str | None:
+    addresses = list(pi_parsed.get("detected_addresses") or [])
+    postcodes = list(pi_parsed.get("detected_postcodes") or [])
+    locations = list(pi_parsed.get("detected_locations") or [])
+    if addresses:
+        return addresses[0]
+    if postcodes:
+        return postcodes[0]
+    if pi_ref.get("address_text"):
+        return str(pi_ref["address_text"])
+    if pi_ref.get("postcode"):
+        return str(pi_ref["postcode"])
+    if pi_ref.get("city"):
+        return str(pi_ref["city"])
+    if locations:
+        return str(locations[0])
+    text = (user_text or "").strip()
+    return text if text else None
+
+
+def _attach_location_info(
+    out: dict[str, Any],
+    trimmed: str,
+    pi_parsed: dict[str, Any],
+    pi_ref: dict[str, Any],
+) -> dict[str, Any]:
+    query = _extract_location_query(trimmed, pi_parsed, pi_ref)
+    if not query:
+        return dict(out)
+    loc = get_location_info(query)
+    o = dict(out)
+    o["location_query"] = query
+    o["location_info"] = loc
+    return o
+
+
 def _looks_unrecognized(text: str) -> bool:
     t = (text or "").strip()
     if not t:
@@ -690,6 +732,7 @@ def _finish_chat_response(
     out = _merge_followup(_merge_scope_into(base, scope_info), bundle)
     out = _attach_property_input(out, pi_parsed, pi_ref)
     out = _attach_reputation(out, trimmed, pi_parsed, pi_ref)
+    out = _attach_location_info(out, trimmed, pi_parsed, pi_ref)
     pref_det = detect_user_preferences(trimmed)
     out = _attach_uk_location(out, trimmed, pi_parsed, pi_ref, pref_det)
     out = _apply_analysis_route(out, trimmed, pi_parsed, pi_ref, scope_info)

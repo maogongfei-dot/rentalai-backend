@@ -33,6 +33,7 @@ TITLE_LOWEST_RISK_OPTION = "【Lowest Risk Option】"
 TITLE_WATCH_OUT = "【Watch Out】"
 TITLE_FINAL_ADVICE = "【Final Advice】"
 TITLE_REPUTATION_CHECK = "【Reputation Check】"
+TITLE_LOCATION_INSIGHT = "【Location Insight】"
 
 NO_MAJOR_RISK_TEXT = (
     "No major risk was found from the available text, but you should still confirm rent, "
@@ -288,6 +289,33 @@ def _reputation_lines(reputation_result: Any) -> list[str]:
         lines.append("Risk tags: none identified yet")
     if action:
         lines.append(f"Suggested action: {action}")
+    return lines
+
+
+def _location_lines(location_info: Any) -> list[str]:
+    if not isinstance(location_info, dict):
+        return []
+    status = _clean_str(location_info.get("status")).lower()
+    if status != "ok":
+        return ["Location details are still unknown from the current address or postcode."]
+    addr = _clean_str(location_info.get("normalized_address"))
+    pc = _clean_str(location_info.get("postcode"))
+    city = _clean_str(location_info.get("city"))
+    nearby = _clean_list(location_info.get("nearby_points") or [], limit=5)
+    transport = _clean_str(location_info.get("transport_hint"))
+    lines = []
+    if addr and addr != "Unknown":
+        lines.append(f"Address context: {addr}")
+    if city and city != "Unknown":
+        lines.append(f"City: {city}")
+    if pc and pc != "Unknown":
+        lines.append(f"Postcode: {pc}")
+    if nearby:
+        lines.append("Nearby points: " + ", ".join(nearby))
+    if transport and transport != "Unknown":
+        lines.append(f"Transport: {transport}")
+    if not lines:
+        lines.append("Location details are still unknown from the current address or postcode.")
     return lines
 
 
@@ -789,6 +817,7 @@ def render_display_text(sections: dict[str, Any]) -> str:
         if not watch:
             watch = ["No major warning found yet, but confirm key costs and terms in writing."]
         rep_lines = _reputation_lines(sections.get("reputation_result"))
+        loc_lines = _location_lines(sections.get("location_info"))
         parts = [
             f"{TITLE_BEST_OPTION}\n{best}",
             f"{TITLE_CHEAPEST_OPTION}\n{cheap}",
@@ -798,6 +827,10 @@ def render_display_text(sections: dict[str, Any]) -> str:
             (
                 f"{TITLE_REPUTATION_CHECK}\n" + "\n".join(f"- {x}" for x in rep_lines)
                 if rep_lines else ""
+            ),
+            (
+                f"{TITLE_LOCATION_INSIGHT}\n" + "\n".join(f"- {x}" for x in loc_lines)
+                if loc_lines else ""
             ),
             f"{TITLE_SUMMARY}\n{_clean_str(sections.get('summary'))}",
         ]
@@ -833,6 +866,7 @@ def render_display_text(sections: dict[str, Any]) -> str:
         if not what_to_do_next:
             what_to_do_next = next_steps
         rep_lines = _reputation_lines(sections.get("reputation_result"))
+        loc_lines = _location_lines(sections.get("location_info"))
 
         parts = [
             f"{TITLE_FINAL_RECOMMENDATION}\n{final_label}",
@@ -842,6 +876,10 @@ def render_display_text(sections: dict[str, Any]) -> str:
             (
                 f"{TITLE_REPUTATION_CHECK}\n" + "\n".join(f"- {x}" for x in rep_lines)
                 if rep_lines else ""
+            ),
+            (
+                f"{TITLE_LOCATION_INSIGHT}\n" + "\n".join(f"- {x}" for x in loc_lines)
+                if loc_lines else ""
             ),
             f"{TITLE_SUMMARY}\n{summary}",
             f"{TITLE_RISK_CLAUSES}\n" + "\n".join(f"- {x}" for x in risk_clauses),
@@ -863,6 +901,7 @@ def render_display_text(sections: dict[str, Any]) -> str:
     if not what_to_do_next:
         what_to_do_next = ["Share rent, postcode, bills, or contract wording."]
     rep_lines = _reputation_lines(sections.get("reputation_result"))
+    loc_lines = _location_lines(sections.get("location_info"))
 
     parts.append(f"{TITLE_FINAL_RECOMMENDATION}\n{final_label}")
     parts.append(f"{TITLE_WHY}\n" + "\n".join(f"- {x}" for x in why))
@@ -870,6 +909,8 @@ def render_display_text(sections: dict[str, Any]) -> str:
     parts.append(f"{TITLE_WHAT_TO_DO_NEXT}\n" + "\n".join(f"- {x}" for x in what_to_do_next))
     if rep_lines:
         parts.append(f"{TITLE_REPUTATION_CHECK}\n" + "\n".join(f"- {x}" for x in rep_lines))
+    if loc_lines:
+        parts.append(f"{TITLE_LOCATION_INSIGHT}\n" + "\n".join(f"- {x}" for x in loc_lines))
 
     s = _clean_str(sections.get("summary"))
     decision_lines = _clean_list(sections.get("decision") or [], limit=3)
@@ -950,6 +991,7 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
     """
     sections = build_display_sections(chat_result)
     sections["reputation_result"] = chat_result.get("reputation_result")
+    sections["location_info"] = chat_result.get("location_info")
     display_text = render_display_text(sections)
     final_result = {
         "explain_result": chat_result.get("explain_result"),
@@ -996,6 +1038,7 @@ def build_chat_display_bundle(chat_result: dict[str, Any]) -> dict[str, Any]:
             "main_risks": list(sections.get("main_risks") or []),
             "what_to_do_next": list(sections.get("what_to_do_next") or []),
             "reputation_result": sections.get("reputation_result"),
+            "location_info": sections.get("location_info"),
             "summary": sections.get("summary") or "",
             "risk_clauses": list(sections.get("risk_clauses") or []),
             "need_to_confirm": list(sections.get("need_to_confirm") or []),
