@@ -45,7 +45,10 @@
   function applyRecommendationStyle(label) {
     var badge = document.getElementById("analysis-recommendation-badge");
     if (!badge) return;
-    var v = String(label || "").trim().toLowerCase();
+    var v = String(label || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[_-]+/g, " ");
     badge.textContent = label;
     badge.classList.remove(
       "analysis-recommendation--recommended",
@@ -57,7 +60,7 @@
       badge.classList.add("analysis-recommendation--recommended");
     } else if (v === "not recommended") {
       badge.classList.add("analysis-recommendation--not-recommended");
-    } else if (v === "need more information") {
+    } else if (v === "need more information" || v === "more information needed") {
       badge.classList.add("analysis-recommendation--need-more-information");
     } else {
       badge.classList.add("analysis-recommendation--caution");

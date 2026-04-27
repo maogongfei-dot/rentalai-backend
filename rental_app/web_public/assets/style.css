@@ -3057,9 +3057,9 @@ body.analysis-result-page-body {
 }
 
 .analysis-recommendation--caution {
-  background: #fffbeb;
-  border-color: #fcd34d;
-  color: #92400e;
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
 }
 
 .analysis-recommendation--not-recommended {
@@ -3069,9 +3069,9 @@ body.analysis-result-page-body {
 }
 
 .analysis-recommendation--need-more-information {
-  background: #eff6ff;
-  border-color: #93c5fd;
-  color: #1d4ed8;
+  background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+  border-color: #94a3b8;
+  color: #334155;
 }
 
 .analysis-bullet-list {
