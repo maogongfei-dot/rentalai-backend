@@ -2992,7 +2992,21 @@ body.analysis-result-page-body {
 .analysis-result-main {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 1rem;
+}
+
+.analysis-result-main > .card {
+  margin-bottom: 0;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.analysis-result-main > .card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  border-color: #cbd5e1;
 }
 
 .analysis-result-header {
@@ -3004,28 +3018,40 @@ body.analysis-result-page-body {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem 0.55rem;
-  margin-bottom: 0.1rem;
+  margin-bottom: 0.2rem;
+  justify-content: flex-end;
 }
 
 .analysis-result-title {
-  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
+  font-size: clamp(1.45rem, 2.5vw, 1.9rem);
   font-weight: 700;
   color: #0f172a;
-  margin: 0.35rem 0 0.45rem;
+  margin: 0.35rem 0 0.5rem;
   letter-spacing: -0.02em;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .analysis-result-lead {
   max-width: 42rem;
   color: #475569;
-  font-size: 0.98rem;
-  line-height: 1.5;
+  font-size: 1rem;
+  line-height: 1.6;
   margin: 0;
 }
 
 .analysis-recommendation-card {
   border-color: #d7e2ef;
+  background: linear-gradient(165deg, #f8fafc 0%, #ffffff 70%);
+}
+
+.analysis-summary-overview-card {
+  border-color: #bfdbfe;
+  border-left: 4px solid #3b82f6;
+  background: linear-gradient(165deg, #eff6ff 0%, #f8fafc 45%, #ffffff 100%);
+}
+
+.analysis-property-summary-card {
+  border-color: #d9e2ef;
 }
 
 .analysis-recommendation-row {
@@ -3047,9 +3073,11 @@ body.analysis-result-page-body {
   justify-content: center;
   border-radius: 999px;
   border: 1px solid transparent;
-  padding: 0.22rem 0.72rem;
+  padding: 0.28rem 0.82rem;
   font-size: 0.84rem;
+  font-weight: 700;
   letter-spacing: 0.01em;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 .analysis-recommendation--recommended {
@@ -3077,8 +3105,69 @@ body.analysis-result-page-body {
 }
 
 .analysis-bullet-list {
-  margin: 0.35rem 0 0;
+  margin: 0.45rem 0 0;
   padding-left: 1.2rem;
+  line-height: 1.6;
+}
+
+.analysis-bullet-list li + li {
+  margin-top: 0.35rem;
+}
+
+.analysis-result-top-actions .saas-btn {
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+.analysis-result-top-actions .saas-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+}
+
+@media (max-width: 720px) {
+  .analysis-result-main {
+    gap: 0.85rem;
+  }
+
+  .analysis-result-main > .card {
+    padding: 0.9rem 0.95rem;
+  }
+
+  .analysis-result-top-actions {
+    justify-content: stretch;
+    gap: 0.45rem;
+  }
+
+  .analysis-result-top-actions .saas-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .analysis-result-title {
+    font-size: 1.45rem;
+    line-height: 1.25;
+  }
+
+  .analysis-result-lead {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .analysis-recommendation-row {
+    align-items: flex-start;
+    gap: 0.35rem 0.45rem;
+  }
+
+  .analysis-recommendation-badge {
+    max-width: 100%;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  .analysis-bullet-list {
+    padding-left: 1.1rem;
+  }
 }
 
 /* Phase 5 / Step 12: /analyzing transition page */
@@ -3137,4 +3226,53 @@ body.analyzing-page-body {
 .analyzing-step-list {
   margin: 0.2rem 0 0;
   padding-left: 1.2rem;
+}
+
+/* Phase 5 / Step 13: /analysis-error page */
+body.analysis-error-page-body {
+  max-width: min(100%, 48rem);
+}
+
+.analysis-error-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.analysis-error-hero-card {
+  border-color: #f5c2c7;
+  background: linear-gradient(160deg, #fff5f5 0%, #fff7ed 45%, #fafafa 100%);
+}
+
+.analysis-error-title {
+  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  margin: 0.1rem 0 0.2rem;
+}
+
+.analysis-error-lead {
+  max-width: 40rem;
+  color: #475569;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.analysis-error-block-card {
+  border-color: #e2e8f0;
+}
+
+.analysis-error-actions-card {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.analysis-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.6rem;
 }
