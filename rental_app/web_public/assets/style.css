@@ -2983,3 +2983,92 @@ body.compare-page-body {
   margin: 0.35rem 0 0;
   padding-left: 1.2rem;
 }
+
+/* Phase 5 / Step 5: unified analysis result page (mock) */
+body.analysis-result-page-body {
+  max-width: min(100%, 52rem);
+}
+
+.analysis-result-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.analysis-result-header {
+  margin: 0 0 0.15rem;
+}
+
+.analysis-result-title {
+  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0.35rem 0 0.45rem;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.analysis-result-lead {
+  max-width: 42rem;
+  color: #475569;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.analysis-recommendation-card {
+  border-color: #d7e2ef;
+}
+
+.analysis-recommendation-row {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
+}
+
+.analysis-recommendation-label {
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.analysis-recommendation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 0.22rem 0.72rem;
+  font-size: 0.84rem;
+  letter-spacing: 0.01em;
+}
+
+.analysis-recommendation--recommended {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #065f46;
+}
+
+.analysis-recommendation--caution {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.analysis-recommendation--not-recommended {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.analysis-recommendation--need-more-information {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.analysis-bullet-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+}
