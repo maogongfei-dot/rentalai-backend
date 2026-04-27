@@ -3001,7 +3001,9 @@ body.analysis-result-page-body {
 
 .analysis-result-top-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 0.45rem 0.55rem;
   margin-bottom: 0.1rem;
 }
 
