@@ -15,6 +15,7 @@
     { "source": "/result/:path*", "destination": "/result.html" },
     { "source": "/reputation", "destination": "/reputation.html" },
     { "source": "/start", "destination": "/start.html" },
-    { "source": "/check-contract", "destination": "/check_contract.html" }
+    { "source": "/check-contract", "destination": "/check_contract.html" },
+    { "source": "/analyzing", "destination": "/analyzing.html" }
   ]
 }

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="rentalai-api-base" content="" />
+    <meta name="vite-rentalai-api-base" content="" />
+    <meta name="rentalai-env" content="" />
+    <title>Analyzing · RentalAI</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body class="analyzing-page-body">
+    <script src="/assets/auth_user_store.js"></script>
+    <script src="/assets/auth_local.js"></script>
+    <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
+
+    <main class="wrap wrap-wide analyzing-main" lang="en-GB">
+      <section class="card saas-hero analyzing-card" aria-live="polite">
+        <div class="analyzing-spinner" aria-hidden="true"></div>
+        <h1 class="analyzing-title">AI is analysing your rental option</h1>
+        <p class="hint analyzing-lead">
+          We are checking the rental details, risks, location signals and next-step recommendations.
+        </p>
+
+        <ul class="analyzing-step-list">
+          <li>Reading property details</li>
+          <li>Checking contract and cost risks</li>
+          <li>Reviewing location signals</li>
+          <li>Preparing your recommendation</li>
+        </ul>
+
+        <p class="hint muted small-print" id="analyzing-status-text">
+          Finalizing your analysis...
+        </p>
+      </section>
+    </main>
+    <script src="/assets/analyzing_page.js"></script>
+  </body>
+</html>

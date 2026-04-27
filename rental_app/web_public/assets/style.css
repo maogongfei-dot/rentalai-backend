@@ -3080,3 +3080,61 @@ body.analysis-result-page-body {
   margin: 0.35rem 0 0;
   padding-left: 1.2rem;
 }
+
+/* Phase 5 / Step 12: /analyzing transition page */
+body.analyzing-page-body {
+  max-width: min(100%, 48rem);
+}
+
+.analyzing-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.analyzing-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.analyzing-title {
+  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  margin: 0.1rem 0 0.15rem;
+}
+
+.analyzing-lead {
+  max-width: 40rem;
+  color: #475569;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.analyzing-spinner {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 3px solid #cbd5e1;
+  border-top-color: #0f172a;
+  animation: analyzing-spin 0.85s linear infinite;
+}
+
+@keyframes analyzing-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.analyzing-step-list {
+  margin: 0.2rem 0 0;
+  padding-left: 1.2rem;
+}
