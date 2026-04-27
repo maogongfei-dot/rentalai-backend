@@ -2872,3 +2872,114 @@ body.check-contract-page-body {
   margin: 0.35rem 0 0;
   padding-left: 1.2rem;
 }
+
+/* Phase 5 / Step 4: /compare — property comparison mock page */
+body.compare-page-body {
+  max-width: min(100%, 56rem);
+}
+
+.compare-page-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.compare-page-header {
+  margin: 0 0 0.15rem;
+}
+
+.compare-page-title {
+  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0.35rem 0 0.5rem;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.compare-page-prompt {
+  max-width: 44rem;
+  color: #475569;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.compare-input-card {
+  margin-top: 0.1rem;
+}
+
+.compare-property-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.compare-property-card {
+  margin: 0;
+}
+
+.compare-property-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.compare-property-head .subsection-title {
+  margin: 0;
+}
+
+.compare-remove-btn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  border-radius: 8px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.compare-remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.compare-input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  background: #fff;
+  font: inherit;
+}
+
+.compare-input:focus {
+  outline: 2px solid #0f172a;
+  outline-offset: 1px;
+  border-color: #94a3b8;
+}
+
+.compare-actions-row {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+}
+
+.compare-result-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.compare-result-block + .compare-result-block {
+  margin-top: 0.7rem;
+}
+
+.compare-result-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+}

@@ -1,24 +1,67 @@
 <!DOCTYPE html>
-<html lang="zh-Hans">
+<html lang="en-GB">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="rentalai-api-base" content="" />
     <meta name="vite-rentalai-api-base" content="" />
     <meta name="rentalai-env" content="" />
-    <title>房源对比 · RentalAI</title>
+    <title>Compare rental properties · RentalAI</title>
     <link rel="stylesheet" href="/assets/style.css" />
   </head>
-  <body>
+  <body class="compare-page-body">
     <script src="/assets/auth_user_store.js"></script>
     <script src="/assets/auth_local.js"></script>
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
-    <main class="wrap wrap-wide result-wrap">
-      <p class="back-link"><a href="/ai-result">← 结果页</a> · <a href="/">首页</a></p>
-      <header class="page-header">
-        <h1>房源对比</h1>
+    <main class="wrap wrap-wide compare-page-main" lang="en-GB">
+      <p class="back-link"><a href="/">Home</a></p>
+
+      <header class="compare-page-header">
+        <p class="saas-hero-kicker">RentalAI</p>
+        <h1 class="compare-page-title">Compare rental properties</h1>
+        <p class="hint compare-page-prompt">
+          Add two or more properties and RentalAI will help compare rent, bills, location, risk,
+          and overall suitability.
+        </p>
       </header>
-      <section class="card" id="compare-list"></section>
+
+      <section class="card saas-hero compare-input-card" aria-labelledby="compare-input-heading">
+        <h2 class="section-title" id="compare-input-heading">Property inputs</h2>
+        <div id="compare-property-list" class="compare-property-list"></div>
+        <div class="compare-actions-row">
+          <button type="button" class="saas-btn" id="compare-add-property-btn">+ Add property</button>
+          <button type="button" class="saas-btn saas-btn--primary" id="compare-run-btn">
+            Compare Properties
+          </button>
+        </div>
+        <p id="compare-run-err" class="err hidden" role="alert" aria-live="assertive"></p>
+        <p class="hint muted small-print">Demo mode: this page uses local mock output only.</p>
+      </section>
+
+      <section id="compare-result-card" class="card compare-result-card hidden" aria-live="polite">
+        <h2 class="section-title">Comparison result (preview)</h2>
+
+        <div class="compare-result-block">
+          <h3 class="subsection-title">Best Option</h3>
+          <p class="hint" id="compare-result-best"></p>
+        </div>
+        <div class="compare-result-block">
+          <h3 class="subsection-title">Cheapest Option</h3>
+          <p class="hint" id="compare-result-cheapest"></p>
+        </div>
+        <div class="compare-result-block">
+          <h3 class="subsection-title">Lowest Risk Option</h3>
+          <p class="hint" id="compare-result-low-risk"></p>
+        </div>
+        <div class="compare-result-block">
+          <h3 class="subsection-title">Watch Out</h3>
+          <ul class="compare-result-list" id="compare-result-watch-out"></ul>
+        </div>
+        <div class="compare-result-block">
+          <h3 class="subsection-title">Final Advice</h3>
+          <p class="hint" id="compare-result-advice"></p>
+        </div>
+      </section>
     </main>
     <script src="/assets/compare_page.js"></script>
   </body>
