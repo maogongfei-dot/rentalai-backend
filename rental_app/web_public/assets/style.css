@@ -2999,6 +2999,12 @@ body.analysis-result-page-body {
   margin: 0 0 0.15rem;
 }
 
+.analysis-result-top-actions {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.1rem;
+}
+
 .analysis-result-title {
   font-size: clamp(1.35rem, 2.2vw, 1.7rem);
   font-weight: 700;
