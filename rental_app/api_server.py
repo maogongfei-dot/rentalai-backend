@@ -2527,6 +2527,21 @@ def web_analyzing_page():
     return FileResponse(page)
 
 
+@app.get("/analysis-error")
+def web_analysis_error_page():
+    """Analysis failed fallback page (static analysis_error.html)."""
+    page = _WEB_PUBLIC_DIR / "analysis_error.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/analysis_error.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
 @app.get("/test-analyze")
 def web_test_analyze_page():
     """Standalone test entry page (no auth scripts)."""

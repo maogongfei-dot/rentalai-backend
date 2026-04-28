@@ -22,6 +22,8 @@
 
   var HOUSING_KEY = "ai_housing_query_last";
   var LEGACY_KEY = "ai_analyze_last";
+  var DIRECT_SESSION_KEY = "rentalai_direct_analyze_result_v1";
+  var DIRECT_LOCAL_KEY = "rentalai_latest_result_v1";
 
   function favStorageKey() {
     if (window.RentalAILocalAuth && window.RentalAILocalAuth.favStorageKey) {
@@ -99,6 +101,108 @@
     if (typeof v === "boolean") return v ? "是" : "否";
     if (typeof v === "object") return JSON.stringify(v);
     return String(v);
+  }
+
+  function firstNonEmpty() {
+    var i;
+    for (i = 0; i < arguments.length; i++) {
+      var val = arguments[i];
+      if (val === null || val === undefined) continue;
+      if (Array.isArray(val) && val.length === 0) continue;
+      if (typeof val === "string" && !val.trim()) continue;
+      return val;
+    }
+    return null;
+  }
+
+  function toDisplayText(v) {
+    if (v === null || v === undefined) return "No data available yet.";
+    if (Array.isArray(v)) {
+      if (!v.length) return "No data available yet.";
+      return v
+        .map(function (it) {
+          return String(it == null ? "" : it).trim();
+        })
+        .filter(Boolean)
+        .join(" | ") || "No data available yet.";
+    }
+    if (typeof v === "object") {
+      try {
+        return JSON.stringify(v);
+      } catch (e) {
+        return "No data available yet.";
+      }
+    }
+    var s = String(v).trim();
+    return s || "No data available yet.";
+  }
+
+  function renderDirectAnalyzeResult(payload) {
+    var data = payload && payload.data && typeof payload.data === "object" ? payload.data : {};
+    var finalRecommendation = firstNonEmpty(
+      data.status && data.status.overall_recommendation,
+      data.decision && data.decision.final_summary
+    );
+    var why = firstNonEmpty(
+      data.analysis && data.analysis.supporting_reasons,
+      data.user_facing && data.user_facing.reason,
+      data.explanation_summary && data.explanation_summary.key_positives
+    );
+    var risks = firstNonEmpty(
+      data.user_facing && data.user_facing.risk_note,
+      data.analysis && data.analysis.primary_blockers,
+      data.explanation_summary && data.explanation_summary.key_risks
+    );
+    var nextStep = firstNonEmpty(
+      data.user_facing && data.user_facing.next_step,
+      data.next_actions
+    );
+    var score = firstNonEmpty(data.score);
+
+    var housingEl = document.getElementById("housing-mode");
+    var legacyEl = document.getElementById("legacy-mode");
+    if (housingEl) housingEl.classList.add("hidden");
+    if (legacyEl) legacyEl.classList.remove("hidden");
+
+    var rawEl = document.getElementById("raw-display");
+    var dl = document.getElementById("structured-dl");
+    var recoList = document.getElementById("reco-list");
+    var recoEmpty = document.getElementById("reco-empty");
+    var summaryLine = document.getElementById("summary-line");
+
+    if (rawEl) rawEl.textContent = "Direct /analyze result";
+    if (summaryLine) summaryLine.textContent = "Showing latest POST /analyze output.";
+    if (recoEmpty) recoEmpty.classList.add("hidden");
+    if (recoList) recoList.innerHTML = "";
+
+    if (dl) {
+      dl.innerHTML =
+        "<dt>Final Recommendation</dt><dd>" +
+        escapeHtml(toDisplayText(finalRecommendation)) +
+        "</dd>" +
+        "<dt>Score</dt><dd>" +
+        escapeHtml(toDisplayText(score)) +
+        "</dd>" +
+        "<dt>Why</dt><dd>" +
+        escapeHtml(toDisplayText(why)) +
+        "</dd>" +
+        "<dt>Main Risks</dt><dd>" +
+        escapeHtml(toDisplayText(risks)) +
+        "</dd>" +
+        "<dt>Next Step</dt><dd>" +
+        escapeHtml(toDisplayText(nextStep)) +
+        "</dd>";
+    }
+
+    if (recoList) {
+      var li = document.createElement("li");
+      li.className = "reco-item card";
+      li.innerHTML =
+        "<strong>Raw JSON fallback</strong><br /><pre class='code-block'>" +
+        escapeHtml(JSON.stringify(payload, null, 2)) +
+        "</pre>";
+      recoList.appendChild(li);
+    }
   }
 
   function fmtMoney(v) {
@@ -1019,49 +1123,61 @@
    * sessionStorage（key：ai_housing_query_last）。此为 RentAI 主结果展示链路的一部分
    * （结果页消费侧）；本脚本仅读取并渲染，不修改接口契约。
    */
-  var rawH = sessionStorage.getItem(HOUSING_KEY);
-  var dataH = null;
+  var directRaw = sessionStorage.getItem(DIRECT_SESSION_KEY) || localStorage.getItem(DIRECT_LOCAL_KEY);
+  var directPayload = null;
   try {
-    dataH = rawH ? JSON.parse(rawH) : null;
-  } catch (e) {
-    dataH = null;
+    directPayload = directRaw ? JSON.parse(directRaw) : null;
+  } catch (e0) {
+    directPayload = null;
   }
 
-  /* 主链路失败态：主分析未成功时的结果区展示（仍属 housing 容器内）。 */
-  if (dataH && dataH.success === false) {
-    var housingEl0 = document.getElementById("housing-mode");
-    var legacyEl0 = document.getElementById("legacy-mode");
-    if (housingEl0) housingEl0.classList.remove("hidden");
-    if (legacyEl0) legacyEl0.classList.add("hidden");
-    var errBox0 = document.getElementById("housing-errors");
-    if (errBox0) {
-      errBox0.classList.remove("hidden");
-      errBox0.innerHTML =
-        "<strong>分析未完成</strong><p>" +
-        escapeHtml(dataH.message || dataH.error || "请返回首页重试") +
-        "</p><p><a href='/'>返回首页</a></p>";
-    }
-    var miss0 = document.getElementById("housing-missing-location");
-    if (miss0) miss0.classList.add("hidden");
-    var empty0 = document.getElementById("housing-empty-hint");
-    if (empty0) empty0.classList.add("hidden");
-  } else if (
-    dataH &&
-    dataH.success !== false &&
-    typeof dataH.user_text === "string" &&
-    dataH.normalized_filters !== undefined
-  ) {
-    renderHousing(dataH);
+  if (directPayload && typeof directPayload === "object") {
+    renderDirectAnalyzeResult(directPayload);
   } else {
-    /* 无主分析负载时回退：读取旧版 key（非当前主结果主线）。 */
-    var rawL = sessionStorage.getItem(LEGACY_KEY);
-    var dataL = null;
+    var rawH = sessionStorage.getItem(HOUSING_KEY);
+    var dataH = null;
     try {
-      dataL = rawL ? JSON.parse(rawL) : null;
-    } catch (e2) {
-      dataL = null;
+      dataH = rawH ? JSON.parse(rawH) : null;
+    } catch (e) {
+      dataH = null;
     }
-    renderLegacy(dataL);
+
+    /* 主链路失败态：主分析未成功时的结果区展示（仍属 housing 容器内）。 */
+    if (dataH && dataH.success === false) {
+      var housingEl0 = document.getElementById("housing-mode");
+      var legacyEl0 = document.getElementById("legacy-mode");
+      if (housingEl0) housingEl0.classList.remove("hidden");
+      if (legacyEl0) legacyEl0.classList.add("hidden");
+      var errBox0 = document.getElementById("housing-errors");
+      if (errBox0) {
+        errBox0.classList.remove("hidden");
+        errBox0.innerHTML =
+          "<strong>分析未完成</strong><p>" +
+          escapeHtml(dataH.message || dataH.error || "请返回首页重试") +
+          "</p><p><a href='/'>返回首页</a></p>";
+      }
+      var miss0 = document.getElementById("housing-missing-location");
+      if (miss0) miss0.classList.add("hidden");
+      var empty0 = document.getElementById("housing-empty-hint");
+      if (empty0) empty0.classList.add("hidden");
+    } else if (
+      dataH &&
+      dataH.success !== false &&
+      typeof dataH.user_text === "string" &&
+      dataH.normalized_filters !== undefined
+    ) {
+      renderHousing(dataH);
+    } else {
+      /* 无主分析负载时回退：读取旧版 key（非当前主结果主线）。 */
+      var rawL = sessionStorage.getItem(LEGACY_KEY);
+      var dataL = null;
+      try {
+        dataL = rawL ? JSON.parse(rawL) : null;
+      } catch (e2) {
+        dataL = null;
+      }
+      renderLegacy(dataL);
+    }
   }
 
   /* ---------- Save：用户手动「保存本次分析」至本机历史（辅助能力，非 API 结果解析） ---------- */

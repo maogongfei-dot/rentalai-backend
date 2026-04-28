@@ -255,7 +255,9 @@
       "/account",
       "/assistant",
       "/analyzing",
+      "/analysis-error",
       "/ai-result",
+      "/test-analyze",
       "/analysis-history",
       "/history",
     ];
