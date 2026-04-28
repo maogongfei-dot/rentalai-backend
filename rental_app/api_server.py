@@ -2512,6 +2512,21 @@ def web_assistant_entry():
     return FileResponse(page)
 
 
+@app.get("/analyzing")
+def web_analyzing_page():
+    """Analyzing transition page (static analyzing.html)."""
+    page = _WEB_PUBLIC_DIR / "analyzing.html"
+    if not page.is_file():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "web_public_missing",
+                "message": "Expected web_public/analyzing.html beside api_server.py.",
+            },
+        )
+    return FileResponse(page)
+
+
 # --- 历史记录相关页面：统一入口 + 列表/详情（与 /api/analysis/history/*、/records/* 等配合）---
 @app.get("/analysis-history")
 def web_analysis_history_hub():
