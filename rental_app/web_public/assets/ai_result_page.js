@@ -22,6 +22,7 @@
 
   var HOUSING_KEY = "ai_housing_query_last";
   var LEGACY_KEY = "ai_analyze_last";
+  var ANALYZE_RESULT_KEY = "rentalai_result";
   var DIRECT_SESSION_KEY = "rentalai_direct_analyze_result_v1";
   var DIRECT_LOCAL_KEY = "rentalai_latest_result_v1";
 
@@ -138,10 +139,15 @@
   }
 
   function renderDirectAnalyzeResult(payload) {
-    var data = payload && payload.data && typeof payload.data === "object" ? payload.data : {};
+    var data =
+      payload && payload.data && typeof payload.data === "object"
+        ? payload.data
+        : payload && typeof payload === "object"
+          ? payload
+          : {};
     var finalRecommendation = firstNonEmpty(
-      data.status && data.status.overall_recommendation,
-      data.decision && data.decision.final_summary
+      data.decision && data.decision.final_summary,
+      data.status && data.status.overall_recommendation
     );
     var why = firstNonEmpty(
       data.analysis && data.analysis.supporting_reasons,
@@ -154,6 +160,7 @@
       data.explanation_summary && data.explanation_summary.key_risks
     );
     var nextStep = firstNonEmpty(
+      data.analysis && data.analysis.required_actions_before_proceeding,
       data.user_facing && data.user_facing.next_step,
       data.next_actions
     );
@@ -1123,7 +1130,10 @@
    * sessionStorage（key：ai_housing_query_last）。此为 RentAI 主结果展示链路的一部分
    * （结果页消费侧）；本脚本仅读取并渲染，不修改接口契约。
    */
-  var directRaw = sessionStorage.getItem(DIRECT_SESSION_KEY) || localStorage.getItem(DIRECT_LOCAL_KEY);
+  var directRaw =
+    sessionStorage.getItem(ANALYZE_RESULT_KEY) ||
+    sessionStorage.getItem(DIRECT_SESSION_KEY) ||
+    localStorage.getItem(DIRECT_LOCAL_KEY);
   var directPayload = null;
   try {
     directPayload = directRaw ? JSON.parse(directRaw) : null;
