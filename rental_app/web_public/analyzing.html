@@ -51,8 +51,12 @@
           window.location.href = "/analysis-error";
         }
 
-        function goSuccess(data) {
+        function goSuccess(response) {
           try {
+            sessionStorage.setItem("rentalai_result", JSON.stringify(response && response.data));
+          } catch (e0) {}
+          try {
+            var data = response;
             localStorage.setItem("rentalai_latest_result_v1", JSON.stringify(data));
             sessionStorage.setItem("rentalai_direct_analyze_result_v1", JSON.stringify(data));
           } catch (e) {
