@@ -254,6 +254,7 @@
       "/register",
       "/account",
       "/assistant",
+      "/analyzing",
       "/ai-result",
       "/analysis-history",
       "/history",
