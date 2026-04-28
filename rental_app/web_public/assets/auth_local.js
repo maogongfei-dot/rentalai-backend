@@ -247,6 +247,8 @@
   }
 
   function requireLogin() {
+    return; // temporary local testing: bypass all login redirects
+
     var path = (window.location.pathname || "").replace(/\/$/, "") || "/";
     var publicPaths = [
       "/",
