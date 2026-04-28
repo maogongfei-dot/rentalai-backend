@@ -34,11 +34,66 @@
         </p>
       </section>
     </main>
-    <script src="/assets/analyzing_page.js"></script>
+    <script src="/assets/api_config.js"></script>
     <script>
-      setTimeout(function () {
-        window.location.href = "ai_result.html";
-      }, 2000);
+      (function () {
+        var mockBody = {
+          rent: 1250,
+          budget: 1500,
+          commute_minutes: 30,
+          bedrooms: 1,
+          bills_included: false,
+          area: "Manchester",
+          postcode: "M1",
+        };
+
+        function goError() {
+          window.location.href = "analysis_error.html";
+        }
+
+        function goSuccess(data) {
+          try {
+            localStorage.setItem("rentalai_latest_result_v1", JSON.stringify(data));
+          } catch (e) {
+            goError();
+            return;
+          }
+          window.location.href = "ai_result.html";
+        }
+
+        function run() {
+          var init = {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(mockBody),
+          };
+          if (typeof window.rentalaiMergeAuthHeaders === "function") {
+            init.headers = window.rentalaiMergeAuthHeaders(init.headers);
+          }
+          var req =
+            typeof window.rentalaiApiFetch === "function"
+              ? window.rentalaiApiFetch("/analyze", init)
+              : fetch(
+                  typeof window.rentalaiApiUrl === "function"
+                    ? window.rentalaiApiUrl("/analyze")
+                    : "/analyze",
+                  init
+                );
+          req
+            .then(function (r) {
+              if (!r.ok) throw new Error("analyze_http_" + r.status);
+              return r.json();
+            })
+            .then(goSuccess)
+            .catch(goError);
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", run);
+        } else {
+          run();
+        }
+      })();
     </script>
   </body>
 </html>
