@@ -120,3 +120,28 @@ def create_user(email: str, password: str) -> tuple[dict[str, str] | None, str |
         "created_at": created_at,
     }, None
 
+
+def verify_user_login(email: str, password: str) -> tuple[dict[str, str] | None, str | None]:
+    """
+    Validate login credentials against SQLite users table.
+
+    Returns (public_user, error_message).
+    """
+    em = str(email or "").strip().lower()
+    pw = str(password or "")
+    if not em or not pw:
+        return None, "Email and password cannot be empty"
+
+    user = find_user_by_email(em)
+    if user is None:
+        return None, "User not found"
+
+    provided_hash = hash_password_sha256(pw)
+    if provided_hash != str(user.get("password_hash") or ""):
+        return None, "Incorrect password"
+
+    return {
+        "id": str(user.get("id") or ""),
+        "email": str(user.get("email") or ""),
+    }, None
+

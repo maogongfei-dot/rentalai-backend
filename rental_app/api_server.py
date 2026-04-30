@@ -117,7 +117,7 @@ from persistence.auth_http_helpers import (
 )
 from persistence.auth_session_store import build_auth_payload, issue_token, resolve_user_id, revoke_token
 from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
-from persistence.sqlite_user_store import create_user, init_users_db
+from persistence.sqlite_user_store import create_user, init_users_db, verify_user_login
 from data.explain.rule_explain import (
     build_p10_explain_for_batch_row,
     build_p10_explain_from_msa_result,
@@ -443,6 +443,40 @@ def register_sqlite_user(body: AuthRequest):
     return {
         "success": True,
         "message": "Account created successfully",
+        "user_id": user["id"],
+        "email": user["email"],
+    }
+
+
+@app.post("/login")
+def login_sqlite_user(body: AuthRequest):
+    """Minimal login endpoint backed by SQLite users table."""
+    email = str(body.email or "").strip()
+    password = str(body.password or "")
+    if not email or not password:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "Email and password cannot be empty",
+            },
+        )
+
+    user, err = verify_user_login(email, password)
+    if err:
+        status = 401 if "password" in err.lower() else 404 if "not found" in err.lower() else 400
+        return JSONResponse(
+            status_code=status,
+            content={
+                "success": False,
+                "message": err,
+            },
+        )
+
+    assert user is not None
+    return {
+        "success": True,
+        "message": "Login successful",
         "user_id": user["id"],
         "email": user["email"],
     }
