@@ -39,6 +39,28 @@
     return d.innerHTML;
   }
 
+  function escapeHtmlMultiline(s) {
+    return String(s == null ? "" : s)
+      .split(/\r?\n/)
+      .map(function (line) {
+        return escapeHtml(line);
+      })
+      .join("<br />");
+  }
+
+  var rentalaiToastTimer = null;
+  function showRentalaiToast(message) {
+    var t = document.getElementById("rentalai-save-toast");
+    if (!t) return;
+    t.textContent = message == null ? "" : String(message);
+    t.classList.remove("hidden");
+    if (rentalaiToastTimer) clearTimeout(rentalaiToastTimer);
+    rentalaiToastTimer = setTimeout(function () {
+      t.classList.add("hidden");
+      rentalaiToastTimer = null;
+    }, 3200);
+  }
+
   function escapeAttr(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;")
@@ -168,7 +190,8 @@
     if (v === null || v === undefined) return "Not provided";
     if (typeof v === "string") {
       var st = v.trim();
-      return st || "Not provided";
+      if (!st || st === "undefined" || st === "null") return "Not provided";
+      return st;
     }
     if (typeof v === "number" && !isNaN(v)) return String(v);
     if (typeof v === "boolean") return v ? "true" : "false";
@@ -187,7 +210,9 @@
       return ex || "Not provided";
     }
     var out = String(v).trim();
-    if (!out || out === "[object Object]") return "Not provided";
+    if (!out || out === "[object Object]" || out === "undefined" || out === "null") {
+      return "Not provided";
+    }
     return out;
   }
 
@@ -282,12 +307,14 @@
   }
 
   /**
-   * analysis 侧字段：非空数组 → 无序列表（条目可为 object，提取可读文案）；字符串 → 正文；
-   * object → 提取 summary/message/text/value；空则回退 user_facing。
+   * Why / Risks / Next Step：数组 → 每条单独 bullet；可读 object 提取；空态 copy；保留 user_facing fallback。
    */
-  function renderAnalysisListOrFallback(elementId, analysisVal, fallbackVal) {
+  function renderExplainCard(elementId, analysisVal, fallbackVal, emptyMessage) {
     var el = document.getElementById(elementId);
     if (!el) return;
+    var emptyCopy =
+      emptyMessage ||
+      "Not provided";
 
     function renderIntoPrimary(val) {
       if (val === null || val === undefined) return false;
@@ -297,31 +324,36 @@
           return s && String(s).trim();
         });
         if (!lines.length) return false;
+        el.className = "rentalai-field-body";
         el.innerHTML =
-          "<ul class=\"rentalai-bullet-list\">" +
+          "<ul class=\"rentalai-bullet-list rentalai-explain-list\">" +
           lines
             .map(function (line) {
-              return "<li>" + escapeHtml(line) + "</li>";
+              return "<li>" + escapeHtmlMultiline(line) + "</li>";
             })
             .join("") +
           "</ul>";
         return true;
       }
       if (typeof val === "string" && val.trim()) {
-        el.textContent = val.trim();
+        el.className = "rentalai-field-body";
+        el.innerHTML = escapeHtmlMultiline(val.trim());
         return true;
       }
       if (typeof val === "number" && !isNaN(val)) {
+        el.className = "rentalai-field-body";
         el.textContent = String(val);
         return true;
       }
       if (typeof val === "boolean") {
+        el.className = "rentalai-field-body";
         el.textContent = val ? "true" : "false";
         return true;
       }
       if (typeof val === "object") {
         var txt = formatAnalyzeField(val);
         if (txt !== "Not provided") {
+          el.className = "rentalai-field-body";
           el.textContent = txt;
           return true;
         }
@@ -332,7 +364,8 @@
 
     if (renderIntoPrimary(analysisVal)) return;
     if (renderIntoPrimary(fallbackVal)) return;
-    el.textContent = "Not provided";
+    el.className = "rentalai-field-body rentalai-explain-empty";
+    el.textContent = emptyCopy;
   }
 
   function renderDirectAnalyzeResult(payload) {
@@ -367,12 +400,23 @@
 
     renderScoreField(data.score);
 
-    renderAnalysisListOrFallback("field-why", analysis.supporting_reasons, uf.reason);
-    renderAnalysisListOrFallback("field-main-risks", analysis.primary_blockers, uf.risk_note);
-    renderAnalysisListOrFallback(
+    renderExplainCard(
+      "field-why",
+      analysis.supporting_reasons,
+      uf.reason,
+      "No clear supporting reasons were provided."
+    );
+    renderExplainCard(
+      "field-main-risks",
+      analysis.primary_blockers,
+      uf.risk_note,
+      "No major risks were detected."
+    );
+    renderExplainCard(
       "field-next-step",
       analysis.required_actions_before_proceeding,
-      uf.next_step
+      uf.next_step,
+      "No further action is required at this stage."
     );
   }
 
@@ -1372,18 +1416,18 @@
         mode = "legacy";
       }
       if (!rawSave) {
-        alert("暂无分析数据");
+        showRentalaiToast("No analysis data available to save.");
         return;
       }
       var parsed;
       try {
         parsed = JSON.parse(rawSave);
       } catch (err) {
-        alert("暂无分析数据");
+        showRentalaiToast("No analysis data available to save.");
         return;
       }
       if (!parsed || parsed.success === false) {
-        alert("暂无分析数据");
+        showRentalaiToast("No analysis data available to save.");
         return;
       }
       function manualHistoryKey() {
@@ -1460,7 +1504,7 @@
       }
       list.push(entry);
       localStorage.setItem(manualHistoryKey(), JSON.stringify(list));
-      alert("已保存到历史记录（当前分桶）");
+      showRentalaiToast("Saved to your history.");
     });
   })();
 })();

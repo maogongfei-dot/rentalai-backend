@@ -10,43 +10,55 @@
     <link rel="stylesheet" href="/assets/style.css" />
     <script src="/assets/api_config.js"></script>
     <style>
-      /* Phase10 Step2-1：结果页产品级布局与 rentalai_result 卡片（仅本页） */
+      /* Phase10 Step2-3：间距 / 字体层级 token（仅本页） */
       body.rentalai-result-body {
         background: linear-gradient(165deg, #eef2f7 0%, #e8edf4 45%, #f1f5f9 100%);
         min-height: 100vh;
       }
       main.rentalai-result-page.rentalai-result-shell {
+        --ra-gap: 1.25rem;
+        --ra-page-pt: 2rem;
+        --ra-page-pb: 2.5rem;
+        --ra-page-px: 1.5rem;
+        --ra-font-page: clamp(1.55rem, 4.5vw, 2rem);
+        --ra-font-sub: clamp(0.875rem, 2.2vw, 1rem);
+        --ra-font-card: 1rem;
+        --ra-font-body: 0.9375rem;
         max-width: 900px;
         width: 100%;
         margin-left: auto;
         margin-right: auto;
-        padding: 2rem 1.5rem 3rem;
+        padding: var(--ra-page-pt) var(--ra-page-px) var(--ra-page-pb);
         box-sizing: border-box;
+      }
+      .rentalai-result-page > section.card.result-actions {
+        margin-bottom: var(--ra-gap);
       }
       .rentalai-result-page-header {
         max-width: none;
         margin-left: 0;
         margin-right: 0;
-        padding: 1.65rem 1.5rem;
-        margin-bottom: 1.5rem;
+        padding: var(--ra-gap) calc(var(--ra-gap) + 0.25rem);
+        margin-bottom: var(--ra-gap);
         background: #fff;
         border-radius: 16px;
         border: 1px solid #e2e8f0;
         box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
       }
       .rentalai-result-page-header h1 {
-        margin: 0 0 0.45rem;
-        font-size: clamp(1.45rem, 4vw, 1.85rem);
+        margin: 0 0 0.5rem;
+        font-size: var(--ra-font-page);
         font-weight: 700;
         color: #0f172a;
         letter-spacing: -0.03em;
-        line-height: 1.2;
+        line-height: 1.22;
       }
       .rentalai-result-page-sub {
         margin: 0;
-        font-size: clamp(0.9rem, 2.5vw, 1rem);
+        font-size: var(--ra-font-sub);
+        font-weight: 400;
         color: #64748b;
-        line-height: 1.5;
+        line-height: 1.55;
         max-width: 36rem;
       }
       .rentalai-direct-root {
@@ -60,30 +72,30 @@
       .rentalai-five-blocks {
         display: flex;
         flex-direction: column;
-        gap: 1.25rem;
+        gap: var(--ra-gap);
       }
       .rentalai-result-card {
         background: #fff;
         border-radius: 14px;
         box-shadow: 0 2px 14px rgba(15, 23, 42, 0.07);
         border: 1px solid #e5e9f0;
-        padding: 1.35rem 1.45rem;
+        padding: calc(var(--ra-gap) + 0.1rem) calc(var(--ra-gap) + 0.2rem);
         margin-bottom: 0;
         max-width: 100%;
         overflow: hidden;
         box-sizing: border-box;
       }
       .rentalai-result-card .section-title {
-        font-size: 1.05rem;
+        font-size: var(--ra-font-card);
         font-weight: 600;
         letter-spacing: -0.02em;
         color: #0f172a;
-        margin: 0 0 0.85rem;
+        margin: 0 0 0.75rem;
         padding-bottom: 0.5rem;
         border-bottom: 1px solid #f1f5f9;
       }
       .rentalai-field-body {
-        font-size: 0.98rem;
+        font-size: var(--ra-font-body);
         line-height: 1.6;
         color: #334155;
         margin: 0;
@@ -101,33 +113,46 @@
         overflow-wrap: anywhere;
       }
       .rentalai-score-value {
-        font-size: clamp(2.25rem, 8vw, 3rem);
+        font-size: clamp(2.35rem, 8.5vw, 3.15rem);
         font-weight: 800;
         color: #1e3a8a;
         letter-spacing: -0.04em;
         line-height: 1.05;
       }
       .rentalai-score-denom {
-        font-size: clamp(1rem, 3.5vw, 1.35rem);
+        font-size: clamp(1.05rem, 3.5vw, 1.35rem);
         font-weight: 600;
         color: #64748b;
         margin-left: 0.2em;
         vertical-align: baseline;
       }
       .rentalai-score-body--text {
-        font-size: 1.02rem;
+        font-size: var(--ra-font-body);
         font-weight: 500;
         color: #334155;
       }
       .rentalai-bullet-list {
         margin: 0;
-        padding-left: 1.25rem;
+        padding-left: 1.35rem;
       }
       .rentalai-bullet-list li {
         margin-bottom: 0.4rem;
       }
       .rentalai-bullet-list li:last-child {
         margin-bottom: 0;
+      }
+      .rentalai-bullet-list.rentalai-explain-list li {
+        margin-bottom: 0.65rem;
+        line-height: 1.58;
+        padding-bottom: 0.2rem;
+      }
+      .rentalai-bullet-list.rentalai-explain-list li:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+      }
+      .rentalai-explain-empty {
+        color: #64748b;
+        line-height: 1.6;
       }
       .rentalai-verdict-card.rentalai-verdict--recommended {
         border-left: 4px solid #16a34a;
@@ -160,8 +185,8 @@
         align-items: stretch;
         justify-content: center;
         gap: 0.75rem 1rem;
-        margin-top: 1.75rem;
-        padding-top: 0.5rem;
+        margin-top: var(--ra-gap);
+        padding-top: 0;
         width: 100%;
         max-width: 100%;
         box-sizing: border-box;
@@ -219,27 +244,48 @@
       }
       @media (max-width: 640px) {
         main.rentalai-result-page.rentalai-result-shell {
-          padding: 1.25rem 0.85rem 2.25rem;
+          --ra-gap: 1rem;
+          --ra-page-pt: 1.25rem;
+          --ra-page-pb: 2rem;
+          --ra-page-px: 0.85rem;
+          padding: var(--ra-page-pt) var(--ra-page-px) var(--ra-page-pb);
         }
         .rentalai-result-page-header {
-          padding: 1.25rem 1rem;
-          margin-bottom: 1.15rem;
-        }
-        .rentalai-five-blocks {
-          gap: 1rem;
+          padding: var(--ra-gap);
+          margin-bottom: var(--ra-gap);
         }
         .rentalai-result-card {
-          padding: 1.15rem 1.1rem;
+          padding: var(--ra-gap);
           border-radius: 12px;
         }
         .rentalai-result-bottom-actions {
           flex-direction: column;
           align-items: stretch;
-          margin-top: 1.5rem;
+          margin-top: var(--ra-gap);
         }
         .rentalai-btn {
           width: 100%;
         }
+      }
+      #rentalai-save-toast.rentalai-toast {
+        position: fixed;
+        bottom: 1.25rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 200;
+        max-width: min(92vw, 22rem);
+        padding: 0.7rem 1.1rem;
+        border-radius: 10px;
+        background: #0f172a;
+        color: #f8fafc;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        text-align: center;
+        box-shadow: 0 6px 24px rgba(15, 23, 42, 0.28);
+        box-sizing: border-box;
+      }
+      #rentalai-save-toast.rentalai-toast.hidden {
+        display: none !important;
       }
     </style>
   </head>
@@ -382,6 +428,7 @@
         </section>
       </div>
     </main>
+    <div id="rentalai-save-toast" class="rentalai-toast hidden" role="status" aria-live="polite"></div>
     <script src="/assets/analysis_history_store.js"></script>
     <script src="/assets/analysis_history_persist.js"></script>
     <script src="/assets/guest_auth_hint.js"></script>
