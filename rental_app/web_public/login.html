@@ -1,86 +1,125 @@
 <!DOCTYPE html>
-<!--
-  Phase 5 Step1：账户入口 — 邮箱/密码登录（POST /auth/login）+ 本地演示快速进入（current_user）
--->
-<html lang="zh-Hans">
+<html lang="en-GB">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="rentalai-api-base" content="" />
-    <meta name="vite-rentalai-api-base" content="" />
-    <meta name="rentalai-env" content="" />
-    <title>登录 · RentalAI</title>
+    <title>Login to RentalAI</title>
     <link rel="stylesheet" href="/assets/style.css" />
-    <script src="/assets/api_config.js"></script>
+    <style>
+      /* Phase12 Step1-4: auth pages — align with home / SaaS hero */
+      .auth-page-body {
+        margin: 0;
+        min-height: 100vh;
+        box-sizing: border-box;
+        background: linear-gradient(175deg, #eef2f7 0%, #e8edf4 50%, #f1f5f9 100%);
+      }
+      .auth-page-main {
+        max-width: 26rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 2.5rem;
+        box-sizing: border-box;
+      }
+      .auth-page-card.card {
+        padding: 1.75rem 1.5rem 1.6rem;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        background: #fff;
+      }
+      .auth-page-kicker {
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin: 0 0 0.5rem;
+      }
+      .auth-page-card .section-title {
+        margin-top: 0;
+        margin-bottom: 0.35rem;
+      }
+      .auth-page-form.auth-form input[type="email"],
+      .auth-page-form.auth-form input[type="password"] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.6rem 0.75rem;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        font-size: 1rem;
+        line-height: 1.45;
+        color: #0f172a;
+      }
+      .auth-page-form.auth-form input:focus {
+        outline: none;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+      }
+      .auth-page-form .actions-row {
+        margin-top: 0.65rem;
+      }
+      .auth-page-form .actions-row .saas-btn {
+        width: 100%;
+        box-sizing: border-box;
+        font: inherit;
+        cursor: pointer;
+      }
+      .auth-page-links {
+        margin-top: 1.15rem;
+        padding-top: 1.05rem;
+        border-top: 1px solid #f1f5f9;
+      }
+      .auth-page-links .hint {
+        margin: 0 0 0.5rem;
+      }
+      .auth-page-links .hint:last-child {
+        margin-bottom: 0;
+      }
+      .auth-page-back a {
+        font-weight: 500;
+      }
+    </style>
   </head>
-  <body>
-    <script src="/assets/auth_user_store.js"></script>
-    <script src="/assets/auth_local.js"></script>
-    <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
+  <body class="auth-page-body">
+    <main class="wrap narrow-wrap auth-page-main">
+      <section class="card form-card auth-page-card" aria-labelledby="login-title">
+        <p class="auth-page-kicker">RentalAI</p>
+        <h1 id="login-title" class="section-title">Login to RentalAI</h1>
 
-    <main class="wrap narrow-wrap">
-      <h1 class="section-title">登录 RentalAI</h1>
-      <p class="hint">
-        使用邮箱与密码登录（服务端 <code>/auth/login</code>）；或继续使用下方「本地演示」无需密码。
-      </p>
-
-      <section class="card form-card" aria-labelledby="login-email-title">
-        <h2 id="login-email-title" class="section-title" style="font-size: 1.1rem">
-          邮箱登录
-        </h2>
-        <form id="login-form" class="auth-form" autocomplete="on">
-          <label class="field-label" for="login-email">邮箱</label>
+        <form class="auth-form auth-page-form" autocomplete="on">
+          <label class="field-label" for="login-email">Email</label>
           <input
             id="login-email"
             name="email"
             type="email"
-            required
             autocomplete="username"
             placeholder="you@example.com"
           />
 
-          <label class="field-label" for="login-password">密码</label>
+          <label class="field-label" for="login-password">Password</label>
           <input
             id="login-password"
             name="password"
             type="password"
-            required
-            minlength="1"
             autocomplete="current-password"
+            placeholder="Enter your password"
           />
 
-          <p id="login-err" class="err hidden" role="alert"></p>
-
           <div class="actions-row">
-            <button type="submit">登录</button>
+            <button type="button" class="saas-btn saas-btn--primary">Login</button>
           </div>
         </form>
-        <p class="hint small-print login-hint">
-          没有账号？<a href="/register">注册</a>
-        </p>
-      </section>
 
-      <section class="card form-card" aria-labelledby="login-demo-title">
-        <h2 id="login-demo-title" class="section-title" style="font-size: 1.1rem">
-          本地演示（无需密码）
-        </h2>
-        <p class="hint">仅写入本机 <code>current_user</code>，不调用登录 API。</p>
-        <label class="field-label" for="local-login-input">昵称或邮箱</label>
-        <input
-          id="local-login-input"
-          type="text"
-          autocomplete="username"
-          placeholder="例如：Alex 或 alex@example.com"
-        />
-        <div class="actions-row">
-          <button type="button" id="local-login-go">进入我的租房助手</button>
+        <div class="auth-page-links">
+          <p class="hint small-print">
+            New to RentalAI?
+            <a href="/register">Create an account</a>
+          </p>
+          <p class="hint small-print auth-page-back">
+            <a href="/">Back to home</a>
+          </p>
         </div>
       </section>
     </main>
-
-    <script src="/assets/auth_session.js"></script>
-    <script src="/assets/auth_api.js"></script>
-    <script src="/assets/login_page.js"></script>
-    <script src="/assets/login_local_page.js"></script>
   </body>
 </html>

@@ -1,36 +1,118 @@
 <!DOCTYPE html>
-<!--
-  Phase 5 Round2：最小账户页 /account — 会话与本地历史分桶（Step4 实现，Step5 文档与入口已对齐 README）
--->
-<html lang="zh-Hans">
+<html lang="en-GB">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="rentalai-api-base" content="" />
-    <meta name="vite-rentalai-api-base" content="" />
-    <meta name="rentalai-env" content="" />
-    <title>账户 · Account · RentalAI</title>
+    <title>My RentalAI Account</title>
     <link rel="stylesheet" href="/assets/style.css" />
-    <script src="/assets/api_config.js"></script>
+    <style>
+      /* Phase12 Step1-4: auth pages — align with home / SaaS hero */
+      .auth-page-body {
+        margin: 0;
+        min-height: 100vh;
+        box-sizing: border-box;
+        background: linear-gradient(175deg, #eef2f7 0%, #e8edf4 50%, #f1f5f9 100%);
+      }
+      .auth-page-main {
+        max-width: 26rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 2.5rem;
+        box-sizing: border-box;
+      }
+      .auth-page-card.card {
+        padding: 1.75rem 1.5rem 1.6rem;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+        background: #fff;
+      }
+      .auth-page-kicker {
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin: 0 0 0.5rem;
+      }
+      .auth-page-card .section-title {
+        margin-top: 0;
+        margin-bottom: 0.35rem;
+      }
+      .auth-subtitle {
+        font-size: 1.05rem;
+        margin: 1.1rem 0 0.45rem;
+      }
+      .auth-status-panel {
+        margin-top: 0.75rem;
+        padding: 0.85rem 1rem;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: linear-gradient(160deg, #f8fafc 0%, #f1f5f9 100%);
+      }
+      .auth-status-panel .auth-status-label {
+        margin: 0 0 0.35rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+      }
+      .auth-status-panel .hint {
+        margin: 0;
+        color: #334155;
+      }
+      .auth-records-block {
+        margin-top: 1rem;
+      }
+      .auth-records-placeholder {
+        margin: 0;
+        padding: 1rem 1rem;
+        border-radius: 10px;
+        border: 1px dashed #cbd5e1;
+        background: #f8fafc;
+        text-align: center;
+        font-size: 0.92rem;
+      }
+      .auth-page-links {
+        margin-top: 1.15rem;
+        padding-top: 1.05rem;
+        border-top: 1px solid #f1f5f9;
+      }
+      .auth-page-links .hint {
+        margin: 0;
+      }
+      .auth-page-back a {
+        font-weight: 500;
+      }
+    </style>
   </head>
-  <body class="account-page-body">
-    <script src="/assets/auth_user_store.js"></script>
-    <script src="/assets/auth_local.js"></script>
-    <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
+  <body class="auth-page-body">
+    <main class="wrap narrow-wrap auth-page-main">
+      <section class="card form-card auth-page-card" aria-labelledby="account-title">
+        <p class="auth-page-kicker">RentalAI</p>
+        <h1 id="account-title" class="section-title">My RentalAI Account</h1>
 
-    <main class="wrap narrow-wrap account-page">
-      <p class="back-link">
-        <a href="/">← 首页</a>
-      </p>
-      <header class="page-header">
-        <h1 class="section-title">账户 <span class="hint muted" style="font-weight: normal">Account</span></h1>
-        <p class="hint muted account-page-lead">
-          当前浏览器内的登录状态与历史分桶。分析历史：访客仅本机；登录后优先云端同步。
-        </p>
-      </header>
+        <div class="auth-status-panel" aria-label="Account status">
+          <p class="auth-status-label">Account status</p>
+          <p class="hint">Not signed in yet (placeholder).</p>
+        </div>
 
-      <div id="account-root" class="account-root" aria-live="polite"></div>
+        <div class="auth-records-block">
+          <h2 class="section-title auth-subtitle">Saved analysis records</h2>
+          <div
+            class="auth-records-placeholder hint muted"
+            aria-label="Saved analysis records placeholder"
+          >
+            No saved records to display yet.
+          </div>
+        </div>
+
+        <div class="auth-page-links">
+          <p class="hint small-print auth-page-back">
+            <a href="/">Back to home</a>
+          </p>
+        </div>
+      </section>
     </main>
-    <script src="/assets/account_page.js"></script>
   </body>
 </html>
