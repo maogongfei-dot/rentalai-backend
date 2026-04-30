@@ -117,6 +117,7 @@ from persistence.auth_http_helpers import (
 )
 from persistence.auth_session_store import build_auth_payload, issue_token, resolve_user_id, revoke_token
 from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
+from persistence.sqlite_user_store import init_users_db
 from data.explain.rule_explain import (
     build_p10_explain_for_batch_row,
     build_p10_explain_from_msa_result,
@@ -145,6 +146,7 @@ logging.basicConfig(
 
 _api_failures = FailureTracker(threshold=3, source="api-server")
 init_records_db()
+init_users_db()
 _task_store = TaskStore()
 
 # 当前主后端 ASGI 应用：新 API、新页面挂载与中间件默认挂在此 ``app`` 上，而不是挂到 app_web.py（Streamlit）。
