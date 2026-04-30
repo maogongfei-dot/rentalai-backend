@@ -36,6 +36,33 @@
         <a href="/">返回首页</a>
       </section>
 
+      <!-- Phase10：rentalai_result 五区块骨架（无样式细化） -->
+      <div id="rentalai-direct-blocks" class="hidden" aria-live="polite">
+        <p id="rentalai-no-data-msg" class="hidden" role="status">No analysis result available</p>
+        <div id="rentalai-five-blocks">
+          <div id="block-final-recommendation">
+            <h2>Final Recommendation</h2>
+            <div id="field-final-recommendation"></div>
+          </div>
+          <div id="block-score">
+            <h2>Score</h2>
+            <div id="field-score"></div>
+          </div>
+          <div id="block-why">
+            <h2>Why</h2>
+            <div id="field-why"></div>
+          </div>
+          <div id="block-main-risks">
+            <h2>Main Risks</h2>
+            <div id="field-main-risks"></div>
+          </div>
+          <div id="block-next-step">
+            <h2>Next Step</h2>
+            <div id="field-next-step"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- P10-4：/api/ai/query 联调展示 -->
       <div id="housing-mode" class="hidden">
         <div id="housing-missing-location" class="card card-warn hidden" role="alert"></div>

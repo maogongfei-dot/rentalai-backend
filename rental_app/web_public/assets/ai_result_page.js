@@ -100,7 +100,7 @@
   function fmt(v) {
     if (v === null || v === undefined) return "—";
     if (typeof v === "boolean") return v ? "是" : "否";
-    if (typeof v === "object") return JSON.stringify(v);
+    if (typeof v === "object") return "—";
     return String(v);
   }
 
@@ -128,14 +128,32 @@
         .join(" | ") || "No data available yet.";
     }
     if (typeof v === "object") {
-      try {
-        return JSON.stringify(v);
-      } catch (e) {
-        return "No data available yet.";
-      }
+      return "No data available yet.";
     }
     var s = String(v).trim();
     return s || "No data available yet.";
+  }
+
+  /** Phase10：rentalai_result 区块展示（无 JSON 原始输出）。 */
+  function formatAnalyzeField(v) {
+    if (v === null || v === undefined) return "Not provided";
+    if (typeof v === "string" && !String(v).trim()) return "Not provided";
+    if (Array.isArray(v)) {
+      var joined = v
+        .map(function (it) {
+          return String(it == null ? "" : it).trim();
+        })
+        .filter(Boolean)
+        .join(", ");
+      return joined || "Not provided";
+    }
+    if (typeof v === "object") return "Not provided";
+    return String(v);
+  }
+
+  function setAnalyzeField(elementId, raw) {
+    var el = document.getElementById(elementId);
+    if (el) el.textContent = formatAnalyzeField(raw);
   }
 
   function renderDirectAnalyzeResult(payload) {
@@ -145,71 +163,39 @@
         : payload && typeof payload === "object"
           ? payload
           : {};
-    var finalRecommendation = firstNonEmpty(
-      data.decision && data.decision.final_summary,
-      data.status && data.status.overall_recommendation
-    );
-    var why = firstNonEmpty(
-      data.analysis && data.analysis.supporting_reasons,
-      data.user_facing && data.user_facing.reason,
-      data.explanation_summary && data.explanation_summary.key_positives
-    );
-    var risks = firstNonEmpty(
-      data.user_facing && data.user_facing.risk_note,
-      data.analysis && data.analysis.primary_blockers,
-      data.explanation_summary && data.explanation_summary.key_risks
-    );
-    var nextStep = firstNonEmpty(
-      data.analysis && data.analysis.required_actions_before_proceeding,
-      data.user_facing && data.user_facing.next_step,
-      data.next_actions
-    );
-    var score = firstNonEmpty(data.score);
 
     var housingEl = document.getElementById("housing-mode");
     var legacyEl = document.getElementById("legacy-mode");
+    var directBlocks = document.getElementById("rentalai-direct-blocks");
+    var noDataMsg = document.getElementById("rentalai-no-data-msg");
+    var fiveBlocks = document.getElementById("rentalai-five-blocks");
+
     if (housingEl) housingEl.classList.add("hidden");
-    if (legacyEl) legacyEl.classList.remove("hidden");
+    if (legacyEl) legacyEl.classList.add("hidden");
+    if (directBlocks) directBlocks.classList.remove("hidden");
+    if (noDataMsg) noDataMsg.classList.add("hidden");
+    if (fiveBlocks) fiveBlocks.classList.remove("hidden");
 
-    var rawEl = document.getElementById("raw-display");
-    var dl = document.getElementById("structured-dl");
-    var recoList = document.getElementById("reco-list");
-    var recoEmpty = document.getElementById("reco-empty");
-    var summaryLine = document.getElementById("summary-line");
+    var finalRecommendation = firstNonEmpty(data.decision && data.decision.final_summary);
+    var scoreRaw = firstNonEmpty(data.score);
+    var why = firstNonEmpty(
+      data.analysis && data.analysis.supporting_reasons,
+      data.user_facing && data.user_facing.reason
+    );
+    var risks = firstNonEmpty(
+      data.analysis && data.analysis.primary_blockers,
+      data.user_facing && data.user_facing.risk_note
+    );
+    var nextStep = firstNonEmpty(
+      data.analysis && data.analysis.required_actions_before_proceeding,
+      data.user_facing && data.user_facing.next_step
+    );
 
-    if (rawEl) rawEl.textContent = "Direct /analyze result";
-    if (summaryLine) summaryLine.textContent = "Showing latest POST /analyze output.";
-    if (recoEmpty) recoEmpty.classList.add("hidden");
-    if (recoList) recoList.innerHTML = "";
-
-    if (dl) {
-      dl.innerHTML =
-        "<dt>Final Recommendation</dt><dd>" +
-        escapeHtml(toDisplayText(finalRecommendation)) +
-        "</dd>" +
-        "<dt>Score</dt><dd>" +
-        escapeHtml(toDisplayText(score)) +
-        "</dd>" +
-        "<dt>Why</dt><dd>" +
-        escapeHtml(toDisplayText(why)) +
-        "</dd>" +
-        "<dt>Main Risks</dt><dd>" +
-        escapeHtml(toDisplayText(risks)) +
-        "</dd>" +
-        "<dt>Next Step</dt><dd>" +
-        escapeHtml(toDisplayText(nextStep)) +
-        "</dd>";
-    }
-
-    if (recoList) {
-      var li = document.createElement("li");
-      li.className = "reco-item card";
-      li.innerHTML =
-        "<strong>Raw JSON fallback</strong><br /><pre class='code-block'>" +
-        escapeHtml(JSON.stringify(payload, null, 2)) +
-        "</pre>";
-      recoList.appendChild(li);
-    }
+    setAnalyzeField("field-final-recommendation", finalRecommendation);
+    setAnalyzeField("field-score", scoreRaw);
+    setAnalyzeField("field-why", why);
+    setAnalyzeField("field-main-risks", risks);
+    setAnalyzeField("field-next-step", nextStep);
   }
 
   function fmtMoney(v) {
@@ -353,6 +339,8 @@
   function renderHousing(data) {
     var housingEl = document.getElementById("housing-mode");
     var legacyEl = document.getElementById("legacy-mode");
+    var directBlocks = document.getElementById("rentalai-direct-blocks");
+    if (directBlocks) directBlocks.classList.add("hidden");
     if (housingEl) housingEl.classList.remove("hidden");
     if (legacyEl) legacyEl.classList.add("hidden");
 
@@ -773,6 +761,8 @@
   function renderLegacy(data) {
     var housingEl = document.getElementById("housing-mode");
     var legacyEl = document.getElementById("legacy-mode");
+    var directBlocks = document.getElementById("rentalai-direct-blocks");
+    if (directBlocks) directBlocks.classList.add("hidden");
     if (housingEl) housingEl.classList.add("hidden");
     if (legacyEl) legacyEl.classList.remove("hidden");
 
@@ -783,10 +773,10 @@
     var summaryLine = document.getElementById("summary-line");
 
     if (!data || !data.success) {
-      if (rawEl) rawEl.textContent = "未找到分析结果，请从首页重新提交。";
+      if (rawEl) rawEl.textContent = "No analysis result available";
       if (recoEmpty) {
         recoEmpty.classList.remove("hidden");
-        recoEmpty.textContent = "没有可展示的数据，请返回首页重试。";
+        recoEmpty.textContent = "No analysis result available";
       }
       return;
     }
@@ -1156,6 +1146,8 @@
     if (dataH && dataH.success === false) {
       var housingEl0 = document.getElementById("housing-mode");
       var legacyEl0 = document.getElementById("legacy-mode");
+      var directBlocks0 = document.getElementById("rentalai-direct-blocks");
+      if (directBlocks0) directBlocks0.classList.add("hidden");
       if (housingEl0) housingEl0.classList.remove("hidden");
       if (legacyEl0) legacyEl0.classList.add("hidden");
       var errBox0 = document.getElementById("housing-errors");
