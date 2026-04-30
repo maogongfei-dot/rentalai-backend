@@ -3,8 +3,8 @@
   =============================================================================
   当前推定主交互页（房源分析提交侧）— web_public/index.html，路由 /
   =============================================================================
-  · 定位说明：与「assistant / 对话入口」见下文区分。本页 **#property-analysis**（#ai-query + #ai-go）由 assets/ai_home.js
-    将输入写入 sessionStorage 后跳转 **/analyzing**，该页 **POST /analyze**，结果写入 sessionStorage 再跳转 **/ai-result**。
+  · 定位说明：与「assistant / 对话入口」见下文区分。本页 **#property-analysis**（结构化 #ai-field-* + #ai-query + #ai-go）由 assets/ai_home.js
+    合并为 user_text 写入 sessionStorage 后跳转 **/analyzing**，该页 **POST /analyze**，结果写入 sessionStorage 再跳转 **/ai-result**。
   · 「assistant / 对话入口」对应 **assistant.html**：预填 #ai-query；用户在本页点击 **Analyze Property** 走同上链路。
   · 角色：默认落地首页 + 上述 **一语分析** 主表单所在；后续新找房能力优先在本区块与 ai_home.js 对齐。
   · ShortRentAI：作为平台内短租 / 合租 / 灵活租期 **扩展分支**，可在本页「主功能」区或表单侧增加并列入口
@@ -22,18 +22,27 @@
     <title>RentalAI · AI-powered rental property analysis</title>
     <link rel="stylesheet" href="/assets/style.css" />
     <style>
-      #property-analysis .property-input-hints-intro {
-        margin: 0 0 0.35rem;
-        font-weight: 600;
-        color: #334155;
+      #property-analysis .ai-structured-fields {
+        margin-bottom: 1rem;
       }
-      #property-analysis .property-input-hints-list {
-        margin: 0 0 0.85rem;
-        padding-left: 1.25rem;
-        line-height: 1.45;
+      #property-analysis .ai-structured-fields .field-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1rem;
+        margin-bottom: 0.75rem;
       }
-      #property-analysis .property-input-hints-list li {
-        margin-bottom: 0.25rem;
+      #property-analysis .ai-structured-fields .field-col {
+        flex: 1 1 12rem;
+        min-width: 0;
+      }
+      #property-analysis .ai-structured-fields input,
+      #property-analysis .ai-structured-fields select,
+      #property-analysis .ai-structured-fields textarea {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      #property-analysis .ai-field-concerns-block {
+        margin-bottom: 0.85rem;
       }
     </style>
     <script src="/assets/api_config.js"></script>
@@ -173,21 +182,72 @@
           role="status"
           aria-live="polite"
         ></p>
-        <label class="field-label" for="ai-query">Describe the property or what you&apos;re looking for</label>
-        <p class="hint property-input-hints-intro">You can include:</p>
-        <ul class="hint muted property-input-hints-list" aria-label="Suggested details to mention">
-          <li>Monthly rent</li>
-          <li>Location or postcode</li>
-          <li>Number of bedrooms</li>
-          <li>Bills included or not</li>
-          <li>Contract concerns</li>
-          <li>Move-in date</li>
-        </ul>
+        <p class="hint muted small-print">
+          Fill in what you know below; add free-form notes under <strong>Additional details</strong>.
+        </p>
+
+        <div class="ai-structured-fields" aria-label="Property details">
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label" for="ai-field-rent">Monthly rent</label>
+              <input
+                type="text"
+                id="ai-field-rent"
+                name="ai_field_rent"
+                inputmode="decimal"
+                autocomplete="off"
+                placeholder="e.g. £1,200 pcm or 1200"
+              />
+            </div>
+            <div class="field-col">
+              <label class="field-label" for="ai-field-location">Location / postcode</label>
+              <input
+                type="text"
+                id="ai-field-location"
+                name="ai_field_location"
+                autocomplete="off"
+                placeholder="e.g. Manchester M1 or DE1"
+              />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label" for="ai-field-bedrooms">Bedrooms</label>
+              <select id="ai-field-bedrooms" name="ai_field_bedrooms">
+                <option value="">Select…</option>
+                <option value="Studio">Studio</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4+">4+</option>
+              </select>
+            </div>
+            <div class="field-col">
+              <label class="field-label" for="ai-field-bills">Bills included?</label>
+              <select id="ai-field-bills" name="ai_field_bills">
+                <option value="">Prefer not to say</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+          </div>
+          <div class="ai-field-concerns-block">
+            <label class="field-label" for="ai-field-concerns">Contract or property concerns</label>
+            <textarea
+              id="ai-field-concerns"
+              name="ai_field_concerns"
+              rows="2"
+              placeholder="e.g. deposit terms, break clause, repairs — optional"
+            ></textarea>
+          </div>
+        </div>
+
+        <label class="field-label" for="ai-query">Additional details</label>
         <textarea
           id="ai-query"
           name="ai_query"
-          rows="5"
-          placeholder="Example: £1,500 per month, Manchester M1, 2 bedrooms, bills not included, move-in next month."
+          rows="4"
+          placeholder="Anything else: commute, move-in date, pets, parking…"
           autocomplete="off"
         ></textarea>
         <div class="actions-row">

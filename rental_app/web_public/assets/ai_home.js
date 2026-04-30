@@ -1,7 +1,7 @@
 /*
- * Phase11：首页房源分析区 — 写入 sessionStorage 后跳转 /analyzing，由 analyzing.html POST /analyze，
- * 结果写入 rentalai_result 并跳转 /ai-result（与 Phase10 结果页对齐）。
- * DOM：#ai-query、#ai-go；assistant 预填见 consumeAssistantHandoff。
+ * Phase11 Step2-1：首页房源分析 — 结构化字段 + Additional details 合并为 user_text，
+ * 写入 sessionStorage 后跳转 /analyzing → POST /analyze（analyzing.html 不变）。
+ * DOM：#ai-field-*、#ai-query、#ai-go；assistant 预填见 consumeAssistantHandoff（仅 #ai-query）。
  */
 (function () {
   var ta = document.getElementById("ai-query");
@@ -13,6 +13,38 @@
   if (!btn || !ta) return;
 
   var PENDING_KEY = "rentalai_analyze_pending_v1";
+
+  function fieldVal(id) {
+    var el = document.getElementById(id);
+    return el ? String(el.value || "").trim() : "";
+  }
+
+  function hasAnyPropertyInput() {
+    if (fieldVal("ai-field-rent")) return true;
+    if (fieldVal("ai-field-location")) return true;
+    if (fieldVal("ai-field-bedrooms")) return true;
+    if (fieldVal("ai-field-bills")) return true;
+    if (fieldVal("ai-field-concerns")) return true;
+    if ((ta.value || "").trim()) return true;
+    return false;
+  }
+
+  function buildMergedUserText() {
+    var lines = [];
+    var rent = fieldVal("ai-field-rent");
+    var loc = fieldVal("ai-field-location");
+    var beds = fieldVal("ai-field-bedrooms");
+    var bills = fieldVal("ai-field-bills");
+    var concerns = fieldVal("ai-field-concerns");
+    var extra = (ta.value || "").trim();
+    if (rent) lines.push("Monthly rent: " + rent);
+    if (loc) lines.push("Location / postcode: " + loc);
+    if (beds) lines.push("Bedrooms: " + beds);
+    if (bills) lines.push("Bills included: " + bills);
+    if (concerns) lines.push("Contract or property concerns: " + concerns);
+    if (extra) lines.push("Additional details: " + extra);
+    return lines.join("\n");
+  }
 
   (function applyAssistantPrefill() {
     try {
@@ -64,18 +96,22 @@
   }
 
   function submit() {
-    var q = (ta.value || "").trim();
-    if (!q) {
+    if (!hasAnyPropertyInput()) {
       showErr("Please enter some property details before analysis.", { noRetry: true });
       try {
-        ta.focus();
-      } catch (ef) {}
+        document.getElementById("ai-field-rent").focus();
+      } catch (ef) {
+        try {
+          ta.focus();
+        } catch (ef2) {}
+      }
       return;
     }
     clearErr();
     hideLoading();
+    var merged = buildMergedUserText();
     try {
-      sessionStorage.setItem(PENDING_KEY, JSON.stringify({ user_text: q }));
+      sessionStorage.setItem(PENDING_KEY, JSON.stringify({ user_text: merged }));
     } catch (e) {
       showErr("Could not save your input. Check that browser storage is enabled.");
       return;
