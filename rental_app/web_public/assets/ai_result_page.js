@@ -134,26 +134,157 @@
     return s || "No data available yet.";
   }
 
-  /** Phase10：rentalai_result 区块展示（无 JSON 原始输出）。 */
+  /**
+   * Phase10 Step1-3：从 object 中尽量提取可读文本（不输出 JSON / [object Object]）。
+   */
+  function extractScalarFromObject(o, depth) {
+    depth = depth || 0;
+    if (depth > 5) return null;
+    if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+    var preferKeys = ["summary", "message", "text", "value"];
+    var i;
+    for (i = 0; i < preferKeys.length; i++) {
+      var key = preferKeys[i];
+      if (!Object.prototype.hasOwnProperty.call(o, key)) continue;
+      var val = o[key];
+      if (val === null || val === undefined) continue;
+      if (typeof val === "string") {
+        var ts = val.trim();
+        if (ts) return ts;
+        continue;
+      }
+      if (typeof val === "number" && !isNaN(val)) return String(val);
+      if (typeof val === "boolean") return val ? "true" : "false";
+      if (typeof val === "object" && !Array.isArray(val)) {
+        var inner = extractScalarFromObject(val, depth + 1);
+        if (inner) return inner;
+      }
+    }
+    return null;
+  }
+
+  /** Phase10：rentalai_result 区块展示（无 JSON 原始输出、无 null/undefined 泄露）。 */
   function formatAnalyzeField(v) {
     if (v === null || v === undefined) return "Not provided";
-    if (typeof v === "string" && !String(v).trim()) return "Not provided";
-    if (Array.isArray(v)) {
-      var joined = v
-        .map(function (it) {
-          return String(it == null ? "" : it).trim();
-        })
-        .filter(Boolean)
-        .join(", ");
-      return joined || "Not provided";
+    if (typeof v === "string") {
+      var st = v.trim();
+      return st || "Not provided";
     }
-    if (typeof v === "object") return "Not provided";
-    return String(v);
+    if (typeof v === "number" && !isNaN(v)) return String(v);
+    if (typeof v === "boolean") return v ? "true" : "false";
+    if (Array.isArray(v)) {
+      if (!v.length) return "Not provided";
+      var parts = [];
+      var j;
+      for (j = 0; j < v.length; j++) {
+        var p = formatAnalyzeField(v[j]);
+        if (p && p !== "Not provided") parts.push(p);
+      }
+      return parts.length ? parts.join(", ") : "Not provided";
+    }
+    if (typeof v === "object") {
+      var ex = extractScalarFromObject(v);
+      return ex || "Not provided";
+    }
+    var out = String(v).trim();
+    if (!out || out === "[object Object]") return "Not provided";
+    return out;
   }
 
   function setAnalyzeField(elementId, raw) {
     var el = document.getElementById(elementId);
     if (el) el.textContent = formatAnalyzeField(raw);
+  }
+
+  /**
+   * Phase10 Step1-2：Final Recommendation 展示文案上的关键词着色（Not Recommended 优先于 Recommended）。
+   */
+  function verdictAccentClass(displayText) {
+    var s = displayText == null ? "" : String(displayText);
+    if (s.indexOf("Not Recommended") !== -1) return "rentalai-verdict--not-recommended";
+    if (s.indexOf("Recommended") !== -1) return "rentalai-verdict--recommended";
+    if (s.indexOf("Caution") !== -1) return "rentalai-verdict--caution";
+    return "";
+  }
+
+  function applyVerdictCard(blockEl, displayText) {
+    if (!blockEl) return;
+    blockEl.classList.remove(
+      "rentalai-verdict--recommended",
+      "rentalai-verdict--caution",
+      "rentalai-verdict--not-recommended"
+    );
+    var cls = verdictAccentClass(displayText);
+    if (cls) blockEl.classList.add(cls);
+  }
+
+  function itemToListLine(item) {
+    if (item === null || item === undefined) return "";
+    if (typeof item === "object" && !Array.isArray(item)) {
+      var ex = extractScalarFromObject(item);
+      return ex || "";
+    }
+    if (Array.isArray(item)) {
+      var fa = formatAnalyzeField(item);
+      return fa === "Not provided" ? "" : fa;
+    }
+    var s = String(item).trim();
+    if (!s || s === "[object Object]") return "";
+    return s;
+  }
+
+  /**
+   * analysis 侧字段：非空数组 → 无序列表（条目可为 object，提取可读文案）；字符串 → 正文；
+   * object → 提取 summary/message/text/value；空则回退 user_facing。
+   */
+  function renderAnalysisListOrFallback(elementId, analysisVal, fallbackVal) {
+    var el = document.getElementById(elementId);
+    if (!el) return;
+
+    function renderIntoPrimary(val) {
+      if (val === null || val === undefined) return false;
+      if (Array.isArray(val)) {
+        if (!val.length) return false;
+        var lines = val.map(itemToListLine).filter(function (s) {
+          return s && String(s).trim();
+        });
+        if (!lines.length) return false;
+        el.innerHTML =
+          "<ul class=\"rentalai-bullet-list\">" +
+          lines
+            .map(function (line) {
+              return "<li>" + escapeHtml(line) + "</li>";
+            })
+            .join("") +
+          "</ul>";
+        return true;
+      }
+      if (typeof val === "string" && val.trim()) {
+        el.textContent = val.trim();
+        return true;
+      }
+      if (typeof val === "number" && !isNaN(val)) {
+        el.textContent = String(val);
+        return true;
+      }
+      if (typeof val === "boolean") {
+        el.textContent = val ? "true" : "false";
+        return true;
+      }
+      if (typeof val === "object") {
+        var txt = formatAnalyzeField(val);
+        if (txt !== "Not provided") {
+          el.textContent = txt;
+          return true;
+        }
+        return false;
+      }
+      return false;
+    }
+
+    if (renderIntoPrimary(analysisVal)) return;
+    if (renderIntoPrimary(fallbackVal)) return;
+    el.textContent = "Not provided";
   }
 
   function renderDirectAnalyzeResult(payload) {
@@ -176,26 +307,25 @@
     if (noDataMsg) noDataMsg.classList.add("hidden");
     if (fiveBlocks) fiveBlocks.classList.remove("hidden");
 
-    var finalRecommendation = firstNonEmpty(data.decision && data.decision.final_summary);
-    var scoreRaw = firstNonEmpty(data.score);
-    var why = firstNonEmpty(
-      data.analysis && data.analysis.supporting_reasons,
-      data.user_facing && data.user_facing.reason
-    );
-    var risks = firstNonEmpty(
-      data.analysis && data.analysis.primary_blockers,
-      data.user_facing && data.user_facing.risk_note
-    );
-    var nextStep = firstNonEmpty(
-      data.analysis && data.analysis.required_actions_before_proceeding,
-      data.user_facing && data.user_facing.next_step
-    );
+    var analysis = data.analysis || {};
+    var uf = data.user_facing || {};
+    var decision = data.decision || {};
 
-    setAnalyzeField("field-final-recommendation", finalRecommendation);
-    setAnalyzeField("field-score", scoreRaw);
-    setAnalyzeField("field-why", why);
-    setAnalyzeField("field-main-risks", risks);
-    setAnalyzeField("field-next-step", nextStep);
+    var finalRaw = decision.final_summary;
+    var finalDisplay = formatAnalyzeField(finalRaw);
+    var finalEl = document.getElementById("field-final-recommendation");
+    if (finalEl) finalEl.textContent = finalDisplay;
+    applyVerdictCard(document.getElementById("block-final-recommendation"), finalDisplay);
+
+    setAnalyzeField("field-score", data.score);
+
+    renderAnalysisListOrFallback("field-why", analysis.supporting_reasons, uf.reason);
+    renderAnalysisListOrFallback("field-main-risks", analysis.primary_blockers, uf.risk_note);
+    renderAnalysisListOrFallback(
+      "field-next-step",
+      analysis.required_actions_before_proceeding,
+      uf.next_step
+    );
   }
 
   function fmtMoney(v) {

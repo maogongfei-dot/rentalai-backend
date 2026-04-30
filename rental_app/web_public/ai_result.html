@@ -6,18 +6,105 @@
     <meta name="rentalai-api-base" content="" />
     <meta name="vite-rentalai-api-base" content="" />
     <meta name="rentalai-env" content="" />
-    <title>需求解析结果 · RentalAI</title>
+    <title>RentalAI Analysis Result · RentalAI</title>
     <link rel="stylesheet" href="/assets/style.css" />
     <script src="/assets/api_config.js"></script>
+    <style>
+      /* Phase10 Step1-2 / Step1-3：rentalai_result 结果区（仅本页，无新增依赖） */
+      .rentalai-result-page-header {
+        max-width: 44rem;
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        margin-bottom: 1.25rem;
+      }
+      .rentalai-result-page-header h1 {
+        margin: 0 0 0.35rem;
+        font-size: 1.65rem;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.03em;
+      }
+      .rentalai-result-page-sub {
+        margin: 0;
+        font-size: 0.95rem;
+        color: #64748b;
+      }
+      .rentalai-direct-root {
+        max-width: 44rem;
+        margin-left: auto;
+        margin-right: auto;
+        padding: 0 1rem 2.5rem;
+        box-sizing: border-box;
+      }
+      .rentalai-five-blocks {
+        display: flex;
+        flex-direction: column;
+        gap: 1.15rem;
+      }
+      .rentalai-result-card {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(15, 23, 42, 0.09);
+        border: 1px solid #e8ecf1;
+        padding: 1.2rem 1.35rem;
+        margin-bottom: 0;
+      }
+      .rentalai-result-card .section-title {
+        font-size: 1.15rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: #0f172a;
+        margin: 0 0 0.75rem;
+      }
+      .rentalai-field-body {
+        font-size: 0.98rem;
+        line-height: 1.55;
+        color: #334155;
+        margin: 0;
+      }
+      .rentalai-bullet-list {
+        margin: 0;
+        padding-left: 1.25rem;
+      }
+      .rentalai-bullet-list li {
+        margin-bottom: 0.4rem;
+      }
+      .rentalai-bullet-list li:last-child {
+        margin-bottom: 0;
+      }
+      .rentalai-verdict-card.rentalai-verdict--recommended {
+        border-left: 4px solid #16a34a;
+        background: #f7fdf9;
+      }
+      .rentalai-verdict-card.rentalai-verdict--caution {
+        border-left: 4px solid #ca8a04;
+        background: #fffbeb;
+      }
+      .rentalai-verdict-card.rentalai-verdict--not-recommended {
+        border-left: 4px solid #dc2626;
+        background: #fff5f5;
+      }
+      #rentalai-no-data-msg {
+        text-align: center;
+        padding: 1.5rem 1rem;
+        color: #64748b;
+        font-size: 1rem;
+      }
+    </style>
   </head>
   <body>
     <script src="/assets/auth_user_store.js"></script>
     <script src="/assets/auth_local.js"></script>
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
-    <main class="wrap wrap-wide result-wrap result-page-ui">
-      <header class="page-header">
-        <h1>需求解析结果</h1>
+    <main class="wrap wrap-wide result-wrap result-page-ui rentalai-result-page">
+      <header class="page-header rentalai-result-page-header">
+        <h1>RentalAI Analysis Result</h1>
+        <p class="rentalai-result-page-sub">
+          Here is your rental decision summary based on the information provided.
+        </p>
       </header>
 
       <div id="guest-auth-hint" class="guest-auth-hint-host" aria-live="polite"></div>
@@ -36,30 +123,38 @@
         <a href="/">返回首页</a>
       </section>
 
-      <!-- Phase10：rentalai_result 五区块骨架（无样式细化） -->
-      <div id="rentalai-direct-blocks" class="hidden" aria-live="polite">
+      <!-- Phase10：rentalai_result 五卡片 -->
+      <div id="rentalai-direct-blocks" class="hidden rentalai-direct-root" aria-live="polite">
         <p id="rentalai-no-data-msg" class="hidden" role="status">No analysis result available</p>
-        <div id="rentalai-five-blocks">
-          <div id="block-final-recommendation">
-            <h2>Final Recommendation</h2>
-            <div id="field-final-recommendation"></div>
-          </div>
-          <div id="block-score">
-            <h2>Score</h2>
-            <div id="field-score"></div>
-          </div>
-          <div id="block-why">
-            <h2>Why</h2>
-            <div id="field-why"></div>
-          </div>
-          <div id="block-main-risks">
-            <h2>Main Risks</h2>
-            <div id="field-main-risks"></div>
-          </div>
-          <div id="block-next-step">
-            <h2>Next Step</h2>
-            <div id="field-next-step"></div>
-          </div>
+        <div id="rentalai-five-blocks" class="rentalai-five-blocks">
+          <section
+            id="block-final-recommendation"
+            class="card rentalai-result-card rentalai-verdict-card"
+            aria-labelledby="rentalai-h-final"
+          >
+            <h2 id="rentalai-h-final" class="section-title">Final Recommendation</h2>
+            <div id="field-final-recommendation" class="rentalai-field-body"></div>
+          </section>
+          <section id="block-score" class="card rentalai-result-card" aria-labelledby="rentalai-h-score">
+            <h2 id="rentalai-h-score" class="section-title">Overall Score</h2>
+            <div id="field-score" class="rentalai-field-body"></div>
+          </section>
+          <section id="block-why" class="card rentalai-result-card" aria-labelledby="rentalai-h-why">
+            <h2 id="rentalai-h-why" class="section-title">Why this result?</h2>
+            <div id="field-why" class="rentalai-field-body"></div>
+          </section>
+          <section
+            id="block-main-risks"
+            class="card rentalai-result-card"
+            aria-labelledby="rentalai-h-risks"
+          >
+            <h2 id="rentalai-h-risks" class="section-title">Main Risks</h2>
+            <div id="field-main-risks" class="rentalai-field-body"></div>
+          </section>
+          <section id="block-next-step" class="card rentalai-result-card" aria-labelledby="rentalai-h-next">
+            <h2 id="rentalai-h-next" class="section-title">What should you do next?</h2>
+            <div id="field-next-step" class="rentalai-field-body"></div>
+          </section>
         </div>
       </div>
 
