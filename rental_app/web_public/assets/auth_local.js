@@ -461,7 +461,12 @@
     var btn = document.getElementById("demo-clear-storage-btn");
     if (!btn) return;
     btn.addEventListener("click", function () {
-      if (!confirm("确定清空本地测试数据？将退出登录。")) return;
+      if (
+        !confirm(
+          "Clear RentalAI data saved on this device? You will be signed out."
+        )
+      )
+        return;
       var favKey = favStorageKey();
       try {
         sessionStorage.removeItem("ai_analyze_last");

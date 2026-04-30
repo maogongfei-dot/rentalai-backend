@@ -117,7 +117,13 @@
     var A = getAuth();
     if (A && A.isLoggedIn && !A.isLoggedIn()) {
       if (readAnalyzeCount() >= 1) {
-        window.alert("Login to save your analysis history");
+        if (err) {
+          err.textContent =
+            "Log in to save your analysis history. This search will still run.";
+          err.classList.remove("hidden");
+        }
+        var d = go && go.closest && go.closest("details");
+        if (d) d.open = true;
       }
     }
 
