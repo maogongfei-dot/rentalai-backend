@@ -1,5 +1,5 @@
 /*
- * Phase11 Step2-1：首页房源分析 — 结构化字段 + Additional details 合并为 user_text，
+ * Phase11 Step2-1 / Step2-2：首页房源分析 — 结构化字段 + Additional details 合并为 user_text，
  * 写入 sessionStorage 后跳转 /analyzing → POST /analyze（analyzing.html 不变）。
  * DOM：#ai-field-*、#ai-query、#ai-go；assistant 预填见 consumeAssistantHandoff（仅 #ai-query）。
  */
