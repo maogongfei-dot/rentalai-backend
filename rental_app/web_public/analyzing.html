@@ -6,7 +6,7 @@
     <meta name="rentalai-api-base" content="" />
     <meta name="vite-rentalai-api-base" content="" />
     <meta name="rentalai-env" content="" />
-    <title>Analyzing · RentalAI</title>
+    <title>Analyzing your property · RentalAI</title>
     <link rel="stylesheet" href="/assets/style.css" />
   </head>
   <body class="analyzing-page-body">
@@ -37,15 +37,32 @@
     <script src="/assets/api_config.js"></script>
     <script>
       (function () {
-        var mockBody = {
-          rent: 1250,
-          budget: 1500,
-          commute_minutes: 30,
-          bedrooms: 1,
-          bills_included: false,
-          area: "Manchester",
-          postcode: "M1",
-        };
+        var PENDING_KEY = "rentalai_analyze_pending_v1";
+
+        function buildAnalyzeBody() {
+          var base = {
+            rent: 1250,
+            budget: 1500,
+            commute_minutes: 30,
+            bedrooms: 1,
+            bills_included: false,
+            postcode: "M1",
+          };
+          try {
+            var raw = sessionStorage.getItem(PENDING_KEY);
+            if (raw) {
+              var p = JSON.parse(raw);
+              sessionStorage.removeItem(PENDING_KEY);
+              var ut = p && p.user_text != null ? String(p.user_text).trim() : "";
+              if (ut) {
+                base.area = ut;
+                return base;
+              }
+            }
+          } catch (e1) {}
+          base.area = "Manchester";
+          return base;
+        }
 
         function goError() {
           window.location.href = "/analysis-error";
@@ -70,7 +87,7 @@
           var init = {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(mockBody),
+            body: JSON.stringify(buildAnalyzeBody()),
           };
           if (typeof window.rentalaiMergeAuthHeaders === "function") {
             init.headers = window.rentalaiMergeAuthHeaders(init.headers);

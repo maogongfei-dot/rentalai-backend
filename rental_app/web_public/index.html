@@ -3,11 +3,9 @@
   =============================================================================
   当前推定主交互页（房源分析提交侧）— web_public/index.html，路由 /
   =============================================================================
-  · 定位说明：与「assistant / 对话入口」见下文区分。本页包含 **#ai-query + #ai-go**，由 assets/ai_home.js
-    发起 **POST /api/ai/query** 并将响应写入 sessionStorage 后跳转 **/ai-result**，属当前主产品 **RentAI**
-    找房主链的 **核心交互页之一**（另一块为结果页 ai-result.html）。
-  · 「assistant / 对话入口」对应 **独立文件 assistant.html（路由 /assistant）**：自然语言描述 + 本地意图分流，
-    **不直接调用** /api/ai/query；跳转回本页或合同页时经 sessionStorage 预填，用户仍在本页点击「开始分析」完成提交。
+  · 定位说明：与「assistant / 对话入口」见下文区分。本页 **#property-analysis**（#ai-query + #ai-go）由 assets/ai_home.js
+    将输入写入 sessionStorage 后跳转 **/analyzing**，该页 **POST /analyze**，结果写入 sessionStorage 再跳转 **/ai-result**。
+  · 「assistant / 对话入口」对应 **assistant.html**：预填 #ai-query；用户在本页点击 **Analyze Property** 走同上链路。
   · 角色：默认落地首页 + 上述 **一语分析** 主表单所在；后续新找房能力优先在本区块与 ai_home.js 对齐。
   · ShortRentAI：作为平台内短租 / 合租 / 灵活租期 **扩展分支**，可在本页「主功能」区或表单侧增加并列入口
     与分流参数（见页内 ShortRentAI 注释），**不替换**本页 RentAI 长线主流程。
@@ -21,8 +19,23 @@
     <meta name="rentalai-api-base" content="" />
     <meta name="vite-rentalai-api-base" content="" />
     <meta name="rentalai-env" content="" />
-    <title>RentalAI · UK rental decision assistant</title>
+    <title>RentalAI · AI-powered rental property analysis</title>
     <link rel="stylesheet" href="/assets/style.css" />
+    <style>
+      #property-analysis .property-input-hints-intro {
+        margin: 0 0 0.35rem;
+        font-weight: 600;
+        color: #334155;
+      }
+      #property-analysis .property-input-hints-list {
+        margin: 0 0 0.85rem;
+        padding-left: 1.25rem;
+        line-height: 1.45;
+      }
+      #property-analysis .property-input-hints-list li {
+        margin-bottom: 0.25rem;
+      }
+    </style>
     <script src="/assets/api_config.js"></script>
   </head>
   <body>
@@ -56,10 +69,10 @@
       >
         <p class="saas-hero-kicker">RentalAI</p>
         <h1 id="saas-hero-title" class="saas-hero-title">
-          AI-powered rental decision assistant for tenants in the UK
+          AI-powered rental property analysis
         </h1>
         <p class="saas-hero-lead">
-          Plan viewings, compare listings, and understand your tenancy — before you sign.
+          Enter the property details and let RentalAI help you assess risks, score, and next steps.
         </p>
         <ul class="saas-feature-grid" aria-label="Core features">
           <li class="saas-feature-item">Contract risk analysis</li>
@@ -69,9 +82,7 @@
           <li class="saas-feature-item">Repair and tenant guidance</li>
         </ul>
         <div class="saas-cta-row" role="group" aria-label="Primary actions">
-          <a class="saas-btn saas-btn--primary" href="/analyzing"
-            >Start Analysis</a
-          >
+          <a class="saas-btn saas-btn--primary" href="#property-analysis">Analyze Property</a>
           <a class="saas-btn" href="/check-contract">Check Contract</a>
           <a class="saas-btn" href="/compare">Compare Properties</a>
           <a class="saas-btn" href="/reputation">Check Reputation</a>
@@ -109,18 +120,18 @@
         <div class="home-entry-grid" role="list">
           <a
             class="home-entry-card home-entry-card--property"
-            href="/analyzing"
+            href="#property-analysis"
             role="listitem"
           >
             <div class="home-entry-card-body">
               <h3 class="home-entry-card-title">房源分析</h3>
               <p class="home-entry-card-sub" lang="en">Property Analysis</p>
               <p class="home-entry-card-desc">
-                一句需求找房；比价、评分与推荐，辅助选房决策。
+                Describe the rental you want — scores, risks, and next steps on the results page.
               </p>
             </div>
             <span class="home-entry-card-cta">
-              <span class="home-entry-card-cta-label">进入房源分析</span>
+              <span class="home-entry-card-cta-label">Analyze Property</span>
             </span>
           </a>
           <!-- 合同分析入口：独立页 /check-contract（与 RentAI 找房并列，非替代关系） -->
@@ -144,10 +155,17 @@
         <!-- ShortRentAI：未来可在此「主功能」栅格旁或下方增加短租/合租并列入口；与 RentAI 双卡扩展共存，不替换本页为主线。 -->
       </section>
 
-      <!-- RentAI 房源分析主区块：一句话需求 → POST /api/ai/query → /ai-result（当前默认核心转化区） -->
-      <section class="card form-card" aria-labelledby="ai-rental-heading">
-        <h2 id="ai-rental-heading" class="section-title">AI 租房助手 · 房源分析</h2>
-        <p class="hint">用一句话描述需求，查看推荐、风险与决策建议。</p>
+      <!-- RentAI 房源分析：sessionStorage → /analyzing → POST /analyze → /ai-result -->
+      <section
+        id="property-analysis"
+        class="card form-card"
+        aria-labelledby="ai-rental-heading"
+        lang="en-GB"
+      >
+        <h2 id="ai-rental-heading" class="section-title">RentalAI · Property analysis</h2>
+        <p class="hint">
+          Enter the property details and let RentalAI help you assess risks, score, and next steps.
+        </p>
         <!-- 自 /assistant 带回描述时由 assistant_prefill.js 显示提示（非错误区） -->
         <p
           id="assistant-prefill-hint"
@@ -155,23 +173,30 @@
           role="status"
           aria-live="polite"
         ></p>
-        <label class="field-label" for="ai-query">你的需求</label>
-        <!-- RentAI 主输入：租房需求自然语言 → 与 #ai-go 一并交由 ai_home.js 提交 -->
+        <label class="field-label" for="ai-query">Describe the property or what you&apos;re looking for</label>
+        <p class="hint property-input-hints-intro">You can include:</p>
+        <ul class="hint muted property-input-hints-list" aria-label="Suggested details to mention">
+          <li>Monthly rent</li>
+          <li>Location or postcode</li>
+          <li>Number of bedrooms</li>
+          <li>Bills included or not</li>
+          <li>Contract concerns</li>
+          <li>Move-in date</li>
+        </ul>
         <textarea
           id="ai-query"
           name="ai_query"
-          rows="4"
-          placeholder="例如：Milton Keynes 一居室，月租 1200 以内…"
+          rows="5"
+          placeholder="Example: £1,500 per month, Manchester M1, 2 bedrooms, bills not included, move-in next month."
+          autocomplete="off"
         ></textarea>
         <div class="actions-row">
-          <!-- 主 CTA：当前默认推荐用户进入 RentAI 分析主流程的按钮（绑定 ai_home.js） -->
-          <button type="button" id="ai-go">开始分析</button>
+          <button type="button" id="ai-go" class="saas-btn saas-btn--primary">Analyze Property</button>
         </div>
-        <!-- 提交后等待 API 时的加载态（结果在跳转后的 /ai-result 展示，不在本页） -->
         <div id="ai-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
-          <span id="ai-loading-text">Analyzing market...</span>
+          <span id="ai-loading-text">Preparing analysis…</span>
         </div>
-        <p class="hint muted small-print">提示：Enter 提交 · Shift+Enter 换行</p>
+        <p class="hint muted small-print">Tip: Enter submits · Shift+Enter for a new line</p>
         <!-- 表单下方快捷链：assistant、合同、历史、对比（同属主产品内导航；对比依赖收藏数据） -->
         <p class="home-quick-links" aria-label="主流程与其它入口">
           <a href="/assistant">智能入口</a>
@@ -190,7 +215,7 @@
         <!-- 接口失败时的错误文案区；重试仍走同一 submit -->
         <div id="ai-err" class="err hidden" role="alert"></div>
         <div id="ai-retry-row" class="actions-row hidden">
-          <button type="button" id="ai-retry">重试</button>
+          <button type="button" id="ai-retry">Try again</button>
         </div>
       </section>
 
