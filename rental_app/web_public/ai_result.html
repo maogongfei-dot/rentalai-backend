@@ -10,59 +10,114 @@
     <link rel="stylesheet" href="/assets/style.css" />
     <script src="/assets/api_config.js"></script>
     <style>
-      /* Phase10 Step1-2 / Step1-3：rentalai_result 结果区（仅本页，无新增依赖） */
-      .rentalai-result-page-header {
-        max-width: 44rem;
+      /* Phase10 Step2-1：结果页产品级布局与 rentalai_result 卡片（仅本页） */
+      body.rentalai-result-body {
+        background: linear-gradient(165deg, #eef2f7 0%, #e8edf4 45%, #f1f5f9 100%);
+        min-height: 100vh;
+      }
+      main.rentalai-result-page.rentalai-result-shell {
+        max-width: 900px;
+        width: 100%;
         margin-left: auto;
         margin-right: auto;
-        padding-left: 1rem;
-        padding-right: 1rem;
-        margin-bottom: 1.25rem;
+        padding: 2rem 1.5rem 3rem;
+        box-sizing: border-box;
+      }
+      .rentalai-result-page-header {
+        max-width: none;
+        margin-left: 0;
+        margin-right: 0;
+        padding: 1.65rem 1.5rem;
+        margin-bottom: 1.5rem;
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
       }
       .rentalai-result-page-header h1 {
-        margin: 0 0 0.35rem;
-        font-size: 1.65rem;
+        margin: 0 0 0.45rem;
+        font-size: clamp(1.45rem, 4vw, 1.85rem);
         font-weight: 700;
         color: #0f172a;
         letter-spacing: -0.03em;
+        line-height: 1.2;
       }
       .rentalai-result-page-sub {
         margin: 0;
-        font-size: 0.95rem;
+        font-size: clamp(0.9rem, 2.5vw, 1rem);
         color: #64748b;
+        line-height: 1.5;
+        max-width: 36rem;
       }
       .rentalai-direct-root {
-        max-width: 44rem;
         margin-left: auto;
         margin-right: auto;
-        padding: 0 1rem 2.5rem;
+        padding: 0;
         box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
       }
       .rentalai-five-blocks {
         display: flex;
         flex-direction: column;
-        gap: 1.15rem;
+        gap: 1.25rem;
       }
       .rentalai-result-card {
         background: #fff;
-        border-radius: 12px;
-        box-shadow: 0 2px 12px rgba(15, 23, 42, 0.09);
-        border: 1px solid #e8ecf1;
-        padding: 1.2rem 1.35rem;
+        border-radius: 14px;
+        box-shadow: 0 2px 14px rgba(15, 23, 42, 0.07);
+        border: 1px solid #e5e9f0;
+        padding: 1.35rem 1.45rem;
         margin-bottom: 0;
+        max-width: 100%;
+        overflow: hidden;
+        box-sizing: border-box;
       }
       .rentalai-result-card .section-title {
-        font-size: 1.15rem;
+        font-size: 1.05rem;
         font-weight: 600;
         letter-spacing: -0.02em;
         color: #0f172a;
-        margin: 0 0 0.75rem;
+        margin: 0 0 0.85rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #f1f5f9;
       }
       .rentalai-field-body {
         font-size: 0.98rem;
-        line-height: 1.55;
+        line-height: 1.6;
         color: #334155;
         margin: 0;
+        overflow-wrap: anywhere;
+        word-wrap: break-word;
+      }
+      .rentalai-score-card {
+        border-width: 1px;
+        border-color: #c7d2fe;
+        background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+        box-shadow: 0 4px 20px rgba(79, 70, 229, 0.08);
+      }
+      .rentalai-score-body {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .rentalai-score-value {
+        font-size: clamp(2.25rem, 8vw, 3rem);
+        font-weight: 800;
+        color: #1e3a8a;
+        letter-spacing: -0.04em;
+        line-height: 1.05;
+      }
+      .rentalai-score-denom {
+        font-size: clamp(1rem, 3.5vw, 1.35rem);
+        font-weight: 600;
+        color: #64748b;
+        margin-left: 0.2em;
+        vertical-align: baseline;
+      }
+      .rentalai-score-body--text {
+        font-size: 1.02rem;
+        font-weight: 500;
+        color: #334155;
       }
       .rentalai-bullet-list {
         margin: 0;
@@ -92,14 +147,108 @@
         color: #64748b;
         font-size: 1rem;
       }
+      .result-page-ui .card.result-actions {
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow-wrap: anywhere;
+      }
+      /* Phase10 Step2-2：结果卡片底部操作 */
+      .rentalai-result-bottom-actions {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: stretch;
+        justify-content: center;
+        gap: 0.75rem 1rem;
+        margin-top: 1.75rem;
+        padding-top: 0.5rem;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+      .rentalai-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.7rem 1.35rem;
+        border-radius: 10px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        text-decoration: none;
+        line-height: 1.35;
+        transition:
+          background-color 0.15s ease,
+          color 0.15s ease,
+          border-color 0.15s ease,
+          box-shadow 0.15s ease,
+          transform 0.12s ease;
+        box-sizing: border-box;
+        min-height: 2.75rem;
+        cursor: pointer;
+      }
+      .rentalai-btn--primary {
+        color: #fff;
+        background: linear-gradient(165deg, #4f46e5 0%, #4338ca 100%);
+        border: 1px solid #3730a3;
+        box-shadow: 0 2px 8px rgba(67, 56, 202, 0.35);
+      }
+      .rentalai-btn--primary:hover {
+        background: linear-gradient(165deg, #6366f1 0%, #4f46e5 100%);
+        box-shadow: 0 4px 14px rgba(67, 56, 202, 0.45);
+        transform: translateY(-1px);
+      }
+      .rentalai-btn--primary:focus-visible {
+        outline: 2px solid #6366f1;
+        outline-offset: 2px;
+      }
+      .rentalai-btn--secondary {
+        color: #334155;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+      }
+      .rentalai-btn--secondary:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        color: #0f172a;
+        transform: translateY(-1px);
+      }
+      .rentalai-btn--secondary:focus-visible {
+        outline: 2px solid #64748b;
+        outline-offset: 2px;
+      }
+      @media (max-width: 640px) {
+        main.rentalai-result-page.rentalai-result-shell {
+          padding: 1.25rem 0.85rem 2.25rem;
+        }
+        .rentalai-result-page-header {
+          padding: 1.25rem 1rem;
+          margin-bottom: 1.15rem;
+        }
+        .rentalai-five-blocks {
+          gap: 1rem;
+        }
+        .rentalai-result-card {
+          padding: 1.15rem 1.1rem;
+          border-radius: 12px;
+        }
+        .rentalai-result-bottom-actions {
+          flex-direction: column;
+          align-items: stretch;
+          margin-top: 1.5rem;
+        }
+        .rentalai-btn {
+          width: 100%;
+        }
+      }
     </style>
   </head>
-  <body>
+  <body class="rentalai-result-body">
     <script src="/assets/auth_user_store.js"></script>
     <script src="/assets/auth_local.js"></script>
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
-    <main class="wrap wrap-wide result-wrap result-page-ui rentalai-result-page">
+    <main class="wrap wrap-wide result-wrap result-page-ui rentalai-result-page rentalai-result-shell">
       <header class="page-header rentalai-result-page-header">
         <h1>RentalAI Analysis Result</h1>
         <p class="rentalai-result-page-sub">
@@ -135,7 +284,11 @@
             <h2 id="rentalai-h-final" class="section-title">Final Recommendation</h2>
             <div id="field-final-recommendation" class="rentalai-field-body"></div>
           </section>
-          <section id="block-score" class="card rentalai-result-card" aria-labelledby="rentalai-h-score">
+          <section
+            id="block-score"
+            class="card rentalai-result-card rentalai-score-card"
+            aria-labelledby="rentalai-h-score"
+          >
             <h2 id="rentalai-h-score" class="section-title">Overall Score</h2>
             <div id="field-score" class="rentalai-field-body"></div>
           </section>
@@ -156,6 +309,10 @@
             <div id="field-next-step" class="rentalai-field-body"></div>
           </section>
         </div>
+        <nav class="rentalai-result-bottom-actions" aria-label="Next steps">
+          <a href="/analyzing.html" class="rentalai-btn rentalai-btn--primary">Analyze another property</a>
+          <a href="/index.html" class="rentalai-btn rentalai-btn--secondary">Back to home</a>
+        </nav>
       </div>
 
       <!-- P10-4：/api/ai/query 联调展示 -->

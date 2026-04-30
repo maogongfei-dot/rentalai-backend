@@ -197,6 +197,54 @@
   }
 
   /**
+   * Phase10 Step2-1：从 data.score 解析数字（仅展示，不修改来源）。非纯数字字符串返回 null。
+   */
+  function parseNumericScore(raw) {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw === "number" && !isNaN(raw)) return raw;
+    if (typeof raw === "string") {
+      var t = raw.trim();
+      if (!t) return null;
+      if (/^-?\d+(\.\d+)?$/.test(t)) {
+        var n = parseFloat(t);
+        return isNaN(n) ? null : n;
+      }
+      return null;
+    }
+    if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
+      var ex = extractScalarFromObject(raw);
+      if (ex != null && String(ex).trim() !== "") {
+        var t2 = String(ex).trim();
+        if (/^-?\d+(\.\d+)?$/.test(t2)) {
+          var n2 = parseFloat(t2);
+          return isNaN(n2) ? null : n2;
+        }
+      }
+    }
+    return null;
+  }
+
+  /** 数字 → 大号「n / 100」；否则沿用 formatAnalyzeField（绝不输出 undefined / null）。 */
+  function renderScoreField(raw) {
+    var el = document.getElementById("field-score");
+    if (!el) return;
+    var n = parseNumericScore(raw);
+    if (n !== null && !isNaN(n)) {
+      var displayNum = Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+      el.className = "rentalai-field-body rentalai-score-body";
+      el.setAttribute("aria-label", displayNum + " out of 100");
+      el.innerHTML =
+        "<span class=\"rentalai-score-value\">" +
+        escapeHtml(displayNum) +
+        "</span><span class=\"rentalai-score-denom\"> / 100</span>";
+      return;
+    }
+    el.removeAttribute("aria-label");
+    el.className = "rentalai-field-body rentalai-score-body rentalai-score-body--text";
+    el.textContent = formatAnalyzeField(raw);
+  }
+
+  /**
    * Phase10 Step1-2：Final Recommendation 展示文案上的关键词着色（Not Recommended 优先于 Recommended）。
    */
   function verdictAccentClass(displayText) {
@@ -317,7 +365,7 @@
     if (finalEl) finalEl.textContent = finalDisplay;
     applyVerdictCard(document.getElementById("block-final-recommendation"), finalDisplay);
 
-    setAnalyzeField("field-score", data.score);
+    renderScoreField(data.score);
 
     renderAnalysisListOrFallback("field-why", analysis.supporting_reasons, uf.reason);
     renderAnalysisListOrFallback("field-main-risks", analysis.primary_blockers, uf.risk_note);
