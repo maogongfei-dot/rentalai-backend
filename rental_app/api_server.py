@@ -117,7 +117,7 @@ from persistence.auth_http_helpers import (
 )
 from persistence.auth_session_store import build_auth_payload, issue_token, resolve_user_id, revoke_token
 from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
-from persistence.sqlite_user_store import init_users_db
+from persistence.sqlite_user_store import create_user, init_users_db
 from data.explain.rule_explain import (
     build_p10_explain_for_batch_row,
     build_p10_explain_from_msa_result,
@@ -406,6 +406,48 @@ def alerts_status():
 # 用户系统：注册 / 登录 / 登出（JSON 用户库 + Bearer 会话；与 web_public 登录页配合）
 # 平台共用能力：会话与身份模型服务于 RentAI 与 ShortRentAI 两侧业务，而非单一子板块独占。
 # -----------------------------------------------------------------------------
+@app.post("/register")
+def register_sqlite_user(body: AuthRequest):
+    """
+    Minimal register endpoint backed by SQLite users table.
+
+    Response shape:
+    - success: bool
+    - message: str
+    - user_id: str (on success)
+    - email: str (on success)
+    """
+    email = str(body.email or "").strip()
+    password = str(body.password or "")
+    if not email or not password:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "Email and password cannot be empty",
+            },
+        )
+
+    user, err = create_user(email, password)
+    if err:
+        status = 409 if "already" in err.lower() else 400
+        return JSONResponse(
+            status_code=status,
+            content={
+                "success": False,
+                "message": err,
+            },
+        )
+
+    assert user is not None
+    return {
+        "success": True,
+        "message": "Account created successfully",
+        "user_id": user["id"],
+        "email": user["email"],
+    }
+
+
 @app.post("/auth/register")
 def auth_register(body: AuthRequest):
     """Register into JSON persistence (``persistence_users.json``); response includes legacy token fields."""
