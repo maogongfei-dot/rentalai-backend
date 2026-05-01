@@ -146,6 +146,7 @@ logging.basicConfig(
 
 _api_failures = FailureTracker(threshold=3, source="api-server")
 init_records_db()
+# User DB remains SQLite; ``DATABASE_URL`` is read in ``persistence.sqlite_user_store`` for a future PostgreSQL step (Phase13+).
 init_users_db()
 _task_store = TaskStore()
 

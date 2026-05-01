@@ -5,6 +5,9 @@ Scope:
 - Ensure local SQLite db exists.
 - Ensure `users` table exists.
 - Provide stdlib `hashlib` password hashing helper.
+
+Phase13 Step1-3: default SQLite filename and DATABASE_URL are centralized here;
+PostgreSQL is not connected yet — local/dev continues to use SQLite only.
 """
 
 from __future__ import annotations
@@ -16,11 +19,27 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+# --- Phase13 Step1-3: user database configuration (SQLite remains active) ---
+
+# Default SQLite file name under ``rental_app/`` (same folder as the parent of ``persistence/``).
+DATABASE_FILENAME = "rentalai_users.db"
+
+# Reserved for a future PostgreSQL step (e.g. Render ``DATABASE_URL``). Read at import time;
+# connections still use SQLite only — non-empty values are intentionally unused for now.
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip() or None
+
 _ENV_USERS_DB = "RENTALAI_USERS_DB_PATH"
-_DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "rentalai_users.db"
+
+_DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / DATABASE_FILENAME
 
 
 def users_db_path() -> Path:
+    """Resolve SQLite path for the users table.
+
+    ``RENTALAI_USERS_DB_PATH`` overrides the default file under ``rental_app/``.
+    When ``DATABASE_URL`` is set, PostgreSQL will be introduced in a later step;
+    until then, that variable is ignored and this function still returns a SQLite path.
+    """
     override = str(os.environ.get(_ENV_USERS_DB, "")).strip()
     if override:
         return Path(override).expanduser()
