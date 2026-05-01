@@ -156,6 +156,7 @@
         </ul>
         <div class="saas-cta-row" role="group" aria-label="Primary actions">
           <a class="saas-btn saas-btn--primary" href="#property-analysis">Analyze Property</a>
+          <a class="saas-btn" href="/contract-analysis">Contract Analysis</a>
           <a class="saas-btn" href="/check-contract">Check Contract</a>
           <a class="saas-btn" href="/compare">Compare Properties</a>
           <a class="saas-btn" href="/reputation">Check Reputation</a>
@@ -214,17 +215,17 @@
               <span class="home-entry-card-cta-label">Analyze Property</span>
             </span>
           </a>
-          <!-- 合同分析入口：独立页 /check-contract（与 RentAI 找房并列，非替代关系） -->
+          <!-- 合同分析入口：独立页 /contract-analysis（POST /analyze → /ai-result；与找房并列） -->
           <a
             class="home-entry-card home-entry-card--contract"
-            href="/check-contract"
+            href="/contract-analysis"
             role="listitem"
           >
             <div class="home-entry-card-body">
               <h3 class="home-entry-card-title">合同分析</h3>
               <p class="home-entry-card-sub" lang="en">Contract Analysis</p>
               <p class="home-entry-card-desc">
-                粘贴或上传租约；标风险、查费用与条款是否齐全。
+                粘贴租约或条款摘要；结果页查看风险与建议（与房源分析同一结果壳）。
               </p>
             </div>
             <span class="home-entry-card-cta">
