@@ -84,6 +84,15 @@
       .auth-page-back a {
         font-weight: 500;
       }
+      .account-logout-row {
+        margin-top: 0.75rem;
+      }
+      .account-logout-row .saas-btn {
+        width: 100%;
+        box-sizing: border-box;
+        font: inherit;
+        cursor: pointer;
+      }
     </style>
   </head>
   <body class="auth-page-body">
@@ -94,7 +103,22 @@
 
         <div class="auth-status-panel" aria-label="Account status">
           <p class="auth-status-label">Account status</p>
-          <p class="hint">Not signed in yet (placeholder).</p>
+
+          <div id="account-state-logged-in" class="hidden">
+            <p class="hint" id="account-email-line"></p>
+            <div class="account-logout-row">
+              <button type="button" id="account-logout-btn" class="saas-btn saas-btn--primary">
+                Logout
+              </button>
+            </div>
+          </div>
+
+          <div id="account-state-logged-out">
+            <p class="hint">You are not logged in.</p>
+            <p class="hint small-print">
+              <a href="/login">Login</a>
+            </p>
+          </div>
         </div>
 
         <div class="auth-records-block">
@@ -114,5 +138,6 @@
         </div>
       </section>
     </main>
+    <script src="/assets/account_page.js"></script>
   </body>
 </html>
