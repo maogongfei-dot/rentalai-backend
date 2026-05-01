@@ -44,9 +44,18 @@
   }
 
   function truncateText(s, max) {
-    var t = s == null ? "" : String(s);
+    var t = safePlainText(s);
     if (t.length <= max) return t;
-    return t.slice(0, max) + "…";
+    return t.slice(0, max) + "...";
+  }
+
+  function safePlainText(v) {
+    if (v == null) return "";
+    if (typeof v === "object") return "";
+    var t = String(v).trim();
+    if (!t) return "";
+    if (t === "undefined" || t === "null" || t === "[object Object]") return "";
+    return t;
   }
 
   function setRecordsUi(statusEl, listEl, statusMsg, showList) {
@@ -86,13 +95,21 @@
       var row = global.document.createElement("div");
       row.className = "account-record-row";
 
+      var dateLabel = global.document.createElement("p");
+      dateLabel.className = "account-record-label";
+      dateLabel.textContent = "Analysis date";
+
       var meta = global.document.createElement("p");
       meta.className = "account-record-meta";
-      meta.textContent = rec.created_at != null ? String(rec.created_at) : "";
+      meta.textContent = safePlainText(rec.created_at);
+
+      var summaryLabel = global.document.createElement("p");
+      summaryLabel.className = "account-record-label";
+      summaryLabel.textContent = "Property summary";
 
       var inp = global.document.createElement("p");
       inp.className = "account-record-input";
-      inp.textContent = truncateText(rec.input_text, 140);
+      inp.textContent = truncateText(rec.input_text, 120);
 
       var btn = global.document.createElement("button");
       btn.type = "button";
@@ -107,7 +124,9 @@
         global.location.href = "/ai-result";
       });
 
+      row.appendChild(dateLabel);
       row.appendChild(meta);
+      row.appendChild(summaryLabel);
       row.appendChild(inp);
       row.appendChild(btn);
       listEl.appendChild(row);
