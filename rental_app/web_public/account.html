@@ -93,6 +93,44 @@
         font: inherit;
         cursor: pointer;
       }
+      .account-records-root {
+        margin: 0;
+      }
+      #account-records-status {
+        margin: 0;
+      }
+      .account-records-list {
+        margin-top: 0.65rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .account-record-row {
+        padding: 0.75rem 0.85rem;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        text-align: left;
+      }
+      .account-record-meta {
+        margin: 0 0 0.35rem;
+        font-size: 0.78rem;
+        color: #64748b;
+      }
+      .account-record-input {
+        margin: 0 0 0.55rem;
+        font-size: 0.9rem;
+        color: #334155;
+        line-height: 1.45;
+        word-break: break-word;
+      }
+      .account-record-view {
+        width: auto;
+        font: inherit;
+        cursor: pointer;
+        padding: 0.45rem 0.85rem;
+        font-size: 0.88rem;
+      }
     </style>
   </head>
   <body class="auth-page-body">
@@ -123,11 +161,9 @@
 
         <div class="auth-records-block">
           <h2 class="section-title auth-subtitle">Saved analysis records</h2>
-          <div
-            class="auth-records-placeholder hint muted"
-            aria-label="Saved analysis records placeholder"
-          >
-            No saved records to display yet.
+          <div class="account-records-root" aria-label="Saved analysis records">
+            <p id="account-records-status" class="hint muted"></p>
+            <div id="account-records-list" class="account-records-list hidden"></div>
           </div>
         </div>
 
@@ -138,6 +174,7 @@
         </div>
       </section>
     </main>
+    <script src="/assets/api_config.js"></script>
     <script src="/assets/account_page.js"></script>
   </body>
 </html>
