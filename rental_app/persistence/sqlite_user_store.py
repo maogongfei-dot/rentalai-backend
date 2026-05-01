@@ -7,8 +7,7 @@ Scope:
 - Provide stdlib `hashlib` password hashing helper.
 
 Phase13 Step1-3: default SQLite filename and DATABASE_URL are centralized here.
-Phase13 Step2-2: if ``DATABASE_URL`` is set, startup probes PostgreSQL with ``psycopg2``.
-Phase13 Step2-3: when ``DATABASE_URL`` is set, create PostgreSQL ``users`` table if missing.
+Phase13 Step2-3: when ``DATABASE_URL`` is set, create PostgreSQL ``users`` table at startup if missing.
 Phase13 Step2-4: when ``DATABASE_URL`` is set, ``find_user_by_email`` / ``create_user`` /
 ``verify_user_login`` use PostgreSQL; otherwise SQLite.
 """
@@ -110,9 +109,7 @@ def init_postgresql_users_table() -> bool:
 
     Returns True if initialization was attempted and succeeded, False if skipped or failed.
     """
-    url = os.getenv("DATABASE_URL")
-    if url is not None:
-        url = str(url).strip() or None
+    url = _active_postgres_url()
     if not url:
         return False
     try:
