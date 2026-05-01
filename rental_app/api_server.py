@@ -119,8 +119,8 @@ from persistence.auth_session_store import build_auth_payload, issue_token, reso
 from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
 from persistence.sqlite_user_store import (
     create_user,
+    init_postgresql_users_table,
     init_users_db,
-    probe_postgresql_connection,
     verify_user_login,
 )
 from data.explain.rule_explain import (
@@ -151,9 +151,9 @@ logging.basicConfig(
 
 _api_failures = FailureTracker(threshold=3, source="api-server")
 init_records_db()
-# User DB remains SQLite; optional ``DATABASE_URL`` triggers a PostgreSQL connect probe only (see ``probe_postgresql_connection``).
+# User DB: SQLite when ``DATABASE_URL`` unset; PostgreSQL when set (see ``init_postgresql_users_table`` + ``sqlite_user_store``).
 init_users_db()
-probe_postgresql_connection()
+init_postgresql_users_table()
 _task_store = TaskStore()
 
 # 当前主后端 ASGI 应用：新 API、新页面挂载与中间件默认挂在此 ``app`` 上，而不是挂到 app_web.py（Streamlit）。
@@ -416,7 +416,7 @@ def alerts_status():
 @app.post("/register")
 def register_sqlite_user(body: AuthRequest):
     """
-    Minimal register endpoint backed by SQLite users table.
+    Minimal register endpoint backed by SQLite or PostgreSQL users table (see ``DATABASE_URL``).
 
     Response shape:
     - success: bool
@@ -457,7 +457,7 @@ def register_sqlite_user(body: AuthRequest):
 
 @app.post("/login")
 def login_sqlite_user(body: AuthRequest):
-    """Minimal login endpoint backed by SQLite users table."""
+    """Minimal login endpoint backed by SQLite or PostgreSQL (see ``DATABASE_URL``)."""
     email = str(body.email or "").strip()
     password = str(body.password or "")
     if not email or not password:
