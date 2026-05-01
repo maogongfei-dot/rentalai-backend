@@ -78,6 +78,18 @@
       .auth-page-back a {
         font-weight: 500;
       }
+      .auth-form-msg {
+        margin: 0.75rem 0 0;
+        padding: 0.55rem 0.7rem;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        line-height: 1.4;
+      }
+      .auth-form-msg--error {
+        color: #b91c1c;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+      }
     </style>
   </head>
   <body class="auth-page-body">
@@ -86,7 +98,14 @@
         <p class="auth-page-kicker">RentalAI</p>
         <h1 id="login-title" class="section-title">Login to RentalAI</h1>
 
-        <form class="auth-form auth-page-form" autocomplete="on">
+        <form id="login-form" class="auth-form auth-page-form" autocomplete="on">
+          <p
+            id="login-err"
+            class="auth-form-msg auth-form-msg--error hidden"
+            role="alert"
+            aria-live="polite"
+          ></p>
+
           <label class="field-label" for="login-email">Email</label>
           <input
             id="login-email"
@@ -106,7 +125,7 @@
           />
 
           <div class="actions-row">
-            <button type="button" class="saas-btn saas-btn--primary">Login</button>
+            <button type="submit" id="login-submit-btn" class="saas-btn saas-btn--primary">Login</button>
           </div>
         </form>
 
@@ -121,5 +140,7 @@
         </div>
       </section>
     </main>
+    <script src="/assets/api_config.js"></script>
+    <script src="/assets/login_page.js"></script>
   </body>
 </html>
