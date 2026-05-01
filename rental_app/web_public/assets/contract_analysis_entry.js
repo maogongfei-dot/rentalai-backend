@@ -81,6 +81,10 @@
       return;
     }
 
+    try {
+      sessionStorage.setItem("rentalai_analysis_type", "contract");
+    } catch (eType) {}
+
     btn.disabled = true;
     btn.setAttribute("aria-busy", "true");
     var init = {

@@ -166,6 +166,9 @@
               ? response.data
               : response;
           try {
+            sessionStorage.removeItem("rentalai_analysis_type");
+          } catch (eRm) {}
+          try {
             if (payload !== undefined && payload !== null) {
               sessionStorage.setItem("rentalai_result", JSON.stringify(payload));
             }

@@ -222,6 +222,55 @@
   }
 
   /**
+   * Phase15：区分合同入口（rentalai_analysis_type=contract）与默认房源分析页眉。
+   */
+  function setResultPageHeader(variant) {
+    var h = document.getElementById("rentalai-result-page-title");
+    var sub = document.getElementById("rentalai-result-page-sub");
+    if (!h || !sub) return;
+    if (variant === "contract") {
+      h.textContent = "Rental Contract Analysis Result";
+      sub.textContent =
+        "Here is your contract risk summary based on the information provided.";
+    } else {
+      h.textContent = "RentalAI Analysis Result";
+      sub.textContent =
+        "Here is your rental decision summary based on the information provided.";
+    }
+    try {
+      document.title =
+        variant === "contract"
+          ? "Rental Contract Analysis Result · RentalAI"
+          : "RentalAI Analysis Result · RentalAI";
+    } catch (eT) {}
+  }
+
+  /**
+   * Phase15 Step2-3：五卡片标题 — contract 与 property 分流（仅文案，数据字段来源不变）。
+   */
+  function setDirectFiveCardTitles(variant) {
+    var isContract = variant === "contract";
+    var t1 = isContract ? "Contract Recommendation" : "Final Recommendation";
+    var t2 = isContract ? "Contract Risk Score" : "Overall Score";
+    var t3 = isContract ? "Why this contract result?" : "Why this result?";
+    var t4 = isContract ? "Key Contract Risks" : "Main Risks";
+    var t5 = isContract
+      ? "What should you do before signing?"
+      : "What should you do next?";
+    var el;
+    el = document.getElementById("rentalai-h-final");
+    if (el) el.textContent = t1;
+    el = document.getElementById("rentalai-h-score");
+    if (el) el.textContent = t2;
+    el = document.getElementById("rentalai-h-why");
+    if (el) el.textContent = t3;
+    el = document.getElementById("rentalai-h-risks");
+    if (el) el.textContent = t4;
+    el = document.getElementById("rentalai-h-next");
+    if (el) el.textContent = t5;
+  }
+
+  /**
    * Phase10 Step2-1：从 data.score 解析数字（仅展示，不修改来源）。非纯数字字符串返回 null。
    */
   function parseNumericScore(raw) {
@@ -418,6 +467,11 @@
       uf.next_step,
       "No further action is required at this stage."
     );
+
+    var at = sessionStorage.getItem("rentalai_analysis_type");
+    var variant = at === "contract" ? "contract" : "property";
+    setResultPageHeader(variant);
+    setDirectFiveCardTitles(variant);
   }
 
   function fmtMoney(v) {
@@ -559,6 +613,7 @@
 
   /** 将主分析 API 返回的 housing 负载渲染至 #housing-mode 各区块。 */
   function renderHousing(data) {
+    setResultPageHeader("property");
     var housingEl = document.getElementById("housing-mode");
     var legacyEl = document.getElementById("legacy-mode");
     var directBlocks = document.getElementById("rentalai-direct-blocks");
@@ -981,6 +1036,7 @@
 
   /** 旧版分析负载渲染：structured_query + recommendations 列表（非 POST /api/ai/query 主链路）。 */
   function renderLegacy(data) {
+    setResultPageHeader("property");
     var housingEl = document.getElementById("housing-mode");
     var legacyEl = document.getElementById("legacy-mode");
     var directBlocks = document.getElementById("rentalai-direct-blocks");
@@ -1366,6 +1422,7 @@
 
     /* 主链路失败态：主分析未成功时的结果区展示（仍属 housing 容器内）。 */
     if (dataH && dataH.success === false) {
+      setResultPageHeader("property");
       var housingEl0 = document.getElementById("housing-mode");
       var legacyEl0 = document.getElementById("legacy-mode");
       var directBlocks0 = document.getElementById("rentalai-direct-blocks");
