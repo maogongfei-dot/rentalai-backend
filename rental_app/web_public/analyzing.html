@@ -118,6 +118,19 @@
       (function () {
         var PENDING_KEY = "rentalai_analyze_pending_v1";
 
+        function attachLoggedInUserId(base) {
+          try {
+            if (
+              sessionStorage.getItem("rentalai_login_status") === "logged_in" &&
+              sessionStorage.getItem("rentalai_user_id")
+            ) {
+              var uid = String(sessionStorage.getItem("rentalai_user_id") || "").trim();
+              if (uid) base.user_id = uid;
+            }
+          } catch (e2) {}
+          return base;
+        }
+
         function buildAnalyzeBody() {
           var base = {
             rent: 1250,
@@ -135,12 +148,12 @@
               var ut = p && p.user_text != null ? String(p.user_text).trim() : "";
               if (ut) {
                 base.area = ut;
-                return base;
+                return attachLoggedInUserId(base);
               }
             }
           } catch (e1) {}
           base.area = "Manchester";
-          return base;
+          return attachLoggedInUserId(base);
         }
 
         function goError() {

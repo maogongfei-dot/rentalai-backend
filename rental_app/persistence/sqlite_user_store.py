@@ -10,6 +10,13 @@ Phase13 Step1-3: default SQLite filename and DATABASE_URL are centralized here.
 Phase13 Step2-3: when ``DATABASE_URL`` is set, create PostgreSQL ``users`` table at startup if missing.
 Phase13 Step2-4: when ``DATABASE_URL`` is set, ``find_user_by_email`` / ``create_user`` /
 ``verify_user_login`` use PostgreSQL; otherwise SQLite.
+
+Phase13 Step3-3: ``save_analysis_record`` writes successful ``/analyze`` payloads when ``user_id`` is present.
+Phase13 Step3-4: ``list_analysis_records_for_user`` reads Phase13 ``analysis_records`` (SQLite / PostgreSQL).
+
+Phase13 Step3-2: ``analysis_records`` for user analysis history — SQLite DDL runs in the same file
+as ``users`` (``rentalai_users.db``) to avoid colliding with the legacy ``analysis_records`` table
+in ``records_db`` (``.rentalai_records.db``). PostgreSQL DDL runs on ``DATABASE_URL``.
 """
 
 from __future__ import annotations
@@ -21,6 +28,7 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +100,30 @@ def init_users_db() -> str:
     return str(db_path)
 
 
+_SQLITE_ANALYSIS_RECORDS_DDL = """
+CREATE TABLE IF NOT EXISTS analysis_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    input_text TEXT NOT NULL,
+    result_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+)
+"""
+
+
+def init_sqlite_analysis_records_table() -> str:
+    """Ensure Phase13 ``analysis_records`` exists in the SQLite user database file.
+
+    Returns resolved DB path string (same as :func:`users_db_path`).
+    """
+    db_path = users_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(str(db_path), timeout=5.0, check_same_thread=False) as conn:
+        conn.execute(_SQLITE_ANALYSIS_RECORDS_DDL)
+        conn.commit()
+    return str(db_path)
+
+
 _POSTGRES_USERS_DDL = """
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -135,6 +167,180 @@ def init_postgresql_users_table() -> bool:
     except Exception as exc:
         logger.warning("PostgreSQL users table init failed: %s", exc)
         return False
+
+
+_POSTGRES_ANALYSIS_RECORDS_DDL = """
+CREATE TABLE IF NOT EXISTS analysis_records (
+    id BIGSERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    input_text TEXT NOT NULL,
+    result_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+)
+"""
+
+
+def init_postgresql_analysis_records_table() -> bool:
+    """If ``DATABASE_URL`` is set, ensure Phase13 ``analysis_records`` exists in PostgreSQL.
+
+    Returns True if initialization was attempted and succeeded, False if skipped or failed.
+    """
+    url = _active_postgres_url()
+    if not url:
+        return False
+    try:
+        import psycopg2
+    except ImportError as exc:
+        logger.warning("DATABASE_URL is set but psycopg2 is not importable: %s", exc)
+        return False
+    try:
+        conn = psycopg2.connect(url)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(_POSTGRES_ANALYSIS_RECORDS_DDL)
+            conn.commit()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        logger.info("PostgreSQL analysis_records table ensured (CREATE IF NOT EXISTS).")
+        return True
+    except Exception as exc:
+        logger.warning("PostgreSQL analysis_records table init failed: %s", exc)
+        return False
+
+
+def save_analysis_record(user_id: str, input_text: str, result_json: str) -> None:
+    """Insert one row into Phase13 ``analysis_records`` (SQLite user DB or PostgreSQL).
+
+    ``result_json`` must already be a JSON text blob. No-op if ``user_id`` is empty.
+    """
+    uid = str(user_id or "").strip()
+    if not uid:
+        return
+    text = str(input_text or "")
+    rj = str(result_json or "")
+    if not rj:
+        rj = "{}"
+    created = now_iso_utc()
+    url = _active_postgres_url()
+    if url:
+        _save_analysis_record_postgres(url, uid, text, rj, created)
+    else:
+        _save_analysis_record_sqlite(uid, text, rj, created)
+
+
+def _save_analysis_record_sqlite(
+    uid: str, input_text: str, result_json: str, created_at: str
+) -> None:
+    db_path = users_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(str(db_path), timeout=5.0, check_same_thread=False) as conn:
+        conn.execute(
+            """
+            INSERT INTO analysis_records (user_id, input_text, result_json, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (uid, input_text, result_json, created_at),
+        )
+        conn.commit()
+
+
+def _save_analysis_record_postgres(
+    url: str, uid: str, input_text: str, result_json: str, created_at: str
+) -> None:
+    import psycopg2
+
+    conn = psycopg2.connect(url)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO analysis_records (user_id, input_text, result_json, created_at)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (uid, input_text, result_json, created_at),
+            )
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def list_analysis_records_for_user(user_id: str) -> list[dict[str, Any]]:
+    """Return Phase13 ``analysis_records`` rows for ``user_id``, newest ``created_at`` first."""
+    uid = str(user_id or "").strip()
+    if not uid:
+        return []
+    url = _active_postgres_url()
+    if url:
+        return _list_analysis_records_postgres(url, uid)
+    return _list_analysis_records_sqlite(uid)
+
+
+def _list_analysis_records_sqlite(uid: str) -> list[dict[str, Any]]:
+    db_path = users_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    out: list[dict[str, Any]] = []
+    with sqlite3.connect(str(db_path), timeout=5.0, check_same_thread=False) as conn:
+        cur = conn.execute(
+            """
+            SELECT id, user_id, input_text, result_json, created_at
+            FROM analysis_records
+            WHERE user_id = ?
+            ORDER BY datetime(created_at) DESC, id DESC
+            """,
+            (uid,),
+        )
+        for row in cur.fetchall():
+            out.append(
+                {
+                    "id": row[0],
+                    "user_id": str(row[1] or ""),
+                    "input_text": str(row[2] or ""),
+                    "result_json": str(row[3] or ""),
+                    "created_at": str(row[4] or ""),
+                }
+            )
+    return out
+
+
+def _list_analysis_records_postgres(url: str, uid: str) -> list[dict[str, Any]]:
+    import psycopg2
+
+    out: list[dict[str, Any]] = []
+    conn = psycopg2.connect(url)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, user_id, input_text, result_json, created_at
+                FROM analysis_records
+                WHERE user_id = %s
+                ORDER BY created_at DESC, id DESC
+                """,
+                (uid,),
+            )
+            rows = cur.fetchall()
+        for row in rows:
+            out.append(
+                {
+                    "id": row[0],
+                    "user_id": str(row[1] or ""),
+                    "input_text": str(row[2] or ""),
+                    "result_json": str(row[3] or ""),
+                    "created_at": str(row[4] or ""),
+                }
+            )
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return out
 
 
 def _find_user_by_email_sqlite(em: str) -> dict[str, str] | None:

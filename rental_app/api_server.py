@@ -119,8 +119,12 @@ from persistence.auth_session_store import build_auth_payload, issue_token, reso
 from persistence.user_auth_service import get_public_user_by_id, register_user, verify_login
 from persistence.sqlite_user_store import (
     create_user,
+    init_postgresql_analysis_records_table,
     init_postgresql_users_table,
+    init_sqlite_analysis_records_table,
     init_users_db,
+    list_analysis_records_for_user,
+    save_analysis_record,
     verify_user_login,
 )
 from data.explain.rule_explain import (
@@ -153,7 +157,9 @@ _api_failures = FailureTracker(threshold=3, source="api-server")
 init_records_db()
 # User DB: SQLite when ``DATABASE_URL`` unset; PostgreSQL when set (see ``init_postgresql_users_table`` + ``sqlite_user_store``).
 init_users_db()
+init_sqlite_analysis_records_table()
 init_postgresql_users_table()
+init_postgresql_analysis_records_table()
 _task_store = TaskStore()
 
 # 当前主后端 ASGI 应用：新 API、新页面挂载与中间件默认挂在此 ``app`` 上，而不是挂到 app_web.py（Streamlit）。
@@ -265,10 +271,32 @@ class AnalyzeRequest(BaseModel):
     area: Optional[Any] = Field(default=None)
     distance: Optional[Any] = Field(default=None)
     target_postcode: Optional[Any] = Field(default=None, description="Optional; Web UI legacy")
+    user_id: Optional[str] = Field(
+        default=None,
+        description="Phase13: optional logged-in user id for analysis history (not passed to engine).",
+    )
 
 
 def _body_dict(body: AnalyzeRequest) -> dict:
     return body.model_dump(exclude_none=True)
+
+
+def _analysis_input_text_from_analyze_payload(payload: dict[str, Any]) -> str:
+    """Derive a single human-readable input line for Phase13 ``analysis_records.input_text``."""
+    if not isinstance(payload, dict):
+        return ""
+    area = payload.get("area")
+    if isinstance(area, str) and area.strip():
+        return area.strip()
+    parts: list[str] = []
+    for k in ("rent", "budget", "postcode", "bedrooms", "bills_included", "commute_minutes", "distance"):
+        if k not in payload:
+            continue
+        v = payload.get(k)
+        if v is None or v == "":
+            continue
+        parts.append("%s=%s" % (k, v))
+    return "; ".join(parts) if parts else ""
 
 
 class AuthRequest(BaseModel):
@@ -782,7 +810,29 @@ def api_auth_minimal_login(body: MinimalAuthBody):
 @app.post("/analyze")
 def analyze(body: AnalyzeRequest = AnalyzeRequest()):
     """全量分析，data 含 score / decision / analysis / user_facing / references / trace 等。"""
-    return modular_analyze_response(_body_dict(body), "/analyze")
+    payload = _body_dict(body)
+    uid = str(payload.get("user_id") or "").strip()
+    out = modular_analyze_response(payload, "/analyze")
+    if uid and isinstance(out, dict) and out.get("success") is True:
+        try:
+            save_analysis_record(
+                uid,
+                _analysis_input_text_from_analyze_payload(payload),
+                json.dumps(out, ensure_ascii=False, default=str),
+            )
+        except Exception:
+            logger.exception("Phase13: save_analysis_record failed for user_id=%s", uid)
+    return out
+
+
+@app.get("/analysis-records/{user_id}")
+def analysis_records_history(user_id: str):
+    """Phase13: list Phase13 ``analysis_records`` for a user (newest first)."""
+    uid = str(user_id or "").strip()
+    if not uid:
+        return {"success": True, "records": []}
+    records = list_analysis_records_for_user(uid)
+    return {"success": True, "records": records}
 
 
 @app.post("/score-breakdown")
