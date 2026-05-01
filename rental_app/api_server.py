@@ -275,6 +275,10 @@ class AnalyzeRequest(BaseModel):
         default=None,
         description="Phase13: optional logged-in user id for analysis history (not passed to engine).",
     )
+    analysis_kind: Optional[str] = Field(
+        default=None,
+        description="Phase15: optional UI hint for analysis_records — contract | property; stripped before engine.",
+    )
 
 
 def _body_dict(body: AnalyzeRequest) -> dict:
@@ -811,6 +815,9 @@ def api_auth_minimal_login(body: MinimalAuthBody):
 def analyze(body: AnalyzeRequest = AnalyzeRequest()):
     """全量分析，data 含 score / decision / analysis / user_facing / references / trace 等。"""
     payload = _body_dict(body)
+    ak = str(payload.pop("analysis_kind", None) or "").strip().lower()
+    if ak not in ("contract", "property"):
+        ak = "property"
     uid = str(payload.get("user_id") or "").strip()
     out = modular_analyze_response(payload, "/analyze")
     if uid and isinstance(out, dict) and out.get("success") is True:
@@ -819,6 +826,7 @@ def analyze(body: AnalyzeRequest = AnalyzeRequest()):
                 uid,
                 _analysis_input_text_from_analyze_payload(payload),
                 json.dumps(out, ensure_ascii=False, default=str),
+                ak,
             )
         except Exception:
             logger.exception("Phase13: save_analysis_record failed for user_id=%s", uid)

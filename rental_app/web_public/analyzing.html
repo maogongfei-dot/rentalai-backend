@@ -139,6 +139,7 @@
             bedrooms: 1,
             bills_included: false,
             postcode: "M1",
+            analysis_kind: "property",
           };
           try {
             var raw = sessionStorage.getItem(PENDING_KEY);
@@ -166,7 +167,7 @@
               ? response.data
               : response;
           try {
-            sessionStorage.removeItem("rentalai_analysis_type");
+            sessionStorage.setItem("rentalai_analysis_type", "property");
           } catch (eRm) {}
           try {
             if (payload !== undefined && payload !== null) {

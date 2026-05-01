@@ -105,7 +105,11 @@
 
       var summaryLabel = global.document.createElement("p");
       summaryLabel.className = "account-record-label";
-      summaryLabel.textContent = "Property summary";
+      summaryLabel.textContent =
+        rec.analysis_kind &&
+        String(rec.analysis_kind).toLowerCase().trim() === "contract"
+          ? "Input summary (contract)"
+          : "Input summary (property)";
 
       var inp = global.document.createElement("p");
       inp.className = "account-record-input";
@@ -118,6 +122,14 @@
 
       var rj = rec.result_json != null ? String(rec.result_json) : "";
       btn.addEventListener("click", function () {
+        try {
+          var kind =
+            rec.analysis_kind &&
+            String(rec.analysis_kind).toLowerCase().trim() === "contract"
+              ? "contract"
+              : "property";
+          global.sessionStorage.setItem("rentalai_analysis_type", kind);
+        } catch (eT) {}
         try {
           global.sessionStorage.setItem("rentalai_result", rj);
         } catch (e1) {}

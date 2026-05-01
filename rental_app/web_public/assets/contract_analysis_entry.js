@@ -44,6 +44,7 @@
       bills_included: false,
       postcode: "M1",
       area: (contractText || "").trim(),
+      analysis_kind: "contract",
     };
     return attachLoggedInUserId(base);
   }

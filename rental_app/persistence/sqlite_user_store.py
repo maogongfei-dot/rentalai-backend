@@ -111,6 +111,17 @@ CREATE TABLE IF NOT EXISTS analysis_records (
 """
 
 
+def _sqlite_ensure_analysis_kind_column(conn: sqlite3.Connection) -> None:
+    """Phase15: add ``analysis_kind`` to existing SQLite ``analysis_records`` if missing."""
+    cur = conn.execute("PRAGMA table_info(analysis_records)")
+    cols = [str(r[1]) for r in cur.fetchall()]
+    if "analysis_kind" in cols:
+        return
+    conn.execute(
+        "ALTER TABLE analysis_records ADD COLUMN analysis_kind TEXT NOT NULL DEFAULT 'property'"
+    )
+
+
 def init_sqlite_analysis_records_table() -> str:
     """Ensure Phase13 ``analysis_records`` exists in the SQLite user database file.
 
@@ -120,6 +131,7 @@ def init_sqlite_analysis_records_table() -> str:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(str(db_path), timeout=5.0, check_same_thread=False) as conn:
         conn.execute(_SQLITE_ANALYSIS_RECORDS_DDL)
+        _sqlite_ensure_analysis_kind_column(conn)
         conn.commit()
     return str(db_path)
 
@@ -198,6 +210,9 @@ def init_postgresql_analysis_records_table() -> bool:
         try:
             with conn.cursor() as cur:
                 cur.execute(_POSTGRES_ANALYSIS_RECORDS_DDL)
+                cur.execute(
+                    "ALTER TABLE analysis_records ADD COLUMN IF NOT EXISTS analysis_kind TEXT NOT NULL DEFAULT 'property'"
+                )
             conn.commit()
         finally:
             try:
@@ -211,7 +226,9 @@ def init_postgresql_analysis_records_table() -> bool:
         return False
 
 
-def save_analysis_record(user_id: str, input_text: str, result_json: str) -> None:
+def save_analysis_record(
+    user_id: str, input_text: str, result_json: str, analysis_kind: str = "property"
+) -> None:
     """Insert one row into Phase13 ``analysis_records`` (SQLite user DB or PostgreSQL).
 
     ``result_json`` must already be a JSON text blob. No-op if ``user_id`` is empty.
@@ -223,32 +240,36 @@ def save_analysis_record(user_id: str, input_text: str, result_json: str) -> Non
     rj = str(result_json or "")
     if not rj:
         rj = "{}"
+    kind = str(analysis_kind or "").strip().lower()
+    if kind not in ("contract", "property"):
+        kind = "property"
     created = now_iso_utc()
     url = _active_postgres_url()
     if url:
-        _save_analysis_record_postgres(url, uid, text, rj, created)
+        _save_analysis_record_postgres(url, uid, text, rj, created, kind)
     else:
-        _save_analysis_record_sqlite(uid, text, rj, created)
+        _save_analysis_record_sqlite(uid, text, rj, created, kind)
 
 
 def _save_analysis_record_sqlite(
-    uid: str, input_text: str, result_json: str, created_at: str
+    uid: str, input_text: str, result_json: str, created_at: str, analysis_kind: str
 ) -> None:
     db_path = users_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(str(db_path), timeout=5.0, check_same_thread=False) as conn:
+        _sqlite_ensure_analysis_kind_column(conn)
         conn.execute(
             """
-            INSERT INTO analysis_records (user_id, input_text, result_json, created_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO analysis_records (user_id, input_text, result_json, created_at, analysis_kind)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (uid, input_text, result_json, created_at),
+            (uid, input_text, result_json, created_at, analysis_kind),
         )
         conn.commit()
 
 
 def _save_analysis_record_postgres(
-    url: str, uid: str, input_text: str, result_json: str, created_at: str
+    url: str, uid: str, input_text: str, result_json: str, created_at: str, analysis_kind: str
 ) -> None:
     import psycopg2
 
@@ -257,10 +278,10 @@ def _save_analysis_record_postgres(
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO analysis_records (user_id, input_text, result_json, created_at)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO analysis_records (user_id, input_text, result_json, created_at, analysis_kind)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
-                (uid, input_text, result_json, created_at),
+                (uid, input_text, result_json, created_at, analysis_kind),
             )
         conn.commit()
     finally:
@@ -286,9 +307,12 @@ def _list_analysis_records_sqlite(uid: str) -> list[dict[str, Any]]:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     out: list[dict[str, Any]] = []
     with sqlite3.connect(str(db_path), timeout=5.0, check_same_thread=False) as conn:
+        _sqlite_ensure_analysis_kind_column(conn)
+        conn.commit()
         cur = conn.execute(
             """
-            SELECT id, user_id, input_text, result_json, created_at
+            SELECT id, user_id, input_text, result_json, created_at,
+                   COALESCE(analysis_kind, 'property') AS analysis_kind
             FROM analysis_records
             WHERE user_id = ?
             ORDER BY datetime(created_at) DESC, id DESC
@@ -303,6 +327,7 @@ def _list_analysis_records_sqlite(uid: str) -> list[dict[str, Any]]:
                     "input_text": str(row[2] or ""),
                     "result_json": str(row[3] or ""),
                     "created_at": str(row[4] or ""),
+                    "analysis_kind": str(row[5] or "property"),
                 }
             )
     return out
@@ -317,7 +342,8 @@ def _list_analysis_records_postgres(url: str, uid: str) -> list[dict[str, Any]]:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, user_id, input_text, result_json, created_at
+                SELECT id, user_id, input_text, result_json, created_at,
+                       COALESCE(analysis_kind, 'property') AS analysis_kind
                 FROM analysis_records
                 WHERE user_id = %s
                 ORDER BY created_at DESC, id DESC
@@ -333,6 +359,7 @@ def _list_analysis_records_postgres(url: str, uid: str) -> list[dict[str, Any]]:
                     "input_text": str(row[2] or ""),
                     "result_json": str(row[3] or ""),
                     "created_at": str(row[4] or ""),
+                    "analysis_kind": str(row[5] or "property"),
                 }
             )
     finally:
