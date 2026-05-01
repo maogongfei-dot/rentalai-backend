@@ -31,3 +31,6 @@ playwright>=1.40.0
 streamlit>=1.28.0
 
 python-multipart
+
+# Phase13：PostgreSQL 驱动（后续接入；当前仍仅使用 SQLite）
+psycopg2-binary>=2.9.0,<3

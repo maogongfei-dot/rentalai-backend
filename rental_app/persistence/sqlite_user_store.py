@@ -6,27 +6,32 @@ Scope:
 - Ensure `users` table exists.
 - Provide stdlib `hashlib` password hashing helper.
 
-Phase13 Step1-3: default SQLite filename and DATABASE_URL are centralized here;
-PostgreSQL is not connected yet — local/dev continues to use SQLite only.
+Phase13 Step1-3: default SQLite filename and DATABASE_URL are centralized here.
+Phase13 Step2-2: if ``DATABASE_URL`` is set, startup probes PostgreSQL with ``psycopg2``;
+``/register`` / ``/login`` still use SQLite only until a later migration step.
 """
 
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-# --- Phase13 Step1-3: user database configuration (SQLite remains active) ---
+logger = logging.getLogger(__name__)
+
+# --- Phase13: user database configuration (SQLite remains the default store for users) ---
 
 # Default SQLite file name under ``rental_app/`` (same folder as the parent of ``persistence/``).
 DATABASE_FILENAME = "rentalai_users.db"
 
-# Reserved for a future PostgreSQL step (e.g. Render ``DATABASE_URL``). Read at import time;
-# connections still use SQLite only — non-empty values are intentionally unused for now.
-DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip() or None
+# PostgreSQL URL when present (e.g. Render). User CRUD still uses SQLite; probe-only until migration.
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL is not None:
+    DATABASE_URL = str(DATABASE_URL).strip() or None
 
 _ENV_USERS_DB = "RENTALAI_USERS_DB_PATH"
 
@@ -37,8 +42,8 @@ def users_db_path() -> Path:
     """Resolve SQLite path for the users table.
 
     ``RENTALAI_USERS_DB_PATH`` overrides the default file under ``rental_app/``.
-    When ``DATABASE_URL`` is set, PostgreSQL will be introduced in a later step;
-    until then, that variable is ignored and this function still returns a SQLite path.
+    ``DATABASE_URL`` does not change this path: register/login still read/write SQLite here
+    until user rows are migrated to PostgreSQL.
     """
     override = str(os.environ.get(_ENV_USERS_DB, "")).strip()
     if override:
@@ -77,6 +82,35 @@ def init_users_db() -> str:
         )
         conn.commit()
     return str(db_path)
+
+
+def probe_postgresql_connection() -> bool:
+    """If ``DATABASE_URL`` is set, open and close a PostgreSQL connection (connectivity check only).
+
+    Does not create tables or change how ``find_user_by_email`` / ``create_user`` work (still SQLite).
+    Returns True if a probe was attempted and succeeded, False if skipped or failed.
+    """
+    url = os.getenv("DATABASE_URL")
+    if url is not None:
+        url = str(url).strip() or None
+    if not url:
+        return False
+    try:
+        import psycopg2
+    except ImportError as exc:
+        logger.warning("DATABASE_URL is set but psycopg2 is not importable: %s", exc)
+        return False
+    try:
+        conn = psycopg2.connect(url)
+        try:
+            conn.close()
+        except Exception:
+            pass
+        logger.info("PostgreSQL connection probe succeeded (user storage remains SQLite).")
+        return True
+    except Exception as exc:
+        logger.warning("PostgreSQL connection probe failed: %s", exc)
+        return False
 
 
 def find_user_by_email(email: str) -> dict[str, str] | None:
