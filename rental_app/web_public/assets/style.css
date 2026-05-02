@@ -3170,41 +3170,7 @@ body.analysis-result-page-body {
   }
 }
 
-/* Phase 5 / Step 12: /analyzing transition page */
-body.analyzing-page-body {
-  max-width: min(100%, 48rem);
-}
-
-.analyzing-main {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-}
-
-.analyzing-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.55rem;
-}
-
-.analyzing-title {
-  font-size: clamp(1.35rem, 2.2vw, 1.7rem);
-  font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-  color: #0f172a;
-  margin: 0.1rem 0 0.15rem;
-}
-
-.analyzing-lead {
-  max-width: 40rem;
-  color: #475569;
-  font-size: 0.98rem;
-  line-height: 1.5;
-  margin: 0;
-}
-
+/* Phase 5 / Step 12 + Phase16 Step1-5: /analyzing transition page */
 .analyzing-spinner {
   width: 2rem;
   height: 2rem;
@@ -3223,9 +3189,78 @@ body.analyzing-page-body {
   }
 }
 
+.analyzing-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.container.container--analyzing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  max-width: min(28rem, 100%);
+  padding: 2rem 1.25rem 2.5rem;
+}
+
+.analyzing-card.analyzing-content-card.card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+  padding: 2rem 1.5rem 1.85rem;
+  margin: 0;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+  box-sizing: border-box;
+}
+
+.analyzing-content-card .page-title {
+  max-width: 20rem;
+  margin-bottom: 0.35rem;
+}
+
+.analyzing-content-card .page-subtitle {
+  text-align: center;
+  max-width: 24rem;
+  margin: 0 0 0.35rem;
+}
+
 .analyzing-step-list {
-  margin: 0.2rem 0 0;
+  text-align: left;
+  margin: 0.15rem auto 0;
+  width: 100%;
+  max-width: 22rem;
   padding-left: 1.2rem;
+  line-height: 1.55;
+  color: #334155;
+  font-size: 0.94rem;
+}
+
+.analyzing-step-list li {
+  margin-bottom: 0.45rem;
+}
+
+.analyzing-step-list li:last-child {
+  margin-bottom: 0;
+}
+
+.analyzing-content-card .analyzing-spinner {
+  width: 2.6rem;
+  height: 2.6rem;
+  flex-shrink: 0;
+}
+
+.analyzing-content-card #analyzing-status-text {
+  margin: 0.15rem 0 0;
+  color: #64748b;
+  font-size: 0.88rem;
 }
 
 /* Phase 5 / Step 13: /analysis-error page */
@@ -3658,4 +3693,510 @@ body.page-shell-bg {
 
 .container #contract-entry-error {
   margin-top: 0.9rem;
+}
+
+/* =============================================================================
+   Phase16 Step1-4 — login / register / account unified shell
+   ============================================================================= */
+
+.container.container--auth {
+  max-width: min(26rem, 100%);
+  padding: 2rem 1.25rem 2.5rem;
+}
+
+.auth-page-card.card {
+  padding: 1.75rem 1.5rem 1.6rem;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+  background: #fff;
+}
+
+.auth-page-kicker {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin: 0 0 0.5rem;
+}
+
+.auth-page-card .page-title {
+  margin-bottom: 0.35rem;
+}
+
+.auth-page-card .page-subtitle {
+  margin: 0 0 1.15rem;
+  max-width: none;
+}
+
+.auth-page-form.auth-form .actions-row {
+  margin-top: 0.65rem;
+}
+
+.auth-page-form.auth-form .actions-row .saas-btn {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  cursor: pointer;
+}
+
+.auth-page-links {
+  margin-top: 1.15rem;
+  padding-top: 1.05rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.auth-page-links .hint {
+  margin: 0 0 0.5rem;
+}
+
+.auth-page-links .hint:last-child {
+  margin-bottom: 0;
+}
+
+.auth-page-back a {
+  font-weight: 500;
+}
+
+.auth-form-msg {
+  margin: 0.75rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.auth-form-msg--error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.auth-form-msg--success {
+  color: #15803d;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.auth-section-title {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.auth-status-panel {
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(160deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.auth-status-panel .auth-status-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.auth-status-panel .hint {
+  margin: 0;
+  color: #334155;
+}
+
+.auth-records-block {
+  margin-top: 1rem;
+}
+
+.auth-records-placeholder {
+  margin: 0;
+  padding: 1rem 1rem;
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  text-align: center;
+  font-size: 0.92rem;
+}
+
+.account-logout-row {
+  margin-top: 0.75rem;
+}
+
+.account-logout-row .saas-btn {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  cursor: pointer;
+}
+
+.account-records-root {
+  margin: 0;
+}
+
+#account-records-status {
+  margin: 0;
+}
+
+.account-records-list {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.account-record-row {
+  padding: 0.95rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #dbe5f0;
+  background: linear-gradient(160deg, #f8fafc 0%, #f1f5f9 100%);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  text-align: left;
+}
+
+.account-record-label {
+  margin: 0 0 0.2rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.account-record-meta {
+  margin: 0 0 0.6rem;
+  font-size: 0.86rem;
+  color: #334155;
+}
+
+.account-record-input {
+  margin: 0 0 0.75rem;
+  font-size: 0.92rem;
+  color: #334155;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.account-record-view {
+  width: auto;
+  font: inherit;
+  cursor: pointer;
+  padding: 0.48rem 0.95rem;
+  font-size: 0.88rem;
+}
+
+/* =============================================================================
+   Phase16 Step1-5 — ai_result.html（五卡片 / Score /  verdict / 底部操作）
+   ============================================================================= */
+
+main.container.rentalai-result-page {
+  --ra-gap: 1.25rem;
+  --ra-page-pt: 2rem;
+  --ra-page-pb: 2.5rem;
+  --ra-page-px: 1.5rem;
+  --ra-font-page: clamp(1.55rem, 4.5vw, 2rem);
+  --ra-font-sub: clamp(0.875rem, 2.2vw, 1rem);
+  --ra-font-card: 1rem;
+  --ra-font-body: 0.9375rem;
+  box-sizing: border-box;
+}
+
+.rentalai-result-page > section.card.result-actions {
+  margin-bottom: var(--ra-gap);
+}
+
+.rentalai-result-page-header.card {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  padding: var(--ra-gap) calc(var(--ra-gap) + 0.25rem);
+  margin-bottom: var(--ra-gap);
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+}
+
+.rentalai-result-page-header .page-title {
+  margin: 0 0 0.5rem;
+  font-size: var(--ra-font-page);
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+  line-height: 1.22;
+}
+
+.rentalai-result-page-header .page-subtitle,
+.rentalai-result-page-header .rentalai-result-page-sub {
+  margin: 0;
+  font-size: var(--ra-font-sub);
+  font-weight: 400;
+  color: #64748b;
+  line-height: 1.55;
+  max-width: 36rem;
+}
+
+.rentalai-direct-root {
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+.rentalai-five-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ra-gap);
+}
+
+.result-page-ui .card.rentalai-result-card {
+  border-radius: 14px;
+  box-shadow: 0 2px 14px rgba(15, 23, 42, 0.07);
+  border: 1px solid #e5e9f0;
+  padding: calc(var(--ra-gap) + 0.1rem) calc(var(--ra-gap) + 0.2rem);
+  margin-bottom: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.rentalai-result-card .section-title {
+  font-size: var(--ra-font-card);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.rentalai-field-body {
+  font-size: var(--ra-font-body);
+  line-height: 1.6;
+  color: #334155;
+  margin: 0;
+  overflow-wrap: anywhere;
+  word-wrap: break-word;
+}
+
+.rentalai-score-card.rentalai-result-card {
+  border-width: 1px;
+  border-color: #c7d2fe;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.08);
+}
+
+.rentalai-score-body {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.rentalai-score-value {
+  font-size: clamp(2.35rem, 8.5vw, 3.15rem);
+  font-weight: 800;
+  color: #1e3a8a;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.rentalai-score-denom {
+  font-size: clamp(1.05rem, 3.5vw, 1.35rem);
+  font-weight: 600;
+  color: #64748b;
+  margin-left: 0.2em;
+  vertical-align: baseline;
+}
+
+.rentalai-score-body--text {
+  font-size: var(--ra-font-body);
+  font-weight: 500;
+  color: #334155;
+}
+
+.rentalai-bullet-list {
+  margin: 0;
+  padding-left: 1.35rem;
+}
+
+.rentalai-bullet-list li {
+  margin-bottom: 0.4rem;
+}
+
+.rentalai-bullet-list li:last-child {
+  margin-bottom: 0;
+}
+
+.rentalai-bullet-list.rentalai-explain-list li {
+  margin-bottom: 0.65rem;
+  line-height: 1.58;
+  padding-bottom: 0.2rem;
+}
+
+.rentalai-bullet-list.rentalai-explain-list li:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.rentalai-explain-empty {
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.rentalai-verdict-card.rentalai-verdict--recommended {
+  border-left: 4px solid #16a34a;
+  background: #f7fdf9;
+}
+
+.rentalai-verdict-card.rentalai-verdict--caution {
+  border-left: 4px solid #ca8a04;
+  background: #fffbeb;
+}
+
+.rentalai-verdict-card.rentalai-verdict--not-recommended {
+  border-left: 4px solid #dc2626;
+  background: #fff5f5;
+}
+
+#rentalai-no-data-msg {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  color: #64748b;
+  font-size: 1rem;
+}
+
+.result-page-ui .card.result-actions {
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+
+.rentalai-result-bottom-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.75rem 1rem;
+  margin-top: var(--ra-gap);
+  padding-top: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.rentalai-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.35rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1.35;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.12s ease;
+  box-sizing: border-box;
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+
+.rentalai-btn--primary {
+  color: #fff;
+  background: linear-gradient(165deg, #4f46e5 0%, #4338ca 100%);
+  border: 1px solid #3730a3;
+  box-shadow: 0 2px 8px rgba(67, 56, 202, 0.35);
+}
+
+.rentalai-btn--primary:hover {
+  background: linear-gradient(165deg, #6366f1 0%, #4f46e5 100%);
+  box-shadow: 0 4px 14px rgba(67, 56, 202, 0.45);
+  transform: translateY(-1px);
+}
+
+.rentalai-btn--primary:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.rentalai-btn--secondary {
+  color: #334155;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.rentalai-btn--secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+.rentalai-btn--secondary:focus-visible {
+  outline: 2px solid #64748b;
+  outline-offset: 2px;
+}
+
+#rentalai-save-toast.rentalai-toast {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  max-width: min(92vw, 22rem);
+  padding: 0.7rem 1.1rem;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.28);
+  box-sizing: border-box;
+}
+
+#rentalai-save-toast.rentalai-toast.hidden {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  main.container.rentalai-result-page {
+    --ra-gap: 1rem;
+    --ra-page-pt: 1.25rem;
+    --ra-page-pb: 2rem;
+    --ra-page-px: 0.85rem;
+    padding: var(--ra-page-pt) var(--ra-page-px) var(--ra-page-pb);
+  }
+
+  .rentalai-result-page-header.card {
+    padding: var(--ra-gap);
+    margin-bottom: var(--ra-gap);
+  }
+
+  .result-page-ui .card.rentalai-result-card {
+    padding: var(--ra-gap);
+    border-radius: 12px;
+  }
+
+  .rentalai-result-bottom-actions {
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: var(--ra-gap);
+  }
+
+  .rentalai-btn {
+    width: 100%;
+  }
 }

@@ -5,103 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Create your RentalAI account</title>
     <link rel="stylesheet" href="/assets/style.css" />
-    <style>
-      /* Phase12 Step1-4: auth pages — align with home / SaaS hero */
-      .auth-page-body {
-        margin: 0;
-        min-height: 100vh;
-        box-sizing: border-box;
-        background: linear-gradient(175deg, #eef2f7 0%, #e8edf4 50%, #f1f5f9 100%);
-      }
-      .auth-page-main {
-        max-width: 26rem;
-        margin: 0 auto;
-        padding: 2rem 1.25rem 2.5rem;
-        box-sizing: border-box;
-      }
-      .auth-page-card.card {
-        padding: 1.75rem 1.5rem 1.6rem;
-        border-radius: 16px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
-        background: #fff;
-      }
-      .auth-page-kicker {
-        font-size: 0.8rem;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #64748b;
-        margin: 0 0 0.5rem;
-      }
-      .auth-page-card .section-title {
-        margin-top: 0;
-        margin-bottom: 0.35rem;
-      }
-      .auth-page-form.auth-form input[type="email"],
-      .auth-page-form.auth-form input[type="password"] {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 0.6rem 0.75rem;
-        border-radius: 10px;
-        border: 1px solid #cbd5e1;
-        background: #fff;
-        font-size: 1rem;
-        line-height: 1.45;
-        color: #0f172a;
-      }
-      .auth-page-form.auth-form input:focus {
-        outline: none;
-        border-color: #6366f1;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-      }
-      .auth-page-form .actions-row {
-        margin-top: 0.65rem;
-      }
-      .auth-page-form .actions-row .saas-btn {
-        width: 100%;
-        box-sizing: border-box;
-        font: inherit;
-        cursor: pointer;
-      }
-      .auth-page-links {
-        margin-top: 1.15rem;
-        padding-top: 1.05rem;
-        border-top: 1px solid #f1f5f9;
-      }
-      .auth-page-links .hint {
-        margin: 0 0 0.5rem;
-      }
-      .auth-page-links .hint:last-child {
-        margin-bottom: 0;
-      }
-      .auth-page-back a {
-        font-weight: 500;
-      }
-      .auth-form-msg {
-        margin: 0.75rem 0 0;
-        padding: 0.55rem 0.7rem;
-        border-radius: 10px;
-        font-size: 0.9rem;
-        line-height: 1.4;
-      }
-      .auth-form-msg--error {
-        color: #b91c1c;
-        background: #fef2f2;
-        border: 1px solid #fecaca;
-      }
-      .auth-form-msg--success {
-        color: #15803d;
-        background: #f0fdf4;
-        border: 1px solid #bbf7d0;
-      }
-    </style>
   </head>
-  <body class="auth-page-body">
-    <main class="wrap narrow-wrap auth-page-main">
+  <body class="page-shell-bg">
+    <main class="container container--auth">
       <section class="card form-card auth-page-card" aria-labelledby="register-title">
         <p class="auth-page-kicker">RentalAI</p>
-        <h1 id="register-title" class="section-title">Create your RentalAI account</h1>
+        <h1 id="register-title" class="page-title">Create your RentalAI account</h1>
+        <p class="page-subtitle">Register to save analyses and keep your history in one place.</p>
 
         <form id="register-form" class="auth-form auth-page-form" autocomplete="on">
           <p
@@ -120,6 +30,7 @@
           <label class="field-label" for="register-email">Email</label>
           <input
             id="register-email"
+            class="page-form-control"
             name="email"
             type="email"
             autocomplete="username"
@@ -129,6 +40,7 @@
           <label class="field-label" for="register-password">Password</label>
           <input
             id="register-password"
+            class="page-form-control"
             name="password"
             type="password"
             autocomplete="new-password"
@@ -138,6 +50,7 @@
           <label class="field-label" for="register-confirm-password">Confirm password</label>
           <input
             id="register-confirm-password"
+            class="page-form-control"
             name="confirm_password"
             type="password"
             autocomplete="new-password"
