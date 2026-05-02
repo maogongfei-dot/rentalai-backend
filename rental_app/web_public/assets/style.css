@@ -3276,3 +3276,386 @@ body.analysis-error-page-body {
   align-items: center;
   gap: 0.5rem 0.6rem;
 }
+
+/* =============================================================================
+   Phase16 Step1-2 — Unified UI primitives (additive; opt-in class names)
+   Use .ra-* on new markup or migrate pages incrementally. Does not replace .card / .err.
+   ============================================================================= */
+
+:root {
+  --ra-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ra-color-bg-page: #f1f5f9;
+  --ra-color-surface: #ffffff;
+  --ra-color-text: #0f172a;
+  --ra-color-text-muted: #64748b;
+  --ra-color-border: #e2e8f0;
+  --ra-color-border-input: #cbd5e1;
+  --ra-color-primary: #6366f1;
+  --ra-color-primary-hover: #4f46e5;
+  --ra-color-danger-text: #7f1d1d;
+  --ra-color-danger-bg: #fef2f2;
+  --ra-color-danger-border: #fecaca;
+  --ra-color-success-text: #134e4a;
+  --ra-color-success-bg: #f0fdfa;
+  --ra-color-success-border: #99f6e4;
+  --ra-radius-sm: 8px;
+  --ra-radius-md: 12px;
+  --ra-radius-lg: 16px;
+  --ra-shadow-surface: 0 2px 12px rgba(15, 23, 42, 0.06);
+  --ra-page-max: 48rem;
+  --ra-space-page-x: 1.25rem;
+  --ra-space-page-y: 2rem;
+}
+
+/* Optional full-height app shell (apply to body when migrating a page) */
+body.ra-body-reset {
+  margin: 0;
+  max-width: none;
+  min-height: 100vh;
+  font-family: var(--ra-font-sans);
+  line-height: 1.5;
+  color: var(--ra-color-text);
+  background: linear-gradient(165deg, #eef2f7 0%, #e8edf4 45%, #f1f5f9 100%);
+}
+
+/* Horizontal container — complements existing .wrap / .wrap-wide */
+.ra-container {
+  width: 100%;
+  max-width: var(--ra-page-max);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--ra-space-page-x);
+  padding-right: var(--ra-space-page-x);
+  box-sizing: border-box;
+}
+
+/* Surface card — use alongside or instead of .card for new work */
+.ra-card {
+  background: var(--ra-color-surface);
+  border: 1px solid var(--ra-color-border);
+  border-radius: var(--ra-radius-lg);
+  box-shadow: var(--ra-shadow-surface);
+  padding: 1.25rem 1.35rem;
+  box-sizing: border-box;
+}
+
+/* Page titles */
+.ra-page-title {
+  font-size: clamp(1.45rem, 3.5vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: var(--ra-color-text);
+  margin: 0 0 0.5rem;
+}
+
+.ra-page-subtitle {
+  margin: 0;
+  font-size: clamp(0.9rem, 2.2vw, 1rem);
+  font-weight: 400;
+  color: var(--ra-color-text-muted);
+  line-height: 1.55;
+  max-width: 38rem;
+}
+
+/* Buttons — neutral + primary; pair with existing .saas-btn where needed */
+.ra-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: fit-content;
+  box-sizing: border-box;
+  padding: 0.5rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid var(--ra-color-border);
+  background: var(--ra-color-surface);
+  color: var(--ra-color-text);
+  text-decoration: none;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.ra-btn:hover {
+  background: #f8fafc;
+}
+
+.ra-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ra-btn--primary {
+  background: var(--ra-color-primary);
+  border-color: var(--ra-color-primary);
+  color: #fff;
+}
+
+.ra-btn--primary:hover:not(:disabled) {
+  background: var(--ra-color-primary-hover);
+  border-color: var(--ra-color-primary-hover);
+}
+
+/* Form controls */
+.ra-input,
+.ra-textarea,
+.ra-select {
+  font: inherit;
+  font-size: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--ra-color-border-input);
+  background: var(--ra-color-surface);
+  color: var(--ra-color-text);
+  line-height: 1.45;
+}
+
+.ra-textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.ra-input:focus,
+.ra-textarea:focus,
+.ra-select:focus {
+  outline: none;
+  border-color: var(--ra-color-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.22);
+}
+
+/* Inline messages */
+.ra-msg {
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--ra-radius-sm);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  border: 1px solid transparent;
+}
+
+.ra-msg--error {
+  color: var(--ra-color-danger-text);
+  background: var(--ra-color-danger-bg);
+  border-color: var(--ra-color-danger-border);
+}
+
+.ra-msg--success {
+  color: var(--ra-color-success-text);
+  background: var(--ra-color-success-bg);
+  border-color: var(--ra-color-success-border);
+}
+
+/* Legacy .err keeps existing colour; optional pairing for richer banner */
+.err.ra-msg--error {
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--ra-radius-sm);
+  background: var(--ra-color-danger-bg);
+  border: 1px solid var(--ra-color-danger-border);
+}
+
+/* =============================================================================
+   Phase16 Step1-3 — index + contract_analysis shared shell (.container, titles, forms)
+   ============================================================================= */
+
+body.page-shell-bg {
+  margin: 0;
+  max-width: none;
+  min-height: 100vh;
+  background: linear-gradient(165deg, #eef2f7 0%, #e8edf4 45%, #f1f5f9 100%);
+}
+
+.container {
+  width: 100%;
+  max-width: min(900px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 2rem 1.5rem 2.5rem;
+  box-sizing: border-box;
+}
+
+.page-title {
+  font-size: clamp(1.45rem, 3.5vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: #0f172a;
+  margin: 0 0 0.5rem;
+}
+
+.page-subtitle {
+  margin: 0 0 1rem;
+  font-size: clamp(0.9rem, 2.2vw, 1rem);
+  font-weight: 400;
+  color: #64748b;
+  line-height: 1.55;
+  max-width: 38rem;
+}
+
+/* SaaS hero on index: align subtitle spacing when paired */
+.saas-hero .page-subtitle {
+  color: #475569;
+}
+
+/* Secondary entry links — Login / Register / Account / Contract Analysis */
+.entry-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.6rem;
+}
+
+.entry-strip-sep {
+  color: #94a3b8;
+  font-weight: 400;
+  user-select: none;
+}
+
+.auth-hero-links.entry-strip {
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  max-width: 44rem;
+}
+
+.entry-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.48rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.2;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  text-decoration: none;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.entry-link:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.entry-link:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Unified form controls inside .container (contract page + future pages) */
+.container label.field-label,
+.container .field-label {
+  display: block;
+  margin: 0 0 0.45rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #334155;
+  letter-spacing: -0.01em;
+}
+
+.container textarea.page-form-control,
+.container input.page-form-control,
+.container select.page-form-control {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #0f172a;
+  font-family: inherit;
+}
+
+.container textarea.page-form-control {
+  resize: vertical;
+  min-height: 14rem;
+}
+
+.container textarea.page-form-control:focus,
+.container input.page-form-control:focus,
+.container select.page-form-control:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+@media (max-width: 540px) {
+  .container textarea.page-form-control {
+    font-size: 16px;
+  }
+}
+
+/* Contract analysis card shell */
+.contract-form-card {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+  padding: calc(1.25rem + 0.5rem) calc(1.25rem + 0.25rem);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
+}
+
+.contract-form-header {
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.contract-guide {
+  margin: 0 0 1.15rem;
+  padding: 0.9rem 1rem 0.95rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.contract-guide-title {
+  margin: 0 0 0.45rem;
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.contract-guide-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.contract-guide-list li {
+  margin-bottom: 0.28rem;
+}
+
+.contract-guide-list li:last-child {
+  margin-bottom: 0;
+}
+
+.contract-form-actions {
+  margin-top: 1.15rem;
+}
+
+.contract-form-actions .saas-btn {
+  min-width: 12rem;
+}
+
+.container #contract-entry-error {
+  margin-top: 0.9rem;
+}

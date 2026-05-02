@@ -8,150 +8,33 @@
     <meta name="rentalai-env" content="" />
     <title>Rental Contract Analysis · RentalAI</title>
     <link rel="stylesheet" href="/assets/style.css" />
-    <style>
-      /* Contract analysis page — shell aligned with result / home pages */
-      body.contract-product-body {
-        min-height: 100vh;
-        background: linear-gradient(165deg, #eef2f7 0%, #e8edf4 45%, #f1f5f9 100%);
-      }
-      .contract-product-main {
-        --cp-gap: 1.25rem;
-        --cp-pt: 2rem;
-        --cp-pb: 2.5rem;
-        --cp-px: 1.5rem;
-        width: 100%;
-        max-width: 900px;
-        margin-left: auto;
-        margin-right: auto;
-        padding: var(--cp-pt) var(--cp-px) var(--cp-pb);
-        box-sizing: border-box;
-      }
-      .contract-product-card {
-        margin-top: 0.5rem;
-        margin-bottom: 0;
-        padding: calc(var(--cp-gap) + 0.5rem) calc(var(--cp-gap) + 0.25rem);
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 16px;
-        box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
-      }
-      .contract-product-header {
-        margin-bottom: var(--cp-gap);
-        padding-bottom: 0.85rem;
-        border-bottom: 1px solid #f1f5f9;
-      }
-      .contract-product-h1 {
-        margin: 0 0 0.5rem;
-        font-size: clamp(1.5rem, 4vw, 1.9rem);
-        font-weight: 700;
-        color: #0f172a;
-        letter-spacing: -0.03em;
-        line-height: 1.2;
-      }
-      .contract-product-sub {
-        margin: 0;
-        font-size: clamp(0.9rem, 2.2vw, 1rem);
-        color: #64748b;
-        line-height: 1.55;
-        max-width: 36rem;
-      }
-      .contract-product-guide {
-        margin: 0 0 1.15rem;
-        padding: 0.9rem 1rem 0.95rem;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        font-size: 0.92rem;
-        line-height: 1.5;
-        color: #334155;
-      }
-      .contract-product-guide-title {
-        margin: 0 0 0.45rem;
-        font-weight: 600;
-        color: #0f172a;
-        font-size: 0.95rem;
-      }
-      .contract-product-guide-list {
-        margin: 0;
-        padding-left: 1.2rem;
-      }
-      .contract-product-guide-list li {
-        margin-bottom: 0.28rem;
-      }
-      .contract-product-guide-list li:last-child {
-        margin-bottom: 0;
-      }
-      .contract-product-card .field-label {
-        display: block;
-        margin: 0 0 0.45rem;
-        font-weight: 600;
-        font-size: 0.92rem;
-        color: #334155;
-      }
-      .contract-product-textarea {
-        width: 100%;
-        min-height: 14rem;
-        box-sizing: border-box;
-        padding: 0.85rem 1rem;
-        border-radius: 12px;
-        border: 1px solid #cbd5e1;
-        font-size: 1rem;
-        line-height: 1.5;
-        color: #0f172a;
-        resize: vertical;
-        font-family: inherit;
-        background: #fff;
-      }
-      .contract-product-textarea:focus {
-        outline: none;
-        border-color: #6366f1;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-      }
-      .contract-product-actions {
-        margin-top: 1.15rem;
-      }
-      .contract-product-actions .saas-btn {
-        min-width: 12rem;
-      }
-      #contract-entry-error {
-        margin-top: 0.9rem;
-      }
-      @media (max-width: 540px) {
-        .contract-product-main {
-          --cp-px: 1.15rem;
-        }
-        .contract-product-textarea {
-          font-size: 16px;
-        }
-      }
-    </style>
     <script src="/assets/api_config.js"></script>
   </head>
-  <body class="contract-product-body">
+  <body class="page-shell-bg">
     <script src="/assets/auth_user_store.js"></script>
     <script src="/assets/auth_local.js"></script>
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
-    <main class="wrap wrap-wide contract-product-main">
+    <main class="container">
       <p class="back-link">
         <a href="/">← Back to home</a>
       </p>
 
       <section
-        class="card form-card contract-product-card"
+        class="card form-card contract-form-card"
         aria-labelledby="contract-product-h1"
         lang="en-GB"
       >
-        <header class="contract-product-header">
-          <h1 id="contract-product-h1" class="contract-product-h1">Rental Contract Analysis</h1>
-          <p class="contract-product-sub">
+        <header class="contract-form-header">
+          <h1 id="contract-product-h1" class="page-title">Rental Contract Analysis</h1>
+          <p class="page-subtitle">
             Paste your tenancy agreement or contract concerns below.
           </p>
         </header>
 
-        <div class="contract-product-guide" role="note">
-          <p class="contract-product-guide-title">You can paste:</p>
-          <ul class="contract-product-guide-list">
+        <div class="contract-guide" role="note">
+          <p class="contract-guide-title">You can paste:</p>
+          <ul class="contract-guide-list">
             <li>Tenancy agreement clauses</li>
             <li>Deposit terms</li>
             <li>Rent increase terms</li>
@@ -165,13 +48,13 @@
         <textarea
           id="contract-entry-text"
           name="contract_text"
-          class="contract-product-textarea"
+          class="page-form-control"
           placeholder="Paste your tenancy agreement text or contract concern here..."
           autocomplete="off"
           spellcheck="true"
         ></textarea>
 
-        <div class="actions-row contract-product-actions">
+        <div class="actions-row contract-form-actions">
           <button type="button" id="contract-entry-submit" class="saas-btn saas-btn--primary">
             Analyze Contract
           </button>

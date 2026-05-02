@@ -98,20 +98,10 @@
           font-size: 16px;
         }
       }
-      /* Phase12 Step1-4: account links in hero — secondary to Analyze Property */
-      .auth-hero-links {
-        margin-top: 1.1rem;
-        padding-top: 1rem;
-        border-top: 1px solid #e2e8f0;
-        max-width: 40rem;
-      }
-      .auth-hero-links a {
-        font-weight: 500;
-      }
     </style>
     <script src="/assets/api_config.js"></script>
   </head>
-  <body>
+  <body class="page-shell-bg">
     <script src="/assets/auth_user_store.js"></script>
     <script src="/assets/analysis_history_store.js"></script>
     <script src="/assets/analysis_history_persist.js"></script>
@@ -119,7 +109,7 @@
     <!-- 顶栏：登录 / 注册 / 账户 等由脚本注入（平台通用导航；非业务表单本身） -->
     <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
-    <main class="wrap wrap-wide">
+    <main class="container">
       <!-- 顶区账户条：登录态与快捷账户入口（RentAI / ShortRentAI 共用身份区，脚本渲染） -->
       <div
         id="home-account-strip"
@@ -141,10 +131,10 @@
         lang="en-GB"
       >
         <p class="saas-hero-kicker">RentalAI</p>
-        <h1 id="saas-hero-title" class="saas-hero-title">
+        <h1 id="saas-hero-title" class="saas-hero-title page-title">
           AI-powered rental property analysis
         </h1>
-        <p class="saas-hero-lead">
+        <p class="saas-hero-lead page-subtitle">
           Enter the property details and let RentalAI help you assess risks, score, and next steps.
         </p>
         <ul class="saas-feature-grid" aria-label="Core features">
@@ -156,17 +146,18 @@
         </ul>
         <div class="saas-cta-row" role="group" aria-label="Primary actions">
           <a class="saas-btn saas-btn--primary" href="#property-analysis">Analyze Property</a>
-          <a class="saas-btn" href="/contract-analysis">Contract Analysis</a>
           <a class="saas-btn" href="/check-contract">Check Contract</a>
           <a class="saas-btn" href="/compare">Compare Properties</a>
           <a class="saas-btn" href="/reputation">Check Reputation</a>
         </div>
-        <p class="hint small-print auth-hero-links" lang="en-GB">
-          <a href="/login">Login</a>
-          <span class="hint muted"> · </span>
-          <a href="/register">Register</a>
-          <span class="hint muted"> · </span>
-          <a href="/account">My Account</a>
+        <p class="hint small-print auth-hero-links entry-strip" lang="en-GB">
+          <a class="entry-link" href="/contract-analysis">Contract Analysis</a>
+          <span class="entry-strip-sep" aria-hidden="true">·</span>
+          <a class="entry-link" href="/login">Login</a>
+          <span class="entry-strip-sep" aria-hidden="true">·</span>
+          <a class="entry-link" href="/register">Register</a>
+          <span class="entry-strip-sep" aria-hidden="true">·</span>
+          <a class="entry-link" href="/account">My Account</a>
         </p>
       </section>
 
