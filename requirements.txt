@@ -1,2 +1,2 @@
-fastapi
-uvicorn
+# Monorepo root: delegates to rental_app (same dependency set as Render rootDir: rental_app).
+-r rental_app/requirements.txt

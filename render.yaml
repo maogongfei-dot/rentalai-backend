@@ -10,6 +10,9 @@
 # rentalai-ui（Streamlit）为可选第二站点；仅需 Phase3 时可不在 Dashboard 创建该服务。
 #
 # 文档：https://render.com/docs/blueprint-spec
+#
+# Phase17：FastAPI 使用 ASGI 模块 api_server:app（非 main:app）。PORT 由平台注入；
+# config.get_bind_port() / get_cors_origins() 与本地一致。
 
 services:
   - type: web
@@ -20,11 +23,17 @@ services:
     rootDir: rental_app
     # 与异步 /tasks 多源抓取一致：构建阶段安装 Chromium（体积大，首次构建可能数分钟）
     buildCommand: pip install -r requirements.txt && playwright install chromium
-    startCommand: python run.py
+    # 与 python run.py 等价（api_server 导入时已对齐 cwd / .env）；显式 host/port 便于 PaaS
+    startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
-      # 分域部署：填 Vercel 等前端 origin，逗号分隔。未设则 CORS 为 *（仅建议开发）
+      - key: RENTALAI_ENV
+        value: production
+      # 分域部署：填正式前端 origin，逗号分隔。未设则 CORS 默认为 *（config.get_cors_origins）
       - key: ALLOWED_ORIGINS
+        sync: false
+      # 托管 PostgreSQL 时在 Dashboard 绑定实例后写入；未设则用户库等走 SQLite（实例本地盘）
+      - key: DATABASE_URL
         sync: false
 
   - type: web

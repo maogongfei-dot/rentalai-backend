@@ -1,11 +1,11 @@
-# Render / Railway / Fly：平台注入 PORT；run.py 读 config.get_bind_host/get_bind_port（有 PORT 时 host=0.0.0.0）。
+# Render / Railway / Fly：平台注入 PORT。
 # Build（示例）：pip install -r requirements.txt  （可选 && playwright install chromium）
-# Start：与下列二选一等价
-#   python run.py
+# Start（Phase17 与 render.yaml 一致）：uvicorn 入口为 api_server:app（非 main:app）。
+# 本地仍可用：python run.py（与下列等价，均读 config PORT / CORS）
 #   uvicorn api_server:app --host 0.0.0.0 --port $PORT
-# 建议环境变量：PORT（自动）、ALLOWED_ORIGINS（生产前端 origin）、RENTALAI_DEBUG=0、RENTALAI_RELOAD 勿设为 1
+# 建议环境变量：PORT（自动）、DATABASE_URL（可选 Postgres）、ALLOWED_ORIGINS、RENTALAI_ENV=production、RENTALAI_DEBUG=0
 #
 # 单应用仅支持一条 web 进程。默认：FastAPI。
 # 部署 Streamlit 时请改为（并删掉上一行 web）：
 # web: streamlit run app_web.py --server.port $PORT --server.address 0.0.0.0
-web: python run.py
+web: uvicorn api_server:app --host 0.0.0.0 --port $PORT

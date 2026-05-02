@@ -23,7 +23,8 @@
 **其它启动方式（等价前提）**
 
 亦可 ``python api_server.py``（见文件末尾 ``__main__``）、或 ``uvicorn api_server:app``；生产常见
-``--host 0.0.0.0 --port $PORT``。需在能正确解析 ``rental_app`` 包路径的工作目录下执行，见下文启动引导。
+``--host 0.0.0.0 --port $PORT``（与 ``python run.py``、Render Blueprint 的 ``startCommand`` 对齐）。需在能正确解析
+``rental_app`` 包路径的工作目录下执行；本模块导入时会将 cwd/sys.path 与 ``run.py`` 对齐，见下文启动引导。
 
 历史迭代（如 P2 Phase）体现在路由与实现注释中。
 """
