@@ -1,2 +1,3 @@
-# Monorepo root: delegates to rental_app (same dependency set as Render rootDir: rental_app).
+# Monorepo root — Phase18：Render Blueprint 使用 rootDir: rental_app，构建时读该目录下 requirements.txt。
+# 从仓库根安装完整后端依赖：
 -r rental_app/requirements.txt

@@ -11,8 +11,13 @@
 #
 # 文档：https://render.com/docs/blueprint-spec
 #
-# Phase17：FastAPI 使用 ASGI 模块 api_server:app（非 main:app）。PORT 由平台注入；
-# config.get_bind_port() / get_cors_origins() 与本地一致。
+# Phase17 / Phase18：FastAPI ASGI 模块为 api_server:app（不是 main:app）。PORT 由平台注入。
+#
+# Phase18 Step1-2 — 构建：最小为「pip install -r requirements.txt」（相对 rootDir）。
+# 本仓库含 playwright 抓取链路，故在 API/UI 两服务的 buildCommand 中追加
+# 「&& playwright install chromium」以保持现有功能；纯 API 且无需浏览器时可删后缀以缩短构建。
+#
+# requirements.txt 路径：rootDir 为 rental_app 时使用 rental_app/requirements.txt。
 
 services:
   - type: web
@@ -21,9 +26,7 @@ services:
     region: oregon
     plan: free
     rootDir: rental_app
-    # 与异步 /tasks 多源抓取一致：构建阶段安装 Chromium（体积大，首次构建可能数分钟）
     buildCommand: pip install -r requirements.txt && playwright install chromium
-    # 与 python run.py 等价（api_server 导入时已对齐 cwd / .env）；显式 host/port 便于 PaaS
     startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:

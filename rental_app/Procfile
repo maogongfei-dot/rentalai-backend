@@ -1,6 +1,6 @@
 # Render / Railway / Fly：平台注入 PORT。
 # Build（示例）：pip install -r requirements.txt  （可选 && playwright install chromium）
-# Start（Phase17 与 render.yaml 一致）：uvicorn 入口为 api_server:app（非 main:app）。
+# Start（Phase17/18 与 render.yaml 一致）：uvicorn 入口为 api_server:app（非 main:app）。
 # 本地仍可用：python run.py（与下列等价，均读 config PORT / CORS）
 #   uvicorn api_server:app --host 0.0.0.0 --port $PORT
 # 建议环境变量：PORT（自动）、DATABASE_URL（可选 Postgres）、ALLOWED_ORIGINS、RENTALAI_ENV=production、RENTALAI_DEBUG=0
