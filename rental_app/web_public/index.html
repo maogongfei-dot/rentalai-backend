@@ -183,7 +183,7 @@
         margin-top: 0.75rem;
       }
 
-      /* Hero — London photo + 左白右图渐变；虚化仅作用于背景层 */
+      /* Hero — 英国住宅街区图 + 左白右图渐变；虚化/压暗仅作用于背景层 */
       .ra-hero {
         position: relative;
         margin-top: clamp(1.5rem, 4vw, 2.5rem);
@@ -203,17 +203,17 @@
         background-image:
           linear-gradient(
             to right,
-            rgba(255, 255, 255, 0.95) 0%,
-            rgba(255, 255, 255, 0.85) 30%,
-            rgba(255, 255, 255, 0.6) 50%,
-            rgba(255, 255, 255, 0.2) 70%,
+            rgba(255, 255, 255, 0.96) 0%,
+            rgba(255, 255, 255, 0.88) 30%,
+            rgba(255, 255, 255, 0.65) 50%,
+            rgba(255, 255, 255, 0.25) 70%,
             rgba(255, 255, 255, 0) 100%
           ),
-          url("https://images.unsplash.com/photo-1513635269975-59663e0ac1ad");
+          url("https://images.unsplash.com/photo-1507089947368-19c1da9775ae");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
-        filter: blur(1px);
+        filter: blur(1px) brightness(0.9);
         transform: scale(1.04);
       }
       /* London Eye 装饰：左下圆环 */
