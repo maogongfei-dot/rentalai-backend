@@ -184,8 +184,9 @@
         display: flex;
         flex-direction: column;
         align-items: flex-end;
-        gap: 0.2rem;
+        gap: 0.3rem;
         min-width: 0;
+        flex-shrink: 0;
       }
 
       .home-lang-heading {
@@ -197,31 +198,41 @@
         line-height: 1;
       }
 
-      .home-lang {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 0.2rem 0.35rem;
-        font-size: 0.72rem;
-        color: var(--home-muted);
-        max-width: min(100%, 14rem);
-      }
-
-      .home-lang a {
-        color: var(--home-muted);
-        text-decoration: none;
+      .home-locale-select {
+        display: block;
+        width: auto;
+        min-width: 7.5rem;
+        max-width: 9.5rem;
+        min-height: 2.25rem;
+        padding: 0.32rem 1.55rem 0.32rem 0.5rem;
+        font: inherit;
+        font-size: 0.8125rem;
         font-weight: 500;
-        padding: 0.1rem 0;
+        line-height: 1.25;
+        color: var(--home-text-secondary);
+        background-color: #fff;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.25L6 7.75l3.5-3.5' stroke='%2364748b' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.42rem center;
+        background-size: 0.7rem;
+        border: 1px solid var(--home-border);
+        border-radius: var(--home-radius-btn);
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
       }
 
-      .home-lang a:hover {
-        color: var(--home-primary);
+      .home-locale-select:hover {
+        border-color: #cbd5e1;
       }
 
-      .home-lang-sep {
-        color: #cbd5e1;
-        user-select: none;
+      .home-locale-select:focus {
+        outline: none;
+        border-color: var(--home-primary);
+        box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.14);
       }
 
       .home-auth-btns {
@@ -271,9 +282,9 @@
         .home-lang-block {
           align-items: flex-end;
         }
-        .home-lang {
-          max-width: 11.5rem;
-          justify-content: flex-end;
+        .home-locale-select {
+          max-width: 8.75rem;
+          min-width: 7rem;
         }
       }
 
@@ -285,8 +296,12 @@
           padding: 0.4rem 0.5rem;
           font-size: 0.8125rem;
         }
-        .home-lang {
-          max-width: 9.5rem;
+        .home-locale-select {
+          max-width: 7.75rem;
+          min-width: 6.5rem;
+          font-size: 0.75rem;
+          padding-top: 0.28rem;
+          padding-bottom: 0.28rem;
         }
         .home-btn-ghost,
         .home-btn-solid {
@@ -937,32 +952,38 @@
           <nav class="home-header-nav" aria-label="Primary">
             <ul class="home-nav-main">
               <li>
-                <a href="/" aria-current="page">Home</a>
+                <a href="/" aria-current="page" data-i18n="nav.home">Home</a>
               </li>
-              <li><a href="/#property-analysis">Property Analysis</a></li>
-              <li><a href="/contract-analysis">Contract Analysis</a></li>
-              <li><a href="/analysis-history">History</a></li>
-              <li><a href="/assistant">AI Assistant</a></li>
+              <li>
+                <a href="/#property-analysis" data-i18n="nav.propertyAnalysis">Property Analysis</a>
+              </li>
+              <li>
+                <a href="/contract-analysis" data-i18n="nav.contractAnalysis">Contract Analysis</a>
+              </li>
+              <li><a href="/analysis-history" data-i18n="nav.history">History</a></li>
+              <li><a href="/assistant" data-i18n="nav.aiAssistant">AI Assistant</a></li>
             </ul>
           </nav>
           <div class="home-header-actions">
             <div class="home-lang-block">
-              <span class="home-lang-heading">Language</span>
-              <div class="home-lang" aria-label="Choose language">
-                <a href="#" onclick="return false;">English</a>
-                <span class="home-lang-sep">/</span>
-                <a href="#" onclick="return false;">中文</a>
-                <span class="home-lang-sep">/</span>
-                <a href="#" onclick="return false;">Français</a>
-                <span class="home-lang-sep">/</span>
-                <a href="#" onclick="return false;">Deutsch</a>
-                <span class="home-lang-sep">/</span>
-                <a href="#" onclick="return false;">Español</a>
-              </div>
+              <span id="home-lang-heading" class="home-lang-heading" data-i18n="nav.languageLabel">Language</span>
+              <select
+                id="home-locale-select"
+                class="home-locale-select"
+                aria-labelledby="home-lang-heading"
+                title="Interface language"
+                onchange="changeLanguage(this.value)"
+              >
+                <option value="en" selected>English</option>
+                <option value="zh-Hans">中文</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="es">Español</option>
+              </select>
             </div>
             <div class="home-auth-btns">
-              <a class="home-btn-ghost" href="/login">Login</a>
-              <a class="home-btn-solid" href="/register">Sign Up</a>
+              <a class="home-btn-ghost" href="/login" data-i18n="nav.login">Login</a>
+              <a class="home-btn-solid" href="/register" data-i18n="nav.signUp">Sign Up</a>
             </div>
           </div>
         </div>
@@ -1048,10 +1069,10 @@
               <div class="home-hero-backdrop__wash"></div>
             </div>
             <div class="home-hero-body">
-              <h1 id="home-hero-heading" class="home-hero-title" lang="en">
+              <h1 id="home-hero-heading" class="home-hero-title" lang="en" data-i18n="hero.title">
                 AI Rental Decision Assistant
               </h1>
-              <p class="home-hero-sub" lang="en">
+              <p class="home-hero-sub" lang="en" data-i18n="hero.subtitle">
                 Smarter decisions. Safer rentals. Better living.
               </p>
               <div class="home-hero-form">
@@ -1061,21 +1082,22 @@
                   role="status"
                   aria-live="polite"
                 ></p>
-                <label class="visually-hidden" for="ai-query">Rental needs</label>
+                <label class="visually-hidden" for="ai-query" data-i18n="hero.inputLabel">Rental needs</label>
                 <textarea
                   id="ai-query"
                   name="ai_query"
                   class="home-hero-input"
                   rows="5"
                   placeholder="Describe your rental needs..."
+                  data-i18n-placeholder="hero.queryPlaceholder"
                   autocomplete="off"
                 ></textarea>
                 <div class="home-hero-cta-row">
-                  <button type="button" id="ai-go" class="home-hero-submit">
+                  <button type="button" id="ai-go" class="home-hero-submit" data-i18n="hero.analyzeNow">
                     Analyze Now
                   </button>
                 </div>
-                <p class="home-hero-hint" lang="en">
+                <p class="home-hero-hint" lang="en" data-i18n="hero.langsHint">
                   Supports English, 中文, Français, Deutsch, Español
                 </p>
               </div>
@@ -1083,80 +1105,84 @@
           </section>
 
           <section aria-labelledby="features-heading">
-            <h2 id="features-heading" class="home-section-title">What you can do</h2>
+            <h2 id="features-heading" class="home-section-title" data-i18n="features.sectionTitle">
+              What you can do
+            </h2>
             <div class="home-cards">
               <article class="home-card">
                 <div class="home-card-icon" aria-hidden="true">◎</div>
-                <h3 class="home-card-title">Property Analysis</h3>
-                <p class="home-card-desc">
+                <h3 class="home-card-title" data-i18n="card.property.title">Property Analysis</h3>
+                <p class="home-card-desc" data-i18n="card.property.desc">
                   Describe what you need — scores, risks, and next steps on the results page.
                 </p>
-                <a class="home-card-btn" href="/#property-analysis">Open analysis</a>
+                <a class="home-card-btn" href="/#property-analysis" data-i18n="card.property.cta">Open analysis</a>
               </article>
               <article class="home-card">
                 <div class="home-card-icon" aria-hidden="true">▤</div>
-                <h3 class="home-card-title">Contract Analysis</h3>
-                <p class="home-card-desc">
+                <h3 class="home-card-title" data-i18n="card.contract.title">Contract Analysis</h3>
+                <p class="home-card-desc" data-i18n="card.contract.desc">
                   Paste your lease or key clauses; get risks and suggestions in one place.
                 </p>
-                <a class="home-card-btn" href="/contract-analysis">Analyze contract</a>
+                <a class="home-card-btn" href="/contract-analysis" data-i18n="card.contract.cta">Analyze contract</a>
               </article>
             </div>
           </section>
 
           <section aria-labelledby="how-heading">
-            <h2 id="how-heading" class="home-section-title">How it works</h2>
+            <h2 id="how-heading" class="home-section-title" data-i18n="how.sectionTitle">How it works</h2>
             <ol class="home-steps">
               <li class="home-step">
                 <div class="home-step-num">1</div>
-                <h3>Describe Needs</h3>
-                <p>Tell us budget, area, and what matters to you.</p>
+                <h3 data-i18n="how.step1.title">Describe Needs</h3>
+                <p data-i18n="how.step1.desc">Tell us budget, area, and what matters to you.</p>
               </li>
               <li class="home-step">
                 <div class="home-step-num">2</div>
-                <h3>AI Analysis</h3>
-                <p>We process your input with RentalAI models.</p>
+                <h3 data-i18n="how.step2.title">AI Analysis</h3>
+                <p data-i18n="how.step2.desc">We process your input with RentalAI models.</p>
               </li>
               <li class="home-step">
                 <div class="home-step-num">3</div>
-                <h3>Get Recommendations</h3>
-                <p>Review scores, risks, and practical tips.</p>
+                <h3 data-i18n="how.step3.title">Get Recommendations</h3>
+                <p data-i18n="how.step3.desc">Review scores, risks, and practical tips.</p>
               </li>
               <li class="home-step">
                 <div class="home-step-num">4</div>
-                <h3>Make Decision</h3>
-                <p>Choose with clearer context — at your own pace.</p>
+                <h3 data-i18n="how.step4.title">Make Decision</h3>
+                <p data-i18n="how.step4.desc">Choose with clearer context — at your own pace.</p>
               </li>
             </ol>
           </section>
 
-          <p class="home-disclaimer" lang="zh-Hans">AI 生成内容仅供参考，不构成法律或专业建议。</p>
+          <p class="home-disclaimer" lang="zh-Hans" data-i18n="disclaimer.short">
+            AI 生成内容仅供参考，不构成法律或专业建议。
+          </p>
 
           <footer class="home-footer" aria-label="Site footer">
             <div class="home-footer-grid">
               <div class="home-footer-col">
-                <h4>Product</h4>
-                <p>—</p>
+                <h4 data-i18n="footer.col.product">Product</h4>
+                <p data-i18n="footer.placeholder">—</p>
               </div>
               <div class="home-footer-col">
-                <h4>Company</h4>
-                <p>—</p>
+                <h4 data-i18n="footer.col.company">Company</h4>
+                <p data-i18n="footer.placeholder">—</p>
               </div>
               <div class="home-footer-col">
-                <h4>Support</h4>
-                <p>—</p>
+                <h4 data-i18n="footer.col.support">Support</h4>
+                <p data-i18n="footer.placeholder">—</p>
               </div>
               <div class="home-footer-col">
-                <h4>Follow Us</h4>
-                <p>—</p>
+                <h4 data-i18n="footer.col.follow">Follow Us</h4>
+                <p data-i18n="footer.placeholder">—</p>
               </div>
             </div>
             <div class="home-footer-bottom">
-              <span>© RentalAI</span>
+              <span data-i18n="footer.copyright">© RentalAI</span>
               <nav class="home-footer-legal" aria-label="Legal">
-                <a href="/privacy.html">Privacy Policy</a>
-                <a href="/terms.html">Terms of Use</a>
-                <a href="/disclaimer.html">Disclaimer</a>
+                <a href="/privacy.html" data-i18n="footer.link.privacy">Privacy Policy</a>
+                <a href="/terms.html" data-i18n="footer.link.terms">Terms of Use</a>
+                <a href="/disclaimer.html" data-i18n="footer.link.disclaimer">Disclaimer</a>
               </nav>
             </div>
           </footer>
@@ -1365,9 +1391,350 @@
     <script src="/assets/assistant_prefill.js"></script>
     <script src="/assets/ai_home.js"></script>
     <script>
-      document.getElementById("go").onclick = function () {
-        window.RentalAIPhase3.startAnalyze();
+      /**
+       * 首页文案语言包（第三步）：供后续与 #home-locale-select / data-i18n 联动。
+       * step_1 … step_4：标题与正文用换行分隔，便于将来拆分。
+       */
+      var DEFAULT_HOME_LOCALE = "en";
+      var translations = {
+        en: {
+          nav_home: "Home",
+          nav_property: "Property Analysis",
+          nav_contract: "Contract Analysis",
+          nav_history: "History",
+          nav_assistant: "AI Assistant",
+          hero_title: "AI Rental Decision Assistant",
+          hero_subtitle: "Smarter decisions. Safer rentals. Better living.",
+          input_placeholder: "Describe your rental needs...",
+          analyze_now: "Analyze Now",
+          language_hint: "Supports English, 中文, Français, Deutsch, Español",
+          property_title: "Property Analysis",
+          property_desc:
+            "Describe what you need — scores, risks, and next steps on the results page.",
+          property_button: "Open analysis",
+          contract_title: "Contract Analysis",
+          contract_desc:
+            "Paste your lease or key clauses; get risks and suggestions in one place.",
+          contract_button: "Analyze contract",
+          how_title: "How it works",
+          step_1: "Describe Needs\nTell us budget, area, and what matters to you.",
+          step_2: "AI Analysis\nWe process your input with RentalAI models.",
+          step_3: "Get Recommendations\nReview scores, risks, and practical tips.",
+          step_4: "Make Decision\nChoose with clearer context — at your own pace.",
+          disclaimer:
+            "AI-generated content is for reference only and does not constitute legal or professional advice.",
+          footer_product: "Product",
+          footer_company: "Company",
+          footer_support: "Support",
+          footer_follow: "Follow Us",
+        },
+        zh: {
+          nav_home: "首页",
+          nav_property: "房源分析",
+          nav_contract: "合同分析",
+          nav_history: "历史",
+          nav_assistant: "AI 助手",
+          hero_title: "AI 租房决策助手",
+          hero_subtitle: "更明智的决策，更安心的租赁，更舒心的居住。",
+          input_placeholder: "描述您的租房需求…",
+          analyze_now: "立即分析",
+          language_hint: "支持 English、中文、Français、Deutsch、Español",
+          property_title: "房源分析",
+          property_desc: "说明您的需求——在结果页查看评分、风险与后续建议。",
+          property_button: "打开分析",
+          contract_title: "合同分析",
+          contract_desc: "粘贴租约或关键条款；在同一处查看风险与建议。",
+          contract_button: "分析合同",
+          how_title: "如何使用",
+          step_1: "说明需求\n告诉我们预算、区域与您看重的因素。",
+          step_2: "AI 分析\n我们使用 RentalAI 模型处理您的输入。",
+          step_3: "获取建议\n查看评分、风险与实用提示。",
+          step_4: "做出决策\n在更清晰的语境下选择——按您的节奏。",
+          disclaimer: "AI 生成内容仅供参考，不构成法律或专业建议。",
+          footer_product: "产品",
+          footer_company: "公司",
+          footer_support: "支持",
+          footer_follow: "关注我们",
+        },
+        fr: {
+          nav_home: "Accueil",
+          nav_property: "Analyse du logement",
+          nav_contract: "Analyse du bail",
+          nav_history: "Historique",
+          nav_assistant: "Assistant IA",
+          hero_title: "Assistant IA pour la décision de location",
+          hero_subtitle: "Des décisions plus avisées. Des locations plus sûres. Une vie meilleure.",
+          input_placeholder: "Décrivez vos besoins de location…",
+          analyze_now: "Analyser maintenant",
+          language_hint: "Prend en charge English, 中文, Français, Deutsch, Español",
+          property_title: "Analyse du logement",
+          property_desc:
+            "Décrivez vos besoins — scores, risques et prochaines étapes sur la page de résultats.",
+          property_button: "Ouvrir l’analyse",
+          contract_title: "Analyse du bail",
+          contract_desc:
+            "Collez votre bail ou les clauses clés ; consultez risques et recommandations au même endroit.",
+          contract_button: "Analyser le bail",
+          how_title: "Comment ça marche",
+          step_1: "Décrire vos besoins\nIndiquez budget, zone et critères importants.",
+          step_2: "Analyse IA\nNous traitons votre saisie avec les modèles RentalAI.",
+          step_3: "Obtenir des recommandations\nConsultez scores, risques et conseils pratiques.",
+          step_4: "Prendre une décision\nChoisissez avec plus de contexte — à votre rythme.",
+          disclaimer:
+            "Le contenu généré par l’IA est fourni à titre indicatif et ne constitue pas un avis juridique ou professionnel.",
+          footer_product: "Produit",
+          footer_company: "Entreprise",
+          footer_support: "Assistance",
+          footer_follow: "Nous suivre",
+        },
+        de: {
+          nav_home: "Start",
+          nav_property: "Immobilienanalyse",
+          nav_contract: "Vertragsanalyse",
+          nav_history: "Verlauf",
+          nav_assistant: "KI-Assistent",
+          hero_title: "KI-Assistent für Mietentscheidungen",
+          hero_subtitle: "Klügere Entscheidungen. Sicherere Mieten. Besseres Wohnen.",
+          input_placeholder: "Beschreiben Sie Ihre Mietanforderungen…",
+          analyze_now: "Jetzt analysieren",
+          language_hint: "Unterstützt English, 中文, Français, Deutsch, Español",
+          property_title: "Immobilienanalyse",
+          property_desc:
+            "Beschreiben Sie Ihre Wünsche — Bewertungen, Risiken und nächste Schritte auf der Ergebnisseite.",
+          property_button: "Analyse öffnen",
+          contract_title: "Vertragsanalyse",
+          contract_desc:
+            "Mietvertrag oder Kernklauseln einfügen; Risiken und Hinweise an einem Ort.",
+          contract_button: "Vertrag analysieren",
+          how_title: "So funktioniert’s",
+          step_1: "Bedarf beschreiben\nTeilen Sie Budget, Gegend und Prioritäten mit.",
+          step_2: "KI-Analyse\nWir verarbeiten Ihre Eingabe mit RentalAI-Modellen.",
+          step_3: "Empfehlungen erhalten\nBewertungen, Risiken und praktische Tipps prüfen.",
+          step_4: "Entscheidung treffen\nMit klarerem Kontext wählen — in Ihrem Tempo.",
+          disclaimer:
+            "KI-generierte Inhalte dienen nur zur Orientierung und stellen keine Rechts- oder Fachberatung dar.",
+          footer_product: "Produkt",
+          footer_company: "Unternehmen",
+          footer_support: "Support",
+          footer_follow: "Folgen Sie uns",
+        },
+        es: {
+          nav_home: "Inicio",
+          nav_property: "Análisis de vivienda",
+          nav_contract: "Análisis de contrato",
+          nav_history: "Historial",
+          nav_assistant: "Asistente IA",
+          hero_title: "Asistente de decisiones de alquiler con IA",
+          hero_subtitle: "Decisiones más inteligentes. Alquileres más seguros. Mejor vida.",
+          input_placeholder: "Describe tus necesidades de alquiler…",
+          analyze_now: "Analizar ahora",
+          language_hint: "Admite English, 中文, Français, Deutsch, Español",
+          property_title: "Análisis de vivienda",
+          property_desc:
+            "Describe lo que buscas: puntuaciones, riesgos y próximos pasos en la página de resultados.",
+          property_button: "Abrir análisis",
+          contract_title: "Análisis de contrato",
+          contract_desc:
+            "Pega tu contrato o cláusulas clave; consulta riesgos y sugerencias en un solo lugar.",
+          contract_button: "Analizar contrato",
+          how_title: "Cómo funciona",
+          step_1: "Describe tus necesidades\nCuéntanos presupuesto, zona y lo que te importa.",
+          step_2: "Análisis con IA\nProcesamos tu información con los modelos RentalAI.",
+          step_3: "Obtén recomendaciones\nRevisa puntuaciones, riesgos y consejos prácticos.",
+          step_4: "Toma una decisión\nElige con más contexto — a tu ritmo.",
+          disclaimer:
+            "El contenido generado por IA es solo orientativo y no constituye asesoramiento legal o profesional.",
+          footer_product: "Producto",
+          footer_company: "Empresa",
+          footer_support: "Soporte",
+          footer_follow: "Síguenos",
+        },
       };
+
+      (function mergeHomeI18nExtras() {
+        var X = {
+          en: {
+            nav_language_label: "Language",
+            nav_login: "Login",
+            nav_sign_up: "Sign Up",
+            hero_input_label: "Rental needs",
+            features_section: "What you can do",
+            footer_placeholder: "—",
+            footer_copyright: "© RentalAI",
+            footer_privacy: "Privacy Policy",
+            footer_terms: "Terms of Use",
+            footer_disclaimer_link: "Disclaimer",
+          },
+          zh: {
+            nav_language_label: "语言",
+            nav_login: "登录",
+            nav_sign_up: "注册",
+            hero_input_label: "租房需求",
+            features_section: "您可以做什么",
+            footer_placeholder: "—",
+            footer_copyright: "© RentalAI",
+            footer_privacy: "隐私政策",
+            footer_terms: "使用条款",
+            footer_disclaimer_link: "免责声明",
+          },
+          fr: {
+            nav_language_label: "Langue",
+            nav_login: "Connexion",
+            nav_sign_up: "S’inscrire",
+            hero_input_label: "Besoins de location",
+            features_section: "Ce que vous pouvez faire",
+            footer_placeholder: "—",
+            footer_copyright: "© RentalAI",
+            footer_privacy: "Politique de confidentialité",
+            footer_terms: "Conditions d’utilisation",
+            footer_disclaimer_link: "Avertissement",
+          },
+          de: {
+            nav_language_label: "Sprache",
+            nav_login: "Anmelden",
+            nav_sign_up: "Registrieren",
+            hero_input_label: "Mietbedarf",
+            features_section: "Was Sie tun können",
+            footer_placeholder: "—",
+            footer_copyright: "© RentalAI",
+            footer_privacy: "Datenschutz",
+            footer_terms: "Nutzungsbedingungen",
+            footer_disclaimer_link: "Haftungsausschluss",
+          },
+          es: {
+            nav_language_label: "Idioma",
+            nav_login: "Iniciar sesión",
+            nav_sign_up: "Registrarse",
+            hero_input_label: "Necesidades de alquiler",
+            features_section: "Qué puede hacer",
+            footer_placeholder: "—",
+            footer_copyright: "© RentalAI",
+            footer_privacy: "Política de privacidad",
+            footer_terms: "Términos de uso",
+            footer_disclaimer_link: "Aviso legal",
+          },
+        };
+        ["en", "zh", "fr", "de", "es"].forEach(function (lc) {
+          var t = translations[lc];
+          var e = X[lc];
+          if (!t || !e) return;
+          for (var k in e) {
+            t[k] = e[k];
+          }
+        });
+      })();
+
+      var DATA_I18N_TO_KEY = {
+        "nav.home": "nav_home",
+        "nav.propertyAnalysis": "nav_property",
+        "nav.contractAnalysis": "nav_contract",
+        "nav.history": "nav_history",
+        "nav.aiAssistant": "nav_assistant",
+        "nav.languageLabel": "nav_language_label",
+        "nav.login": "nav_login",
+        "nav.signUp": "nav_sign_up",
+        "hero.title": "hero_title",
+        "hero.subtitle": "hero_subtitle",
+        "hero.inputLabel": "hero_input_label",
+        "hero.analyzeNow": "analyze_now",
+        "hero.langsHint": "language_hint",
+        "features.sectionTitle": "features_section",
+        "card.property.title": "property_title",
+        "card.property.desc": "property_desc",
+        "card.property.cta": "property_button",
+        "card.contract.title": "contract_title",
+        "card.contract.desc": "contract_desc",
+        "card.contract.cta": "contract_button",
+        "how.sectionTitle": "how_title",
+        "disclaimer.short": "disclaimer",
+        "footer.col.product": "footer_product",
+        "footer.col.company": "footer_company",
+        "footer.col.support": "footer_support",
+        "footer.col.follow": "footer_follow",
+        "footer.placeholder": "footer_placeholder",
+        "footer.copyright": "footer_copyright",
+        "footer.link.privacy": "footer_privacy",
+        "footer.link.terms": "footer_terms",
+        "footer.link.disclaimer": "footer_disclaimer_link",
+      };
+
+      var DATA_I18N_PLACEHOLDER_TO_KEY = {
+        "hero.queryPlaceholder": "input_placeholder",
+      };
+
+      function normalizeHomeLocale(lang) {
+        if (!lang) return DEFAULT_HOME_LOCALE;
+        if (lang === "zh-Hans" || lang === "zh-CN") return "zh";
+        return lang;
+      }
+
+      function resolveHomeI18nText(pack, attr) {
+        if (!attr || !pack) return undefined;
+        var m = /^how\.step([1-4])\.(title|desc)$/.exec(attr);
+        if (m) {
+          var raw = pack["step_" + m[1]];
+          if (typeof raw !== "string") return undefined;
+          var br = raw.indexOf("\n");
+          if (m[2] === "title") {
+            return br === -1 ? raw : raw.slice(0, br);
+          }
+          return br === -1 ? undefined : raw.slice(br + 1);
+        }
+        var key = DATA_I18N_TO_KEY[attr];
+        if (!key) return undefined;
+        var v = pack[key];
+        return v;
+      }
+
+      function changeLanguage(lang) {
+        try {
+          var loc = normalizeHomeLocale(lang);
+          var pack = translations[loc];
+          if (!pack) pack = translations[DEFAULT_HOME_LOCALE];
+          if (!pack) return;
+
+          var textEls = document.querySelectorAll("[data-i18n]");
+          for (var i = 0; i < textEls.length; i++) {
+            var el = textEls[i];
+            var attr = el.getAttribute("data-i18n");
+            var val = resolveHomeI18nText(pack, attr);
+            if (val !== undefined && val !== null && val !== "") {
+              el.textContent = val;
+            }
+          }
+
+          var phEls = document.querySelectorAll("[data-i18n-placeholder]");
+          for (var j = 0; j < phEls.length; j++) {
+            var pel = phEls[j];
+            var pa = pel.getAttribute("data-i18n-placeholder");
+            var pk = pa ? DATA_I18N_PLACEHOLDER_TO_KEY[pa] : null;
+            if (!pk) continue;
+            var pv = pack[pk];
+            if (pv !== undefined && pv !== null && pv !== "") {
+              pel.placeholder = pv;
+            }
+          }
+        } catch (err) {}
+      }
+
+      window.changeLanguage = changeLanguage;
+
+      document.addEventListener("DOMContentLoaded", function () {
+        var sel = document.getElementById("home-locale-select");
+        if (sel) {
+          sel.value = "en";
+          changeLanguage("en");
+        } else {
+          changeLanguage("en");
+        }
+      });
+
+      var goBtn = document.getElementById("go");
+      if (goBtn) {
+        goBtn.onclick = function () {
+          window.RentalAIPhase3.startAnalyze();
+        };
+      }
     </script>
     <script src="/assets/guest_auth_hint.js"></script>
     <script>
