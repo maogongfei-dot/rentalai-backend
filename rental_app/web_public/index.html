@@ -1,18 +1,9 @@
 <!DOCTYPE html>
 <!--
-  =============================================================================
-  当前推定主交互页（房源分析提交侧）— web_public/index.html，路由 /
-  =============================================================================
-  · 定位说明：与「assistant / 对话入口」见下文区分。本页 **#property-analysis**（结构化 #ai-field-* + #ai-query + #ai-go）由 assets/ai_home.js
-    合并为 user_text 写入 sessionStorage 后跳转 **/analyzing**，该页 **POST /analyze**，结果写入 sessionStorage 再跳转 **/ai-result**。
-  · 「assistant / 对话入口」对应 **assistant.html**：预填 #ai-query；用户在本页点击 **Analyze Property** 走同上链路。
-  · 角色：默认落地首页 + 上述 **一语分析** 主表单所在；后续新找房能力优先在本区块与 ai_home.js 对齐。
-  · ShortRentAI：作为平台内短租 / 合租 / 灵活租期 **扩展分支**，可在本页「主功能」区或表单侧增加并列入口
-    与分流参数（见页内 ShortRentAI 注释），**不替换**本页 RentAI 长线主流程。
-  · 访问：未登录可浏览本页、/start（Phase5 Step2 起租分析/演示 mock）、/assistant、/ai-result、/analysis-history、/history；受保护路由见 auth_local.js。
-  =============================================================================
+  RentalAI 首页 — 主交互：#ai-query + #ai-go，结构化 #property-analysis 与 ai_home.js
+  合并后 sessionStorage → /analyzing；Phase3 见 #go 与 app.js。
 -->
-<html lang="zh-Hans">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -23,60 +14,36 @@
     <link rel="stylesheet" href="/assets/style.css" />
     <script src="/assets/api_config.js"></script>
     <style>
-      /* Home SaaS layout — max width 1100px, centered */
-      :root {
-        --home-max: 1100px;
-        --home-radius: 12px;
-        --home-radius-btn: 10px;
-        --home-border: #e5e7eb;
-        --home-input-border: #e2e8f0;
-        --home-input-focus: #7dd3fc;
-        --home-input-focus-ring: rgba(125, 211, 252, 0.45);
-        --home-placeholder: #b0bec8;
-        --home-text: #0f172a;
-        --home-text-secondary: #475569;
-        --home-muted: #64748b;
-        --home-hint: #94a3b8;
-        --home-bg: #f1f5f9;
-        --home-card: #ffffff;
-        --home-primary: #1e3a8a;
-        --home-primary-hover: #172554;
-        --home-primary-active: #142045;
-        --home-accent: #2563eb;
-        --home-accent-hover: #1d4ed8;
-        --home-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.06);
-        --home-shadow-lg: 0 2px 8px rgba(15, 23, 42, 0.05), 0 16px 40px rgba(15, 23, 42, 0.08);
-        --home-shadow-hover: 0 2px 6px rgba(15, 23, 42, 0.05), 0 12px 28px rgba(15, 23, 42, 0.1);
-        --home-btn-min-h: 2.75rem;
-        --home-btn-px: 1.25rem;
-        --home-btn-font: 0.9375rem;
-        --home-section-gap: 3.25rem;
-        --home-card-gap: 1.5rem;
-      }
-
-      .home-saas {
-        --page-pad: clamp(1rem, 4vw, 1.75rem);
-        color: var(--home-text);
-        background: var(--home-bg);
+      .ra-home {
+        --ra-max: 1080px;
+        --ra-pad: clamp(1.25rem, 4vw, 2rem);
+        --ra-surface: #ffffff;
+        --ra-muted: #64748b;
+        --ra-text: #0f172a;
+        --ra-line: #e2e8f0;
+        --ra-accent: #2563eb;
+        --ra-accent-soft: rgba(37, 99, 235, 0.12);
+        --ra-radius: 16px;
+        --ra-radius-sm: 12px;
+        color: var(--ra-text);
+        background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 55%, #f1f5f9 100%);
         min-height: 100vh;
       }
 
-      .home-saas a {
-        color: var(--home-accent);
+      .ra-home a {
+        color: var(--ra-accent);
+      }
+      .ra-home a:hover {
+        color: #1d4ed8;
       }
 
-      .home-saas a:hover {
-        color: var(--home-accent-hover);
-      }
-
-      .home-wrap {
-        max-width: var(--home-max);
+      .ra-shell {
+        max-width: var(--ra-max);
         margin: 0 auto;
-        padding: 0 var(--page-pad) 3.5rem;
+        padding: 0 var(--ra-pad) 3.5rem;
       }
 
-      /* Script-driven nav kept in DOM for auth_local.js / favorite counts — visually hidden */
-      .home-nav-script-sr {
+      .ra-nav-sr {
         position: absolute;
         width: 1px;
         height: 1px;
@@ -88,1519 +55,979 @@
         border: 0;
       }
 
-      /* 顶栏：sticky、白底、阴影；左 Logo / 中菜单 / 右 Language + Auth */
-      .home-header {
+      /* Top bar */
+      .ra-topbar {
         position: sticky;
         top: 0;
-        z-index: 100;
-        background: rgba(255, 255, 255, 0.97);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-bottom: 1px solid var(--home-border);
-        box-shadow:
-          0 1px 0 rgba(255, 255, 255, 0.8) inset,
-          0 4px 20px rgba(15, 23, 42, 0.06);
+        z-index: 50;
+        background: rgba(255, 255, 255, 0.86);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--ra-line);
       }
-
-      .home-header-inner {
-        max-width: var(--home-max);
+      .ra-topbar-inner {
+        max-width: var(--ra-max);
         margin: 0 auto;
-        padding: 0.75rem var(--page-pad);
-      }
-
-      .home-header-row {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
-        align-items: center;
-        column-gap: clamp(0.75rem, 2vw, 1.5rem);
-        row-gap: 0.65rem;
-        width: 100%;
-      }
-
-      .home-header-nav {
-        justify-self: center;
-        min-width: 0;
-        max-width: 100%;
-      }
-
-      .home-logo {
-        font-weight: 700;
-        font-size: 1.125rem;
-        letter-spacing: -0.02em;
-        color: var(--home-text);
-        text-decoration: none;
-        flex-shrink: 0;
-      }
-
-      .home-logo:hover {
-        color: var(--home-primary);
-      }
-
-      .home-nav-main {
+        padding: 0.65rem var(--ra-pad);
         display: flex;
-        flex-wrap: wrap;
         align-items: center;
-        justify-content: center;
-        gap: 0.25rem 0.2rem;
-        list-style: none;
-        margin: 0;
-        padding: 0;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .ra-brand {
+        font-weight: 700;
+        font-size: 1.05rem;
+        letter-spacing: -0.03em;
+        color: var(--ra-text);
+        text-decoration: none;
+      }
+      .ra-brand:hover {
+        color: var(--ra-accent);
+      }
+      .ra-topnav {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
         font-size: 0.875rem;
       }
-
-      .home-nav-main li {
-        flex-shrink: 0;
-      }
-
-      .home-nav-main a {
-        display: inline-block;
-        padding: 0.45rem 0.65rem;
-        border-radius: var(--home-radius-btn);
-        color: var(--home-text-secondary);
+      .ra-topnav a {
         text-decoration: none;
+        color: var(--ra-muted);
         font-weight: 500;
-        white-space: nowrap;
-        transition:
-          color 0.16s ease,
-          background 0.16s ease,
-          box-shadow 0.16s ease;
+        padding: 0.35rem 0.55rem;
+        border-radius: 8px;
       }
-
-      .home-nav-main a:hover {
-        color: var(--home-primary);
-        background: rgba(30, 58, 138, 0.1);
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07);
+      .ra-topnav a:hover {
+        color: var(--ra-text);
+        background: rgba(15, 23, 42, 0.05);
       }
-
-      .home-nav-main a:focus-visible {
-        outline: 2px solid rgba(37, 99, 235, 0.45);
-        outline-offset: 2px;
-      }
-
-      .home-nav-main a[aria-current="page"] {
-        color: var(--home-primary);
-        font-weight: 600;
-        background: rgba(30, 58, 138, 0.09);
-        box-shadow: inset 0 0 0 1px rgba(30, 58, 138, 0.14);
-      }
-
-      .home-nav-main a[aria-current="page"]:hover {
-        background: rgba(30, 58, 138, 0.11);
-      }
-
-      .home-header-actions {
+      .ra-top-actions {
         display: flex;
-        flex-wrap: wrap;
         align-items: center;
-        justify-content: flex-end;
-        gap: 0.65rem 1rem;
+        gap: 0.65rem;
         flex-shrink: 0;
-        min-width: 0;
       }
-
-      .home-lang-block {
+      .ra-lang {
         display: flex;
         flex-direction: column;
-        align-items: flex-end;
-        gap: 0.3rem;
-        min-width: 0;
-        flex: 0 1 auto;
-        max-width: min(10rem, 100%);
+        gap: 0.15rem;
       }
-
-      .home-lang-heading {
+      .ra-lang span {
         font-size: 0.65rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
+        font-weight: 600;
         text-transform: uppercase;
-        color: var(--home-hint);
-        line-height: 1;
+        letter-spacing: 0.06em;
+        color: var(--ra-muted);
       }
-
-      .home-locale-select {
-        display: block;
-        width: auto;
-        min-width: 0;
-        max-width: min(9.5rem, 100%);
-        min-height: 2.25rem;
-        padding: 0.32rem 1.55rem 0.32rem 0.5rem;
+      .ra-lang select {
         font: inherit;
         font-size: 0.8125rem;
-        font-weight: 500;
-        line-height: 1.25;
-        color: var(--home-text-secondary);
-        background-color: #fff;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.25L6 7.75l3.5-3.5' stroke='%2364748b' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 0.42rem center;
-        background-size: 0.7rem;
-        border: 1px solid var(--home-input-border);
-        border-radius: var(--home-radius-btn);
-        cursor: pointer;
-        appearance: none;
-        -webkit-appearance: none;
-        transition:
-          border-color 0.15s ease,
-          box-shadow 0.15s ease;
+        padding: 0.35rem 0.5rem;
+        border-radius: 8px;
+        border: 1px solid var(--ra-line);
+        background: #fff;
+        color: var(--ra-text);
+        min-width: 7.5rem;
       }
-
-      .home-locale-select:hover {
-        border-color: #cbd5e1;
-      }
-
-      .home-locale-select:focus {
-        outline: none;
-        border-color: var(--home-input-focus);
-        box-shadow: 0 0 0 3px var(--home-input-focus-ring);
-      }
-
-      .home-auth-btns {
-        display: flex;
-        align-items: center;
-        gap: 0.45rem;
-        flex-shrink: 0;
-      }
-
-      @media (max-width: 900px) {
-        .home-header-inner {
-          padding: 0.7rem var(--page-pad) 0.85rem;
-        }
-        .home-header-row {
-          grid-template-columns: 1fr auto;
-          grid-template-rows: auto auto;
-        }
-        .home-logo {
-          grid-column: 1;
-          grid-row: 1;
-        }
-        .home-header-actions {
-          grid-column: 2;
-          grid-row: 1;
-          justify-self: end;
-          align-self: center;
-        }
-        .home-header-nav {
-          grid-column: 1 / -1;
-          grid-row: 2;
-          justify-self: stretch;
-          max-width: none;
-          padding-top: 0.15rem;
-          border-top: 1px solid rgba(226, 232, 240, 0.9);
-          margin: 0.1rem 0 0;
-        }
-        .home-nav-main {
-          flex-wrap: nowrap;
-          justify-content: flex-start;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-          gap: 0.15rem 0.5rem;
-          padding: 0.35rem 0 0.45rem;
-          margin: 0 -0.15rem;
-          scrollbar-width: thin;
-        }
-        .home-lang-block {
-          align-items: flex-end;
-        }
-        .home-locale-select {
-          max-width: min(8.75rem, calc(100vw - 11rem));
-          width: 100%;
-        }
-      }
-
-      @media (max-width: 420px) {
-        .home-nav-main {
-          gap: 0.1rem 0.35rem;
-        }
-        .home-nav-main a {
-          padding: 0.4rem 0.5rem;
-          font-size: 0.8125rem;
-        }
-        .home-lang-block {
-          max-width: min(8.5rem, calc(100vw - 9.5rem));
-        }
-        .home-locale-select {
-          max-width: 100%;
-          min-width: 0;
-          font-size: 0.75rem;
-          padding-top: 0.28rem;
-          padding-bottom: 0.28rem;
-        }
-        .home-btn-ghost,
-        .home-btn-solid {
-          min-height: 2.5rem;
-          padding: 0 0.85rem;
-          font-size: 0.8125rem;
-        }
-      }
-
-      /* 极窄屏：隐藏中间部分主导航项，保留 Home + 末项入口，避免挤压 Logo / Language / Auth */
-      @media (max-width: 360px) {
-        .home-nav-main li:nth-child(3),
-        .home-nav-main li:nth-child(4) {
-          display: none;
-        }
-      }
-
-      .home-btn-ghost,
-      .home-btn-solid {
+      .ra-btn-ghost,
+      .ra-btn-solid {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: var(--home-btn-min-h);
-        padding: 0 var(--home-btn-px);
-        font-size: var(--home-btn-font);
+        padding: 0.45rem 0.9rem;
+        border-radius: 999px;
+        font-size: 0.8125rem;
         font-weight: 600;
-        line-height: 1.2;
-        border-radius: var(--home-radius-btn);
         text-decoration: none;
-        box-sizing: border-box;
-        transition:
-          background 0.18s ease,
-          color 0.18s ease,
-          border-color 0.18s ease,
-          box-shadow 0.18s ease,
-          transform 0.15s ease;
+        white-space: nowrap;
       }
-
-      .home-btn-ghost {
-        color: var(--home-text-secondary);
+      .ra-btn-ghost {
+        border: 1px solid var(--ra-line);
+        color: var(--ra-text);
         background: #fff;
-        border: 1px solid var(--home-input-border);
       }
-
-      .home-btn-ghost:hover {
-        border-color: #cbd5e1;
-        background: #f1f5f9;
-        color: var(--home-text);
-        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
-        transform: translateY(-1px);
-      }
-
-      .home-btn-ghost:focus-visible {
-        outline: 2px solid rgba(37, 99, 235, 0.35);
-        outline-offset: 2px;
-      }
-
-      .home-btn-solid {
+      .ra-btn-solid {
+        background: var(--ra-text);
         color: #fff;
-        background: var(--home-primary);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--ra-text);
       }
-
-      .home-btn-solid:hover {
-        background: var(--home-primary-active);
+      .ra-btn-solid:hover {
+        background: var(--ra-accent);
+        border-color: var(--ra-accent);
         color: #fff;
-        transform: translateY(-1px);
-        box-shadow: 0 3px 12px rgba(23, 37, 84, 0.35);
       }
 
-      .home-btn-solid:focus-visible {
-        outline: 2px solid var(--home-input-focus);
-        outline-offset: 2px;
+      @media (max-width: 900px) {
+        .ra-topbar-inner {
+          flex-wrap: wrap;
+        }
+        .ra-topnav {
+          order: 3;
+          width: 100%;
+          justify-content: flex-start;
+          overflow-x: auto;
+          padding-bottom: 0.15rem;
+          -webkit-overflow-scrolling: touch;
+        }
       }
 
-      .home-stack {
-        display: flex;
-        flex-direction: column;
-        gap: var(--home-section-gap);
-        padding-top: 2rem;
+      /* Account strip (auth_local) */
+      .ra-home #home-account-strip {
+        margin: 1rem 0 0;
       }
 
-      .home-hero {
+      .ra-home #guest-home-hint:not(:empty) {
+        margin-top: 0.75rem;
+      }
+
+      /* Hero */
+      .ra-hero {
         position: relative;
-        isolation: isolate;
-        border-radius: var(--home-radius);
+        margin-top: clamp(1.75rem, 4vw, 2.75rem);
+        border-radius: calc(var(--ra-radius) + 4px);
         overflow: hidden;
-        background: var(--home-card);
-        box-shadow: var(--home-shadow-lg);
-        border: 1px solid var(--home-border);
+        background: linear-gradient(155deg, #0b1020 0%, #121c33 42%, #1e3a5f 100%);
+        color: #e2e8f0;
+        box-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.06) inset,
+          0 24px 60px rgba(15, 23, 42, 0.35);
       }
-
-      /* Hero 英国风背景：底层插画 + 浅色渐变遮罩（左白右透，不抢正文） */
-      .home-hero-backdrop {
+      .ra-hero-bg {
         position: absolute;
         inset: 0;
-        z-index: 0;
         pointer-events: none;
-        overflow: hidden;
-        border-radius: inherit;
+        opacity: 0.4;
+        color: #93c5fd;
       }
-
-      .home-hero-backdrop__sky {
+      .ra-hero-bg svg {
         position: absolute;
-        inset: 0;
-        background: linear-gradient(
-          155deg,
-          #eef2f7 0%,
-          #f8fafc 38%,
-          #e8edf4 72%,
-          #e0e7ff 100%
-        );
-      }
-
-      .home-hero-backdrop__london {
-        position: absolute;
-        left: -3%;
-        bottom: -6%;
-        width: min(58%, 520px);
+        bottom: -5%;
+        width: 55%;
+        max-width: 420px;
         height: auto;
-        color: #475569;
-        opacity: 0.1;
       }
-
-      .home-hero-backdrop__homes {
-        position: absolute;
+      .ra-hero-bg .ra-uk-left {
+        left: -2%;
+      }
+      .ra-hero-bg .ra-uk-right {
         right: -4%;
-        bottom: -10%;
-        width: min(44%, 420px);
-        height: auto;
-        color: #334155;
-        opacity: 0.13;
+        bottom: 8%;
+        width: 38%;
+        max-width: 200px;
+        opacity: 0.85;
       }
-
-      .home-hero-backdrop__wash {
+      .ra-hero-wash {
         position: absolute;
         inset: 0;
-        background: linear-gradient(
-          100deg,
-          rgba(255, 255, 255, 0.98) 0%,
-          rgba(255, 255, 255, 0.9) 26%,
-          rgba(255, 255, 255, 0.55) 45%,
-          rgba(248, 250, 252, 0.22) 68%,
-          rgba(255, 255, 255, 0.08) 88%,
-          rgba(241, 245, 249, 0.04) 100%
-        );
+        background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(59, 130, 246, 0.18), transparent 70%);
       }
 
-      @media (max-width: 520px) {
-        .home-hero-backdrop__london {
-          width: 75%;
-          opacity: 0.07;
-        }
-        .home-hero-backdrop__homes {
-          width: 58%;
-          opacity: 0.09;
-        }
-      }
-
-      .home-hero-body {
+      .ra-hero-inner {
         position: relative;
         z-index: 1;
-        padding: clamp(1.75rem, 4.5vw, 3rem);
+        padding: clamp(2.5rem, 6vw, 4.25rem) clamp(1.25rem, 4vw, 2.5rem) clamp(2rem, 5vw, 3rem);
         text-align: center;
-        max-width: 42rem;
+        max-width: 44rem;
         margin: 0 auto;
       }
-
-      .home-hero-title {
+      .ra-hero h1 {
         margin: 0 0 0.75rem;
-        font-size: clamp(1.9rem, 4.8vw, 2.65rem);
+        font-size: clamp(1.75rem, 4.5vw, 2.65rem);
         font-weight: 700;
         letter-spacing: -0.035em;
         line-height: 1.12;
-        color: var(--home-text);
+        color: #fff;
+      }
+      .ra-hero-lead {
+        margin: 0 auto 1.75rem;
+        max-width: 32rem;
+        font-size: clamp(1rem, 2.2vw, 1.125rem);
+        line-height: 1.55;
+        color: rgba(226, 232, 240, 0.88);
       }
 
-      .home-hero-sub {
-        margin: 0 0 2rem;
-        font-size: clamp(1.02rem, 2.2vw, 1.15rem);
-        font-weight: 500;
-        color: var(--home-text-secondary);
-        line-height: 1.6;
-      }
-
-      .home-hero-form {
+      .ra-prompt {
         text-align: left;
+        background: rgba(15, 23, 42, 0.45);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: var(--ra-radius);
+        padding: 1rem 1.1rem 1.1rem;
+        backdrop-filter: blur(10px);
       }
-
-      .home-hero-input {
+      .ra-prefill {
+        font-size: 0.8125rem;
+        margin: 0 0 0.65rem;
+        padding: 0.5rem 0.65rem;
+        border-radius: var(--ra-radius-sm);
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.35);
+        color: #bbf7d0;
+      }
+      .ra-prefill.hidden {
+        display: none;
+      }
+      .ra-visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .ra-prompt textarea#ai-query {
+        display: block;
         width: 100%;
         box-sizing: border-box;
-        min-height: 120px;
-        padding: 1.1rem 1.15rem;
-        font: inherit;
-        font-size: 1rem;
-        line-height: 1.55;
-        color: var(--home-text);
-        border: 1px solid var(--home-input-border);
-        border-radius: var(--home-radius-btn);
+        min-height: 8.5rem;
         resize: vertical;
-        background: #fff;
-        transition:
-          border-color 0.16s ease,
-          box-shadow 0.16s ease;
+        margin: 0;
+        padding: 0.85rem 1rem;
+        font: inherit;
+        font-size: 0.9375rem;
+        line-height: 1.5;
+        border-radius: var(--ra-radius-sm);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(255, 255, 255, 0.97);
+        color: var(--ra-text);
       }
-
-      .home-hero-input::placeholder {
-        color: var(--home-placeholder);
-        opacity: 1;
+      .ra-prompt textarea#ai-query::placeholder {
+        color: #94a3b8;
       }
-
-      .home-hero-input:focus {
+      .ra-prompt textarea#ai-query:focus {
         outline: none;
-        border-color: var(--home-input-focus);
-        box-shadow: 0 0 0 3px var(--home-input-focus-ring);
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.35);
       }
-
-      .home-hero-cta-row {
+      .ra-prompt-actions {
         display: flex;
-        flex-wrap: wrap;
-        gap: 0.75rem;
-        margin-top: 1.1rem;
-        align-items: center;
+        justify-content: flex-end;
+        margin-top: 0.85rem;
       }
-
-      .home-hero-submit,
-      .home-saas #property-analysis #ai-retry,
-      .home-saas #go {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: var(--home-btn-min-h);
-        padding: 0 var(--home-btn-px);
-        font-size: var(--home-btn-font);
-        font-weight: 600;
-        line-height: 1.2;
-        font-family: inherit;
-        border-radius: var(--home-radius-btn);
-        box-sizing: border-box;
+      #ai-go {
+        appearance: none;
         cursor: pointer;
+        font: inherit;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        padding: 0.65rem 1.35rem;
+        border-radius: 999px;
         border: none;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
         color: #fff;
-        background: var(--home-primary);
-        transition:
-          background 0.18s ease,
-          box-shadow 0.18s ease,
-          transform 0.15s ease;
+        box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45);
       }
-
-      .home-hero-submit:hover,
-      .home-saas #property-analysis #ai-retry:hover,
-      .home-saas #go:hover {
-        background: var(--home-primary-active);
-        transform: translateY(-1px);
-        box-shadow: 0 3px 12px rgba(23, 37, 84, 0.35);
+      #ai-go:hover {
+        filter: brightness(1.06);
       }
-
-      .home-hero-submit:focus-visible,
-      .home-saas #property-analysis #ai-retry:focus-visible,
-      .home-saas #go:focus-visible {
-        outline: 2px solid var(--home-input-focus);
-        outline-offset: 2px;
+      #ai-go:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 3px;
       }
-
-      @media (max-width: 640px) {
-        .home-wrap {
-          text-align: center;
-        }
-        .home-saas main.container {
-          text-align: center;
-        }
-        .home-hero-body {
-          text-align: center;
-        }
-        .home-hero-form {
-          margin-left: auto;
-          margin-right: auto;
-        }
-        .home-card {
-          align-items: center;
-          text-align: center;
-        }
-        .home-card-btn {
-          align-self: center;
-        }
-        .home-header-actions {
-          justify-content: flex-end;
-          max-width: 100%;
-        }
-        .home-hero-cta-row {
-          flex-direction: column;
-          align-items: stretch;
-          gap: 1rem;
-          margin-top: 1.25rem;
-        }
-        .home-hero-submit {
-          width: 100%;
-        }
-        /* 避免主栏居中继承到结构化表单，造成标签与输入在窄屏下错位 */
-        .home-saas #property-analysis,
-        .home-saas #property-analysis .ai-property-form,
-        .home-saas details.form-card {
-          text-align: left;
-        }
-      }
-
-      .home-hero-hint {
-        margin: 0.85rem auto 0;
-        max-width: 34rem;
-        padding: 0 0.25rem;
-        font-size: 0.78rem;
+      .ra-prompt-meta {
+        margin: 0.75rem 0 0;
+        font-size: 0.75rem;
+        color: rgba(148, 163, 184, 0.95);
         line-height: 1.45;
-        color: var(--home-hint);
         text-align: center;
-        font-weight: 400;
       }
 
-      .home-section-title {
-        margin: 0 0 1.75rem;
-        font-size: clamp(1.22rem, 2.8vw, 1.55rem);
+      /* Optional structured fields (ai_home.js) */
+      #property-analysis {
+        margin-top: 1rem;
+        text-align: left;
+        background: rgba(15, 23, 42, 0.35);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: var(--ra-radius-sm);
+      }
+      #property-analysis > summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 0.65rem 1rem;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: rgba(226, 232, 240, 0.95);
+      }
+      #property-analysis > summary::-webkit-details-marker {
+        display: none;
+      }
+      #property-analysis > summary::after {
+        content: " ▾";
+        font-size: 0.7rem;
+        opacity: 0.7;
+      }
+      #property-analysis[open] > summary::after {
+        content: " ▴";
+      }
+      #property-analysis .ra-optional-body {
+        padding: 0 1rem 1rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.15);
+      }
+      .ra-home #property-analysis .field-label,
+      .ra-home #property-analysis label.field-label {
+        color: #e2e8f0;
+      }
+      .ra-home #property-analysis .hint {
+        color: rgba(226, 232, 240, 0.85);
+      }
+      .ra-home #property-analysis .hint.muted,
+      .ra-home #property-analysis .small-print {
+        color: rgba(148, 163, 184, 0.95) !important;
+      }
+      .ra-home #property-analysis input,
+      .ra-home #property-analysis select,
+      .ra-home #property-analysis textarea {
+        background: rgba(255, 255, 255, 0.96);
+        color: var(--ra-text);
+      }
+
+      /* Feature cards */
+      .ra-section-head {
+        margin: clamp(2.75rem, 5vw, 3.5rem) 0 1.25rem;
+        text-align: center;
+      }
+      .ra-section-head h2 {
+        margin: 0;
+        font-size: clamp(1.15rem, 2.5vw, 1.35rem);
         font-weight: 700;
         letter-spacing: -0.02em;
-        line-height: 1.25;
-        color: var(--home-text);
-        text-align: center;
+        color: var(--ra-text);
       }
-
-      .home-cards {
+      .ra-cards {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: var(--home-card-gap);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.25rem;
       }
-
-      @media (max-width: 768px) {
-        .home-cards {
+      @media (max-width: 640px) {
+        .ra-cards {
           grid-template-columns: 1fr;
         }
       }
-
-      .home-card {
-        background: var(--home-card);
-        border: 1px solid var(--home-input-border);
-        border-radius: var(--home-radius);
-        padding: 1.75rem 1.6rem;
-        box-shadow: var(--home-shadow);
+      .ra-card {
+        background: var(--ra-surface);
+        border: 1px solid var(--ra-line);
+        border-radius: var(--ra-radius);
+        padding: 1.75rem 1.5rem;
+        box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
         display: flex;
         flex-direction: column;
-        align-items: flex-start;
-        gap: 0.75rem;
+        gap: 0.65rem;
         transition:
-          transform 0.22s ease,
-          box-shadow 0.22s ease;
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
       }
-
-      .home-card:hover {
+      .ra-card:hover {
         transform: translateY(-2px);
-        box-shadow: var(--home-shadow-hover);
+        box-shadow: 0 12px 36px rgba(15, 23, 42, 0.1);
       }
-
-      .home-card-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: var(--home-radius-btn);
-        background: rgba(30, 58, 138, 0.08);
-        color: var(--home-primary);
+      .ra-card-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 10px;
+        background: var(--ra-accent-soft);
+        color: var(--ra-accent);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.25rem;
-      }
-
-      .home-card-title {
-        margin: 0;
-        font-size: 1.125rem;
+        font-size: 1.1rem;
         font-weight: 700;
-        color: var(--home-text);
-        letter-spacing: -0.02em;
       }
-
-      .home-card-desc {
+      .ra-card h3 {
         margin: 0;
-        font-size: 0.9375rem;
-        color: var(--home-text-secondary);
-        line-height: 1.6;
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+      .ra-card p {
+        margin: 0;
         flex: 1;
+        font-size: 0.9375rem;
+        line-height: 1.55;
+        color: var(--ra-muted);
       }
-
-      .home-card-btn {
+      .ra-card-cta {
         margin-top: 0.35rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: var(--home-btn-min-h);
-        padding: 0 var(--home-btn-px);
-        font-size: var(--home-btn-font);
+        align-self: flex-start;
         font-weight: 600;
-        border-radius: var(--home-radius-btn);
+        font-size: 0.875rem;
         text-decoration: none;
-        border: 1px solid var(--home-input-border);
-        color: var(--home-text-secondary);
-        background: #fff;
-        box-sizing: border-box;
-        transition:
-          border-color 0.18s ease,
-          color 0.18s ease,
-          background 0.18s ease,
-          box-shadow 0.18s ease,
-          transform 0.15s ease;
+        padding: 0.4rem 0;
+        border-bottom: 2px solid var(--ra-accent);
+        color: var(--ra-text);
+      }
+      .ra-card-cta:hover {
+        color: var(--ra-accent);
       }
 
-      .home-card-btn:hover {
-        border-color: var(--home-primary);
-        color: var(--home-primary);
-        background: #f8fafc;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
-      }
-
-      .home-card-btn:focus-visible {
-        outline: 2px solid rgba(37, 99, 235, 0.35);
-        outline-offset: 2px;
-      }
-
-      .home-steps {
+      /* How it works */
+      .ra-steps {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: var(--home-card-gap);
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
         list-style: none;
         margin: 0;
         padding: 0;
       }
-
       @media (max-width: 900px) {
-        .home-steps {
-          grid-template-columns: repeat(2, 1fr);
+        .ra-steps {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
-
-      @media (max-width: 480px) {
-        .home-steps {
+      @media (max-width: 520px) {
+        .ra-steps {
           grid-template-columns: 1fr;
         }
       }
-
-      .home-step {
-        background: var(--home-card);
-        border: 1px solid var(--home-input-border);
-        border-radius: var(--home-radius);
-        padding: 1.5rem 1.15rem;
-        text-align: center;
-        box-shadow: var(--home-shadow);
-        transition:
-          transform 0.22s ease,
-          box-shadow 0.22s ease;
+      .ra-step {
+        background: var(--ra-surface);
+        border: 1px solid var(--ra-line);
+        border-radius: var(--ra-radius-sm);
+        padding: 1.25rem 1.1rem;
+        position: relative;
       }
-
-      .home-step:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--home-shadow-hover);
-      }
-
-      .home-step-num {
+      .ra-step-num {
         display: inline-flex;
-        width: 2.25rem;
-        height: 2.25rem;
+        width: 1.75rem;
+        height: 1.75rem;
         align-items: center;
         justify-content: center;
         border-radius: 999px;
-        background: var(--home-primary);
+        background: var(--ra-text);
         color: #fff;
+        font-size: 0.75rem;
         font-weight: 700;
-        font-size: 0.875rem;
-        margin-bottom: 0.65rem;
+        margin-bottom: 0.6rem;
       }
-
-      .home-step h3 {
-        margin: 0 0 0.4rem;
-        font-size: 1rem;
+      .ra-step h3 {
+        margin: 0 0 0.35rem;
+        font-size: 0.9375rem;
         font-weight: 600;
-        color: var(--home-text);
       }
-
-      .home-step p {
+      .ra-step p {
         margin: 0;
-        font-size: 0.875rem;
-        color: var(--home-text-secondary);
+        font-size: 0.8125rem;
         line-height: 1.5;
+        color: var(--ra-muted);
       }
 
-      .home-disclaimer {
+      /* Disclaimer */
+      .ra-disclaimer {
         display: flex;
+        gap: 0.75rem;
         align-items: flex-start;
-        gap: 0.65rem;
-        max-width: 40rem;
-        margin: 0.35rem auto 0;
-        padding: 0.75rem 1rem;
-        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-        border: 1px solid var(--home-input-border);
-        border-radius: var(--home-radius-btn);
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        margin: clamp(2.5rem, 4vw, 3rem) 0 0;
+        padding: 1rem 1.15rem;
+        background: #fff;
+        border: 1px solid var(--ra-line);
+        border-radius: var(--ra-radius-sm);
+        max-width: 42rem;
+        margin-left: auto;
+        margin-right: auto;
       }
-
-      .home-disclaimer__icon {
+      .ra-disclaimer-icon {
         flex-shrink: 0;
-        width: 1.35rem;
-        height: 1.35rem;
-        margin-top: 0.05rem;
+        width: 1.5rem;
+        height: 1.5rem;
         border-radius: 999px;
-        background: rgba(59, 130, 246, 0.12);
-        color: #3b82f6;
-        font-size: 0.7rem;
+        background: var(--ra-accent-soft);
+        color: var(--ra-accent);
+        font-size: 0.75rem;
         font-weight: 800;
         font-style: italic;
         display: flex;
         align-items: center;
         justify-content: center;
-        line-height: 1;
-        user-select: none;
       }
-
-      .home-disclaimer__text {
+      .ra-disclaimer p {
         margin: 0;
-        flex: 1;
-        min-width: 0;
-        text-align: left;
-        font-size: 0.78rem;
-        line-height: 1.5;
-        color: var(--home-muted);
-        font-weight: 400;
+        font-size: 0.8125rem;
+        line-height: 1.55;
+        color: var(--ra-muted);
       }
 
-      @media (max-width: 640px) {
-        .home-disclaimer {
-          margin-left: auto;
-          margin-right: auto;
-          max-width: min(40rem, 100%);
-        }
+      /* Footer */
+      .ra-footer {
+        margin-top: clamp(2.5rem, 4vw, 3.25rem);
+        padding: 2.5rem 0 2rem;
+        border-top: 1px solid var(--ra-line);
       }
-
-      .home-footer {
-        margin-top: 2.75rem;
-        padding: 2.75rem clamp(0.5rem, 2vw, 0) 2.25rem;
-        background: #f8fafc;
-        border: 1px solid var(--home-input-border);
-        border-radius: var(--home-radius);
-        box-shadow: var(--home-shadow);
-      }
-
-      .home-footer-grid {
+      .ra-footer-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 2rem 1.75rem;
+        gap: 1.75rem 1.5rem;
         margin-bottom: 2rem;
       }
-
-      @media (max-width: 900px) {
-        .home-footer-grid {
+      @media (max-width: 800px) {
+        .ra-footer-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
-
-      @media (max-width: 520px) {
-        .home-footer-grid {
+      @media (max-width: 480px) {
+        .ra-footer-grid {
           grid-template-columns: 1fr;
-          gap: 1.75rem;
-        }
-        .home-footer-col {
           text-align: center;
         }
-        .home-footer-list {
-          align-items: center;
+        .ra-footer-list {
+          align-items: center !important;
         }
       }
-
-      .home-footer-col h4 {
-        margin: 0 0 0.85rem;
-        font-size: 0.72rem;
+      .ra-footer h4 {
+        margin: 0 0 0.65rem;
+        font-size: 0.75rem;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--home-text-secondary);
+        letter-spacing: 0.06em;
+        color: var(--ra-muted);
       }
-
-      .home-footer-list {
+      .ra-footer-list {
         list-style: none;
         margin: 0;
         padding: 0;
         display: flex;
         flex-direction: column;
-        gap: 0.55rem;
+        gap: 0.45rem;
+        align-items: flex-start;
       }
-
-      .home-footer-list a {
+      .ra-footer-list a {
         font-size: 0.875rem;
-        font-weight: 500;
-        color: var(--home-muted);
+        color: var(--ra-text);
         text-decoration: none;
-        line-height: 1.45;
-        transition: color 0.15s ease;
       }
-
-      .home-footer-list a:hover {
-        color: var(--home-primary);
+      .ra-footer-list a:hover {
+        color: var(--ra-accent);
       }
-
-      .home-footer-list a:focus-visible {
-        outline: 2px solid rgba(37, 99, 235, 0.35);
-        outline-offset: 2px;
-        border-radius: 4px;
-      }
-
-      .home-footer-bottom {
+      .ra-footer-bottom {
         display: flex;
         flex-wrap: wrap;
         justify-content: space-between;
         align-items: center;
         gap: 1rem;
-        padding-top: 1.35rem;
-        border-top: 1px solid var(--home-input-border);
-        font-size: 0.8rem;
-        color: var(--home-muted);
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--ra-line);
+        font-size: 0.8125rem;
+        color: var(--ra-muted);
       }
-
-      .home-footer-legal {
+      .ra-footer-legal {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.5rem 1rem;
+        gap: 0.5rem 1.25rem;
+      }
+      .ra-footer-legal a {
+        color: var(--ra-muted);
+      }
+      .ra-clear-wrap {
+        margin-top: 1.5rem;
+        text-align: center;
+      }
+      .ra-clear-wrap .demo-clear-btn {
+        font-size: 0.8125rem;
       }
 
-      .home-footer-legal a {
-        color: var(--home-muted);
-        text-decoration: none;
-      }
-
-      .home-footer-legal a:hover {
-        color: var(--home-accent);
-      }
-
-      /* Property analysis / Phase3：与首页卡片视觉统一 */
-      .home-saas .form-card,
-      .home-saas details.form-card {
-        max-width: 100%;
-        margin-left: auto;
-        margin-right: auto;
-      }
-
-      .home-saas .home-stack > .card.form-card,
-      .home-saas .home-stack > details.card.form-card {
-        background: var(--home-card) !important;
-        border: 1px solid var(--home-border) !important;
-        border-radius: var(--home-radius) !important;
-        box-shadow: var(--home-shadow) !important;
-        padding: clamp(1.5rem, 3vw, 2rem) !important;
-        transition:
-          transform 0.22s ease,
-          box-shadow 0.22s ease;
-      }
-
-      .home-saas .home-stack > .card.form-card:hover,
-      .home-saas .home-stack > details.card.form-card:hover {
-        transform: translateY(-3px);
-        box-shadow: var(--home-shadow-hover) !important;
-      }
-
-      .home-saas #home-account-strip.home-account-strip {
-        margin-bottom: 1.25rem;
-      }
-
-      .home-saas #guest-home-hint.guest-auth-hint-host:not(:empty) {
-        margin-bottom: 1.25rem;
-      }
-
-      /* 正文字体层级 */
-      .home-saas .section-title {
-        font-size: clamp(1.15rem, 2.2vw, 1.4rem);
-        font-weight: 700;
-        color: var(--home-text);
-        letter-spacing: -0.02em;
-        line-height: 1.3;
-      }
-
-      .home-saas .field-label,
-      .home-saas label.field-label {
-        font-size: 0.9375rem;
-        font-weight: 600;
-        color: var(--home-text);
-      }
-
-      .home-saas .hint {
-        font-size: 0.9375rem;
-        line-height: 1.55;
-        color: var(--home-text-secondary);
-      }
-
-      .home-saas .hint.muted,
-      .home-saas .small-print,
-      .home-saas .field-hint {
-        font-size: 0.8125rem !important;
-        color: var(--home-hint) !important;
-        line-height: 1.5;
-      }
-
-      .home-saas .ai-examples {
-        color: var(--home-hint) !important;
-      }
-
-      .home-saas .demo-clear-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: var(--home-btn-min-h);
-        padding: 0 var(--home-btn-px);
-        font-size: var(--home-btn-font);
-        font-weight: 600;
-        font-family: inherit;
-        line-height: 1.2;
-        border-radius: var(--home-radius-btn);
-        border: 1px solid var(--home-input-border);
-        background: #fff;
-        color: var(--home-text-secondary);
-        cursor: pointer;
-        box-sizing: border-box;
-        transition:
-          border-color 0.18s ease,
-          background 0.18s ease,
-          transform 0.15s ease,
-          box-shadow 0.18s ease;
-      }
-
-      .home-saas .demo-clear-btn:hover {
-        border-color: #cbd5e1;
-        background: #f1f5f9;
-        transform: translateY(-1px);
-        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
-      }
-
-      .home-saas .demo-clear-btn:focus-visible {
-        outline: 2px solid rgba(37, 99, 235, 0.35);
-        outline-offset: 2px;
-      }
-
-      .home-saas .home-quick-links {
-        font-size: 0.9375rem;
-      }
-
-      .home-saas .home-quick-links a {
-        font-weight: 500;
-      }
-
-      .home-saas .form-card input[type="text"],
-      .home-saas .form-card input[type="number"],
-      .home-saas .form-card select,
-      .home-saas .form-card textarea {
-        border-radius: var(--home-radius-btn);
-        border: 1px solid var(--home-input-border);
-        transition:
-          border-color 0.16s ease,
-          box-shadow 0.16s ease;
-      }
-
-      .home-saas .form-card input::placeholder,
-      .home-saas .form-card textarea::placeholder {
-        color: var(--home-placeholder);
-        opacity: 1;
-      }
-
-      .home-saas .form-card input[type="text"]:focus,
-      .home-saas .form-card input[type="number"]:focus,
-      .home-saas .form-card select:focus,
-      .home-saas .form-card textarea:focus {
-        outline: none;
-        border-color: var(--home-input-focus);
-        box-shadow: 0 0 0 3px var(--home-input-focus-ring);
-      }
-
-      /* 与 .container 默认 max-width:900px 对齐到父级 1100px 宽 */
-      .home-saas main.container {
-        max-width: 100%;
-        width: 100%;
-        margin-left: auto;
-        margin-right: auto;
-        padding: 1rem 0 0;
-        box-sizing: border-box;
-      }
-
-      .visually-hidden {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
+      /* Phase3 collapsed */
+      .ra-phase3 {
+        margin-top: 1.5rem;
       }
     </style>
   </head>
-  <body class="page-shell-bg home-saas">
+  <body class="page-shell-bg ra-home">
     <script src="/assets/auth_user_store.js"></script>
     <script src="/assets/analysis_history_store.js"></script>
     <script src="/assets/analysis_history_persist.js"></script>
     <script src="/assets/auth_local.js"></script>
 
-    <header class="home-header">
-      <div class="home-header-inner">
-        <div class="home-header-row">
-          <a class="home-logo" href="/">RentalAI</a>
-          <nav class="home-header-nav" aria-label="Primary">
-            <ul class="home-nav-main">
-              <li>
-                <a href="/" aria-current="page" data-i18n="nav.home">Home</a>
-              </li>
-              <li>
-                <a href="/#property-analysis" data-i18n="nav.propertyAnalysis">Property Analysis</a>
-              </li>
-              <li>
-                <a href="/contract-analysis" data-i18n="nav.contractAnalysis">Contract Analysis</a>
-              </li>
-              <li><a href="/analysis-history" data-i18n="nav.history">History</a></li>
-              <li><a href="/assistant" data-i18n="nav.aiAssistant">AI Assistant</a></li>
-            </ul>
-          </nav>
-          <div class="home-header-actions">
-            <div class="home-lang-block">
-              <span id="home-lang-heading" class="home-lang-heading" data-i18n="nav.languageLabel">Language</span>
-              <select
-                id="home-locale-select"
-                class="home-locale-select"
-                aria-labelledby="home-lang-heading"
-                title="Interface language"
-                onchange="changeLanguage(this.value, { persist: true })"
-              >
-                <option value="en" selected>English</option>
-                <option value="zh-Hans">中文</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="es">Español</option>
-              </select>
-            </div>
-            <div class="home-auth-btns">
-              <a class="home-btn-ghost" href="/login" data-i18n="nav.login">Login</a>
-              <a class="home-btn-solid" href="/register" data-i18n="nav.signUp">Sign Up</a>
-            </div>
+    <header class="ra-topbar">
+      <div class="ra-topbar-inner">
+        <a class="ra-brand" href="/">RentalAI</a>
+        <nav class="ra-topnav" aria-label="Primary">
+          <a href="/" aria-current="page" data-i18n="nav.home">Home</a>
+          <a href="/#property-analysis" data-i18n="nav.propertyAnalysis">Property Analysis</a>
+          <a href="/contract-analysis" data-i18n="nav.contractAnalysis">Contract Analysis</a>
+          <a href="/analysis-history" data-i18n="nav.history">History</a>
+          <a href="/assistant" data-i18n="nav.aiAssistant">AI Assistant</a>
+        </nav>
+        <div class="ra-top-actions">
+          <div class="ra-lang">
+            <span id="home-lang-heading" data-i18n="nav.languageLabel">Language</span>
+            <select
+              id="home-locale-select"
+              aria-labelledby="home-lang-heading"
+              title="Interface language"
+              onchange="changeLanguage(this.value, { persist: true })"
+            >
+              <option value="en" selected>English</option>
+              <option value="zh-Hans">中文</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="es">Español</option>
+            </select>
           </div>
+          <a class="ra-btn-ghost" href="/login" data-i18n="nav.login">Login</a>
+          <a class="ra-btn-solid" href="/register" data-i18n="nav.signUp">Sign Up</a>
         </div>
       </div>
     </header>
 
-    <!-- auth_local.js 注入全局链接与 Login / Logout；保留 DOM，避免破坏收藏计数等逻辑 -->
-    <nav
-      class="top-nav demo-unified-nav home-nav-script-sr"
-      id="demo-unified-nav"
-      aria-label="Main"
-    ></nav>
+    <nav class="top-nav demo-unified-nav ra-nav-sr" id="demo-unified-nav" aria-label="Main"></nav>
 
-    <div class="home-wrap">
-      <main class="container">
-        <div
-          id="home-account-strip"
-          class="home-account-strip"
-          role="region"
-          aria-label="Account"
-        ></div>
-        <div
-          id="guest-home-hint"
-          class="guest-auth-hint-host"
-          aria-live="polite"
-        ></div>
+    <main>
+      <div class="ra-shell">
+        <div id="home-account-strip" class="home-account-strip" role="region" aria-label="Account"></div>
+        <div id="guest-home-hint" class="guest-auth-hint-host" aria-live="polite"></div>
 
-        <div class="home-stack">
-          <section class="home-hero" aria-labelledby="home-hero-heading">
-            <div class="home-hero-backdrop" aria-hidden="true">
-              <div class="home-hero-backdrop__sky"></div>
-              <!-- 左侧：淡化伦敦天际线 / Big Ben / London Eye 轮廓 -->
-              <svg
-                class="home-hero-backdrop__london"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 420 160"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <g opacity="0.95">
-                  <rect x="0" y="95" width="36" height="65" rx="1" />
-                  <rect x="42" y="78" width="32" height="82" rx="1" />
-                  <rect x="82" y="88" width="28" height="72" rx="1" />
-                  <!-- Big Ben 塔身 + 尖顶 -->
-                  <rect x="128" y="42" width="20" height="118" rx="1" />
-                  <polygon points="138,18 118,46 158,46" />
-                  <rect x="132" y="110" width="12" height="10" opacity="0.35" fill="#fff" />
-                  <rect x="158" y="70" width="40" height="90" rx="1" />
-                  <rect x="206" y="82" width="26" height="78" rx="1" />
-                  <!-- London Eye 简化为圆环 -->
-                  <circle
-                    cx="288"
-                    cy="98"
-                    r="44"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="10"
-                  />
-                  <line x1="288" y1="54" x2="288" y2="142" stroke="currentColor" stroke-width="4" />
-                  <rect x="338" y="92" width="52" height="68" rx="1" />
-                  <rect x="360" y="72" width="60" height="20" rx="1" />
-                </g>
-              </svg>
-              <!-- 右侧：现代住宅 / 房屋插画感 -->
-              <svg
-                class="home-hero-backdrop__homes"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 220 180"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <g opacity="0.92">
-                  <rect x="8" y="118" width="88" height="58" rx="3" opacity="0.85" />
-                  <rect x="102" y="98" width="108" height="78" rx="4" />
-                  <polygon points="156,38 88,104 224,104" />
-                  <rect x="118" y="118" width="36" height="32" rx="2" opacity="0.22" fill="#fff" />
-                  <rect x="168" y="124" width="28" height="26" rx="2" opacity="0.22" fill="#fff" />
-                  <rect x="128" y="72" width="56" height="8" rx="2" opacity="0.35" />
-                  <rect x="24" y="132" width="22" height="28" rx="2" opacity="0.2" fill="#fff" />
-                  <rect x="54" y="140" width="18" height="20" rx="2" opacity="0.18" fill="#fff" />
-                </g>
-              </svg>
-              <div class="home-hero-backdrop__wash"></div>
-            </div>
-            <div class="home-hero-body">
-              <h1 id="home-hero-heading" class="home-hero-title" lang="en" data-i18n="hero.title">
-                AI Rental Decision Assistant
-              </h1>
-              <p class="home-hero-sub" lang="en" data-i18n="hero.subtitle">
-                Smarter decisions. Safer rentals. Better living.
-              </p>
-              <div class="home-hero-form">
-                <p
-                  id="assistant-prefill-hint"
-                  class="hint save-banner save-banner-ok hidden"
-                  role="status"
-                  aria-live="polite"
-                ></p>
-                <label class="visually-hidden" for="ai-query" data-i18n="hero.inputLabel">Rental needs</label>
-                <textarea
-                  id="ai-query"
-                  name="ai_query"
-                  class="home-hero-input"
-                  rows="5"
-                  placeholder="Describe your rental needs..."
-                  data-i18n-placeholder="hero.queryPlaceholder"
-                  autocomplete="off"
-                ></textarea>
-                <div class="home-hero-cta-row">
-                  <button type="button" id="ai-go" class="home-hero-submit" data-i18n="hero.analyzeNow">
-                    Analyze Now
-                  </button>
-                </div>
-                <p class="home-hero-hint" data-i18n="hero.langsHint">
-                  You can describe your rental needs in English, 中文, Français, Deutsch, or Español.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section aria-labelledby="features-heading">
-            <h2 id="features-heading" class="home-section-title" data-i18n="features.sectionTitle">
-              What you can do
-            </h2>
-            <div class="home-cards">
-              <article class="home-card">
-                <div class="home-card-icon" aria-hidden="true">◎</div>
-                <h3 class="home-card-title" data-i18n="card.property.title">Property Analysis</h3>
-                <p class="home-card-desc" data-i18n="card.property.desc">
-                  Describe what you need — scores, risks, and next steps on the results page.
-                </p>
-                <a class="home-card-btn" href="/#property-analysis" data-i18n="card.property.cta">Open analysis</a>
-              </article>
-              <article class="home-card">
-                <div class="home-card-icon" aria-hidden="true">▤</div>
-                <h3 class="home-card-title" data-i18n="card.contract.title">Contract Analysis</h3>
-                <p class="home-card-desc" data-i18n="card.contract.desc">
-                  Paste your lease or key clauses; get risks and suggestions in one place.
-                </p>
-                <a class="home-card-btn" href="/contract-analysis" data-i18n="card.contract.cta">Analyze contract</a>
-              </article>
-            </div>
-          </section>
-
-          <section aria-labelledby="how-heading">
-            <h2 id="how-heading" class="home-section-title" data-i18n="how.sectionTitle">How it works</h2>
-            <ol class="home-steps">
-              <li class="home-step">
-                <div class="home-step-num">1</div>
-                <h3 data-i18n="how.step1.title">Describe Needs</h3>
-                <p data-i18n="how.step1.desc">Tell us budget, area, and what matters to you.</p>
-              </li>
-              <li class="home-step">
-                <div class="home-step-num">2</div>
-                <h3 data-i18n="how.step2.title">AI Analysis</h3>
-                <p data-i18n="how.step2.desc">We process your input with RentalAI models.</p>
-              </li>
-              <li class="home-step">
-                <div class="home-step-num">3</div>
-                <h3 data-i18n="how.step3.title">Get Recommendations</h3>
-                <p data-i18n="how.step3.desc">Review scores, risks, and practical tips.</p>
-              </li>
-              <li class="home-step">
-                <div class="home-step-num">4</div>
-                <h3 data-i18n="how.step4.title">Make Decision</h3>
-                <p data-i18n="how.step4.desc">Choose with clearer context — at your own pace.</p>
-              </li>
-            </ol>
-          </section>
-
-          <aside class="home-disclaimer" role="note" aria-label="Disclaimer">
-            <span class="home-disclaimer__icon" aria-hidden="true">i</span>
-            <p class="home-disclaimer__text" data-i18n="disclaimer.short">
-              RentalAI provides AI-assisted information to help you explore rental options. It is not
-              legal, financial, or professional tenancy advice. You should decide for yourself and
-              consult a qualified professional when it matters.
+        <section class="ra-hero" aria-labelledby="home-hero-heading">
+          <div class="ra-hero-bg" aria-hidden="true">
+            <svg
+              class="ra-uk-left"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 420 160"
+              fill="currentColor"
+            >
+              <g opacity="0.9">
+                <rect x="0" y="95" width="36" height="65" rx="1" />
+                <rect x="42" y="78" width="32" height="82" rx="1" />
+                <rect x="82" y="88" width="28" height="72" rx="1" />
+                <rect x="128" y="42" width="20" height="118" rx="1" />
+                <polygon points="138,18 118,46 158,46" />
+                <rect x="132" y="110" width="12" height="10" opacity="0.35" fill="#fff" />
+                <rect x="158" y="70" width="40" height="90" rx="1" />
+                <rect x="206" y="82" width="26" height="78" rx="1" />
+                <circle cx="288" cy="98" r="44" fill="none" stroke="currentColor" stroke-width="10" />
+                <line x1="288" y1="54" x2="288" y2="142" stroke="currentColor" stroke-width="4" />
+                <rect x="338" y="92" width="52" height="68" rx="1" />
+                <rect x="360" y="72" width="60" height="20" rx="1" />
+              </g>
+            </svg>
+            <svg
+              class="ra-uk-right"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 220 180"
+              fill="currentColor"
+            >
+              <g opacity="0.85">
+                <rect x="8" y="118" width="88" height="58" rx="3" opacity="0.85" />
+                <rect x="102" y="98" width="108" height="78" rx="4" />
+                <polygon points="156,38 88,104 224,104" />
+                <rect x="118" y="118" width="36" height="32" rx="2" opacity="0.22" fill="#fff" />
+                <rect x="168" y="124" width="28" height="26" rx="2" opacity="0.22" fill="#fff" />
+              </g>
+            </svg>
+            <div class="ra-hero-wash"></div>
+          </div>
+          <div class="ra-hero-inner">
+            <h1 id="home-hero-heading" lang="en" data-i18n="hero.title">AI Rental Decision Assistant</h1>
+            <p class="ra-hero-lead" lang="en" data-i18n="hero.subtitle">
+              Smarter decisions. Safer rentals. Better living.
             </p>
-          </aside>
-
-          <footer class="home-footer" aria-label="Site footer">
-            <div class="home-footer-grid">
-              <div class="home-footer-col">
-                <h4 data-i18n="footer.col.product">Product</h4>
-                <ul class="home-footer-list">
-                  <li>
-                    <a href="/#property-analysis" data-i18n="footer.product.property">Property Analysis</a>
-                  </li>
-                  <li>
-                    <a href="/contract-analysis" data-i18n="footer.product.contract">Contract Analysis</a>
-                  </li>
-                  <li><a href="/assistant" data-i18n="footer.product.assistant">AI Assistant</a></li>
-                  <li>
-                    <a href="/analysis-history" data-i18n="footer.product.history">History</a>
-                  </li>
-                </ul>
+            <div class="ra-prompt">
+              <p
+                id="assistant-prefill-hint"
+                class="ra-prefill hidden"
+                role="status"
+                aria-live="polite"
+              ></p>
+              <label class="ra-visually-hidden" for="ai-query" data-i18n="hero.inputLabel">Rental needs</label>
+              <textarea
+                id="ai-query"
+                name="ai_query"
+                rows="5"
+                placeholder="Describe your rental needs..."
+                data-i18n-placeholder="hero.queryPlaceholder"
+                autocomplete="off"
+              ></textarea>
+              <div class="ra-prompt-actions">
+                <button type="button" id="ai-go" data-i18n="hero.analyzeNow">Analyze Now</button>
               </div>
-              <div class="home-footer-col">
-                <h4 data-i18n="footer.col.company">Company</h4>
-                <ul class="home-footer-list">
-                  <li><a href="#" data-i18n="footer.company.about">About</a></li>
-                  <li><a href="#" data-i18n="footer.company.contact">Contact</a></li>
-                  <li>
-                    <a href="/privacy.html" data-i18n="footer.company.privacy">Privacy Policy</a>
-                  </li>
-                  <li><a href="/terms.html" data-i18n="footer.company.terms">Terms of Use</a></li>
-                </ul>
-              </div>
-              <div class="home-footer-col">
-                <h4 data-i18n="footer.col.support">Support</h4>
-                <ul class="home-footer-list">
-                  <li><a href="#" data-i18n="footer.support.help">Help</a></li>
-                  <li><a href="#" data-i18n="footer.support.faq">FAQ</a></li>
-                  <li><a href="#" data-i18n="footer.support.feedback">Feedback</a></li>
-                  <li><a href="#" data-i18n="footer.support.report">Report an Issue</a></li>
-                </ul>
-              </div>
-              <div class="home-footer-col">
-                <h4 data-i18n="footer.col.follow">Follow Us</h4>
-                <ul class="home-footer-list">
-                  <li><a href="#" data-i18n="footer.follow.x">X</a></li>
-                  <li><a href="#" data-i18n="footer.follow.linkedin">LinkedIn</a></li>
-                  <li><a href="#" data-i18n="footer.follow.tiktok">TikTok</a></li>
-                  <li><a href="#" data-i18n="footer.follow.facebook">Facebook</a></li>
-                </ul>
-              </div>
-            </div>
-            <div class="home-footer-bottom">
-              <span data-i18n="footer.copyright">© RentalAI</span>
-              <nav class="home-footer-legal" aria-label="Legal">
-                <a href="/privacy.html" data-i18n="footer.link.privacy">Privacy Policy</a>
-                <a href="/terms.html" data-i18n="footer.link.terms">Terms of Use</a>
-                <a href="/disclaimer.html" data-i18n="footer.link.disclaimer">Disclaimer</a>
-              </nav>
-            </div>
-          </footer>
-
-          <!-- RentAI 结构化字段：与 ai_home.js 合并提交；锚点 #property-analysis -->
-          <section
-            id="property-analysis"
-            class="card form-card"
-            aria-labelledby="ai-rental-heading"
-            lang="en-GB"
-          >
-            <h2 id="ai-rental-heading" class="section-title">RentalAI · Property analysis</h2>
-            <p class="hint">
-              Optional structured fields — combined with your description above when you tap Analyze
-              Now.
-            </p>
-            <p class="hint muted small-print">
-              Fill in what you know below; everything merges into one request.
-            </p>
-
-            <div class="ai-property-form" aria-label="Property details">
-              <div class="ai-form-field">
-                <label class="field-label" for="ai-field-rent">Monthly rent</label>
-                <input
-                  type="text"
-                  id="ai-field-rent"
-                  name="ai_field_rent"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  placeholder="e.g. £1,200 pcm or 1200"
-                />
-              </div>
-              <div class="ai-form-field">
-                <label class="field-label" for="ai-field-location">Location / postcode</label>
-                <input
-                  type="text"
-                  id="ai-field-location"
-                  name="ai_field_location"
-                  autocomplete="off"
-                  placeholder="e.g. Manchester M1 or DE1"
-                />
-              </div>
-              <div class="ai-form-field">
-                <label class="field-label" for="ai-field-bedrooms">Bedrooms</label>
-                <p class="field-hint">Use 0 for a studio.</p>
-                <input
-                  type="number"
-                  id="ai-field-bedrooms"
-                  name="ai_field_bedrooms"
-                  min="0"
-                  max="20"
-                  step="1"
-                  inputmode="numeric"
-                  autocomplete="off"
-                  placeholder="e.g. 2"
-                />
-              </div>
-              <div class="ai-form-field">
-                <label class="field-label" for="ai-field-bills">Bills included?</label>
-                <select id="ai-field-bills" name="ai_field_bills">
-                  <option value="">Select…</option>
-                  <option value="Not sure">Not sure</option>
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
-              </div>
-              <div class="ai-form-field">
-                <label class="field-label" for="ai-field-concerns">Contract or property concerns</label>
-                <textarea
-                  id="ai-field-concerns"
-                  name="ai_field_concerns"
-                  rows="3"
-                  placeholder="e.g. deposit terms, break clause, repairs — optional"
-                ></textarea>
-              </div>
-              <p class="hint muted small-print">
-                Submit with the <strong>Analyze Now</strong> button in the hero — optional fields here are merged into the same request.
+              <p class="ra-prompt-meta" data-i18n="hero.langsHint">
+                You can describe your rental needs in English, 中文, Français, Deutsch, or Español.
               </p>
             </div>
-            <div id="ai-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
-              <span id="ai-loading-text">Preparing analysis…</span>
-            </div>
-            <p class="hint muted small-print">Tip: Enter submits · Shift+Enter for a new line</p>
-            <p class="home-quick-links" aria-label="主流程与其它入口">
-              <a href="/assistant">智能入口</a>
-              <span class="nav-sep">·</span>
-              <a href="/check-contract">去合同分析</a>
-              <span class="nav-sep">·</span>
-              <a href="/analysis-history">分析历史</a>
-              <span class="nav-sep">·</span>
-              <a href="/compare">去房源对比</a>
-            </p>
-            <ul class="hint muted ai-examples" aria-label="示例">
-              <li>I want a 2-bed in Milton Keynes for 1000 to 1500</li>
-              <li>Show me cheaper 1-bed rentals near DE1 with images</li>
-              <li>我想找 Milton Keynes 月租 1200 以内、通勤方便的一居室</li>
-            </ul>
-            <div id="ai-err" class="err hidden" role="alert"></div>
-            <div id="ai-retry-row" class="actions-row hidden">
-              <button type="button" id="ai-retry">Try again</button>
-            </div>
-          </section>
 
-          <details class="card form-card">
-            <summary class="section-title">扩展示例：Phase3 表单搜索（可选）</summary>
-            <p class="hint muted">
-              使用下方表单与「Analyze」可走原有 Phase3 分析流程（与上方 AI 一句话入口不同）。
-            </p>
-
-            <div class="form-section">
-              <h3 class="form-section-title">Property</h3>
-              <label class="field-label" for="property-type">Property type</label>
-              <select id="property-type" name="property_type">
-                <option value="">No preference</option>
-                <option value="flat">Flat</option>
-                <option value="apartment">Apartment</option>
-                <option value="house">House</option>
-                <option value="studio">Studio</option>
-                <option value="other">Other</option>
-              </select>
-
-              <div class="field-row">
-                <div class="field-col">
-                  <label class="field-label" for="bedrooms">Bedrooms</label>
-                  <select id="bedrooms" name="bedrooms">
-                    <option value="">No preference</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4+">4+</option>
-                  </select>
+            <details id="property-analysis" class="card form-card" aria-labelledby="ai-rental-heading" lang="en-GB">
+              <summary>
+                <span id="ai-rental-heading">Optional property fields</span>
+              </summary>
+              <div class="ra-optional-body">
+                <p class="hint small-print">
+                  Combined with the description above when you use <strong>Analyze Now</strong>.
+                </p>
+                <div class="ai-property-form" aria-label="Property details">
+                  <div class="ai-form-field">
+                    <label class="field-label" for="ai-field-rent">Monthly rent</label>
+                    <input
+                      type="text"
+                      id="ai-field-rent"
+                      name="ai_field_rent"
+                      inputmode="decimal"
+                      autocomplete="off"
+                      placeholder="e.g. £1,200 pcm or 1200"
+                    />
+                  </div>
+                  <div class="ai-form-field">
+                    <label class="field-label" for="ai-field-location">Location / postcode</label>
+                    <input
+                      type="text"
+                      id="ai-field-location"
+                      name="ai_field_location"
+                      autocomplete="off"
+                      placeholder="e.g. Manchester M1 or DE1"
+                    />
+                  </div>
+                  <div class="ai-form-field">
+                    <label class="field-label" for="ai-field-bedrooms">Bedrooms</label>
+                    <p class="field-hint">Use 0 for a studio.</p>
+                    <input
+                      type="number"
+                      id="ai-field-bedrooms"
+                      name="ai_field_bedrooms"
+                      min="0"
+                      max="20"
+                      step="1"
+                      inputmode="numeric"
+                      autocomplete="off"
+                      placeholder="e.g. 2"
+                    />
+                  </div>
+                  <div class="ai-form-field">
+                    <label class="field-label" for="ai-field-bills">Bills included?</label>
+                    <select id="ai-field-bills" name="ai_field_bills">
+                      <option value="">Select…</option>
+                      <option value="Not sure">Not sure</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </div>
+                  <div class="ai-form-field">
+                    <label class="field-label" for="ai-field-concerns">Contract or property concerns</label>
+                    <textarea
+                      id="ai-field-concerns"
+                      name="ai_field_concerns"
+                      rows="3"
+                      placeholder="e.g. deposit terms, break clause, repairs — optional"
+                    ></textarea>
+                  </div>
                 </div>
-                <div class="field-col">
-                  <label class="field-label" for="bathrooms">Bathrooms (minimum)</label>
-                  <select id="bathrooms" name="bathrooms">
-                    <option value="">No preference</option>
-                    <option value="1">1</option>
-                    <option value="1.5">1.5</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                  </select>
+                <div id="ai-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
+                  <span id="ai-loading-text">Preparing analysis…</span>
+                </div>
+                <p class="hint muted small-print">Enter submits · Shift+Enter for a new line (hero box).</p>
+                <div id="ai-err" class="err hidden" role="alert"></div>
+                <div id="ai-retry-row" class="actions-row hidden">
+                  <button type="button" id="ai-retry">Try again</button>
                 </div>
               </div>
+            </details>
+          </div>
+        </section>
+
+        <div class="ra-section-head">
+          <h2 id="features-heading" data-i18n="features.sectionTitle">What you can do</h2>
+        </div>
+        <div class="ra-cards" role="list">
+          <article class="ra-card">
+            <div class="ra-card-icon" aria-hidden="true">◎</div>
+            <h3 data-i18n="card.property.title">Property Analysis</h3>
+            <p data-i18n="card.property.desc">
+              Describe what you need — scores, risks, and next steps on the results page.
+            </p>
+            <a class="ra-card-cta" href="/#property-analysis" data-i18n="card.property.cta">Open analysis</a>
+          </article>
+          <article class="ra-card">
+            <div class="ra-card-icon" aria-hidden="true">▤</div>
+            <h3 data-i18n="card.contract.title">Contract Analysis</h3>
+            <p data-i18n="card.contract.desc">
+              Paste your lease or key clauses; get risks and suggestions in one place.
+            </p>
+            <a class="ra-card-cta" href="/contract-analysis" data-i18n="card.contract.cta">Analyze contract</a>
+          </article>
+        </div>
+
+        <div class="ra-section-head">
+          <h2 id="how-heading" data-i18n="how.sectionTitle">How it works</h2>
+        </div>
+        <ol class="ra-steps" aria-labelledby="how-heading">
+          <li class="ra-step">
+            <div class="ra-step-num">1</div>
+            <h3 data-i18n="how.step1.title">Describe Needs</h3>
+            <p data-i18n="how.step1.desc">Tell us budget, area, and what matters to you.</p>
+          </li>
+          <li class="ra-step">
+            <div class="ra-step-num">2</div>
+            <h3 data-i18n="how.step2.title">AI Analysis</h3>
+            <p data-i18n="how.step2.desc">We process your input with RentalAI models.</p>
+          </li>
+          <li class="ra-step">
+            <div class="ra-step-num">3</div>
+            <h3 data-i18n="how.step3.title">Get Recommendations</h3>
+            <p data-i18n="how.step3.desc">Review scores, risks, and practical tips.</p>
+          </li>
+          <li class="ra-step">
+            <div class="ra-step-num">4</div>
+            <h3 data-i18n="how.step4.title">Make Decision</h3>
+            <p data-i18n="how.step4.desc">Choose with clearer context — at your own pace.</p>
+          </li>
+        </ol>
+
+        <aside class="ra-disclaimer" role="note" aria-label="Disclaimer">
+          <span class="ra-disclaimer-icon" aria-hidden="true">i</span>
+          <p data-i18n="disclaimer.short">
+            RentalAI provides AI-assisted information to help you explore rental options. It is not
+            legal, financial, or professional tenancy advice. You should decide for yourself and
+            consult a qualified professional when it matters.
+          </p>
+        </aside>
+
+        <footer class="ra-footer" aria-label="Site footer">
+          <div class="ra-footer-grid">
+            <div>
+              <h4 data-i18n="footer.col.product">Product</h4>
+              <ul class="ra-footer-list">
+                <li>
+                  <a href="/#property-analysis" data-i18n="footer.product.property">Property Analysis</a>
+                </li>
+                <li>
+                  <a href="/contract-analysis" data-i18n="footer.product.contract">Contract Analysis</a>
+                </li>
+                <li><a href="/assistant" data-i18n="footer.product.assistant">AI Assistant</a></li>
+                <li>
+                  <a href="/analysis-history" data-i18n="footer.product.history">History</a>
+                </li>
+              </ul>
             </div>
-
-            <div class="form-section">
-              <h3 class="form-section-title">Budget and location</h3>
-              <label class="field-label" for="budget">Monthly budget (optional, £)</label>
-              <input
-                type="text"
-                id="budget"
-                name="budget"
-                inputmode="decimal"
-                placeholder="e.g. 1500"
-                autocomplete="off"
-              />
-
-              <label class="field-label" for="location">Postcode / area or listing URL</label>
-              <input
-                type="text"
-                id="location"
-                name="location"
-                placeholder="e.g. SW1A 1AA or https://www.rightmove.co.uk/..."
-                autocomplete="off"
-              />
+            <div>
+              <h4 data-i18n="footer.col.company">Company</h4>
+              <ul class="ra-footer-list">
+                <li><a href="#" data-i18n="footer.company.about">About</a></li>
+                <li><a href="#" data-i18n="footer.company.contact">Contact</a></li>
+                <li>
+                  <a href="/privacy.html" data-i18n="footer.company.privacy">Privacy Policy</a>
+                </li>
+                <li><a href="/terms.html" data-i18n="footer.company.terms">Terms of Use</a></li>
+              </ul>
             </div>
-
-            <div class="form-section">
-              <h3 class="form-section-title">Optional preferences</h3>
-              <label class="field-label" for="distance">Distance to city centre</label>
-              <select id="distance" name="distance_to_centre">
-                <option value="any">Any</option>
-                <option value="1">Within 1 mile</option>
-                <option value="3">Within 3 miles</option>
-                <option value="5">Within 5 miles</option>
-              </select>
-
-              <label class="field-label" for="safety">Safety preference</label>
-              <select id="safety" name="safety_preference">
-                <option value="">No preference</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
+            <div>
+              <h4 data-i18n="footer.col.support">Support</h4>
+              <ul class="ra-footer-list">
+                <li><a href="#" data-i18n="footer.support.help">Help</a></li>
+                <li><a href="#" data-i18n="footer.support.faq">FAQ</a></li>
+                <li><a href="#" data-i18n="footer.support.feedback">Feedback</a></li>
+                <li><a href="#" data-i18n="footer.support.report">Report an Issue</a></li>
+              </ul>
             </div>
-
-            <div class="actions-row">
-              <button type="button" id="go">Analyze</button>
+            <div>
+              <h4 data-i18n="footer.col.follow">Follow Us</h4>
+              <ul class="ra-footer-list">
+                <li><a href="#" data-i18n="footer.follow.x">X</a></li>
+                <li><a href="#" data-i18n="footer.follow.linkedin">LinkedIn</a></li>
+                <li><a href="#" data-i18n="footer.follow.tiktok">TikTok</a></li>
+                <li><a href="#" data-i18n="footer.follow.facebook">Facebook</a></li>
+              </ul>
             </div>
-            <div id="load" class="hidden">Analyzing...</div>
-            <div id="err" class="err hidden"></div>
-          </details>
-
-          <p class="demo-clear-zone">
-            <button type="button" id="demo-clear-storage-btn" class="demo-clear-btn" title="Clear RentalAI data stored in this browser">
+          </div>
+          <div class="ra-footer-bottom">
+            <span data-i18n="footer.copyright">© RentalAI</span>
+            <nav class="ra-footer-legal" aria-label="Legal">
+              <a href="/privacy.html" data-i18n="footer.link.privacy">Privacy Policy</a>
+              <a href="/terms.html" data-i18n="footer.link.terms">Terms of Use</a>
+              <a href="/disclaimer.html" data-i18n="footer.link.disclaimer">Disclaimer</a>
+            </nav>
+          </div>
+          <p class="ra-clear-wrap">
+            <button
+              type="button"
+              id="demo-clear-storage-btn"
+              class="demo-clear-btn"
+              title="Clear RentalAI data stored in this browser"
+            >
               Clear saved data on this device
             </button>
           </p>
-        </div>
-      </main>
-    </div>
+        </footer>
+
+        <details class="card form-card ra-phase3">
+          <summary class="section-title">Advanced search (Phase3)</summary>
+          <p class="hint muted">Legacy form — separate flow from the hero analyzer.</p>
+          <div class="form-section">
+            <h3 class="form-section-title">Property</h3>
+            <label class="field-label" for="property-type">Property type</label>
+            <select id="property-type" name="property_type">
+              <option value="">No preference</option>
+              <option value="flat">Flat</option>
+              <option value="apartment">Apartment</option>
+              <option value="house">House</option>
+              <option value="studio">Studio</option>
+              <option value="other">Other</option>
+            </select>
+            <div class="field-row">
+              <div class="field-col">
+                <label class="field-label" for="bedrooms">Bedrooms</label>
+                <select id="bedrooms" name="bedrooms">
+                  <option value="">No preference</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4+">4+</option>
+                </select>
+              </div>
+              <div class="field-col">
+                <label class="field-label" for="bathrooms">Bathrooms (minimum)</label>
+                <select id="bathrooms" name="bathrooms">
+                  <option value="">No preference</option>
+                  <option value="1">1</option>
+                  <option value="1.5">1.5</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="form-section">
+            <h3 class="form-section-title">Budget and location</h3>
+            <label class="field-label" for="budget">Monthly budget (optional, £)</label>
+            <input
+              type="text"
+              id="budget"
+              name="budget"
+              inputmode="decimal"
+              placeholder="e.g. 1500"
+              autocomplete="off"
+            />
+            <label class="field-label" for="location">Postcode / area or listing URL</label>
+            <input
+              type="text"
+              id="location"
+              name="location"
+              placeholder="e.g. SW1A 1AA or https://www.rightmove.co.uk/..."
+              autocomplete="off"
+            />
+          </div>
+          <div class="form-section">
+            <h3 class="form-section-title">Optional preferences</h3>
+            <label class="field-label" for="distance">Distance to city centre</label>
+            <select id="distance" name="distance_to_centre">
+              <option value="any">Any</option>
+              <option value="1">Within 1 mile</option>
+              <option value="3">Within 3 miles</option>
+              <option value="5">Within 5 miles</option>
+            </select>
+            <label class="field-label" for="safety">Safety preference</label>
+            <select id="safety" name="safety_preference">
+              <option value="">No preference</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <div class="actions-row">
+            <button type="button" id="go">Analyze</button>
+          </div>
+          <div id="load" class="hidden">Analyzing...</div>
+          <div id="err" class="err hidden"></div>
+        </details>
+      </div>
+    </main>
 
     <script src="/assets/auth_session.js"></script>
     <script src="/assets/history_shelf.js"></script>
@@ -1608,10 +1035,6 @@
     <script src="/assets/assistant_prefill.js"></script>
     <script src="/assets/ai_home.js"></script>
     <script>
-      /**
-       * 首页文案语言包（第三步）：供后续与 #home-locale-select / data-i18n 联动。
-       * step_1 … step_4：标题与正文用换行分隔，便于将来拆分。
-       */
       var DEFAULT_HOME_LOCALE = "en";
       var translations = {
         en: {
@@ -1880,7 +1303,7 @@
           fr: {
             nav_language_label: "Langue",
             nav_login: "Connexion",
-            nav_sign_up: "S’inscrire",
+            nav_sign_up: "S\u2019inscrire",
             hero_input_label: "Besoins de location",
             features_section: "Ce que vous pouvez faire",
             footer_copyright: "© RentalAI",
@@ -1982,7 +1405,6 @@
         return String(lang).trim();
       }
 
-      /** 将语言包键（en/zh/fr/de/es）映射为 <select> 的 option value */
       function localeToSelectValue(loc) {
         if (loc === "zh") return "zh-Hans";
         if (loc === "en" || loc === "fr" || loc === "de" || loc === "es") return loc;
@@ -2003,8 +1425,7 @@
         }
         var key = DATA_I18N_TO_KEY[attr];
         if (!key) return undefined;
-        var v = pack[key];
-        return v;
+        return pack[key];
       }
 
       function changeLanguage(lang, options) {
@@ -2081,6 +1502,15 @@
           sel.value = pick;
         }
         changeLanguage(pick);
+
+        function openPropertyHash() {
+          if (location.hash === "#property-analysis") {
+            var pa = document.getElementById("property-analysis");
+            if (pa && pa.tagName === "DETAILS") pa.open = true;
+          }
+        }
+        openPropertyHash();
+        window.addEventListener("hashchange", openPropertyHash);
       });
 
       var goBtn = document.getElementById("go");
