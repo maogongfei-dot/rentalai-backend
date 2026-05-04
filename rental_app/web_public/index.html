@@ -27,15 +27,25 @@
       :root {
         --home-max: 1100px;
         --home-radius: 12px;
+        --home-radius-btn: 10px;
         --home-border: #e5e7eb;
         --home-text: #0f172a;
+        --home-text-secondary: #475569;
         --home-muted: #64748b;
-        --home-bg: #f8fafc;
+        --home-hint: #94a3b8;
+        --home-bg: #f1f5f9;
         --home-card: #ffffff;
+        --home-primary: #1e3a8a;
+        --home-primary-hover: #172554;
         --home-accent: #2563eb;
         --home-accent-hover: #1d4ed8;
-        --home-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-        --home-shadow-lg: 0 10px 40px rgba(15, 23, 42, 0.08);
+        --home-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+        --home-shadow-lg: 0 8px 36px rgba(15, 23, 42, 0.09);
+        --home-shadow-hover: 0 12px 36px rgba(15, 23, 42, 0.12);
+        --home-btn-min-h: 2.75rem;
+        --home-btn-px: 1.25rem;
+        --home-btn-font: 0.9375rem;
+        --home-section-gap: 3.25rem;
       }
 
       .home-saas {
@@ -56,7 +66,7 @@
       .home-wrap {
         max-width: var(--home-max);
         margin: 0 auto;
-        padding: 0 var(--page-pad) 3rem;
+        padding: 0 var(--page-pad) 3.5rem;
       }
 
       /* Script-driven nav kept in DOM for auth_local.js / favorite counts — visually hidden */
@@ -84,11 +94,49 @@
       .home-header-inner {
         max-width: var(--home-max);
         margin: 0 auto;
-        padding: 0.75rem var(--page-pad);
+        padding: 0.85rem var(--page-pad);
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: 1rem 1.25rem;
+      }
+
+      @media (max-width: 768px) {
+        .home-header-inner {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 1rem;
+          padding: 1rem var(--page-pad);
+        }
+        .home-nav-main {
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          gap: 0.75rem 1.25rem;
+          padding: 0.15rem 0 0.35rem;
+          margin: 0 -0.25rem;
+          scrollbar-width: thin;
+        }
+        .home-nav-main li {
+          flex-shrink: 0;
+        }
+        .home-header-actions {
+          margin-left: 0;
+          width: 100%;
+          flex-wrap: wrap;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 1rem;
+        }
+        .home-lang {
+          flex: 1 1 auto;
+          min-width: 0;
+          flex-wrap: wrap;
+          row-gap: 0.5rem;
+        }
+        .home-auth-btns {
+          flex-shrink: 0;
+        }
       }
 
       .home-logo {
@@ -162,50 +210,59 @@
         gap: 0.5rem;
       }
 
-      .home-btn-ghost {
+      .home-btn-ghost,
+      .home-btn-solid {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.45rem 0.9rem;
-        font-size: 0.875rem;
+        min-height: var(--home-btn-min-h);
+        padding: 0 var(--home-btn-px);
+        font-size: var(--home-btn-font);
         font-weight: 600;
-        color: #334155;
-        background: transparent;
-        border: 1px solid var(--home-border);
-        border-radius: 8px;
+        line-height: 1.2;
+        border-radius: var(--home-radius-btn);
         text-decoration: none;
+        box-sizing: border-box;
+        transition:
+          background 0.18s ease,
+          color 0.18s ease,
+          border-color 0.18s ease,
+          box-shadow 0.18s ease,
+          transform 0.15s ease;
+      }
+
+      .home-btn-ghost {
+        color: var(--home-text-secondary);
+        background: #fff;
+        border: 1px solid var(--home-border);
       }
 
       .home-btn-ghost:hover {
         border-color: #cbd5e1;
         background: #f8fafc;
         color: var(--home-text);
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+        transform: translateY(-1px);
       }
 
       .home-btn-solid {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.45rem 0.95rem;
-        font-size: 0.875rem;
-        font-weight: 600;
         color: #fff;
-        background: var(--home-accent);
-        border: none;
-        border-radius: 8px;
-        text-decoration: none;
+        background: var(--home-primary);
+        border: 2px solid transparent;
       }
 
       .home-btn-solid:hover {
-        background: var(--home-accent-hover);
+        background: var(--home-primary-hover);
         color: #fff;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(30, 58, 138, 0.38);
       }
 
       .home-stack {
         display: flex;
         flex-direction: column;
-        gap: 2.5rem;
-        padding-top: 1.5rem;
+        gap: var(--home-section-gap);
+        padding-top: 2rem;
       }
 
       .home-hero {
@@ -288,25 +345,27 @@
       .home-hero-body {
         position: relative;
         z-index: 1;
-        padding: clamp(1.5rem, 4vw, 2.75rem);
+        padding: clamp(1.75rem, 4.5vw, 3rem);
         text-align: center;
         max-width: 42rem;
         margin: 0 auto;
       }
 
       .home-hero-title {
-        margin: 0 0 0.65rem;
-        font-size: clamp(1.65rem, 4vw, 2.35rem);
+        margin: 0 0 0.75rem;
+        font-size: clamp(1.9rem, 4.8vw, 2.65rem);
         font-weight: 700;
-        letter-spacing: -0.03em;
-        line-height: 1.15;
+        letter-spacing: -0.035em;
+        line-height: 1.12;
+        color: var(--home-text);
       }
 
       .home-hero-sub {
-        margin: 0 0 1.75rem;
-        font-size: 1.05rem;
-        color: var(--home-muted);
-        line-height: 1.55;
+        margin: 0 0 2rem;
+        font-size: clamp(1.02rem, 2.2vw, 1.15rem);
+        font-weight: 500;
+        color: var(--home-text-secondary);
+        line-height: 1.6;
       }
 
       .home-hero-form {
@@ -317,76 +376,100 @@
         width: 100%;
         box-sizing: border-box;
         min-height: 120px;
-        padding: 1rem 1.1rem;
+        padding: 1.1rem 1.15rem;
         font: inherit;
         font-size: 1rem;
-        line-height: 1.5;
+        line-height: 1.55;
+        color: var(--home-text);
         border: 1px solid var(--home-border);
-        border-radius: 10px;
+        border-radius: var(--home-radius-btn);
         resize: vertical;
         background: #fff;
       }
 
       .home-hero-input:focus {
         outline: none;
-        border-color: var(--home-accent);
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        border-color: var(--home-primary);
+        box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.18);
       }
 
       .home-hero-cta-row {
         display: flex;
         flex-wrap: wrap;
         gap: 0.75rem;
-        margin-top: 1rem;
+        margin-top: 1.1rem;
         align-items: center;
       }
 
-      .home-hero-submit {
+      .home-hero-submit,
+      .home-saas #property-analysis #ai-retry,
+      .home-saas #go {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.65rem 1.35rem;
-        font-size: 0.95rem;
+        min-height: var(--home-btn-min-h);
+        padding: 0 var(--home-btn-px);
+        font-size: var(--home-btn-font);
         font-weight: 600;
-        color: #fff;
-        background: var(--home-accent);
-        border: none;
-        border-radius: 10px;
+        line-height: 1.2;
+        font-family: inherit;
+        border-radius: var(--home-radius-btn);
+        box-sizing: border-box;
         cursor: pointer;
+        border: none;
+        color: #fff;
+        background: var(--home-primary);
+        transition:
+          background 0.18s ease,
+          box-shadow 0.18s ease,
+          transform 0.15s ease;
       }
 
-      .home-hero-submit:hover {
-        background: var(--home-accent-hover);
+      .home-hero-submit:hover,
+      .home-saas #property-analysis #ai-retry:hover,
+      .home-saas #go:hover {
+        background: var(--home-primary-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(30, 58, 138, 0.38);
+      }
+
+      @media (max-width: 640px) {
+        .home-hero-cta-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .home-hero-submit {
+          width: 100%;
+        }
       }
 
       .home-hero-hint {
-        margin: 0.85rem 0 0;
-        font-size: 0.8rem;
-        color: var(--home-muted);
+        margin: 1rem 0 0;
+        font-size: 0.8125rem;
+        color: var(--home-hint);
         text-align: center;
+        font-weight: 500;
       }
 
       .home-section-title {
-        margin: 0 0 1.25rem;
-        font-size: 1.35rem;
+        margin: 0 0 1.75rem;
+        font-size: clamp(1.22rem, 2.8vw, 1.55rem);
         font-weight: 700;
         letter-spacing: -0.02em;
+        line-height: 1.25;
+        color: var(--home-text);
         text-align: center;
       }
 
       .home-cards {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 1.25rem;
+        gap: 1.5rem;
       }
 
-      @media (max-width: 720px) {
+      @media (max-width: 768px) {
         .home-cards {
           grid-template-columns: 1fr;
-        }
-        .home-header-actions {
-          margin-left: 0;
-          width: 100%;
         }
       }
 
@@ -394,20 +477,28 @@
         background: var(--home-card);
         border: 1px solid var(--home-border);
         border-radius: var(--home-radius);
-        padding: 1.5rem 1.35rem;
+        padding: 1.75rem 1.6rem;
         box-shadow: var(--home-shadow);
         display: flex;
         flex-direction: column;
         align-items: flex-start;
-        gap: 0.65rem;
+        gap: 0.75rem;
+        transition:
+          transform 0.22s ease,
+          box-shadow 0.22s ease;
+      }
+
+      .home-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--home-shadow-hover);
       }
 
       .home-card-icon {
-        width: 44px;
-        height: 44px;
-        border-radius: 10px;
-        background: #eff6ff;
-        color: var(--home-accent);
+        width: 48px;
+        height: 48px;
+        border-radius: var(--home-radius-btn);
+        background: rgba(30, 58, 138, 0.08);
+        color: var(--home-primary);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -416,40 +507,53 @@
 
       .home-card-title {
         margin: 0;
-        font-size: 1.1rem;
+        font-size: 1.125rem;
         font-weight: 700;
+        color: var(--home-text);
+        letter-spacing: -0.02em;
       }
 
       .home-card-desc {
         margin: 0;
-        font-size: 0.9rem;
-        color: var(--home-muted);
-        line-height: 1.55;
+        font-size: 0.9375rem;
+        color: var(--home-text-secondary);
+        line-height: 1.6;
         flex: 1;
       }
 
       .home-card-btn {
         margin-top: 0.35rem;
         display: inline-flex;
-        padding: 0.5rem 1rem;
-        font-size: 0.875rem;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--home-btn-min-h);
+        padding: 0 var(--home-btn-px);
+        font-size: var(--home-btn-font);
         font-weight: 600;
-        border-radius: 8px;
+        border-radius: var(--home-radius-btn);
         text-decoration: none;
         border: 1px solid var(--home-border);
-        color: var(--home-text);
+        color: var(--home-text-secondary);
         background: #fff;
+        box-sizing: border-box;
+        transition:
+          border-color 0.18s ease,
+          color 0.18s ease,
+          box-shadow 0.18s ease,
+          transform 0.15s ease;
       }
 
       .home-card-btn:hover {
-        border-color: var(--home-accent);
-        color: var(--home-accent);
+        border-color: var(--home-primary);
+        color: var(--home-primary);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
       }
 
       .home-steps {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 1rem;
+        gap: 1.25rem;
         list-style: none;
         margin: 0;
         padding: 0;
@@ -471,49 +575,60 @@
         background: var(--home-card);
         border: 1px solid var(--home-border);
         border-radius: var(--home-radius);
-        padding: 1.25rem 1rem;
+        padding: 1.5rem 1.15rem;
         text-align: center;
         box-shadow: var(--home-shadow);
+        transition:
+          transform 0.22s ease,
+          box-shadow 0.22s ease;
+      }
+
+      .home-step:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--home-shadow-hover);
       }
 
       .home-step-num {
         display: inline-flex;
-        width: 2rem;
-        height: 2rem;
+        width: 2.25rem;
+        height: 2.25rem;
         align-items: center;
         justify-content: center;
         border-radius: 999px;
-        background: var(--home-accent);
+        background: var(--home-primary);
         color: #fff;
         font-weight: 700;
-        font-size: 0.85rem;
-        margin-bottom: 0.6rem;
+        font-size: 0.875rem;
+        margin-bottom: 0.65rem;
       }
 
       .home-step h3 {
-        margin: 0 0 0.35rem;
-        font-size: 0.95rem;
+        margin: 0 0 0.4rem;
+        font-size: 1rem;
         font-weight: 600;
+        color: var(--home-text);
       }
 
       .home-step p {
         margin: 0;
-        font-size: 0.82rem;
-        color: var(--home-muted);
-        line-height: 1.45;
+        font-size: 0.875rem;
+        color: var(--home-text-secondary);
+        line-height: 1.5;
       }
 
       .home-disclaimer {
         text-align: center;
-        font-size: 0.8rem;
-        color: var(--home-muted);
-        padding: 0.5rem 0;
+        font-size: 0.8125rem;
+        color: var(--home-hint);
+        font-weight: 500;
+        padding: 0.75rem 0;
+        line-height: 1.55;
       }
 
       .home-footer {
         border-top: 1px solid var(--home-border);
-        padding-top: 2rem;
-        margin-top: 0.5rem;
+        padding-top: 2.25rem;
+        margin-top: 0.75rem;
       }
 
       .home-footer-grid {
@@ -535,7 +650,7 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        color: #94a3b8;
+        color: var(--home-hint);
       }
 
       .home-footer-col p,
@@ -579,12 +694,117 @@
         color: var(--home-accent);
       }
 
-      /* Property analysis block — readable spacing inside home */
+      /* Property analysis / Phase3：与首页卡片视觉统一 */
       .home-saas .form-card,
       .home-saas details.form-card {
         max-width: 100%;
         margin-left: auto;
         margin-right: auto;
+      }
+
+      .home-saas .home-stack > .card.form-card,
+      .home-saas .home-stack > details.card.form-card {
+        background: var(--home-card) !important;
+        border: 1px solid var(--home-border) !important;
+        border-radius: var(--home-radius) !important;
+        box-shadow: var(--home-shadow) !important;
+        padding: clamp(1.5rem, 3vw, 2rem) !important;
+        transition:
+          transform 0.22s ease,
+          box-shadow 0.22s ease;
+      }
+
+      .home-saas .home-stack > .card.form-card:hover,
+      .home-saas .home-stack > details.card.form-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--home-shadow-hover) !important;
+      }
+
+      .home-saas #home-account-strip.home-account-strip {
+        margin-bottom: 1.25rem;
+      }
+
+      .home-saas #guest-home-hint.guest-auth-hint-host:not(:empty) {
+        margin-bottom: 1.25rem;
+      }
+
+      /* 正文字体层级 */
+      .home-saas .section-title {
+        font-size: clamp(1.15rem, 2.2vw, 1.4rem);
+        font-weight: 700;
+        color: var(--home-text);
+        letter-spacing: -0.02em;
+        line-height: 1.3;
+      }
+
+      .home-saas .field-label,
+      .home-saas label.field-label {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--home-text);
+      }
+
+      .home-saas .hint {
+        font-size: 0.9375rem;
+        line-height: 1.55;
+        color: var(--home-text-secondary);
+      }
+
+      .home-saas .hint.muted,
+      .home-saas .small-print,
+      .home-saas .field-hint {
+        font-size: 0.8125rem !important;
+        color: var(--home-hint) !important;
+        line-height: 1.5;
+      }
+
+      .home-saas .ai-examples {
+        color: var(--home-hint) !important;
+      }
+
+      .home-saas .demo-clear-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: var(--home-btn-min-h);
+        padding: 0 var(--home-btn-px);
+        font-size: var(--home-btn-font);
+        font-weight: 600;
+        font-family: inherit;
+        line-height: 1.2;
+        border-radius: var(--home-radius-btn);
+        border: 1px solid var(--home-border);
+        background: #fff;
+        color: var(--home-text-secondary);
+        cursor: pointer;
+        box-sizing: border-box;
+        transition:
+          border-color 0.18s ease,
+          background 0.18s ease,
+          transform 0.15s ease,
+          box-shadow 0.18s ease;
+      }
+
+      .home-saas .demo-clear-btn:hover {
+        border-color: #cbd5e1;
+        background: #f8fafc;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.07);
+      }
+
+      .home-saas .home-quick-links {
+        font-size: 0.9375rem;
+      }
+
+      .home-saas .home-quick-links a {
+        font-weight: 500;
+      }
+
+      .home-saas .form-card input[type="text"],
+      .home-saas .form-card input[type="number"],
+      .home-saas .form-card select,
+      .home-saas .form-card textarea {
+        border-radius: var(--home-radius-btn);
       }
 
       /* 与 .container 默认 max-width:900px 对齐到父级 1100px 宽 */
@@ -593,8 +813,7 @@
         width: 100%;
         margin-left: auto;
         margin-right: auto;
-        padding-left: 0;
-        padding-right: 0;
+        padding: 1rem 0 0;
         box-sizing: border-box;
       }
 
@@ -657,7 +876,7 @@
     ></nav>
 
     <div class="home-wrap">
-      <main class="container" style="padding-top: 0">
+      <main class="container">
         <div
           id="home-account-strip"
           class="home-account-strip"
