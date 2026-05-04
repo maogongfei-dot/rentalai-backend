@@ -7,6 +7,7 @@ import sys
 from copy import deepcopy
 from typing import Any
 
+from utils.listing_availability import filter_available_listings
 from data.storage.listing_storage import export_listings_as_dicts
 from house_candidate_loader import get_last_candidate_load_meta, load_candidate_houses
 from house_canonical import canonical_records_to_listing_rows, canonical_to_listing_row
@@ -496,6 +497,10 @@ def _rank_from_pool(
     dataset_used: str | None = None,
 ) -> dict[str, Any]:
     """候选 listing 行 pool → 评分排序 → recommendations（Phase A5 共用）。"""
+    availability_before_count = len(pool)
+    pool = filter_available_listings(pool)
+    availability_after_count = len(pool)
+
     want_pt = structured.get("property_type")
     if want_pt:
         pool = [r for r in pool if _property_type_ok(r, want_pt)] or pool
@@ -528,6 +533,9 @@ def _rank_from_pool(
         "sample_source": sample_source or "unknown",
         "multisource_samples_prepended": multisource_prepended,
         "city_filter_relaxed": relaxed_city,
+        "availability_before_count": availability_before_count,
+        "availability_after_count": availability_after_count,
+        "availability_filtered_count": availability_before_count - availability_after_count,
     }
     if dataset_used:
         summ["dataset"] = dataset_used
