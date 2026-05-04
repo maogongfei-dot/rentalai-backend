@@ -22,375 +22,1023 @@
     <title>RentalAI · AI-powered rental property analysis</title>
     <link rel="stylesheet" href="/assets/style.css" />
     <script src="/assets/api_config.js"></script>
+    <style>
+      /* Home SaaS layout — max width 1100px, centered */
+      :root {
+        --home-max: 1100px;
+        --home-radius: 12px;
+        --home-border: #e5e7eb;
+        --home-text: #0f172a;
+        --home-muted: #64748b;
+        --home-bg: #f8fafc;
+        --home-card: #ffffff;
+        --home-accent: #2563eb;
+        --home-accent-hover: #1d4ed8;
+        --home-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+        --home-shadow-lg: 0 10px 40px rgba(15, 23, 42, 0.08);
+      }
+
+      .home-saas {
+        --page-pad: clamp(1rem, 4vw, 1.75rem);
+        color: var(--home-text);
+        background: var(--home-bg);
+        min-height: 100vh;
+      }
+
+      .home-saas a {
+        color: var(--home-accent);
+      }
+
+      .home-saas a:hover {
+        color: var(--home-accent-hover);
+      }
+
+      .home-wrap {
+        max-width: var(--home-max);
+        margin: 0 auto;
+        padding: 0 var(--page-pad) 3rem;
+      }
+
+      /* Script-driven nav kept in DOM for auth_local.js / favorite counts — visually hidden */
+      .home-nav-script-sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .home-header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--home-border);
+      }
+
+      .home-header-inner {
+        max-width: var(--home-max);
+        margin: 0 auto;
+        padding: 0.75rem var(--page-pad);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1rem 1.25rem;
+      }
+
+      .home-logo {
+        font-weight: 700;
+        font-size: 1.125rem;
+        letter-spacing: -0.02em;
+        color: var(--home-text);
+        text-decoration: none;
+      }
+
+      .home-logo:hover {
+        color: var(--home-accent);
+      }
+
+      .home-nav-main {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 1.1rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        font-size: 0.9rem;
+      }
+
+      .home-nav-main a {
+        color: #334155;
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .home-nav-main a:hover {
+        color: var(--home-accent);
+      }
+
+      .home-header-actions {
+        margin-left: auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem 1rem;
+      }
+
+      .home-lang {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.5rem;
+        font-size: 0.78rem;
+        color: var(--home-muted);
+      }
+
+      .home-lang a {
+        color: var(--home-muted);
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .home-lang a:hover {
+        color: var(--home-accent);
+      }
+
+      .home-lang-sep {
+        color: #cbd5e1;
+        user-select: none;
+      }
+
+      .home-auth-btns {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .home-btn-ghost {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.45rem 0.9rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #334155;
+        background: transparent;
+        border: 1px solid var(--home-border);
+        border-radius: 8px;
+        text-decoration: none;
+      }
+
+      .home-btn-ghost:hover {
+        border-color: #cbd5e1;
+        background: #f8fafc;
+        color: var(--home-text);
+      }
+
+      .home-btn-solid {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.45rem 0.95rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #fff;
+        background: var(--home-accent);
+        border: none;
+        border-radius: 8px;
+        text-decoration: none;
+      }
+
+      .home-btn-solid:hover {
+        background: var(--home-accent-hover);
+        color: #fff;
+      }
+
+      .home-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 2.5rem;
+        padding-top: 1.5rem;
+      }
+
+      .home-hero {
+        position: relative;
+        isolation: isolate;
+        border-radius: var(--home-radius);
+        overflow: hidden;
+        background: var(--home-card);
+        box-shadow: var(--home-shadow-lg);
+        border: 1px solid var(--home-border);
+      }
+
+      /* Hero 英国风背景：底层插画 + 浅色渐变遮罩（左白右透，不抢正文） */
+      .home-hero-backdrop {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+        border-radius: inherit;
+      }
+
+      .home-hero-backdrop__sky {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          155deg,
+          #eef2f7 0%,
+          #f8fafc 38%,
+          #e8edf4 72%,
+          #e0e7ff 100%
+        );
+      }
+
+      .home-hero-backdrop__london {
+        position: absolute;
+        left: -3%;
+        bottom: -6%;
+        width: min(58%, 520px);
+        height: auto;
+        color: #475569;
+        opacity: 0.1;
+      }
+
+      .home-hero-backdrop__homes {
+        position: absolute;
+        right: -4%;
+        bottom: -10%;
+        width: min(44%, 420px);
+        height: auto;
+        color: #334155;
+        opacity: 0.13;
+      }
+
+      .home-hero-backdrop__wash {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          100deg,
+          rgba(255, 255, 255, 0.98) 0%,
+          rgba(255, 255, 255, 0.9) 26%,
+          rgba(255, 255, 255, 0.55) 45%,
+          rgba(248, 250, 252, 0.22) 68%,
+          rgba(255, 255, 255, 0.08) 88%,
+          rgba(241, 245, 249, 0.04) 100%
+        );
+      }
+
+      @media (max-width: 520px) {
+        .home-hero-backdrop__london {
+          width: 75%;
+          opacity: 0.07;
+        }
+        .home-hero-backdrop__homes {
+          width: 58%;
+          opacity: 0.09;
+        }
+      }
+
+      .home-hero-body {
+        position: relative;
+        z-index: 1;
+        padding: clamp(1.5rem, 4vw, 2.75rem);
+        text-align: center;
+        max-width: 42rem;
+        margin: 0 auto;
+      }
+
+      .home-hero-title {
+        margin: 0 0 0.65rem;
+        font-size: clamp(1.65rem, 4vw, 2.35rem);
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        line-height: 1.15;
+      }
+
+      .home-hero-sub {
+        margin: 0 0 1.75rem;
+        font-size: 1.05rem;
+        color: var(--home-muted);
+        line-height: 1.55;
+      }
+
+      .home-hero-form {
+        text-align: left;
+      }
+
+      .home-hero-input {
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 120px;
+        padding: 1rem 1.1rem;
+        font: inherit;
+        font-size: 1rem;
+        line-height: 1.5;
+        border: 1px solid var(--home-border);
+        border-radius: 10px;
+        resize: vertical;
+        background: #fff;
+      }
+
+      .home-hero-input:focus {
+        outline: none;
+        border-color: var(--home-accent);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      }
+
+      .home-hero-cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1rem;
+        align-items: center;
+      }
+
+      .home-hero-submit {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.65rem 1.35rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #fff;
+        background: var(--home-accent);
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+
+      .home-hero-submit:hover {
+        background: var(--home-accent-hover);
+      }
+
+      .home-hero-hint {
+        margin: 0.85rem 0 0;
+        font-size: 0.8rem;
+        color: var(--home-muted);
+        text-align: center;
+      }
+
+      .home-section-title {
+        margin: 0 0 1.25rem;
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        text-align: center;
+      }
+
+      .home-cards {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.25rem;
+      }
+
+      @media (max-width: 720px) {
+        .home-cards {
+          grid-template-columns: 1fr;
+        }
+        .home-header-actions {
+          margin-left: 0;
+          width: 100%;
+        }
+      }
+
+      .home-card {
+        background: var(--home-card);
+        border: 1px solid var(--home-border);
+        border-radius: var(--home-radius);
+        padding: 1.5rem 1.35rem;
+        box-shadow: var(--home-shadow);
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.65rem;
+      }
+
+      .home-card-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background: #eff6ff;
+        color: var(--home-accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+      }
+
+      .home-card-title {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+
+      .home-card-desc {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--home-muted);
+        line-height: 1.55;
+        flex: 1;
+      }
+
+      .home-card-btn {
+        margin-top: 0.35rem;
+        display: inline-flex;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        border-radius: 8px;
+        text-decoration: none;
+        border: 1px solid var(--home-border);
+        color: var(--home-text);
+        background: #fff;
+      }
+
+      .home-card-btn:hover {
+        border-color: var(--home-accent);
+        color: var(--home-accent);
+      }
+
+      .home-steps {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      @media (max-width: 900px) {
+        .home-steps {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 480px) {
+        .home-steps {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .home-step {
+        background: var(--home-card);
+        border: 1px solid var(--home-border);
+        border-radius: var(--home-radius);
+        padding: 1.25rem 1rem;
+        text-align: center;
+        box-shadow: var(--home-shadow);
+      }
+
+      .home-step-num {
+        display: inline-flex;
+        width: 2rem;
+        height: 2rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: var(--home-accent);
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.85rem;
+        margin-bottom: 0.6rem;
+      }
+
+      .home-step h3 {
+        margin: 0 0 0.35rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+      }
+
+      .home-step p {
+        margin: 0;
+        font-size: 0.82rem;
+        color: var(--home-muted);
+        line-height: 1.45;
+      }
+
+      .home-disclaimer {
+        text-align: center;
+        font-size: 0.8rem;
+        color: var(--home-muted);
+        padding: 0.5rem 0;
+      }
+
+      .home-footer {
+        border-top: 1px solid var(--home-border);
+        padding-top: 2rem;
+        margin-top: 0.5rem;
+      }
+
+      .home-footer-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      @media (max-width: 640px) {
+        .home-footer-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      .home-footer-col h4 {
+        margin: 0 0 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #94a3b8;
+      }
+
+      .home-footer-col p,
+      .home-footer-col a {
+        margin: 0;
+        font-size: 0.85rem;
+        color: var(--home-muted);
+        text-decoration: none;
+        display: block;
+        line-height: 1.6;
+      }
+
+      .home-footer-col a:hover {
+        color: var(--home-accent);
+      }
+
+      .home-footer-bottom {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--home-border);
+        font-size: 0.8rem;
+        color: var(--home-muted);
+      }
+
+      .home-footer-legal {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+      }
+
+      .home-footer-legal a {
+        color: var(--home-muted);
+        text-decoration: none;
+      }
+
+      .home-footer-legal a:hover {
+        color: var(--home-accent);
+      }
+
+      /* Property analysis block — readable spacing inside home */
+      .home-saas .form-card,
+      .home-saas details.form-card {
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      /* 与 .container 默认 max-width:900px 对齐到父级 1100px 宽 */
+      .home-saas main.container {
+        max-width: 100%;
+        width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 0;
+        padding-right: 0;
+        box-sizing: border-box;
+      }
+
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
   </head>
-  <body class="page-shell-bg">
+  <body class="page-shell-bg home-saas">
     <script src="/assets/auth_user_store.js"></script>
     <script src="/assets/analysis_history_store.js"></script>
     <script src="/assets/analysis_history_persist.js"></script>
     <script src="/assets/auth_local.js"></script>
-    <!-- 顶栏：登录 / 注册 / 账户 等由脚本注入（平台通用导航；非业务表单本身） -->
-    <nav class="top-nav demo-unified-nav" id="demo-unified-nav" aria-label="Main"></nav>
 
-    <main class="container">
-      <!-- 顶区账户条：登录态与快捷账户入口（RentAI / ShortRentAI 共用身份区，脚本渲染） -->
-      <div
-        id="home-account-strip"
-        class="home-account-strip"
-        role="region"
-        aria-label="Account"
-      ></div>
-      <!-- 访客提示区：脚本注入轻提示（与登录引导相关；非主按钮） -->
-      <div
-        id="guest-home-hint"
-        class="guest-auth-hint-host"
-        aria-live="polite"
-      ></div>
-
-      <!-- Phase 5 / Step 1: product marketing hero (SaaS landing; no API calls) -->
-      <section
-        class="card saas-hero"
-        aria-labelledby="saas-hero-title"
-        lang="en-GB"
-      >
-        <p class="saas-hero-kicker">RentalAI</p>
-        <h1 id="saas-hero-title" class="saas-hero-title page-title">
-          AI-powered rental property analysis
-        </h1>
-        <p class="saas-hero-lead page-subtitle">
-          Enter the property details and let RentalAI help you assess risks, score, and next steps.
-        </p>
-        <ul class="saas-feature-grid" aria-label="Core features">
-          <li class="saas-feature-item">Contract risk analysis</li>
-          <li class="saas-feature-item">Property comparison</li>
-          <li class="saas-feature-item">Location insight</li>
-          <li class="saas-feature-item">Reputation check</li>
-          <li class="saas-feature-item">Repair and tenant guidance</li>
-        </ul>
-        <div class="saas-cta-row" role="group" aria-label="Primary actions">
-          <a class="saas-btn saas-btn--primary" href="#property-analysis">Analyze Property</a>
-          <a class="saas-btn" href="/check-contract">Check Contract</a>
-          <a class="saas-btn" href="/compare">Compare Properties</a>
-          <a class="saas-btn" href="/reputation">Check Reputation</a>
-        </div>
-        <p class="hint small-print auth-hero-links entry-strip" lang="en-GB">
-          <a class="entry-link" href="/contract-analysis">Contract Analysis</a>
-          <span class="entry-strip-sep" aria-hidden="true">·</span>
-          <a class="entry-link" href="/login">Login</a>
-          <span class="entry-strip-sep" aria-hidden="true">·</span>
-          <a class="entry-link" href="/register">Register</a>
-          <span class="entry-strip-sep" aria-hidden="true">·</span>
-          <a class="entry-link" href="/account">My Account</a>
-        </p>
-      </section>
-
-      <!-- 「主功能」区：RentAI 默认双分岔（左房源 / 右合同）；页内首屏决策引导 -->
-      <section class="card home-main-entries" aria-labelledby="main-entries-heading">
-        <h2 id="main-entries-heading" class="section-title">主功能</h2>
-        <p class="hint home-main-entries-hook">该点哪个？看你现在卡在哪一步。</p>
-        <ul class="home-entry-pick-list" aria-label="如何选择入口">
-          <li>
-            <strong>选房、比房</strong>：通勤、账单、性价比与推荐 → 点<strong>左</strong>「房源分析」
-          </li>
-          <li>
-            <strong>手上有租约</strong>：条款风险、费用问题、完整性 → 点<strong>右</strong>「合同分析」
-          </li>
-        </ul>
-        <p class="hint muted small-print home-main-entries-lead">
-          两条路线同属 RentalAI，可先找房再签约，也可先审合同再决定租不租。
-        </p>
-        <!-- 入口：分析历史（聚合房源/合同记录；登录后可云端同步） -->
-        <p class="hint small-print home-analysis-history-cta">
-          <a href="/analysis-history">分析历史</a>
-          <span class="hint muted">
-            · Recent Analyses — 访客仅本机；登录后优先账户同步 ·
-          </span>
-        </p>
-        <!-- 入口：assistant / 对话式智能入口（自然语言草稿 → 再进房源或合同；属主流程旁路增强） -->
-        <p class="hint small-print home-smart-entry-cta">
-          <a href="/assistant">智能入口</a>
-          <span class="hint muted"> · AI Assistant — Describe what you need，再选房源或合同流程</span>
-        </p>
-        <!-- 双大卡片：左=房源分析主路径（锚点下至一句话表单）；右=合同分析分支 -->
-        <div class="home-entry-grid" role="list">
-          <a
-            class="home-entry-card home-entry-card--property"
-            href="#property-analysis"
-            role="listitem"
-          >
-            <div class="home-entry-card-body">
-              <h3 class="home-entry-card-title">房源分析</h3>
-              <p class="home-entry-card-sub" lang="en">Property Analysis</p>
-              <p class="home-entry-card-desc">
-                Describe the rental you want — scores, risks, and next steps on the results page.
-              </p>
-            </div>
-            <span class="home-entry-card-cta">
-              <span class="home-entry-card-cta-label">Analyze Property</span>
-            </span>
-          </a>
-          <!-- 合同分析入口：独立页 /contract-analysis（POST /analyze → /ai-result；与找房并列） -->
-          <a
-            class="home-entry-card home-entry-card--contract"
-            href="/contract-analysis"
-            role="listitem"
-          >
-            <div class="home-entry-card-body">
-              <h3 class="home-entry-card-title">合同分析</h3>
-              <p class="home-entry-card-sub" lang="en">Contract Analysis</p>
-              <p class="home-entry-card-desc">
-                粘贴租约或条款摘要；结果页查看风险与建议（与房源分析同一结果壳）。
-              </p>
-            </div>
-            <span class="home-entry-card-cta">
-              <span class="home-entry-card-cta-label">进入合同分析</span>
-            </span>
-          </a>
-        </div>
-        <!-- ShortRentAI：未来可在此「主功能」栅格旁或下方增加短租/合租并列入口；与 RentAI 双卡扩展共存，不替换本页为主线。 -->
-      </section>
-
-      <!-- RentAI 房源分析：sessionStorage → /analyzing → POST /analyze → /ai-result -->
-      <section
-        id="property-analysis"
-        class="card form-card"
-        aria-labelledby="ai-rental-heading"
-        lang="en-GB"
-      >
-        <h2 id="ai-rental-heading" class="section-title">RentalAI · Property analysis</h2>
-        <p class="hint">
-          Enter the property details and let RentalAI help you assess risks, score, and next steps.
-        </p>
-        <!-- 自 /assistant 带回描述时由 assistant_prefill.js 显示提示（非错误区） -->
-        <p
-          id="assistant-prefill-hint"
-          class="hint save-banner save-banner-ok hidden"
-          role="status"
-          aria-live="polite"
-        ></p>
-        <p class="hint muted small-print">
-          Fill in what you know below; add free-form notes under <strong>Additional details</strong>.
-        </p>
-
-        <div class="ai-property-form" aria-label="Property details">
-          <div class="ai-form-field">
-            <label class="field-label" for="ai-field-rent">Monthly rent</label>
-            <input
-              type="text"
-              id="ai-field-rent"
-              name="ai_field_rent"
-              inputmode="decimal"
-              autocomplete="off"
-              placeholder="e.g. £1,200 pcm or 1200"
-            />
-          </div>
-          <div class="ai-form-field">
-            <label class="field-label" for="ai-field-location">Location / postcode</label>
-            <input
-              type="text"
-              id="ai-field-location"
-              name="ai_field_location"
-              autocomplete="off"
-              placeholder="e.g. Manchester M1 or DE1"
-            />
-          </div>
-          <div class="ai-form-field">
-            <label class="field-label" for="ai-field-bedrooms">Bedrooms</label>
-            <p class="field-hint">Use 0 for a studio.</p>
-            <input
-              type="number"
-              id="ai-field-bedrooms"
-              name="ai_field_bedrooms"
-              min="0"
-              max="20"
-              step="1"
-              inputmode="numeric"
-              autocomplete="off"
-              placeholder="e.g. 2"
-            />
-          </div>
-          <div class="ai-form-field">
-            <label class="field-label" for="ai-field-bills">Bills included?</label>
-            <select id="ai-field-bills" name="ai_field_bills">
-              <option value="">Select…</option>
-              <option value="Not sure">Not sure</option>
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
-          </div>
-          <div class="ai-form-field">
-            <label class="field-label" for="ai-field-concerns">Contract or property concerns</label>
-            <textarea
-              id="ai-field-concerns"
-              name="ai_field_concerns"
-              rows="3"
-              placeholder="e.g. deposit terms, break clause, repairs — optional"
-            ></textarea>
-          </div>
-          <div class="ai-form-field">
-            <label class="field-label" for="ai-query">Additional details</label>
-            <textarea
-              id="ai-query"
-              name="ai_query"
-              rows="4"
-              placeholder="Anything else: commute, move-in date, pets, parking…"
-              autocomplete="off"
-            ></textarea>
-          </div>
-          <div class="ai-form-actions">
-            <div class="actions-row">
-              <button type="button" id="ai-go" class="saas-btn saas-btn--primary">Analyze Property</button>
-            </div>
-          </div>
-        </div>
-        <div id="ai-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
-          <span id="ai-loading-text">Preparing analysis…</span>
-        </div>
-        <p class="hint muted small-print">Tip: Enter submits · Shift+Enter for a new line</p>
-        <!-- 表单下方快捷链：assistant、合同、历史、对比（同属主产品内导航；对比依赖收藏数据） -->
-        <p class="home-quick-links" aria-label="主流程与其它入口">
-          <a href="/assistant">智能入口</a>
-          <span class="nav-sep">·</span>
-          <a href="/check-contract">去合同分析</a>
-          <span class="nav-sep">·</span>
-          <a href="/analysis-history">分析历史</a>
-          <span class="nav-sep">·</span>
-          <a href="/compare">去房源对比</a>
-        </p>
-        <ul class="hint muted ai-examples" aria-label="示例">
-          <li>I want a 2-bed in Milton Keynes for 1000 to 1500</li>
-          <li>Show me cheaper 1-bed rentals near DE1 with images</li>
-          <li>我想找 Milton Keynes 月租 1200 以内、通勤方便的一居室</li>
-        </ul>
-        <!-- 接口失败时的错误文案区；重试仍走同一 submit -->
-        <div id="ai-err" class="err hidden" role="alert"></div>
-        <div id="ai-retry-row" class="actions-row hidden">
-          <button type="button" id="ai-retry">Try again</button>
-        </div>
-      </section>
-
-      <!-- 如何使用：静态步骤说明（帮助理解 RentAI 主路径，无独立跳转逻辑） -->
-      <section class="card demo-how-to" aria-labelledby="how-to-heading">
-        <h2 id="how-to-heading" class="section-title">如何使用</h2>
-        <ol class="hint demo-how-to-list">
-          <li>在上方「主功能」选好入口：左为房源分析，右为合同分析（可先读本页引导）</li>
-          <li>可选：打开「智能入口」用自然语言写需求并保存草稿，再进入房源或合同流程</li>
-          <li>房源分析：输入一句租房需求并提交</li>
-          <li>查看推荐结果和风险提示</li>
-          <li>收藏想要的房源</li>
-          <li>从「分析历史」或对比页继续决策（房源列表在分析历史 → 房源分区）</li>
-          <li>审合同：从主功能右卡、顶栏或表单下「去合同分析」进入，上传或粘贴租约</li>
-        </ol>
-      </section>
-
-      <!-- 辅助 / 旧版入口：Phase3 表单 + Analyze（非当前默认主流程核心；与上方 AI 一句话并行保留） -->
-      <details class="card form-card">
-        <summary class="section-title">扩展示例：Phase3 表单搜索（可选）</summary>
-        <p class="hint muted">
-          使用下方表单与「Analyze」可走原有 Phase3 分析流程（与上方 AI 一句话入口不同）。
-        </p>
-
-        <div class="form-section">
-          <h3 class="form-section-title">Property</h3>
-          <label class="field-label" for="property-type">Property type</label>
-          <select id="property-type" name="property_type">
-            <option value="">No preference</option>
-            <option value="flat">Flat</option>
-            <option value="apartment">Apartment</option>
-            <option value="house">House</option>
-            <option value="studio">Studio</option>
-            <option value="other">Other</option>
-          </select>
-
-          <div class="field-row">
-            <div class="field-col">
-              <label class="field-label" for="bedrooms">Bedrooms</label>
-              <select id="bedrooms" name="bedrooms">
-                <option value="">No preference</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4+">4+</option>
-              </select>
-            </div>
-            <div class="field-col">
-              <label class="field-label" for="bathrooms">Bathrooms (minimum)</label>
-              <select id="bathrooms" name="bathrooms">
-                <option value="">No preference</option>
-                <option value="1">1</option>
-                <option value="1.5">1.5</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-section">
-          <h3 class="form-section-title">Budget and location</h3>
-          <label class="field-label" for="budget">Monthly budget (optional, £)</label>
-          <input
-            type="text"
-            id="budget"
-            name="budget"
-            inputmode="decimal"
-            placeholder="e.g. 1500"
-            autocomplete="off"
-          />
-
-          <label class="field-label" for="location">Postcode / area or listing URL</label>
-          <input
-            type="text"
-            id="location"
-            name="location"
-            placeholder="e.g. SW1A 1AA or https://www.rightmove.co.uk/..."
-            autocomplete="off"
-          />
-        </div>
-
-        <div class="form-section">
-          <h3 class="form-section-title">Optional preferences</h3>
-          <label class="field-label" for="distance">Distance to city centre</label>
-          <select id="distance" name="distance_to_centre">
-            <option value="any">Any</option>
-            <option value="1">Within 1 mile</option>
-            <option value="3">Within 3 miles</option>
-            <option value="5">Within 5 miles</option>
-          </select>
-
-          <label class="field-label" for="safety">Safety preference</label>
-          <select id="safety" name="safety_preference">
-            <option value="">No preference</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </div>
-
-        <div class="actions-row">
-          <!-- Phase3 次入口按钮：调用 RentalAIPhase3.startAnalyze()；非首页主 CTA -->
-          <button type="button" id="go">Analyze</button>
-        </div>
-        <div id="load" class="hidden">Analyzing...</div>
-        <div id="err" class="err hidden"></div>
-      </details>
-
-      <!-- 本机数据清理（账户与浏览记录相关项）；非主分析路径 -->
-      <p class="demo-clear-zone">
-        <button type="button" id="demo-clear-storage-btn" class="demo-clear-btn" title="Clear RentalAI data stored in this browser">
-          Clear saved data on this device
-        </button>
-      </p>
-
-      <footer class="home-compliance-footer" lang="en-GB">
-        <nav class="home-compliance-nav" aria-label="Legal">
-          <a href="/privacy.html">Privacy Policy</a>
-          <span class="home-compliance-sep" aria-hidden="true">·</span>
-          <a href="/terms.html">Terms of Use</a>
-          <span class="home-compliance-sep" aria-hidden="true">·</span>
-          <a href="/disclaimer.html">Disclaimer</a>
+    <header class="home-header">
+      <div class="home-header-inner">
+        <a class="home-logo" href="/">RentalAI</a>
+        <nav aria-label="Primary">
+          <ul class="home-nav-main">
+            <li><a href="/">Home</a></li>
+            <li><a href="/#property-analysis">Property Analysis</a></li>
+            <li><a href="/contract-analysis">Contract Analysis</a></li>
+            <li><a href="/analysis-history">History</a></li>
+            <li><a href="/assistant">AI Assistant</a></li>
+          </ul>
         </nav>
-      </footer>
-    </main>
+        <div class="home-header-actions">
+          <div class="home-lang" aria-label="Language">
+            <a href="#" onclick="return false;">English</a>
+            <span class="home-lang-sep">/</span>
+            <a href="#" onclick="return false;">中文</a>
+            <span class="home-lang-sep">/</span>
+            <a href="#" onclick="return false;">Français</a>
+            <span class="home-lang-sep">/</span>
+            <a href="#" onclick="return false;">Deutsch</a>
+            <span class="home-lang-sep">/</span>
+            <a href="#" onclick="return false;">Español</a>
+          </div>
+          <div class="home-auth-btns">
+            <a class="home-btn-ghost" href="/login">Login</a>
+            <a class="home-btn-solid" href="/register">Sign Up</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- auth_local.js 注入全局链接与 Login / Logout；保留 DOM，避免破坏收藏计数等逻辑 -->
+    <nav
+      class="top-nav demo-unified-nav home-nav-script-sr"
+      id="demo-unified-nav"
+      aria-label="Main"
+    ></nav>
+
+    <div class="home-wrap">
+      <main class="container" style="padding-top: 0">
+        <div
+          id="home-account-strip"
+          class="home-account-strip"
+          role="region"
+          aria-label="Account"
+        ></div>
+        <div
+          id="guest-home-hint"
+          class="guest-auth-hint-host"
+          aria-live="polite"
+        ></div>
+
+        <div class="home-stack">
+          <section class="home-hero" aria-labelledby="home-hero-heading">
+            <div class="home-hero-backdrop" aria-hidden="true">
+              <div class="home-hero-backdrop__sky"></div>
+              <!-- 左侧：淡化伦敦天际线 / Big Ben / London Eye 轮廓 -->
+              <svg
+                class="home-hero-backdrop__london"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 420 160"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <g opacity="0.95">
+                  <rect x="0" y="95" width="36" height="65" rx="1" />
+                  <rect x="42" y="78" width="32" height="82" rx="1" />
+                  <rect x="82" y="88" width="28" height="72" rx="1" />
+                  <!-- Big Ben 塔身 + 尖顶 -->
+                  <rect x="128" y="42" width="20" height="118" rx="1" />
+                  <polygon points="138,18 118,46 158,46" />
+                  <rect x="132" y="110" width="12" height="10" opacity="0.35" fill="#fff" />
+                  <rect x="158" y="70" width="40" height="90" rx="1" />
+                  <rect x="206" y="82" width="26" height="78" rx="1" />
+                  <!-- London Eye 简化为圆环 -->
+                  <circle
+                    cx="288"
+                    cy="98"
+                    r="44"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="10"
+                  />
+                  <line x1="288" y1="54" x2="288" y2="142" stroke="currentColor" stroke-width="4" />
+                  <rect x="338" y="92" width="52" height="68" rx="1" />
+                  <rect x="360" y="72" width="60" height="20" rx="1" />
+                </g>
+              </svg>
+              <!-- 右侧：现代住宅 / 房屋插画感 -->
+              <svg
+                class="home-hero-backdrop__homes"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 220 180"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <g opacity="0.92">
+                  <rect x="8" y="118" width="88" height="58" rx="3" opacity="0.85" />
+                  <rect x="102" y="98" width="108" height="78" rx="4" />
+                  <polygon points="156,38 88,104 224,104" />
+                  <rect x="118" y="118" width="36" height="32" rx="2" opacity="0.22" fill="#fff" />
+                  <rect x="168" y="124" width="28" height="26" rx="2" opacity="0.22" fill="#fff" />
+                  <rect x="128" y="72" width="56" height="8" rx="2" opacity="0.35" />
+                  <rect x="24" y="132" width="22" height="28" rx="2" opacity="0.2" fill="#fff" />
+                  <rect x="54" y="140" width="18" height="20" rx="2" opacity="0.18" fill="#fff" />
+                </g>
+              </svg>
+              <div class="home-hero-backdrop__wash"></div>
+            </div>
+            <div class="home-hero-body">
+              <h1 id="home-hero-heading" class="home-hero-title" lang="en">
+                AI Rental Decision Assistant
+              </h1>
+              <p class="home-hero-sub" lang="en">
+                Smarter decisions. Safer rentals. Better living.
+              </p>
+              <div class="home-hero-form">
+                <p
+                  id="assistant-prefill-hint"
+                  class="hint save-banner save-banner-ok hidden"
+                  role="status"
+                  aria-live="polite"
+                ></p>
+                <label class="visually-hidden" for="ai-query">Rental needs</label>
+                <textarea
+                  id="ai-query"
+                  name="ai_query"
+                  class="home-hero-input"
+                  rows="5"
+                  placeholder="Describe your rental needs..."
+                  autocomplete="off"
+                ></textarea>
+                <div class="home-hero-cta-row">
+                  <button type="button" id="ai-go" class="home-hero-submit">
+                    Analyze Now
+                  </button>
+                </div>
+                <p class="home-hero-hint" lang="en">
+                  Supports English, 中文, Français, Deutsch, Español
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section aria-labelledby="features-heading">
+            <h2 id="features-heading" class="home-section-title">What you can do</h2>
+            <div class="home-cards">
+              <article class="home-card">
+                <div class="home-card-icon" aria-hidden="true">◎</div>
+                <h3 class="home-card-title">Property Analysis</h3>
+                <p class="home-card-desc">
+                  Describe what you need — scores, risks, and next steps on the results page.
+                </p>
+                <a class="home-card-btn" href="/#property-analysis">Open analysis</a>
+              </article>
+              <article class="home-card">
+                <div class="home-card-icon" aria-hidden="true">▤</div>
+                <h3 class="home-card-title">Contract Analysis</h3>
+                <p class="home-card-desc">
+                  Paste your lease or key clauses; get risks and suggestions in one place.
+                </p>
+                <a class="home-card-btn" href="/contract-analysis">Analyze contract</a>
+              </article>
+            </div>
+          </section>
+
+          <section aria-labelledby="how-heading">
+            <h2 id="how-heading" class="home-section-title">How it works</h2>
+            <ol class="home-steps">
+              <li class="home-step">
+                <div class="home-step-num">1</div>
+                <h3>Describe Needs</h3>
+                <p>Tell us budget, area, and what matters to you.</p>
+              </li>
+              <li class="home-step">
+                <div class="home-step-num">2</div>
+                <h3>AI Analysis</h3>
+                <p>We process your input with RentalAI models.</p>
+              </li>
+              <li class="home-step">
+                <div class="home-step-num">3</div>
+                <h3>Get Recommendations</h3>
+                <p>Review scores, risks, and practical tips.</p>
+              </li>
+              <li class="home-step">
+                <div class="home-step-num">4</div>
+                <h3>Make Decision</h3>
+                <p>Choose with clearer context — at your own pace.</p>
+              </li>
+            </ol>
+          </section>
+
+          <p class="home-disclaimer" lang="zh-Hans">AI 生成内容仅供参考，不构成法律或专业建议。</p>
+
+          <footer class="home-footer" aria-label="Site footer">
+            <div class="home-footer-grid">
+              <div class="home-footer-col">
+                <h4>Product</h4>
+                <p>—</p>
+              </div>
+              <div class="home-footer-col">
+                <h4>Company</h4>
+                <p>—</p>
+              </div>
+              <div class="home-footer-col">
+                <h4>Support</h4>
+                <p>—</p>
+              </div>
+              <div class="home-footer-col">
+                <h4>Follow Us</h4>
+                <p>—</p>
+              </div>
+            </div>
+            <div class="home-footer-bottom">
+              <span>© RentalAI</span>
+              <nav class="home-footer-legal" aria-label="Legal">
+                <a href="/privacy.html">Privacy Policy</a>
+                <a href="/terms.html">Terms of Use</a>
+                <a href="/disclaimer.html">Disclaimer</a>
+              </nav>
+            </div>
+          </footer>
+
+          <!-- RentAI 结构化字段：与 ai_home.js 合并提交；锚点 #property-analysis -->
+          <section
+            id="property-analysis"
+            class="card form-card"
+            aria-labelledby="ai-rental-heading"
+            lang="en-GB"
+          >
+            <h2 id="ai-rental-heading" class="section-title">RentalAI · Property analysis</h2>
+            <p class="hint">
+              Optional structured fields — combined with your description above when you tap Analyze
+              Now.
+            </p>
+            <p class="hint muted small-print">
+              Fill in what you know below; everything merges into one request.
+            </p>
+
+            <div class="ai-property-form" aria-label="Property details">
+              <div class="ai-form-field">
+                <label class="field-label" for="ai-field-rent">Monthly rent</label>
+                <input
+                  type="text"
+                  id="ai-field-rent"
+                  name="ai_field_rent"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="e.g. £1,200 pcm or 1200"
+                />
+              </div>
+              <div class="ai-form-field">
+                <label class="field-label" for="ai-field-location">Location / postcode</label>
+                <input
+                  type="text"
+                  id="ai-field-location"
+                  name="ai_field_location"
+                  autocomplete="off"
+                  placeholder="e.g. Manchester M1 or DE1"
+                />
+              </div>
+              <div class="ai-form-field">
+                <label class="field-label" for="ai-field-bedrooms">Bedrooms</label>
+                <p class="field-hint">Use 0 for a studio.</p>
+                <input
+                  type="number"
+                  id="ai-field-bedrooms"
+                  name="ai_field_bedrooms"
+                  min="0"
+                  max="20"
+                  step="1"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  placeholder="e.g. 2"
+                />
+              </div>
+              <div class="ai-form-field">
+                <label class="field-label" for="ai-field-bills">Bills included?</label>
+                <select id="ai-field-bills" name="ai_field_bills">
+                  <option value="">Select…</option>
+                  <option value="Not sure">Not sure</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+              <div class="ai-form-field">
+                <label class="field-label" for="ai-field-concerns">Contract or property concerns</label>
+                <textarea
+                  id="ai-field-concerns"
+                  name="ai_field_concerns"
+                  rows="3"
+                  placeholder="e.g. deposit terms, break clause, repairs — optional"
+                ></textarea>
+              </div>
+              <p class="hint muted small-print">
+                Submit with the <strong>Analyze Now</strong> button in the hero — optional fields here are merged into the same request.
+              </p>
+            </div>
+            <div id="ai-loading" class="ai-loading-panel hidden" aria-live="polite" aria-busy="false">
+              <span id="ai-loading-text">Preparing analysis…</span>
+            </div>
+            <p class="hint muted small-print">Tip: Enter submits · Shift+Enter for a new line</p>
+            <p class="home-quick-links" aria-label="主流程与其它入口">
+              <a href="/assistant">智能入口</a>
+              <span class="nav-sep">·</span>
+              <a href="/check-contract">去合同分析</a>
+              <span class="nav-sep">·</span>
+              <a href="/analysis-history">分析历史</a>
+              <span class="nav-sep">·</span>
+              <a href="/compare">去房源对比</a>
+            </p>
+            <ul class="hint muted ai-examples" aria-label="示例">
+              <li>I want a 2-bed in Milton Keynes for 1000 to 1500</li>
+              <li>Show me cheaper 1-bed rentals near DE1 with images</li>
+              <li>我想找 Milton Keynes 月租 1200 以内、通勤方便的一居室</li>
+            </ul>
+            <div id="ai-err" class="err hidden" role="alert"></div>
+            <div id="ai-retry-row" class="actions-row hidden">
+              <button type="button" id="ai-retry">Try again</button>
+            </div>
+          </section>
+
+          <details class="card form-card">
+            <summary class="section-title">扩展示例：Phase3 表单搜索（可选）</summary>
+            <p class="hint muted">
+              使用下方表单与「Analyze」可走原有 Phase3 分析流程（与上方 AI 一句话入口不同）。
+            </p>
+
+            <div class="form-section">
+              <h3 class="form-section-title">Property</h3>
+              <label class="field-label" for="property-type">Property type</label>
+              <select id="property-type" name="property_type">
+                <option value="">No preference</option>
+                <option value="flat">Flat</option>
+                <option value="apartment">Apartment</option>
+                <option value="house">House</option>
+                <option value="studio">Studio</option>
+                <option value="other">Other</option>
+              </select>
+
+              <div class="field-row">
+                <div class="field-col">
+                  <label class="field-label" for="bedrooms">Bedrooms</label>
+                  <select id="bedrooms" name="bedrooms">
+                    <option value="">No preference</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4+">4+</option>
+                  </select>
+                </div>
+                <div class="field-col">
+                  <label class="field-label" for="bathrooms">Bathrooms (minimum)</label>
+                  <select id="bathrooms" name="bathrooms">
+                    <option value="">No preference</option>
+                    <option value="1">1</option>
+                    <option value="1.5">1.5</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3 class="form-section-title">Budget and location</h3>
+              <label class="field-label" for="budget">Monthly budget (optional, £)</label>
+              <input
+                type="text"
+                id="budget"
+                name="budget"
+                inputmode="decimal"
+                placeholder="e.g. 1500"
+                autocomplete="off"
+              />
+
+              <label class="field-label" for="location">Postcode / area or listing URL</label>
+              <input
+                type="text"
+                id="location"
+                name="location"
+                placeholder="e.g. SW1A 1AA or https://www.rightmove.co.uk/..."
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="form-section">
+              <h3 class="form-section-title">Optional preferences</h3>
+              <label class="field-label" for="distance">Distance to city centre</label>
+              <select id="distance" name="distance_to_centre">
+                <option value="any">Any</option>
+                <option value="1">Within 1 mile</option>
+                <option value="3">Within 3 miles</option>
+                <option value="5">Within 5 miles</option>
+              </select>
+
+              <label class="field-label" for="safety">Safety preference</label>
+              <select id="safety" name="safety_preference">
+                <option value="">No preference</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+
+            <div class="actions-row">
+              <button type="button" id="go">Analyze</button>
+            </div>
+            <div id="load" class="hidden">Analyzing...</div>
+            <div id="err" class="err hidden"></div>
+          </details>
+
+          <p class="demo-clear-zone">
+            <button type="button" id="demo-clear-storage-btn" class="demo-clear-btn" title="Clear RentalAI data stored in this browser">
+              Clear saved data on this device
+            </button>
+          </p>
+        </div>
+      </main>
+    </div>
+
     <script src="/assets/auth_session.js"></script>
     <script src="/assets/history_shelf.js"></script>
     <script src="/assets/app.js"></script>
