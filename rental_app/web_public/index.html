@@ -623,6 +623,12 @@
         .home-hero-submit {
           width: 100%;
         }
+        /* 避免主栏居中继承到结构化表单，造成标签与输入在窄屏下错位 */
+        .home-saas #property-analysis,
+        .home-saas #property-analysis .ai-property-form,
+        .home-saas details.form-card {
+          text-align: left;
+        }
       }
 
       .home-hero-hint {
