@@ -809,12 +809,53 @@
       }
 
       .home-disclaimer {
-        text-align: center;
-        font-size: 0.8125rem;
-        color: var(--home-hint);
-        font-weight: 500;
-        padding: 0.75rem 0;
-        line-height: 1.55;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.65rem;
+        max-width: 40rem;
+        margin: 0.35rem auto 0;
+        padding: 0.75rem 1rem;
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1px solid var(--home-input-border);
+        border-radius: var(--home-radius-btn);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      }
+
+      .home-disclaimer__icon {
+        flex-shrink: 0;
+        width: 1.35rem;
+        height: 1.35rem;
+        margin-top: 0.05rem;
+        border-radius: 999px;
+        background: rgba(59, 130, 246, 0.12);
+        color: #3b82f6;
+        font-size: 0.7rem;
+        font-weight: 800;
+        font-style: italic;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        user-select: none;
+      }
+
+      .home-disclaimer__text {
+        margin: 0;
+        flex: 1;
+        min-width: 0;
+        text-align: left;
+        font-size: 0.78rem;
+        line-height: 1.5;
+        color: var(--home-muted);
+        font-weight: 400;
+      }
+
+      @media (max-width: 640px) {
+        .home-disclaimer {
+          margin-left: auto;
+          margin-right: auto;
+          max-width: min(40rem, 100%);
+        }
       }
 
       .home-footer {
@@ -1291,9 +1332,14 @@
             </ol>
           </section>
 
-          <p class="home-disclaimer" lang="zh-Hans" data-i18n="disclaimer.short">
-            AI 生成内容仅供参考，不构成法律或专业建议。
-          </p>
+          <aside class="home-disclaimer" role="note" aria-label="Disclaimer">
+            <span class="home-disclaimer__icon" aria-hidden="true">i</span>
+            <p class="home-disclaimer__text" data-i18n="disclaimer.short">
+              RentalAI provides AI-assisted information to help you explore rental options. It is not
+              legal, financial, or professional tenancy advice. You should decide for yourself and
+              consult a qualified professional when it matters.
+            </p>
+          </aside>
 
           <footer class="home-footer" aria-label="Site footer">
             <div class="home-footer-grid">
@@ -1588,7 +1634,7 @@
           step_3: "Get Recommendations\nReview scores, risks, and practical tips.",
           step_4: "Make Decision\nChoose with clearer context — at your own pace.",
           disclaimer:
-            "AI-generated content is for reference only and does not constitute legal or professional advice.",
+            "RentalAI provides AI-assisted information to help you explore rental options. It is not legal, financial, or professional tenancy advice. You should decide for yourself and consult a qualified professional when it matters.",
           footer_product: "Product",
           footer_company: "Company",
           footer_support: "Support",
@@ -1632,7 +1678,8 @@
           step_2: "AI 分析\n我们使用 RentalAI 模型处理您的输入。",
           step_3: "获取建议\n查看评分、风险与实用提示。",
           step_4: "做出决策\n在更清晰的语境下选择——按您的节奏。",
-          disclaimer: "AI 生成内容仅供参考，不构成法律或专业建议。",
+          disclaimer:
+            "RentalAI 提供 AI 辅助信息，帮助你了解租房相关思路；不构成法律、财务或专业租房顾问意见。请自行判断，涉及重要决定时建议咨询专业人士。",
           footer_product: "产品",
           footer_company: "公司",
           footer_support: "支持",
@@ -1680,7 +1727,7 @@
           step_3: "Obtenir des recommandations\nConsultez scores, risques et conseils pratiques.",
           step_4: "Prendre une décision\nChoisissez avec plus de contexte — à votre rythme.",
           disclaimer:
-            "Le contenu généré par l’IA est fourni à titre indicatif et ne constitue pas un avis juridique ou professionnel.",
+            "RentalAI fournit des informations assistées par l’IA pour vous aider à explorer la location. Ce n’est pas un conseil juridique, financier ou professionnel. Vous restez responsable de vos choix ; pour les questions importantes, adressez-vous à un professionnel.",
           footer_product: "Produit",
           footer_company: "Entreprise",
           footer_support: "Assistance",
@@ -1728,7 +1775,7 @@
           step_3: "Empfehlungen erhalten\nBewertungen, Risiken und praktische Tipps prüfen.",
           step_4: "Entscheidung treffen\nMit klarerem Kontext wählen — in Ihrem Tempo.",
           disclaimer:
-            "KI-generierte Inhalte dienen nur zur Orientierung und stellen keine Rechts- oder Fachberatung dar.",
+            "RentalAI bietet KI-gestützte Informationen zur Orientierung bei der Miete — keine Rechts-, Finanz- oder fachliche Mietberatung. Entscheidungen treffen Sie selbst; bei wichtigen Themen ziehen Sie bitte Fachleute hinzu.",
           footer_product: "Produkt",
           footer_company: "Unternehmen",
           footer_support: "Support",
@@ -1776,7 +1823,7 @@
           step_3: "Obtén recomendaciones\nRevisa puntuaciones, riesgos y consejos prácticos.",
           step_4: "Toma una decisión\nElige con más contexto — a tu ritmo.",
           disclaimer:
-            "El contenido generado por IA es solo orientativo y no constituye asesoramiento legal o profesional.",
+            "RentalAI ofrece información asistida por IA para ayudarte a explorar opciones de alquiler; no es asesoramiento legal, financiero ni profesional sobre arrendamientos. Tú decides; para asuntos importantes, consulta a un profesional cualificado.",
           footer_product: "Producto",
           footer_company: "Empresa",
           footer_support: "Soporte",
