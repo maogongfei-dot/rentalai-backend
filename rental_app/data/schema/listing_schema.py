@@ -53,6 +53,35 @@ class ListingSchema:
     normalized_at: Optional[str] = None
     raw_data: Optional[dict[str, Any]] = None
 
+    # --- G. platform（long_rent / short_rent / external_short_rent；platform / external）---
+    listing_mode: Optional[str] = None
+    source_type: Optional[str] = None
+
+    # --- H. landlord / publisher ---
+    landlord_id: Optional[str] = None
+    owner_user_id: Optional[str] = None
+
+    # --- I. availability（available / rented / paused / unknown）---
+    availability_status: Optional[str] = None
+    availability_checked_at: Optional[str] = None
+    last_seen_at: Optional[str] = None
+    expires_at: Optional[str] = None
+
+    # --- J. short-term rental ---
+    price_per_night: Optional[float] = None
+    cleaning_fee: Optional[float] = None
+    min_stay_nights: Optional[int] = None
+    available_dates: Optional[list[str]] = None
+
+    # --- K. media ---
+    image_urls: Optional[list[str]] = None
+    video_url: Optional[str] = None
+    virtual_tour_url: Optional[str] = None
+
+    # --- L. reviews / trust ---
+    landlord_rating: Optional[float] = None
+    review_count: Optional[int] = None
+
     def to_dict(self) -> dict[str, Any]:
         """JSON/API 友好 dict；无自定义类型，仅基本类型 + dict / list。"""
         d = asdict(self)
