@@ -553,11 +553,14 @@
       }
 
       .home-hero-hint {
-        margin: 1rem 0 0;
-        font-size: 0.8125rem;
+        margin: 0.85rem auto 0;
+        max-width: 34rem;
+        padding: 0 0.25rem;
+        font-size: 0.78rem;
+        line-height: 1.45;
         color: var(--home-hint);
         text-align: center;
-        font-weight: 500;
+        font-weight: 400;
       }
 
       .home-section-title {
@@ -972,7 +975,7 @@
                 class="home-locale-select"
                 aria-labelledby="home-lang-heading"
                 title="Interface language"
-                onchange="changeLanguage(this.value)"
+                onchange="changeLanguage(this.value, { persist: true })"
               >
                 <option value="en" selected>English</option>
                 <option value="zh-Hans">中文</option>
@@ -1097,8 +1100,8 @@
                     Analyze Now
                   </button>
                 </div>
-                <p class="home-hero-hint" lang="en" data-i18n="hero.langsHint">
-                  Supports English, 中文, Français, Deutsch, Español
+                <p class="home-hero-hint" data-i18n="hero.langsHint">
+                  You can describe your rental needs in English, 中文, Français, Deutsch, or Español.
                 </p>
               </div>
             </div>
@@ -1407,7 +1410,8 @@
           hero_subtitle: "Smarter decisions. Safer rentals. Better living.",
           input_placeholder: "Describe your rental needs...",
           analyze_now: "Analyze Now",
-          language_hint: "Supports English, 中文, Français, Deutsch, Español",
+          language_hint:
+            "You can describe your rental needs in English, 中文, Français, Deutsch, or Español.",
           property_title: "Property Analysis",
           property_desc:
             "Describe what you need — scores, risks, and next steps on the results page.",
@@ -1438,7 +1442,7 @@
           hero_subtitle: "更明智的决策，更安心的租赁，更舒心的居住。",
           input_placeholder: "描述您的租房需求…",
           analyze_now: "立即分析",
-          language_hint: "支持 English、中文、Français、Deutsch、Español",
+          language_hint: "你可以用英文、中文、法语、德语或西班牙语描述你的租房需求。",
           property_title: "房源分析",
           property_desc: "说明您的需求——在结果页查看评分、风险与后续建议。",
           property_button: "打开分析",
@@ -1466,7 +1470,8 @@
           hero_subtitle: "Des décisions plus avisées. Des locations plus sûres. Une vie meilleure.",
           input_placeholder: "Décrivez vos besoins de location…",
           analyze_now: "Analyser maintenant",
-          language_hint: "Prend en charge English, 中文, Français, Deutsch, Español",
+          language_hint:
+            "Vous pouvez décrire vos besoins de location en anglais, chinois, français, allemand ou espagnol.",
           property_title: "Analyse du logement",
           property_desc:
             "Décrivez vos besoins — scores, risques et prochaines étapes sur la page de résultats.",
@@ -1497,7 +1502,8 @@
           hero_subtitle: "Klügere Entscheidungen. Sicherere Mieten. Besseres Wohnen.",
           input_placeholder: "Beschreiben Sie Ihre Mietanforderungen…",
           analyze_now: "Jetzt analysieren",
-          language_hint: "Unterstützt English, 中文, Français, Deutsch, Español",
+          language_hint:
+            "Sie können Ihre Mietwünsche auf Englisch, Chinesisch, Französisch, Deutsch oder Spanisch beschreiben.",
           property_title: "Immobilienanalyse",
           property_desc:
             "Beschreiben Sie Ihre Wünsche — Bewertungen, Risiken und nächste Schritte auf der Ergebnisseite.",
@@ -1528,7 +1534,8 @@
           hero_subtitle: "Decisiones más inteligentes. Alquileres más seguros. Mejor vida.",
           input_placeholder: "Describe tus necesidades de alquiler…",
           analyze_now: "Analizar ahora",
-          language_hint: "Admite English, 中文, Français, Deutsch, Español",
+          language_hint:
+            "Puedes describir tus necesidades de alquiler en inglés, chino, francés, alemán o español.",
           property_title: "Análisis de vivienda",
           property_desc:
             "Describe lo que buscas: puntuaciones, riesgos y próximos pasos en la página de resultados.",
@@ -1662,10 +1669,19 @@
         "hero.queryPlaceholder": "input_placeholder",
       };
 
+      var RENTALAI_LANGUAGE_STORAGE_KEY = "rentalai_language";
+
       function normalizeHomeLocale(lang) {
         if (!lang) return DEFAULT_HOME_LOCALE;
         if (lang === "zh-Hans" || lang === "zh-CN") return "zh";
-        return lang;
+        return String(lang).trim();
+      }
+
+      /** 将语言包键（en/zh/fr/de/es）映射为 <select> 的 option value */
+      function localeToSelectValue(loc) {
+        if (loc === "zh") return "zh-Hans";
+        if (loc === "en" || loc === "fr" || loc === "de" || loc === "es") return loc;
+        return "en";
       }
 
       function resolveHomeI18nText(pack, attr) {
@@ -1686,9 +1702,12 @@
         return v;
       }
 
-      function changeLanguage(lang) {
+      function changeLanguage(lang, options) {
         try {
           var loc = normalizeHomeLocale(lang);
+          if (!translations[loc]) {
+            loc = DEFAULT_HOME_LOCALE;
+          }
           var pack = translations[loc];
           if (!pack) pack = translations[DEFAULT_HOME_LOCALE];
           if (!pack) return;
@@ -1714,6 +1733,21 @@
               pel.placeholder = pv;
             }
           }
+
+          var sel = document.getElementById("home-locale-select");
+          var selectVal = localeToSelectValue(loc);
+          if (sel) {
+            sel.value = selectVal;
+          }
+
+          if (options && options.persist) {
+            try {
+              localStorage.setItem(
+                RENTALAI_LANGUAGE_STORAGE_KEY,
+                sel ? sel.value : selectVal
+              );
+            } catch (persistErr) {}
+          }
         } catch (err) {}
       }
 
@@ -1721,12 +1755,27 @@
 
       document.addEventListener("DOMContentLoaded", function () {
         var sel = document.getElementById("home-locale-select");
-        if (sel) {
-          sel.value = "en";
-          changeLanguage("en");
-        } else {
-          changeLanguage("en");
+        var stored = null;
+        try {
+          stored = localStorage.getItem(RENTALAI_LANGUAGE_STORAGE_KEY);
+        } catch (readErr) {
+          stored = null;
         }
+        var pick = "en";
+        if (stored) {
+          var loc = normalizeHomeLocale(stored);
+          if (translations[loc]) {
+            pick = localeToSelectValue(loc);
+          } else {
+            try {
+              localStorage.removeItem(RENTALAI_LANGUAGE_STORAGE_KEY);
+            } catch (clearErr) {}
+          }
+        }
+        if (sel) {
+          sel.value = pick;
+        }
+        changeLanguage(pick);
       });
 
       var goBtn = document.getElementById("go");
