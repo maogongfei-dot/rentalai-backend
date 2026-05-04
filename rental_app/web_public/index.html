@@ -29,6 +29,10 @@
         --home-radius: 12px;
         --home-radius-btn: 10px;
         --home-border: #e5e7eb;
+        --home-input-border: #e2e8f0;
+        --home-input-focus: #7dd3fc;
+        --home-input-focus-ring: rgba(125, 211, 252, 0.45);
+        --home-placeholder: #b0bec8;
         --home-text: #0f172a;
         --home-text-secondary: #475569;
         --home-muted: #64748b;
@@ -37,15 +41,17 @@
         --home-card: #ffffff;
         --home-primary: #1e3a8a;
         --home-primary-hover: #172554;
+        --home-primary-active: #142045;
         --home-accent: #2563eb;
         --home-accent-hover: #1d4ed8;
-        --home-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-        --home-shadow-lg: 0 8px 36px rgba(15, 23, 42, 0.09);
-        --home-shadow-hover: 0 12px 36px rgba(15, 23, 42, 0.12);
+        --home-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.06);
+        --home-shadow-lg: 0 2px 8px rgba(15, 23, 42, 0.05), 0 16px 40px rgba(15, 23, 42, 0.08);
+        --home-shadow-hover: 0 2px 6px rgba(15, 23, 42, 0.05), 0 12px 28px rgba(15, 23, 42, 0.1);
         --home-btn-min-h: 2.75rem;
         --home-btn-px: 1.25rem;
         --home-btn-font: 0.9375rem;
         --home-section-gap: 3.25rem;
+        --home-card-gap: 1.5rem;
       }
 
       .home-saas {
@@ -149,25 +155,37 @@
       .home-nav-main a {
         display: inline-block;
         padding: 0.45rem 0.65rem;
-        border-radius: 8px;
+        border-radius: var(--home-radius-btn);
         color: var(--home-text-secondary);
         text-decoration: none;
         font-weight: 500;
         white-space: nowrap;
         transition:
-          color 0.15s ease,
-          background 0.15s ease;
+          color 0.16s ease,
+          background 0.16s ease,
+          box-shadow 0.16s ease;
       }
 
       .home-nav-main a:hover {
         color: var(--home-primary);
-        background: rgba(30, 58, 138, 0.06);
+        background: rgba(30, 58, 138, 0.1);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07);
+      }
+
+      .home-nav-main a:focus-visible {
+        outline: 2px solid rgba(37, 99, 235, 0.45);
+        outline-offset: 2px;
       }
 
       .home-nav-main a[aria-current="page"] {
         color: var(--home-primary);
         font-weight: 600;
-        background: rgba(30, 58, 138, 0.08);
+        background: rgba(30, 58, 138, 0.09);
+        box-shadow: inset 0 0 0 1px rgba(30, 58, 138, 0.14);
+      }
+
+      .home-nav-main a[aria-current="page"]:hover {
+        background: rgba(30, 58, 138, 0.11);
       }
 
       .home-header-actions {
@@ -186,7 +204,8 @@
         align-items: flex-end;
         gap: 0.3rem;
         min-width: 0;
-        flex-shrink: 0;
+        flex: 0 1 auto;
+        max-width: min(10rem, 100%);
       }
 
       .home-lang-heading {
@@ -201,8 +220,8 @@
       .home-locale-select {
         display: block;
         width: auto;
-        min-width: 7.5rem;
-        max-width: 9.5rem;
+        min-width: 0;
+        max-width: min(9.5rem, 100%);
         min-height: 2.25rem;
         padding: 0.32rem 1.55rem 0.32rem 0.5rem;
         font: inherit;
@@ -215,7 +234,7 @@
         background-repeat: no-repeat;
         background-position: right 0.42rem center;
         background-size: 0.7rem;
-        border: 1px solid var(--home-border);
+        border: 1px solid var(--home-input-border);
         border-radius: var(--home-radius-btn);
         cursor: pointer;
         appearance: none;
@@ -231,8 +250,8 @@
 
       .home-locale-select:focus {
         outline: none;
-        border-color: var(--home-primary);
-        box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.14);
+        border-color: var(--home-input-focus);
+        box-shadow: 0 0 0 3px var(--home-input-focus-ring);
       }
 
       .home-auth-btns {
@@ -283,8 +302,8 @@
           align-items: flex-end;
         }
         .home-locale-select {
-          max-width: 8.75rem;
-          min-width: 7rem;
+          max-width: min(8.75rem, calc(100vw - 11rem));
+          width: 100%;
         }
       }
 
@@ -296,9 +315,12 @@
           padding: 0.4rem 0.5rem;
           font-size: 0.8125rem;
         }
+        .home-lang-block {
+          max-width: min(8.5rem, calc(100vw - 9.5rem));
+        }
         .home-locale-select {
-          max-width: 7.75rem;
-          min-width: 6.5rem;
+          max-width: 100%;
+          min-width: 0;
           font-size: 0.75rem;
           padding-top: 0.28rem;
           padding-bottom: 0.28rem;
@@ -343,28 +365,38 @@
       .home-btn-ghost {
         color: var(--home-text-secondary);
         background: #fff;
-        border: 1px solid var(--home-border);
+        border: 1px solid var(--home-input-border);
       }
 
       .home-btn-ghost:hover {
         border-color: #cbd5e1;
-        background: #f8fafc;
+        background: #f1f5f9;
         color: var(--home-text);
-        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
         transform: translateY(-1px);
+      }
+
+      .home-btn-ghost:focus-visible {
+        outline: 2px solid rgba(37, 99, 235, 0.35);
+        outline-offset: 2px;
       }
 
       .home-btn-solid {
         color: #fff;
         background: var(--home-primary);
-        border: 2px solid transparent;
+        border: 1px solid rgba(255, 255, 255, 0.08);
       }
 
       .home-btn-solid:hover {
-        background: var(--home-primary-hover);
+        background: var(--home-primary-active);
         color: #fff;
         transform: translateY(-1px);
-        box-shadow: 0 4px 16px rgba(30, 58, 138, 0.38);
+        box-shadow: 0 3px 12px rgba(23, 37, 84, 0.35);
+      }
+
+      .home-btn-solid:focus-visible {
+        outline: 2px solid var(--home-input-focus);
+        outline-offset: 2px;
       }
 
       .home-stack {
@@ -490,16 +522,24 @@
         font-size: 1rem;
         line-height: 1.55;
         color: var(--home-text);
-        border: 1px solid var(--home-border);
+        border: 1px solid var(--home-input-border);
         border-radius: var(--home-radius-btn);
         resize: vertical;
         background: #fff;
+        transition:
+          border-color 0.16s ease,
+          box-shadow 0.16s ease;
+      }
+
+      .home-hero-input::placeholder {
+        color: var(--home-placeholder);
+        opacity: 1;
       }
 
       .home-hero-input:focus {
         outline: none;
-        border-color: var(--home-primary);
-        box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.18);
+        border-color: var(--home-input-focus);
+        box-shadow: 0 0 0 3px var(--home-input-focus-ring);
       }
 
       .home-hero-cta-row {
@@ -537,15 +577,48 @@
       .home-hero-submit:hover,
       .home-saas #property-analysis #ai-retry:hover,
       .home-saas #go:hover {
-        background: var(--home-primary-hover);
+        background: var(--home-primary-active);
         transform: translateY(-1px);
-        box-shadow: 0 4px 16px rgba(30, 58, 138, 0.38);
+        box-shadow: 0 3px 12px rgba(23, 37, 84, 0.35);
+      }
+
+      .home-hero-submit:focus-visible,
+      .home-saas #property-analysis #ai-retry:focus-visible,
+      .home-saas #go:focus-visible {
+        outline: 2px solid var(--home-input-focus);
+        outline-offset: 2px;
       }
 
       @media (max-width: 640px) {
+        .home-wrap {
+          text-align: center;
+        }
+        .home-saas main.container {
+          text-align: center;
+        }
+        .home-hero-body {
+          text-align: center;
+        }
+        .home-hero-form {
+          margin-left: auto;
+          margin-right: auto;
+        }
+        .home-card {
+          align-items: center;
+          text-align: center;
+        }
+        .home-card-btn {
+          align-self: center;
+        }
+        .home-header-actions {
+          justify-content: flex-end;
+          max-width: 100%;
+        }
         .home-hero-cta-row {
           flex-direction: column;
           align-items: stretch;
+          gap: 1rem;
+          margin-top: 1.25rem;
         }
         .home-hero-submit {
           width: 100%;
@@ -576,7 +649,7 @@
       .home-cards {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 1.5rem;
+        gap: var(--home-card-gap);
       }
 
       @media (max-width: 768px) {
@@ -587,7 +660,7 @@
 
       .home-card {
         background: var(--home-card);
-        border: 1px solid var(--home-border);
+        border: 1px solid var(--home-input-border);
         border-radius: var(--home-radius);
         padding: 1.75rem 1.6rem;
         box-shadow: var(--home-shadow);
@@ -601,7 +674,7 @@
       }
 
       .home-card:hover {
-        transform: translateY(-4px);
+        transform: translateY(-2px);
         box-shadow: var(--home-shadow-hover);
       }
 
@@ -644,13 +717,14 @@
         font-weight: 600;
         border-radius: var(--home-radius-btn);
         text-decoration: none;
-        border: 1px solid var(--home-border);
+        border: 1px solid var(--home-input-border);
         color: var(--home-text-secondary);
         background: #fff;
         box-sizing: border-box;
         transition:
           border-color 0.18s ease,
           color 0.18s ease,
+          background 0.18s ease,
           box-shadow 0.18s ease,
           transform 0.15s ease;
       }
@@ -658,14 +732,20 @@
       .home-card-btn:hover {
         border-color: var(--home-primary);
         color: var(--home-primary);
+        background: #f8fafc;
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+      }
+
+      .home-card-btn:focus-visible {
+        outline: 2px solid rgba(37, 99, 235, 0.35);
+        outline-offset: 2px;
       }
 
       .home-steps {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 1.25rem;
+        gap: var(--home-card-gap);
         list-style: none;
         margin: 0;
         padding: 0;
@@ -685,7 +765,7 @@
 
       .home-step {
         background: var(--home-card);
-        border: 1px solid var(--home-border);
+        border: 1px solid var(--home-input-border);
         border-radius: var(--home-radius);
         padding: 1.5rem 1.15rem;
         text-align: center;
@@ -696,7 +776,7 @@
       }
 
       .home-step:hover {
-        transform: translateY(-4px);
+        transform: translateY(-2px);
         box-shadow: var(--home-shadow-hover);
       }
 
@@ -738,45 +818,75 @@
       }
 
       .home-footer {
-        border-top: 1px solid var(--home-border);
-        padding-top: 2.25rem;
-        margin-top: 0.75rem;
+        margin-top: 2.75rem;
+        padding: 2.75rem clamp(0.5rem, 2vw, 0) 2.25rem;
+        background: #f8fafc;
+        border: 1px solid var(--home-input-border);
+        border-radius: var(--home-radius);
+        box-shadow: var(--home-shadow);
       }
 
       .home-footer-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 1.5rem;
-        margin-bottom: 1.5rem;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 2rem 1.75rem;
+        margin-bottom: 2rem;
       }
 
-      @media (max-width: 640px) {
+      @media (max-width: 900px) {
         .home-footer-grid {
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 520px) {
+        .home-footer-grid {
+          grid-template-columns: 1fr;
+          gap: 1.75rem;
+        }
+        .home-footer-col {
+          text-align: center;
+        }
+        .home-footer-list {
+          align-items: center;
         }
       }
 
       .home-footer-col h4 {
-        margin: 0 0 0.5rem;
-        font-size: 0.75rem;
+        margin: 0 0 0.85rem;
+        font-size: 0.72rem;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--home-hint);
+        letter-spacing: 0.08em;
+        color: var(--home-text-secondary);
       }
 
-      .home-footer-col p,
-      .home-footer-col a {
+      .home-footer-list {
+        list-style: none;
         margin: 0;
-        font-size: 0.85rem;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+      }
+
+      .home-footer-list a {
+        font-size: 0.875rem;
+        font-weight: 500;
         color: var(--home-muted);
         text-decoration: none;
-        display: block;
-        line-height: 1.6;
+        line-height: 1.45;
+        transition: color 0.15s ease;
       }
 
-      .home-footer-col a:hover {
-        color: var(--home-accent);
+      .home-footer-list a:hover {
+        color: var(--home-primary);
+      }
+
+      .home-footer-list a:focus-visible {
+        outline: 2px solid rgba(37, 99, 235, 0.35);
+        outline-offset: 2px;
+        border-radius: 4px;
       }
 
       .home-footer-bottom {
@@ -785,8 +895,8 @@
         justify-content: space-between;
         align-items: center;
         gap: 1rem;
-        padding-top: 1rem;
-        border-top: 1px solid var(--home-border);
+        padding-top: 1.35rem;
+        border-top: 1px solid var(--home-input-border);
         font-size: 0.8rem;
         color: var(--home-muted);
       }
@@ -885,7 +995,7 @@
         font-family: inherit;
         line-height: 1.2;
         border-radius: var(--home-radius-btn);
-        border: 1px solid var(--home-border);
+        border: 1px solid var(--home-input-border);
         background: #fff;
         color: var(--home-text-secondary);
         cursor: pointer;
@@ -899,9 +1009,14 @@
 
       .home-saas .demo-clear-btn:hover {
         border-color: #cbd5e1;
-        background: #f8fafc;
+        background: #f1f5f9;
         transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.07);
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+      }
+
+      .home-saas .demo-clear-btn:focus-visible {
+        outline: 2px solid rgba(37, 99, 235, 0.35);
+        outline-offset: 2px;
       }
 
       .home-saas .home-quick-links {
@@ -917,6 +1032,25 @@
       .home-saas .form-card select,
       .home-saas .form-card textarea {
         border-radius: var(--home-radius-btn);
+        border: 1px solid var(--home-input-border);
+        transition:
+          border-color 0.16s ease,
+          box-shadow 0.16s ease;
+      }
+
+      .home-saas .form-card input::placeholder,
+      .home-saas .form-card textarea::placeholder {
+        color: var(--home-placeholder);
+        opacity: 1;
+      }
+
+      .home-saas .form-card input[type="text"]:focus,
+      .home-saas .form-card input[type="number"]:focus,
+      .home-saas .form-card select:focus,
+      .home-saas .form-card textarea:focus {
+        outline: none;
+        border-color: var(--home-input-focus);
+        box-shadow: 0 0 0 3px var(--home-input-focus-ring);
       }
 
       /* 与 .container 默认 max-width:900px 对齐到父级 1100px 宽 */
@@ -1165,19 +1299,47 @@
             <div class="home-footer-grid">
               <div class="home-footer-col">
                 <h4 data-i18n="footer.col.product">Product</h4>
-                <p data-i18n="footer.placeholder">—</p>
+                <ul class="home-footer-list">
+                  <li>
+                    <a href="/#property-analysis" data-i18n="footer.product.property">Property Analysis</a>
+                  </li>
+                  <li>
+                    <a href="/contract-analysis" data-i18n="footer.product.contract">Contract Analysis</a>
+                  </li>
+                  <li><a href="/assistant" data-i18n="footer.product.assistant">AI Assistant</a></li>
+                  <li>
+                    <a href="/analysis-history" data-i18n="footer.product.history">History</a>
+                  </li>
+                </ul>
               </div>
               <div class="home-footer-col">
                 <h4 data-i18n="footer.col.company">Company</h4>
-                <p data-i18n="footer.placeholder">—</p>
+                <ul class="home-footer-list">
+                  <li><a href="#" data-i18n="footer.company.about">About</a></li>
+                  <li><a href="#" data-i18n="footer.company.contact">Contact</a></li>
+                  <li>
+                    <a href="/privacy.html" data-i18n="footer.company.privacy">Privacy Policy</a>
+                  </li>
+                  <li><a href="/terms.html" data-i18n="footer.company.terms">Terms of Use</a></li>
+                </ul>
               </div>
               <div class="home-footer-col">
                 <h4 data-i18n="footer.col.support">Support</h4>
-                <p data-i18n="footer.placeholder">—</p>
+                <ul class="home-footer-list">
+                  <li><a href="#" data-i18n="footer.support.help">Help</a></li>
+                  <li><a href="#" data-i18n="footer.support.faq">FAQ</a></li>
+                  <li><a href="#" data-i18n="footer.support.feedback">Feedback</a></li>
+                  <li><a href="#" data-i18n="footer.support.report">Report an Issue</a></li>
+                </ul>
               </div>
               <div class="home-footer-col">
                 <h4 data-i18n="footer.col.follow">Follow Us</h4>
-                <p data-i18n="footer.placeholder">—</p>
+                <ul class="home-footer-list">
+                  <li><a href="#" data-i18n="footer.follow.x">X</a></li>
+                  <li><a href="#" data-i18n="footer.follow.linkedin">LinkedIn</a></li>
+                  <li><a href="#" data-i18n="footer.follow.tiktok">TikTok</a></li>
+                  <li><a href="#" data-i18n="footer.follow.facebook">Facebook</a></li>
+                </ul>
               </div>
             </div>
             <div class="home-footer-bottom">
@@ -1431,6 +1593,22 @@
           footer_company: "Company",
           footer_support: "Support",
           footer_follow: "Follow Us",
+          footer_product_property: "Property Analysis",
+          footer_product_contract: "Contract Analysis",
+          footer_product_assistant: "AI Assistant",
+          footer_product_history: "History",
+          footer_company_about: "About",
+          footer_company_contact: "Contact",
+          footer_company_privacy: "Privacy Policy",
+          footer_company_terms: "Terms of Use",
+          footer_support_help: "Help",
+          footer_support_faq: "FAQ",
+          footer_support_feedback: "Feedback",
+          footer_support_report: "Report an Issue",
+          footer_follow_x: "X",
+          footer_follow_linkedin: "LinkedIn",
+          footer_follow_tiktok: "TikTok",
+          footer_follow_facebook: "Facebook",
         },
         zh: {
           nav_home: "首页",
@@ -1459,6 +1637,22 @@
           footer_company: "公司",
           footer_support: "支持",
           footer_follow: "关注我们",
+          footer_product_property: "房源分析",
+          footer_product_contract: "合同分析",
+          footer_product_assistant: "AI 助手",
+          footer_product_history: "历史",
+          footer_company_about: "关于我们",
+          footer_company_contact: "联系我们",
+          footer_company_privacy: "隐私政策",
+          footer_company_terms: "使用条款",
+          footer_support_help: "帮助",
+          footer_support_faq: "常见问题",
+          footer_support_feedback: "反馈",
+          footer_support_report: "问题举报",
+          footer_follow_x: "X",
+          footer_follow_linkedin: "领英",
+          footer_follow_tiktok: "TikTok",
+          footer_follow_facebook: "Facebook",
         },
         fr: {
           nav_home: "Accueil",
@@ -1491,6 +1685,22 @@
           footer_company: "Entreprise",
           footer_support: "Assistance",
           footer_follow: "Nous suivre",
+          footer_product_property: "Analyse du logement",
+          footer_product_contract: "Analyse du bail",
+          footer_product_assistant: "Assistant IA",
+          footer_product_history: "Historique",
+          footer_company_about: "À propos",
+          footer_company_contact: "Contact",
+          footer_company_privacy: "Politique de confidentialité",
+          footer_company_terms: "Conditions d’utilisation",
+          footer_support_help: "Aide",
+          footer_support_faq: "FAQ",
+          footer_support_feedback: "Retour d’expérience",
+          footer_support_report: "Signaler un problème",
+          footer_follow_x: "X",
+          footer_follow_linkedin: "LinkedIn",
+          footer_follow_tiktok: "TikTok",
+          footer_follow_facebook: "Facebook",
         },
         de: {
           nav_home: "Start",
@@ -1523,6 +1733,22 @@
           footer_company: "Unternehmen",
           footer_support: "Support",
           footer_follow: "Folgen Sie uns",
+          footer_product_property: "Immobilienanalyse",
+          footer_product_contract: "Vertragsanalyse",
+          footer_product_assistant: "KI-Assistent",
+          footer_product_history: "Verlauf",
+          footer_company_about: "Über uns",
+          footer_company_contact: "Kontakt",
+          footer_company_privacy: "Datenschutz",
+          footer_company_terms: "Nutzungsbedingungen",
+          footer_support_help: "Hilfe",
+          footer_support_faq: "FAQ",
+          footer_support_feedback: "Feedback",
+          footer_support_report: "Problem melden",
+          footer_follow_x: "X",
+          footer_follow_linkedin: "LinkedIn",
+          footer_follow_tiktok: "TikTok",
+          footer_follow_facebook: "Facebook",
         },
         es: {
           nav_home: "Inicio",
@@ -1555,6 +1781,22 @@
           footer_company: "Empresa",
           footer_support: "Soporte",
           footer_follow: "Síguenos",
+          footer_product_property: "Análisis de vivienda",
+          footer_product_contract: "Análisis de contrato",
+          footer_product_assistant: "Asistente IA",
+          footer_product_history: "Historial",
+          footer_company_about: "Acerca de",
+          footer_company_contact: "Contacto",
+          footer_company_privacy: "Política de privacidad",
+          footer_company_terms: "Términos de uso",
+          footer_support_help: "Ayuda",
+          footer_support_faq: "Preguntas frecuentes",
+          footer_support_feedback: "Comentarios",
+          footer_support_report: "Informar de un problema",
+          footer_follow_x: "X",
+          footer_follow_linkedin: "LinkedIn",
+          footer_follow_tiktok: "TikTok",
+          footer_follow_facebook: "Facebook",
         },
       };
 
@@ -1566,7 +1808,6 @@
             nav_sign_up: "Sign Up",
             hero_input_label: "Rental needs",
             features_section: "What you can do",
-            footer_placeholder: "—",
             footer_copyright: "© RentalAI",
             footer_privacy: "Privacy Policy",
             footer_terms: "Terms of Use",
@@ -1578,7 +1819,6 @@
             nav_sign_up: "注册",
             hero_input_label: "租房需求",
             features_section: "您可以做什么",
-            footer_placeholder: "—",
             footer_copyright: "© RentalAI",
             footer_privacy: "隐私政策",
             footer_terms: "使用条款",
@@ -1590,7 +1830,6 @@
             nav_sign_up: "S’inscrire",
             hero_input_label: "Besoins de location",
             features_section: "Ce que vous pouvez faire",
-            footer_placeholder: "—",
             footer_copyright: "© RentalAI",
             footer_privacy: "Politique de confidentialité",
             footer_terms: "Conditions d’utilisation",
@@ -1602,7 +1841,6 @@
             nav_sign_up: "Registrieren",
             hero_input_label: "Mietbedarf",
             features_section: "Was Sie tun können",
-            footer_placeholder: "—",
             footer_copyright: "© RentalAI",
             footer_privacy: "Datenschutz",
             footer_terms: "Nutzungsbedingungen",
@@ -1614,7 +1852,6 @@
             nav_sign_up: "Registrarse",
             hero_input_label: "Necesidades de alquiler",
             features_section: "Qué puede hacer",
-            footer_placeholder: "—",
             footer_copyright: "© RentalAI",
             footer_privacy: "Política de privacidad",
             footer_terms: "Términos de uso",
@@ -1658,7 +1895,22 @@
         "footer.col.company": "footer_company",
         "footer.col.support": "footer_support",
         "footer.col.follow": "footer_follow",
-        "footer.placeholder": "footer_placeholder",
+        "footer.product.property": "footer_product_property",
+        "footer.product.contract": "footer_product_contract",
+        "footer.product.assistant": "footer_product_assistant",
+        "footer.product.history": "footer_product_history",
+        "footer.company.about": "footer_company_about",
+        "footer.company.contact": "footer_company_contact",
+        "footer.company.privacy": "footer_company_privacy",
+        "footer.company.terms": "footer_company_terms",
+        "footer.support.help": "footer_support_help",
+        "footer.support.faq": "footer_support_faq",
+        "footer.support.feedback": "footer_support_feedback",
+        "footer.support.report": "footer_support_report",
+        "footer.follow.x": "footer_follow_x",
+        "footer.follow.linkedin": "footer_follow_linkedin",
+        "footer.follow.tiktok": "footer_follow_tiktok",
+        "footer.follow.facebook": "footer_follow_facebook",
         "footer.copyright": "footer_copyright",
         "footer.link.privacy": "footer_privacy",
         "footer.link.terms": "footer_terms",
