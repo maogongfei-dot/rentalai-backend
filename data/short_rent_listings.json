@@ -1,0 +1,15 @@
+[
+  {
+    "id": "1",
+    "title": "t",
+    "location": "l",
+    "postcode": "p",
+    "price_per_day": 1.0,
+    "available_dates": [],
+    "min_days": 1,
+    "max_days": 7,
+    "landlord_id": "x",
+    "description": "d",
+    "created_at": "2026-01-01"
+  }
+]
