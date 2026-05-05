@@ -9,6 +9,7 @@ from typing import Any
 
 from utils.listing_availability import filter_available_listings
 from data.storage.listing_storage import export_listings_as_dicts
+from landlord.landlord_listing_service import prepare_landlord_listing_for_save  # noqa: F401
 from house_candidate_loader import get_last_candidate_load_meta, load_candidate_houses
 from house_canonical import canonical_records_to_listing_rows, canonical_to_listing_row
 from house_samples_loader import load_house_samples
@@ -252,6 +253,38 @@ def _merge_auxiliary_for_city(pool: list[dict[str, Any]], sq: dict[str, Any]) ->
     return pool + extra
 
 
+def inject_landlord_listings(pool: list[dict]) -> list[dict]:
+    """
+    Inject landlord listings into recommendation pool (mock version)
+    """
+
+    mock_landlord_listings = [
+        {
+            "id": "landlord_101",
+            "landlord_id": "landlord_001",
+            "title": "2 Bedroom Flat - Landlord Direct",
+            "location": "London",
+            "listing_mode": "long_rent",
+            "monthly_price": 1750,
+            "availability_status": "available",
+            "source_type": "platform",
+        },
+        {
+            "id": "landlord_102",
+            "landlord_id": "landlord_002",
+            "title": "Short Stay Studio",
+            "location": "Manchester",
+            "listing_mode": "short_rent",
+            "price_per_night": 60,
+            "min_stay_nights": 2,
+            "availability_status": "available",
+            "source_type": "platform",
+        },
+    ]
+
+    return mock_landlord_listings + pool
+
+
 def _property_type_ok(row: dict[str, Any], want: str | None) -> bool:
     if not want:
         return True
@@ -485,6 +518,58 @@ def _simplify_recommendations(
     return rec
 
 
+def normalize_listing_for_display(listing: dict) -> dict:
+    """
+    Normalize listing to frontend display format
+    """
+    if not isinstance(listing, dict):
+        listing = {}
+
+    location = listing.get("location")
+    if not location:
+        location = ", ".join(
+            str(p) for p in (listing.get("area"), listing.get("city")) if p
+        ) or None
+
+    listing_mode = listing.get("listing_mode")
+    if not listing_mode:
+        listing_mode = (
+            "short_rent"
+            if listing.get("price_per_night") is not None
+            else "long_rent"
+        )
+
+    source_type = listing.get("source_type") or listing.get("source")
+    if source_type is None or (isinstance(source_type, str) and not str(source_type).strip()):
+        source_type = "unknown"
+
+    image_urls = listing.get("image_urls", [])
+    if not isinstance(image_urls, list):
+        image_urls = []
+
+    listing_id = listing.get("id")
+    if listing_id is None:
+        listing_id = listing.get("listing_id")
+
+    normalized = {
+        "id": listing_id,
+        "title": listing.get("title"),
+        "location": location,
+        "listing_mode": listing_mode,
+        "source_type": str(source_type),
+        "price": listing.get("monthly_price")
+        or listing.get("price")
+        or listing.get("rent"),
+        "price_per_night": listing.get("price_per_night"),
+        "image_urls": image_urls,
+        "availability_status": listing.get("availability_status"),
+        "final_score": listing.get("final_score"),
+        "explain_summary": listing.get("explain_summary") or listing.get("explain"),
+    }
+
+    return normalized
+
+
 def _rank_from_pool(
     raw_user_query: str,
     structured: dict[str, Any],
@@ -497,6 +582,7 @@ def _rank_from_pool(
     dataset_used: str | None = None,
 ) -> dict[str, Any]:
     """候选 listing 行 pool → 评分排序 → recommendations（Phase A5 共用）。"""
+    pool = inject_landlord_listings(pool)
     availability_before_count = len(pool)
     pool = filter_available_listings(pool)
     availability_after_count = len(pool)
@@ -525,6 +611,10 @@ def _rank_from_pool(
     recommendations = _simplify_recommendations(ranking_data, structured)
     recommendation_summary = build_recommendation_summary(structured, recommendations)
     top_decision_block = build_top_decision_summary(recommendations, structured)
+
+    recommendations = [
+        normalize_listing_for_display(x) for x in recommendations
+    ]
 
     summ: dict[str, Any] = {
         "total_candidates": total_candidates,
