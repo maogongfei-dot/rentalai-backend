@@ -11,5 +11,20 @@
     "landlord_id": "x",
     "description": "d",
     "created_at": "2026-01-01"
+  },
+  {
+    "id": "short_7dcdbae0db2d475fb31a1e37807dd807",
+    "title": "a",
+    "location": "b",
+    "postcode": "SW1",
+    "price_per_day": 50.0,
+    "available_dates": [
+      "2026-06-01"
+    ],
+    "min_days": 2,
+    "max_days": 14,
+    "landlord_id": "L1",
+    "description": "x",
+    "created_at": "2026-05-05T00:31:13.944514+00:00"
   }
 ]
