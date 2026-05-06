@@ -1,1 +1,67 @@
-[]
+[
+  {
+    "id": "ext_sr_001",
+    "source": "SpareRoom",
+    "title": "Double room in flatshare near Camden Town",
+    "location": "London",
+    "postcode": "NW1 8NH",
+    "price_per_day": 45.0,
+    "price_per_week": 315.0,
+    "available_from": "2026-06-01",
+    "link": "https://example.com/external-short-rent-1",
+    "description": "Bright double room in a friendly flatshare, bills included, 5 min walk to Camden tube.",
+    "created_at": "2026-05-01T10:00:00+00:00"
+  },
+  {
+    "id": "ext_or_002",
+    "source": "OpenRent",
+    "title": "Modern studio near Northern Quarter",
+    "location": "Manchester",
+    "postcode": "M4 1HQ",
+    "price_per_day": 38.0,
+    "price_per_week": 250.0,
+    "available_from": "2026-05-15",
+    "link": "https://example.com/external-short-rent-2",
+    "description": "Self-contained studio with kitchenette, ideal for short stays; secure building.",
+    "created_at": "2026-05-02T14:30:00+00:00"
+  },
+  {
+    "id": "ext_rm_003",
+    "source": "Rightmove",
+    "title": "One-bed apartment Jewellery Quarter",
+    "location": "Birmingham",
+    "postcode": "B18 6NF",
+    "price_per_day": 52.0,
+    "price_per_week": 360.0,
+    "available_from": "2026-06-10",
+    "link": "https://example.com/external-short-rent-3",
+    "description": "Furnished one-bedroom with Wi-Fi and parking space on request.",
+    "created_at": "2026-05-03T09:15:00+00:00"
+  },
+  {
+    "id": "ext_sr_004",
+    "source": "SpareRoom",
+    "title": "En-suite room in Headingley house",
+    "location": "Leeds",
+    "postcode": "LS6 3BR",
+    "price_per_day": 28.0,
+    "price_per_week": 195.0,
+    "available_from": "2026-05-20",
+    "link": "https://example.com/external-short-rent-4",
+    "description": "Student-friendly house with large kitchen; en-suite shower; short let considered.",
+    "created_at": "2026-05-04T11:45:00+00:00"
+  },
+  {
+    "id": "ext_or_005",
+    "source": "OpenRent",
+    "title": "Waterfront 2-bed short let",
+    "location": "Liverpool",
+    "postcode": "L3 4AD",
+    "price_per_day": 72.0,
+    "price_per_week": 480.0,
+    "available_from": "2026-07-01",
+    "link": "https://example.com/external-short-rent-5",
+    "description": "Two-bedroom flat with river views, lift access, suitable for 1-2 month stays.",
+    "created_at": "2026-05-05T16:00:00+00:00"
+  }
+]
