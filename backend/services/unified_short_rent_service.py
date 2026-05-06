@@ -64,3 +64,66 @@ def explain_short_rent_result(result: dict) -> str:
 
 def add_explanations_to_short_rent_results(results: list) -> list:
     return [{**row, "explanation": explain_short_rent_result(row)} for row in results]
+
+
+def _norm_str(value) -> str:
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _norm_list(value) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return list(value)
+    return []
+
+
+def _norm_price(value):
+    if value is None or value == "":
+        return ""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return ""
+
+
+def normalize_short_rent_result(result: dict) -> dict:
+    st = result.get("source_type")
+    if st == "internal":
+        raw_src = result.get("source")
+        if raw_src is None or str(raw_src).strip() == "":
+            src = "RentalAI"
+        else:
+            src = str(raw_src).strip()
+    else:
+        src = _norm_str(result.get("source"))
+
+    canonical = {
+        "id": _norm_str(result.get("id")),
+        "source_type": _norm_str(st),
+        "source": src,
+        "title": _norm_str(result.get("title")),
+        "location": _norm_str(result.get("location")),
+        "postcode": _norm_str(result.get("postcode")),
+        "price_per_day": _norm_price(result.get("price_per_day")),
+        "price_per_week": _norm_price(result.get("price_per_week")),
+        "available_from": _norm_str(result.get("available_from")),
+        "available_dates": _norm_list(result.get("available_dates")),
+        "link": _norm_str(result.get("link")),
+        "description": _norm_str(result.get("description")),
+        "explanation": _norm_str(result.get("explanation")),
+    }
+    return {**result, **canonical}
+
+
+def normalize_short_rent_results(results: list) -> list:
+    return [normalize_short_rent_result(row) for row in results]
+
+
+def get_final_short_rent_recommendations(filters: dict = None) -> list:
+    """Rank, attach explanations, normalize — single entry point for short-rent listings."""
+    ranked = get_ranked_short_rent_results(filters)
+    with_explanations = add_explanations_to_short_rent_results(ranked)
+    return normalize_short_rent_results(with_explanations)
