@@ -1,9 +1,11 @@
 import { useState } from "react";
 
 export default function ShortRentPage() {
-  const [location, setLocation] = useState("");
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
+  const [filters, setFilters] = useState({
+    location: "",
+    min_price: "",
+    max_price: "",
+  });
 
   const mockResults = [
     {
@@ -38,9 +40,17 @@ export default function ShortRentPage() {
     },
   ];
 
+  function handleInputChange(event) {
+    const { name, value } = event.target;
+    setFilters((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
+
   function handleSearch(event) {
     event.preventDefault();
-    // Phase 4-D3+: wire filters to backend
+    console.log("Short rent search filters:", filters);
   }
 
   function formatSourceLine(item) {
@@ -68,8 +78,9 @@ export default function ShortRentPage() {
             <span style={styles.labelText}>Location</span>
             <input
               type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              name="location"
+              value={filters.location}
+              onChange={handleInputChange}
               placeholder="e.g. London, Manchester"
               style={styles.input}
             />
@@ -80,8 +91,9 @@ export default function ShortRentPage() {
               type="number"
               min="0"
               step="0.01"
-              value={minPrice}
-              onChange={(e) => setMinPrice(e.target.value)}
+              name="min_price"
+              value={filters.min_price}
+              onChange={handleInputChange}
               placeholder="0"
               style={styles.input}
             />
@@ -92,8 +104,9 @@ export default function ShortRentPage() {
               type="number"
               min="0"
               step="0.01"
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(e.target.value)}
+              name="max_price"
+              value={filters.max_price}
+              onChange={handleInputChange}
               placeholder="e.g. 100"
               style={styles.input}
             />
