@@ -39,6 +39,9 @@ export default function ShortRentPage() {
         "这是外部平台短租房源，适合作为补充比较，需要跳转原平台查看详情。",
     },
   ];
+  const [results, setResults] = useState(mockResults);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   function handleInputChange(event) {
     const { name, value } = event.target;
@@ -48,9 +51,20 @@ export default function ShortRentPage() {
     }));
   }
 
-  function handleSearch(event) {
+  async function handleSearch(event) {
     event.preventDefault();
+    setLoading(true);
+    setError("");
     console.log("Short rent search filters:", filters);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      setResults(mockResults);
+    } catch (e) {
+      setError("Failed to load short rent results.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function formatSourceLine(item) {
@@ -119,8 +133,10 @@ export default function ShortRentPage() {
 
       <section style={styles.resultsSection} aria-label="Short rent results">
         <h2 style={styles.resultsHeading}>Results</h2>
+        {loading ? <p style={styles.loadingText}>Loading short rent results...</p> : null}
+        {error ? <p style={styles.errorText}>{error}</p> : null}
         <ul style={styles.resultList}>
-          {mockResults.map((item) => (
+          {results.map((item) => (
             <li key={item.id} style={styles.resultCard}>
               <h3 style={styles.resultTitle}>{item.title}</h3>
               <p style={styles.resultRow}>
@@ -209,6 +225,16 @@ const styles = {
   },
   resultsSection: {
     marginTop: "2rem",
+  },
+  loadingText: {
+    margin: "0 0 1rem",
+    fontSize: "0.9rem",
+    color: "#555",
+  },
+  errorText: {
+    margin: "0 0 1rem",
+    fontSize: "0.9rem",
+    color: "#b91c1c",
   },
   resultsHeading: {
     fontSize: "1.125rem",
