@@ -54,11 +54,11 @@ def _matches_filters(listing: ShortRentListing, filters: dict) -> bool:
         if str(loc).lower() not in str(listing.location or "").lower():
             return False
     mn = filters.get("min_price")
-    if mn is not None:
+    if mn is not None and str(mn).strip() != "":
         if listing.price_per_day < float(mn):
             return False
     mx = filters.get("max_price")
-    if mx is not None:
+    if mx is not None and str(mx).strip() != "":
         if listing.price_per_day > float(mx):
             return False
     return True

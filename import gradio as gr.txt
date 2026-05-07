@@ -1,0 +1,33 @@
+import gradio as gr
+import requests
+from PIL import Image
+from io import BytesIO
+
+REMOVE_BG_API_KEY = "SPZKLNWVGx8ecRN9GEZ6FVBf"  # ← 换成你的 API Key
+
+def remove_bg(input_image):
+    buffered = BytesIO()
+    input_image.save(buffered, format="PNG")
+
+    response = requests.post(
+        "https://api.remove.bg/v1.0/removebg",
+        data={"size": "auto"},
+        files={"image_file": buffered.getvalue()},
+        headers={"X-Api-Key": REMOVE_BG_API_KEY},
+    )
+
+    if response.status_code == 200:
+        result = Image.open(BytesIO(response.content))
+        return result
+    else:
+        return f"抠图失败：{response.status_code} - {response.text}"
+
+demo = gr.Interface(
+    fn=remove_bg,
+    inputs=gr.Image(type="pil"),
+    outputs="image",
+    title="自动抠图工具",
+    description="上传产品图，自动去背景"
+)
+
+demo.launch()

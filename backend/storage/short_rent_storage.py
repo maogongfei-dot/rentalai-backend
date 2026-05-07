@@ -16,7 +16,10 @@ def load_short_rent_listings() -> list:
     text = _JSON_PATH.read_text(encoding="utf-8").strip()
     if not text:
         return []
-    data = json.loads(text)
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return []
     if not isinstance(data, list):
         return []
     return [ShortRentListing.from_dict(item) for item in data]
