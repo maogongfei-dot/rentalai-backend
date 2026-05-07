@@ -58,10 +58,21 @@ export default function ShortRentPage() {
     console.log("Short rent search filters:", filters);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setResults(mockResults);
+      const apiResponse = await fetch(
+        "http://localhost:8000/api/short-rent/recommendations",
+        {
+          method: "GET",
+        }
+      );
+      const response = await apiResponse.json();
+
+      if (response.success === true) {
+        setResults(response.data);
+      } else {
+        setError(response.error || "Failed to load short rent results");
+      }
     } catch (e) {
-      setError("Failed to load short rent results.");
+      setError("Failed to load short rent results");
     } finally {
       setLoading(false);
     }
