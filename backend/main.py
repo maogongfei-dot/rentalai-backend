@@ -1,7 +1,10 @@
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.short_rent_api import get_short_rent_recommendations_api
+from backend.api.short_rent_api import (
+    create_short_rent_listing_api,
+    get_short_rent_recommendations_api,
+)
 
 
 app = FastAPI(title="Short Rent Backend API")
@@ -31,3 +34,8 @@ def root() -> dict:
 @app.get("/api/short-rent/recommendations")
 def short_rent_recommendations() -> dict:
     return get_short_rent_recommendations_api()
+
+
+@app.post("/api/short-rent/create")
+def short_rent_create(data: dict = Body(...)) -> dict:
+    return create_short_rent_listing_api(data)
