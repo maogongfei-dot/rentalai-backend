@@ -37,3 +37,6 @@ python-multipart
 
 # Phase13：PostgreSQL 驱动（后续接入；当前仍仅使用 SQLite）
 psycopg2-binary>=2.9.0,<3
+
+# Phase 5-B (backend/)：SQLAlchemy ORM —— backend/database.py + backend/db_models/* 使用
+sqlalchemy>=2.0,<3
