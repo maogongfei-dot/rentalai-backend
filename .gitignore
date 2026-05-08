@@ -1,0 +1,8 @@
+node_modules/
+dist/
+rental_app/node_modules/
+rental_app/dist/
+__pycache__/
+*.pyc
+.env
+rentalai.db
