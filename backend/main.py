@@ -9,7 +9,8 @@ from backend.api.short_rent_api import (
 
 app = FastAPI(title="Short Rent Backend API")
 
-# Phase 5-A4：本地前后端联调允许跨域；生产环境应收紧 allow_origins。
+# Phase 5-A4：本地前后端联调允许跨域；生产环境应收紧。
+# Phase 6-C3：allow_origin_regex 覆盖 Vite 端口占用时自动切换的 localhost 端口（如 5174）。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -20,6 +21,7 @@ app.add_middleware(
         "http://localhost:4173",
         "http://127.0.0.1:4173",
     ],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

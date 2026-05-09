@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createShortRentListing } from "../api/shortRentApi";
 
 const initialForm = {
   title: "",
@@ -59,15 +60,8 @@ export default function CreateShortRentPage() {
     setError("");
 
     try {
-      const apiResponse = await fetch(
-        "http://localhost:8000/api/short-rent/create",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(buildPayload()),
-        }
-      );
-      const response = await apiResponse.json();
+      const formData = buildPayload();
+      const response = await createShortRentListing(formData);
 
       if (response.success === true) {
         setSuccessMessage("Short rent listing created successfully.");

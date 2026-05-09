@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fetchShortRentRecommendations } from "../api/shortRentApi";
 
 export default function ShortRentPage() {
   const [filters, setFilters] = useState({
@@ -58,13 +59,7 @@ export default function ShortRentPage() {
     console.log("Short rent search filters:", filters);
 
     try {
-      const apiResponse = await fetch(
-        "http://localhost:8000/api/short-rent/recommendations",
-        {
-          method: "GET",
-        }
-      );
-      const response = await apiResponse.json();
+      const response = await fetchShortRentRecommendations();
 
       if (response.success === true) {
         setResults(response.data);
