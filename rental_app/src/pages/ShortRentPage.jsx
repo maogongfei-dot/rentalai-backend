@@ -84,29 +84,29 @@ export default function ShortRentPage() {
   }
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <h1 style={styles.title}>Short Rent Finder</h1>
-        <p style={styles.subtitle}>
+    <div className="page-shell">
+      <header className="page-header">
+        <h1 className="page-title">Short Rent Finder</h1>
+        <p className="page-subtitle">
           Find short-term rentals from RentalAI and external platforms
         </p>
       </header>
 
-      <section style={styles.card} aria-label="Search short-term rentals">
-        <form style={styles.form} onSubmit={handleSearch}>
-          <label style={styles.label}>
-            <span style={styles.labelText}>Location</span>
+      <section className="card" aria-label="Search short-term rentals">
+        <form className="form-stack" onSubmit={handleSearch}>
+          <label className="field">
+            <span className="field-label">Location</span>
             <input
               type="text"
               name="location"
               value={filters.location}
               onChange={handleInputChange}
               placeholder="e.g. London, Manchester"
-              style={styles.input}
+              className="input"
             />
           </label>
-          <label style={styles.label}>
-            <span style={styles.labelText}>Min price (per day)</span>
+          <label className="field">
+            <span className="field-label">Min price (per day)</span>
             <input
               type="number"
               min="0"
@@ -115,11 +115,11 @@ export default function ShortRentPage() {
               value={filters.min_price}
               onChange={handleInputChange}
               placeholder="0"
-              style={styles.input}
+              className="input"
             />
           </label>
-          <label style={styles.label}>
-            <span style={styles.labelText}>Max price (per day)</span>
+          <label className="field">
+            <span className="field-label">Max price (per day)</span>
             <input
               type="number"
               min="0"
@@ -128,35 +128,39 @@ export default function ShortRentPage() {
               value={filters.max_price}
               onChange={handleInputChange}
               placeholder="e.g. 100"
-              style={styles.input}
+              className="input"
             />
           </label>
-          <button type="submit" style={styles.button}>
+          <button type="submit" className="btn">
             Search
           </button>
         </form>
       </section>
 
-      <section style={styles.resultsSection} aria-label="Short rent results">
-        <h2 style={styles.resultsHeading}>Results</h2>
-        {loading ? <p style={styles.loadingText}>Loading short rent results...</p> : null}
-        {error ? <p style={styles.errorText}>{error}</p> : null}
-        <ul style={styles.resultList}>
+      <section className="section-stack" aria-label="Short rent results">
+        <h2 className="section-title">Results</h2>
+        {loading ? (
+          <p className="feedback-block text-muted">Loading short rent results...</p>
+        ) : null}
+        {error ? (
+          <p className="feedback-block text-error">{error}</p>
+        ) : null}
+        <ul className="result-list">
           {results.map((item) => (
-            <li key={item.id} style={styles.resultCard}>
-              <h3 style={styles.resultTitle}>{item.title}</h3>
-              <p style={styles.resultRow}>
-                <span style={styles.resultLabel}>Source</span>
+            <li key={item.id} className="result-card">
+              <h3 className="result-card-title">{item.title}</h3>
+              <p className="result-row">
+                <span className="result-row-label">Source</span>
                 {formatSourceLine(item)}
               </p>
-              <p style={styles.resultRow}>
-                <span style={styles.resultLabel}>Location</span>
+              <p className="result-row">
+                <span className="result-row-label">Location</span>
                 {item.location}
               </p>
-              <p style={styles.resultPrice}>
+              <p className="result-price">
                 £{Number(item.price_per_day).toFixed(0)}/day
               </p>
-              <p style={styles.resultExplanation}>{item.explanation}</p>
+              <p className="result-explanation">{item.explanation}</p>
             </li>
           ))}
         </ul>
@@ -164,136 +168,3 @@ export default function ShortRentPage() {
     </div>
   );
 }
-
-const styles = {
-  page: {
-    maxWidth: 680,
-    margin: "0 auto",
-    padding: "2rem 1.25rem",
-    fontFamily:
-      'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    color: "#1a1a1a",
-  },
-  header: {
-    marginBottom: "2rem",
-  },
-  title: {
-    fontSize: "1.75rem",
-    fontWeight: 700,
-    margin: "0 0 0.5rem",
-    letterSpacing: "-0.02em",
-  },
-  subtitle: {
-    margin: 0,
-    fontSize: "1rem",
-    color: "#555",
-    lineHeight: 1.5,
-  },
-  card: {
-    border: "1px solid #e5e5e5",
-    borderRadius: 12,
-    padding: "1.5rem",
-    background: "#fafafa",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-  },
-  label: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.35rem",
-  },
-  labelText: {
-    fontSize: "0.875rem",
-    fontWeight: 600,
-    color: "#333",
-  },
-  input: {
-    padding: "0.6rem 0.75rem",
-    fontSize: "1rem",
-    border: "1px solid #ccc",
-    borderRadius: 8,
-    background: "#fff",
-  },
-  button: {
-    marginTop: "0.25rem",
-    padding: "0.65rem 1rem",
-    fontSize: "1rem",
-    fontWeight: 600,
-    color: "#fff",
-    background: "#2563eb",
-    border: "none",
-    borderRadius: 8,
-    cursor: "pointer",
-  },
-  resultsSection: {
-    marginTop: "2rem",
-  },
-  loadingText: {
-    margin: "0 0 1rem",
-    fontSize: "0.9rem",
-    color: "#555",
-  },
-  errorText: {
-    margin: "0 0 1rem",
-    fontSize: "0.9rem",
-    color: "#b91c1c",
-  },
-  resultsHeading: {
-    fontSize: "1.125rem",
-    fontWeight: 600,
-    margin: "0 0 1rem",
-    color: "#333",
-  },
-  resultList: {
-    listStyle: "none",
-    margin: 0,
-    padding: 0,
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-  },
-  resultCard: {
-    background: "#fff",
-    borderRadius: 12,
-    padding: "1.25rem 1.35rem",
-    margin: 0,
-    border: "1px solid #eaeaea",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-  },
-  resultTitle: {
-    margin: "0 0 0.75rem",
-    fontSize: "1.05rem",
-    fontWeight: 600,
-    lineHeight: 1.35,
-  },
-  resultRow: {
-    margin: "0 0 0.4rem",
-    fontSize: "0.9rem",
-    color: "#444",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "0.35rem",
-    alignItems: "baseline",
-  },
-  resultLabel: {
-    fontWeight: 600,
-    color: "#666",
-    marginRight: "0.35rem",
-  },
-  resultPrice: {
-    margin: "0.65rem 0 0.5rem",
-    fontSize: "1rem",
-    fontWeight: 600,
-    color: "#1d4ed8",
-  },
-  resultExplanation: {
-    margin: 0,
-    fontSize: "0.875rem",
-    color: "#555",
-    lineHeight: 1.55,
-  },
-};

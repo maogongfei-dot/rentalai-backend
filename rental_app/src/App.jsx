@@ -8,12 +8,14 @@ function App() {
   return (
     <>
       <Navbar />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/short-rent" element={<ShortRentPage />} />
-        <Route path="/create-short-rent" element={<CreateShortRentPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <main className="layout-main">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/short-rent" element={<ShortRentPage />} />
+          <Route path="/create-short-rent" element={<CreateShortRentPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </>
   );
 }
