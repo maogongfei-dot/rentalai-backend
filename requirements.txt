@@ -1,3 +1,8 @@
-# Monorepo root — Phase18：Render Blueprint 使用 rootDir: rental_app，构建时读该目录下 requirements.txt。
-# 从仓库根安装完整后端依赖：
--r rental_app/requirements.txt
+# Phase 7-A2：FastAPI 后端 Render 部署所需最小依赖（backend/main.py）
+# Build：pip install -r requirements.txt
+# Start：uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+
+fastapi>=0.109.0,<1
+uvicorn[standard]>=0.27.0,<1
+sqlalchemy>=2.0,<3
+python-multipart
