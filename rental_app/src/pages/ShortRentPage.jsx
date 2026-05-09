@@ -83,6 +83,11 @@ export default function ShortRentPage() {
     return item.source || "";
   }
 
+  function formatPricePerDay(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(0) : "—";
+  }
+
   return (
     <div className="page-shell">
       <header className="page-header">
@@ -158,7 +163,7 @@ export default function ShortRentPage() {
                 {item.location}
               </p>
               <p className="result-price">
-                £{Number(item.price_per_day).toFixed(0)}/day
+                £{formatPricePerDay(item.price_per_day)}/day
               </p>
               <p className="result-explanation">{item.explanation}</p>
             </li>
