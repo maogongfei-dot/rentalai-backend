@@ -1,30 +1,69 @@
-"""Phase 5-B2: SQLAlchemy database bootstrap.
+"""Phase 5-B2 / Phase 9-A1: SQLAlchemy database bootstrap.
 
-Single, minimal entry point for the SQLAlchemy stack used by the new
-``backend/`` package. SQLite is the default during local development; a
-PostgreSQL ``DATABASE_URL`` may replace it later without changing call sites.
+Single entry point for the SQLAlchemy stack used by the ``backend/`` package.
 
-This module deliberately exposes only three names:
+* If ``DATABASE_URL`` is set (after trimming), it is used for the engine.
+  Heroku/Render-style ``postgres://`` URLs are normalized to ``postgresql://``
+  for SQLAlchemy + psycopg2.
+* If ``DATABASE_URL`` is unset or empty, behavior matches pre–Phase 9-A1:
+  local SQLite at ``sqlite:///./rentalai.db``.
 
-* ``engine``       — SQLAlchemy Engine bound to the configured database URL.
-* ``SessionLocal`` — sessionmaker factory for short-lived request sessions.
-* ``Base``         — declarative base class for future ORM models.
+Exposed names:
 
-No tables are declared here and no data is migrated. Existing Phase 4 / 5-A
-JSON-backed code paths are not touched.
+* ``SQLALCHEMY_DATABASE_URL`` — resolved URL string (for logs/tests).
+* ``engine`` — bound Engine.
+* ``SessionLocal`` — sessionmaker for short-lived sessions.
+* ``Base`` — declarative base for ORM models.
+* ``get_db`` — FastAPI dependency that yields a session and closes it.
+
+No tables are declared here; callers register models on ``Base``.
 """
 
+from __future__ import annotations
+
+import os
+from collections.abc import Generator
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./rentalai.db"
+def _normalize_database_url(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    u = str(raw).strip()
+    if not u:
+        return None
+    if u.startswith("postgres://"):
+        return "postgresql://" + u[len("postgres://") :]
+    return u
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-)
+
+def _resolve_sqlalchemy_database_url() -> str:
+    url = _normalize_database_url(os.getenv("DATABASE_URL"))
+    if url:
+        return url
+    return "sqlite:///./rentalai.db"
+
+
+SQLALCHEMY_DATABASE_URL = _resolve_sqlalchemy_database_url()
+
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
+
+def get_db() -> Generator[Session, None, None]:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

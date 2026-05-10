@@ -52,6 +52,11 @@ def _active_postgres_url() -> str | None:
     u = os.getenv("DATABASE_URL")
     if u is not None:
         u = str(u).strip() or None
+    if not u:
+        return None
+    # Align with SQLAlchemy ``backend.database`` (Phase 9-A1): libpq/psycopg2 expect postgresql://
+    if u.startswith("postgres://"):
+        u = "postgresql://" + u[len("postgres://") :]
     return u
 
 
