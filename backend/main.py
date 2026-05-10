@@ -1,10 +1,9 @@
+import logging
 import os
 
 from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.database import Base, engine
-from backend.db_models.short_rent_db_model import ShortRentDB  # noqa: F401
 from backend.api.short_rent_api import (
     create_short_rent_listing_api,
     get_short_rent_recommendations_api,
@@ -13,10 +12,14 @@ from backend.api.short_rent_api import (
 
 app = FastAPI(title="Short Rent Backend API")
 
+_logger = logging.getLogger("backend.main")
+
 
 @app.on_event("startup")
 def on_startup() -> None:
-    Base.metadata.create_all(bind=engine)
+    from backend.init_db import ensure_sqlalchemy_tables
+
+    ensure_sqlalchemy_tables(_logger)
 
 
 default_origins = [

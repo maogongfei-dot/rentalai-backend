@@ -212,22 +212,15 @@ def _sqlalchemy_bind_database_url() -> None:
     """SQLAlchemy shares ``DATABASE_URL`` with psycopg2 user/history paths (PostgreSQL or SQLite fallback)."""
     _ensure_repo_root_for_backend_imports()
     try:
-        from backend.database import Base, SQLALCHEMY_DATABASE_URL, engine
-        from backend.db_models.short_rent_db_model import ShortRentDB  # noqa: F401
+        from backend.init_db import ensure_sqlalchemy_tables
 
-        Base.metadata.create_all(bind=engine)
-        scheme = (
-            SQLALCHEMY_DATABASE_URL.split("://", 1)[0]
-            if "://" in SQLALCHEMY_DATABASE_URL
-            else "unknown"
-        )
-        logger.info(
-            "SQLAlchemy OK: create_all done; dialect=%s scheme=%s",
-            engine.dialect.name,
-            scheme,
-        )
+        ensure_sqlalchemy_tables(logger)
     except Exception as exc:
-        logger.warning("SQLAlchemy startup skipped or failed (non-fatal): %s", exc)
+        logger.warning(
+            "SQLAlchemy startup skipped or failed (non-fatal): %s",
+            exc,
+            exc_info=True,
+        )
 
 
 _SLOW_REQUEST_THRESHOLD = 5.0  # seconds
