@@ -54,6 +54,9 @@ if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
         connect_args={"check_same_thread": False},
     )
 else:
+    # SQLAlchemy maps ``postgresql://`` to the psycopg2 DBAPI; require driver at import time.
+    import psycopg2  # noqa: F401
+
     engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
