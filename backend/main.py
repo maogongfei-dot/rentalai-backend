@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.short_rent_api import (
     create_short_rent_listing_api,
+    get_short_rent_listings_from_db_api,
     get_short_rent_recommendations_api,
 )
 
@@ -57,6 +58,12 @@ def root() -> dict:
 @app.get("/api/short-rent/recommendations")
 def short_rent_recommendations() -> dict:
     return get_short_rent_recommendations_api()
+
+
+@app.get("/api/short-rent/listings")
+def short_rent_listings_db_only() -> dict:
+    """DB-only listing readback (no mock pipeline); for PostgreSQL verification."""
+    return get_short_rent_listings_from_db_api()
 
 
 @app.post("/api/short-rent/create")

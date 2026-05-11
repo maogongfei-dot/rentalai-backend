@@ -1,11 +1,12 @@
-"""Phase 5-C4 / 5-D1: short-rent recommendations + creation API.
+"""Phase 5-C4 / 5-D1 / 9-A4: short-rent recommendations + creation API.
 
-* ``get_short_rent_recommendations_api`` reads from the SQLite
-  ``short_rent_listings`` table when available; otherwise falls back to the
-  existing JSON-backed pipeline so Phase 4 / 5-A behavior is preserved when
-  the database is empty.
-* ``create_short_rent_listing_api`` writes a new row into the same table via
-  the SQLAlchemy CRUD helpers and returns a frontend-friendly dict.
+* ``get_short_rent_recommendations_api`` reads from the ``short_rent_listings``
+  table (PostgreSQL or SQLite per ``DATABASE_URL``) when non-empty; otherwise
+  falls back to the JSON-backed pipeline.
+* ``create_short_rent_listing_api`` inserts into ``short_rent_listings`` via
+  SQLAlchemy and returns a frontend-friendly dict.
+* ``get_short_rent_listings_from_db_api`` reads only persisted rows (no mock);
+  used for DB verification (Phase 9-A4).
 """
 
 import json
@@ -111,4 +112,29 @@ def create_short_rent_listing_api(data: dict) -> dict:
             "success": False,
             "error": str(e),
             "data": None,
+        }
+
+
+def get_short_rent_listings_from_db_api() -> dict:
+    """Return every row in ``short_rent_listings`` only (no JSON/mock fallback).
+
+    Intended for Phase 9-A4 PostgreSQL persistence checks; response shape matches
+    ``get_short_rent_recommendations_api`` ``data`` items where applicable.
+    """
+    try:
+        db_items = get_all_short_rents()
+        results = [db_short_rent_to_dict(row) for row in db_items]
+        return {
+            "success": True,
+            "source": "database",
+            "data": results,
+            "count": len(results),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "source": "database",
+            "error": str(e),
+            "data": [],
+            "count": 0,
         }
