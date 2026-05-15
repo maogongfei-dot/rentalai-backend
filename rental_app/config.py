@@ -102,6 +102,9 @@ def _cors_default_origins() -> list[str]:
         "http://localhost:5173",
         "http://localhost:3000",
         "https://rentalai-backend.onrender.com",
+        "https://rentalai-api.onrender.com",
+        "https://rentalai-ui.onrender.com",
+        "https://rentalai-frontend.onrender.com",
     ]
 
 
