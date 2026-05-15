@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import AIChatWidget from "./components/AIChatWidget";
 import Navbar from "./components/Navbar.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import ShortRentPage from "./pages/ShortRentPage.jsx";
@@ -16,6 +17,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <AIChatWidget />
     </>
   );
 }
