@@ -143,6 +143,7 @@ from data.storage.records_query_service import (
 )
 from task_store import TaskStore
 
+from api_ai_chat import AIChatRequest, AIChatResponse, build_ai_chat_response
 from api_auth_minimal import MinimalAuthBody, minimal_login_response, minimal_register_response
 from config import get_cors_origins
 from contract_analysis_api_payload import build_contract_analysis_ui_payload
@@ -1145,6 +1146,18 @@ def api_market_explain(body: dict = Body(default_factory=dict)):
             status_code=500,
             content={"success": False, "error": "server_error", "message": str(exc)},
         )
+
+
+# -----------------------------------------------------------------------------
+# 全站统一 AI 对话框（Phase 1 Step 6 — 规则模拟，不接 LLM）
+# -----------------------------------------------------------------------------
+@app.post("/api/ai-chat", response_model=AIChatResponse)
+def api_ai_chat(body: AIChatRequest):
+    """
+    全站 AI 对话框占位接口：按关键词返回固定 intent / answer / suggested_next_actions。
+    请求体：``{ "message": "..." }``。
+    """
+    return build_ai_chat_response(body.message)
 
 
 # -----------------------------------------------------------------------------
