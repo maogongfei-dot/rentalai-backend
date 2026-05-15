@@ -16,6 +16,11 @@ function chatUrl() {
  * @returns {Promise<{ answer: string, intent: string, suggested_next_actions: unknown[] }>}
  */
 export async function sendAIChatMessage(message) {
+  const trimmed = String(message ?? "").trim();
+  if (!trimmed) {
+    throw new Error("Message cannot be empty");
+  }
+
   const url = chatUrl();
 
   let res;
@@ -23,7 +28,7 @@ export async function sendAIChatMessage(message) {
     res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message: trimmed }),
     });
   } catch (err) {
     const cause = err instanceof Error ? err.message : String(err);

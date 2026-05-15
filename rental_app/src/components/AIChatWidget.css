@@ -284,6 +284,20 @@
   max-width: 100%;
 }
 
+.ai-chat-widget__intent {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ai-chat-slate-muted);
+  background: #fff;
+  border: 1px solid var(--ai-chat-border);
+  border-radius: 6px;
+}
+
 /* ----- Suggested actions ----- */
 
 .ai-chat-widget__actions {

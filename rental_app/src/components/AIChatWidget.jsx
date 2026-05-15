@@ -12,6 +12,20 @@ function nextMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+const INTENT_LABELS = {
+  property_search: "Property search",
+  contract_help: "Contract help",
+  area_info: "Area info",
+  dispute_help: "Dispute help",
+  landlord_help: "Landlord help",
+  general: "General",
+};
+
+function formatIntentLabel(intent) {
+  if (!intent) return "";
+  return INTENT_LABELS[intent] || intent.replace(/_/g, " ");
+}
+
 function normalizeActions(actions) {
   if (!Array.isArray(actions)) return undefined;
   const items = actions
@@ -114,6 +128,10 @@ export default function AIChatWidget() {
     handleSendMessage(actionText);
   }
 
+  const latestAssistantMessageId = [...messages]
+    .reverse()
+    .find((m) => m.role === "assistant" && !m.isError)?.id;
+
   return (
     <div className="ai-chat-widget">
       {isOpen ? (
@@ -155,7 +173,7 @@ export default function AIChatWidget() {
               m.role === "user" ? (
                 <div
                   key={m.id}
-                  className="ai-chat-widget__row ai-chat-widget__row--user ai-chat-widget__message-enter"
+                  className="ai-chat-widget__row ai-chat-widget__row--user"
                 >
                   <div className="ai-chat-widget__bubble ai-chat-widget__bubble--user">
                     {m.content}
@@ -164,9 +182,14 @@ export default function AIChatWidget() {
               ) : (
                 <div
                   key={m.id}
-                  className="ai-chat-widget__row ai-chat-widget__row--assistant ai-chat-widget__message-enter"
+                  className="ai-chat-widget__row ai-chat-widget__row--assistant"
                 >
                   <div className="ai-chat-widget__assistant-block">
+                    {m.intent && !m.isError ? (
+                      <span className="ai-chat-widget__intent" title={m.intent}>
+                        {formatIntentLabel(m.intent)}
+                      </span>
+                    ) : null}
                     <div
                       className={
                         m.isError
@@ -176,7 +199,9 @@ export default function AIChatWidget() {
                     >
                       {m.content}
                     </div>
-                    {m.suggested_next_actions?.length > 0 ? (
+                    {m.suggested_next_actions?.length > 0 &&
+                    m.id === latestAssistantMessageId &&
+                    !isLoading ? (
                       <div
                         className="ai-chat-widget__actions"
                         role="group"
@@ -201,7 +226,7 @@ export default function AIChatWidget() {
             )}
             {isLoading ? (
               <div
-                className="ai-chat-widget__row ai-chat-widget__row--assistant ai-chat-widget__message-enter"
+                className="ai-chat-widget__row ai-chat-widget__row--assistant"
                 aria-live="polite"
                 aria-label="Assistant is thinking"
               >
