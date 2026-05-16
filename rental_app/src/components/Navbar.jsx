@@ -9,6 +9,9 @@ export default function Navbar() {
       <Link to="/" className="navbar-link">
         Home
       </Link>
+      <Link to="/guides" className="navbar-link">
+        AI Guides
+      </Link>
       <Link to="/short-rent" className="navbar-link">
         Short Rent
       </Link>

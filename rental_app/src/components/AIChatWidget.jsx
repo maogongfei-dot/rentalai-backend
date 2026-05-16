@@ -121,6 +121,23 @@ export default function AIChatWidget() {
     }
   }
 
+  const handleSendMessageRef = useRef(handleSendMessage);
+  handleSendMessageRef.current = handleSendMessage;
+
+  useEffect(() => {
+    function onRentalAIChatSend(event) {
+      const raw = event.detail?.message;
+      if (typeof raw !== "string") return;
+      const text = raw.trim();
+      if (!text) return;
+      setIsOpen(true);
+      handleSendMessageRef.current(text);
+    }
+    window.addEventListener("rentalai-send-chat-message", onRentalAIChatSend);
+    return () =>
+      window.removeEventListener("rentalai-send-chat-message", onRentalAIChatSend);
+  }, []);
+
   function sendFromInput() {
     handleSendMessage();
   }

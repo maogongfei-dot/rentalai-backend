@@ -1,0 +1,121 @@
+/* Guide Library — card grid (scoped) */
+
+.guide-library.page-shell {
+  max-width: min(56rem, 100%);
+}
+
+.guide-library-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .guide-library-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.35rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .guide-library-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.guide-library-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-width: 0;
+  height: 100%;
+}
+
+.guide-library-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.guide-library-card__category {
+  align-self: flex-start;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  line-height: 1.2;
+}
+
+.guide-library-card__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.guide-library-card__desc {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--color-text-soft);
+  flex: 1;
+}
+
+.guide-library-card__block {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.guide-library-card__label {
+  margin: 0 0 0.45rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-label);
+}
+
+.guide-library-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.guide-library-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--color-text);
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.guide-library-chip:hover {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: var(--color-primary);
+}
+
+.guide-library-chip:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.guide-library-chip--action {
+  background: #fff;
+}
