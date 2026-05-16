@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sendAIChatMessage } from "../api/aiChatApi";
+import { getRecommendedGuidesByIntent } from "../utils/guideUtils";
 import "./AIChatWidget.css";
 
 const WELCOME_MESSAGE =
@@ -35,12 +36,16 @@ function normalizeActions(actions) {
 }
 
 function buildAssistantMessage(data) {
+  const intent = data.intent || undefined;
+  const recommendedGuides = getRecommendedGuidesByIntent(data.intent);
   return {
     id: nextMessageId(),
     role: "assistant",
     content: data.answer || FALLBACK_ERROR_MESSAGE,
-    intent: data.intent || undefined,
+    intent,
     suggested_next_actions: normalizeActions(data.suggested_next_actions),
+    recommended_guides:
+      recommendedGuides.length > 0 ? recommendedGuides : undefined,
     isError: false,
   };
 }
@@ -52,6 +57,7 @@ function buildErrorAssistantMessage() {
     content: FALLBACK_ERROR_MESSAGE,
     intent: undefined,
     suggested_next_actions: undefined,
+    recommended_guides: undefined,
     isError: true,
   };
 }
@@ -65,6 +71,7 @@ export default function AIChatWidget() {
       content: WELCOME_MESSAGE,
       intent: undefined,
       suggested_next_actions: undefined,
+      recommended_guides: undefined,
       isError: false,
     },
   ]);
@@ -126,6 +133,13 @@ export default function AIChatWidget() {
 
   function handleActionClick(actionText) {
     handleSendMessage(actionText);
+  }
+
+  function handleGuideCardClick(guide) {
+    const first = guide?.starter_questions?.[0];
+    if (typeof first === "string" && first.trim()) {
+      handleSendMessage(first.trim());
+    }
   }
 
   const latestAssistantMessageId = [...messages]
@@ -199,6 +213,45 @@ export default function AIChatWidget() {
                     >
                       {m.content}
                     </div>
+                    {m.recommended_guides?.length > 0 &&
+                    m.id === latestAssistantMessageId &&
+                    !isLoading ? (
+                      <div
+                        className="ai-chat-widget__guides"
+                        role="group"
+                        aria-label="Recommended guides"
+                      >
+                        {m.recommended_guides.map((guide) => (
+                          <button
+                            key={guide.id}
+                            type="button"
+                            className="ai-chat-widget__guide-card"
+                            onClick={() => handleGuideCardClick(guide)}
+                            disabled={isLoading}
+                          >
+                            <span className="ai-chat-widget__guide-card-category">
+                              {guide.category}
+                            </span>
+                            <span className="ai-chat-widget__guide-card-title">
+                              {guide.title}
+                            </span>
+                            <span className="ai-chat-widget__guide-card-desc">
+                              {guide.description}
+                            </span>
+                            {(guide.starter_questions ?? [])
+                              .slice(0, 2)
+                              .map((q, hi) => (
+                                <span
+                                  key={`${guide.id}-hint-${hi}`}
+                                  className="ai-chat-widget__guide-card-hint"
+                                >
+                                  {q}
+                                </span>
+                              ))}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                     {m.suggested_next_actions?.length > 0 &&
                     m.id === latestAssistantMessageId &&
                     !isLoading ? (

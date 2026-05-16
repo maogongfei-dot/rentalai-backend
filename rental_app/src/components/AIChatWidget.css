@@ -298,6 +298,91 @@
   border-radius: 6px;
 }
 
+/* ----- Recommended guides ----- */
+
+.ai-chat-widget__guides {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-width: 100%;
+}
+
+.ai-chat-widget__guide-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  font-family: inherit;
+  border: 1px solid var(--ai-chat-border);
+  border-radius: 10px;
+  background: var(--ai-chat-surface);
+  color: var(--ai-chat-slate);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.ai-chat-widget__guide-card:hover:not(:disabled) {
+  background: #fff;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.ai-chat-widget__guide-card:focus-visible {
+  outline: 2px solid var(--ai-chat-primary);
+  outline-offset: 2px;
+}
+
+.ai-chat-widget__guide-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ai-chat-widget__guide-card-category {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ai-chat-slate-muted);
+  line-height: 1.2;
+}
+
+.ai-chat-widget__guide-card-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ai-chat-slate);
+}
+
+.ai-chat-widget__guide-card-desc {
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--ai-chat-slate-muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.ai-chat-widget__guide-card-hint {
+  display: block;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: #64748b;
+  padding-left: 0.4rem;
+  border-left: 2px solid #e2e8f0;
+  margin-top: 0.1rem;
+}
+
 /* ----- Suggested actions ----- */
 
 .ai-chat-widget__actions {
