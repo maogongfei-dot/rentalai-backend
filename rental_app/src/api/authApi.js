@@ -1,7 +1,9 @@
 /**
- * Auth API — register / login.
+ * Auth API — register / login / current user.
  * Base URL from VITE_API_BASE_URL; dev falls back to same-origin /api (Vite proxy).
  */
+
+export const AUTH_TOKEN_STORAGE_KEY = "rentalai_token";
 
 const API_BASE_RAW = import.meta.env.VITE_API_BASE_URL;
 const API_BASE_URL =
@@ -17,6 +19,27 @@ function loginUrl() {
 
 function registerUrl() {
   return authUrl("/api/auth/register");
+}
+
+function meUrl() {
+  return authUrl("/api/auth/me");
+}
+
+/** @returns {string | null} Stored JWT, or null if missing. */
+export function getAuthToken() {
+  if (typeof localStorage === "undefined") {
+    return null;
+  }
+  const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  const trimmed = typeof token === "string" ? token.trim() : "";
+  return trimmed || null;
+}
+
+/** Remove the stored JWT (client-side logout). */
+export function logoutUser() {
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  }
 }
 
 async function parseErrorDetail(res, fallback) {
@@ -140,6 +163,52 @@ export async function registerUser({ email, password, full_name }) {
     data = await res.json();
   } catch (err) {
     throw new Error("Registration response was not valid JSON", {
+      cause: err instanceof Error ? err : undefined,
+    });
+  }
+
+  return data;
+}
+
+/**
+ * Load the authenticated user via GET /api/auth/me.
+ * @returns {Promise<{ id: number, email: string, full_name: string | null, is_active: boolean, created_at: string } | null>}
+ *   User object, or null when no token is stored.
+ */
+export async function getCurrentUser() {
+  const token = getAuthToken();
+  if (!token) {
+    return null;
+  }
+
+  let res;
+  try {
+    res = await fetch(meUrl(), {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (err) {
+    const cause = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Failed to load current user (network error): ${cause}`,
+      { cause: err instanceof Error ? err : undefined }
+    );
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      await parseErrorDetail(
+        res,
+        `Failed to load current user (HTTP ${res.status})`
+      )
+    );
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (err) {
+    throw new Error("Current user response was not valid JSON", {
       cause: err instanceof Error ? err : undefined,
     });
   }
