@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.db_models.user_db_model import User
+from backend.dependencies.auth import get_current_user
 from backend.schemas.user_schema import Token, UserCreate, UserLogin, UserRead
 from backend.utils.security import create_access_token, hash_password, verify_password
 
@@ -90,3 +91,11 @@ def login_user(body: UserLogin, db: Session = Depends(get_db)) -> Token:
         data={"sub": str(user.id), "email": user.email},
     )
     return Token(access_token=access_token, token_type="bearer")
+
+
+@router.get("/me", response_model=UserRead)
+def read_current_user(
+    current_user: User = Depends(get_current_user),
+) -> UserRead:
+    """Return the authenticated user (JWT required)."""
+    return UserRead.model_validate(current_user)
