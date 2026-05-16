@@ -18,6 +18,12 @@ export default function Navbar() {
       <Link to="/create-short-rent" className="navbar-link">
         Create Listing
       </Link>
+      <Link to="/register" className="navbar-link">
+        Register
+      </Link>
+      <Link to="/login" className="navbar-link">
+        Login
+      </Link>
     </nav>
   );
 }
