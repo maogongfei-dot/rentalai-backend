@@ -8,3 +8,6 @@ sqlalchemy>=2.0,<3
 psycopg2-binary>=2.9.0,<3
 pydantic>=2.0,<3
 python-multipart
+passlib[bcrypt]>=1.7.4
+# passlib 1.7.4 与 bcrypt 4.1+ 不兼容（backend 检测/哈希会报错）
+bcrypt>=4.0.1,<4.1

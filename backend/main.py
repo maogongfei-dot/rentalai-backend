@@ -4,6 +4,7 @@ import os
 from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.api.auth_api import router as auth_router
 from backend.api.short_rent_api import (
     create_short_rent_listing_api,
     get_short_rent_listings_from_db_api,
@@ -12,6 +13,8 @@ from backend.api.short_rent_api import (
 
 
 app = FastAPI(title="Short Rent Backend API")
+
+app.include_router(auth_router)
 
 _logger = logging.getLogger("backend.main")
 
