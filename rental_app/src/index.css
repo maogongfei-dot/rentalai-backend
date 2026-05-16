@@ -216,6 +216,69 @@ body {
   color: var(--color-primary);
 }
 
+.navbar-user {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navbar-link--button {
+  background: none;
+  border: none;
+  padding: 0.35rem 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.navbar-link--button:hover {
+  color: var(--color-primary);
+}
+
+.register-success {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.register-login-link {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.register-login-link:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+.profile-details {
+  margin: 0 0 1.25rem;
+  padding: 0;
+}
+
+.profile-row {
+  margin: 0 0 0.75rem;
+}
+
+.profile-row dt {
+  margin: 0 0 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-label);
+}
+
+.profile-row dd {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
 /* Short rent results */
 .section-stack {
   margin-top: 2rem;

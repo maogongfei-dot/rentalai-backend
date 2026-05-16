@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { registerUser } from "../api/authApi";
 
 const initialForm = {
@@ -31,7 +32,7 @@ export default function Register() {
         full_name: form.full_name,
       });
       setSuccessMessage(
-        "Account created successfully. You can now log in."
+        "Account created successfully. Please log in."
       );
       setForm(initialForm);
     } catch (err) {
@@ -103,9 +104,12 @@ export default function Register() {
           </button>
 
           {successMessage ? (
-            <p className="text-success" role="status">
-              {successMessage}
-            </p>
+            <div className="register-success" role="status">
+              <p className="text-success">{successMessage}</p>
+              <Link to="/login" className="register-login-link">
+                Go to Login
+              </Link>
+            </div>
           ) : null}
           {error ? (
             <p className="text-error" role="alert">

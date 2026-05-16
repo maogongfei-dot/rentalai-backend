@@ -7,6 +7,8 @@ import ShortRentPage from "./pages/ShortRentPage.jsx";
 import CreateShortRentPage from "./pages/CreateShortRentPage.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
+import Profile from "./pages/Profile.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 function App() {
   return (
@@ -20,6 +22,14 @@ function App() {
           <Route path="/create-short-rent" element={<CreateShortRentPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

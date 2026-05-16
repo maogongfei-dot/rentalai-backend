@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { loginUser } from "../api/authApi";
-
-const TOKEN_STORAGE_KEY = "rentalai_token";
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
+  const { login: setAuthSession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ export default function Login() {
 
     try {
       const { access_token } = await loginUser(email, password);
-      localStorage.setItem(TOKEN_STORAGE_KEY, access_token);
+      await setAuthSession(access_token);
       setSuccessMessage("Login successful.");
     } catch (err) {
       const message =
