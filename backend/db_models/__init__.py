@@ -5,5 +5,6 @@ Import this package (or call :func:`backend.init_db.ensure_sqlalchemy_tables`) b
 """
 
 from backend.db_models.short_rent_db_model import ShortRentDB
+from backend.db_models.user_db_model import User
 
-__all__ = ["ShortRentDB"]
+__all__ = ["ShortRentDB", "User"]
