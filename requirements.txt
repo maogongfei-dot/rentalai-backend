@@ -11,3 +11,5 @@ python-multipart
 passlib[bcrypt]>=1.7.4
 # passlib 1.7.4 与 bcrypt 4.1+ 不兼容（backend 检测/哈希会报错）
 bcrypt>=4.0.1,<4.1
+# Phase 3 Step 3：JWT access token（backend/utils/security.py）
+python-jose[cryptography]>=3.3.0,<4

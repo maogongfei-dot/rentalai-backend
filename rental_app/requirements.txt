@@ -41,6 +41,7 @@ psycopg2-binary>=2.9.0,<3
 # Phase 5-B (backend/)：SQLAlchemy ORM —— backend/database.py + backend/db_models/* 使用
 sqlalchemy>=2.0,<3
 
-# Phase 3：注册 / 密码哈希（backend/utils/security.py）
+# Phase 3：注册 / 密码哈希 / JWT（backend/utils/security.py）
 passlib[bcrypt]>=1.7.4
 bcrypt>=4.0.1,<4.1
+python-jose[cryptography]>=3.3.0,<4

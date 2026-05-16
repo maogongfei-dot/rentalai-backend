@@ -1,4 +1,4 @@
-"""Auth HTTP routes (Phase 3 Step 2 — register only)."""
+"""Auth HTTP routes (Phase 3 — register + login)."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.db_models.user_db_model import User
-from backend.schemas.user_schema import UserCreate, UserRead
-from backend.utils.security import hash_password
+from backend.schemas.user_schema import Token, UserCreate, UserLogin, UserRead
+from backend.utils.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -61,3 +61,32 @@ def register_user(body: UserCreate, db: Session = Depends(get_db)) -> UserRead:
         ) from None
     db.refresh(user)
     return UserRead.model_validate(user)
+
+
+@router.post("/login", response_model=Token)
+def login_user(body: UserLogin, db: Session = Depends(get_db)) -> Token:
+    """Authenticate with email + password; returns a JWT access token."""
+    email = (body.email or "").strip().lower()
+    if not email or not body.password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password.",
+        )
+
+    stmt = select(User).where(User.email == email)
+    user = db.execute(stmt).scalar_one_or_none()
+    if user is None or not verify_password(body.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password.",
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password.",
+        )
+
+    access_token = create_access_token(
+        data={"sub": str(user.id), "email": user.email},
+    )
+    return Token(access_token=access_token, token_type="bearer")

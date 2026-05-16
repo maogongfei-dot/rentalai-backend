@@ -16,6 +16,16 @@ class UserCreate(UserBase):
     password: str = Field(..., min_length=1, max_length=512)
 
 
+class UserLogin(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=1, max_length=512)
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
