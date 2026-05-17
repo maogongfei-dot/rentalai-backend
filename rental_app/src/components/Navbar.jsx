@@ -33,6 +33,9 @@ export default function Navbar() {
           <Link to="/landlord-dashboard" className="navbar-link">
             Landlord Center
           </Link>
+          <Link to="/contract-center" className="navbar-link">
+            Contract Center
+          </Link>
           <Link to="/profile" className="navbar-link">
             Profile
           </Link>
