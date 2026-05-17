@@ -27,6 +27,9 @@ export default function Navbar() {
 
       {!loading && isAuthenticated ? (
         <>
+          <Link to="/tenant-dashboard" className="navbar-link">
+            Tenant Center
+          </Link>
           <Link to="/profile" className="navbar-link">
             Profile
           </Link>

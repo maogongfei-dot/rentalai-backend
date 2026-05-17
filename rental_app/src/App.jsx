@@ -8,6 +8,7 @@ import CreateShortRentPage from "./pages/CreateShortRentPage.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Profile from "./pages/Profile.jsx";
+import TenantDashboard from "./pages/TenantDashboard.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 function App() {
@@ -27,6 +28,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tenant-dashboard"
+            element={
+              <ProtectedRoute>
+                <TenantDashboard />
               </ProtectedRoute>
             }
           />

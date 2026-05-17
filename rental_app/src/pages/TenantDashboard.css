@@ -1,0 +1,222 @@
+/* Tenant Dashboard — module card grid */
+
+.tenant-dashboard.page-shell {
+  max-width: min(56rem, 100%);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.tenant-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .tenant-dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+  }
+}
+
+.tenant-dashboard-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 10rem;
+  margin: 0;
+}
+
+.tenant-dashboard-card-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--color-label);
+}
+
+.tenant-dashboard-card-text {
+  flex: 1;
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.tenant-dashboard-card-badge {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: #f5f5f5;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* Saved Properties section */
+.tenant-saved-section {
+  margin-top: 2.5rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.tenant-saved-header {
+  margin-bottom: 1.25rem;
+}
+
+.tenant-saved-intro {
+  margin: 0.35rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.tenant-saved-hint {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.9rem;
+  color: var(--color-label);
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.tenant-saved-empty {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.tenant-saved-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tenant-saved-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 0;
+}
+
+.tenant-saved-card-top {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tenant-saved-card-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.tenant-saved-location {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.tenant-saved-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 480px) {
+  .tenant-saved-meta {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.tenant-saved-meta-row {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  align-items: baseline;
+}
+
+.tenant-saved-meta-row dt {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #666666;
+  min-width: 5.5rem;
+}
+
+.tenant-saved-meta-row dd {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-soft);
+}
+
+.tenant-saved-score {
+  font-weight: 600;
+  color: var(--color-primary-hover);
+}
+
+.tenant-saved-risk {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+
+.tenant-saved-risk--low {
+  color: var(--color-success);
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.tenant-saved-risk--medium {
+  color: #a16207;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.tenant-saved-risk--high {
+  color: var(--color-danger);
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.tenant-saved-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.tenant-saved-btn {
+  margin-top: 0;
+  flex: 1 1 auto;
+  min-width: 8rem;
+}
+
+.tenant-saved-btn--remove {
+  color: var(--color-danger);
+  background: #fff;
+  border: 1px solid #e5e5e5;
+}
+
+.tenant-saved-btn--remove:hover:not(:disabled) {
+  color: #fff;
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
