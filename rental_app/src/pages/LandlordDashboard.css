@@ -9,6 +9,10 @@
   overflow-x: clip;
 }
 
+.landlord-section[id] {
+  scroll-margin-top: 5rem;
+}
+
 /* Hero */
 .landlord-hero {
   margin-bottom: 1.75rem;
@@ -88,6 +92,7 @@
   letter-spacing: -0.02em;
   line-height: 1.2;
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 /* Quick nav */
@@ -173,6 +178,7 @@
 .landlord-callout strong {
   font-weight: 700;
   color: var(--color-primary-hover);
+  overflow-wrap: anywhere;
 }
 
 .landlord-empty {
@@ -254,6 +260,7 @@
   letter-spacing: -0.01em;
   line-height: 1.35;
   color: var(--color-label);
+  overflow-wrap: anywhere;
 }
 
 .landlord-panel-card__meta {
@@ -318,6 +325,16 @@
   border-top: 1px solid var(--color-border);
 }
 
+.landlord-metric-grid--booking {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 480px) {
+  .landlord-metric-grid--booking {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 .landlord-metric-grid--triple {
   grid-template-columns: repeat(2, 1fr);
 }
@@ -346,6 +363,7 @@
   font-size: 0.9375rem;
   font-weight: 600;
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .landlord-metric--emphasis dd {

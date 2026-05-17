@@ -1,10 +1,4 @@
-import { useState } from "react";
-import {
-  mockBookingRequests,
-  mockListingAssistantTools,
-  mockListings,
-  mockPropertyPerformance,
-} from "../data/landlordMockData.js";
+import { useLandlordDashboardState } from "../hooks/useLandlordDashboardState.js";
 import "./LandlordDashboard.css";
 
 const QUICK_NAV = [
@@ -57,37 +51,6 @@ function listingStatusLabel(status) {
 function bookingStatusLabel(status) {
   const labels = { pending: "Pending", accepted: "Accepted", declined: "Declined" };
   return labels[status] ?? status;
-}
-
-function getTopPerformingListing(performanceData) {
-  if (performanceData.length === 0) return null;
-  return performanceData.reduce((best, item) =>
-    item.performance_score > best.performance_score ? item : best,
-  );
-}
-
-function computeDashboardSummary(listings, bookingRequests, propertyPerformance) {
-  const pendingRequests = bookingRequests.filter(
-    (r) => r.status === "pending",
-  ).length;
-  const averageOccupancy =
-    listings.length > 0
-      ? Math.round(
-          listings.reduce((sum, item) => sum + item.occupancy_rate, 0) /
-            listings.length,
-        )
-      : 0;
-  const bestPerformanceScore =
-    propertyPerformance.length > 0
-      ? Math.max(...propertyPerformance.map((item) => item.performance_score))
-      : 0;
-
-  return {
-    totalListings: listings.length,
-    pendingRequests,
-    averageOccupancy,
-    bestPerformanceScore,
-  };
 }
 
 function LandlordBadge({ label, variant }) {
@@ -153,7 +116,7 @@ function LandlordQuickNav() {
   );
 }
 
-function BookingRequestCard({ request, onAccept, onDecline }) {
+function BookingRequestCard({ request, onUpdateStatus }) {
   const isResolved =
     request.status === "accepted" || request.status === "declined";
 
@@ -168,7 +131,7 @@ function BookingRequestCard({ request, onAccept, onDecline }) {
       </div>
       <p className="landlord-panel-card__meta">{request.property_title}</p>
 
-      <dl className="landlord-metric-grid">
+      <dl className="landlord-metric-grid landlord-metric-grid--booking">
         <div className="landlord-metric">
           <dt>Check-in</dt>
           <dd>{formatStayDate(request.check_in)}</dd>
@@ -194,7 +157,7 @@ function BookingRequestCard({ request, onAccept, onDecline }) {
           type="button"
           className="landlord-btn landlord-btn--success"
           disabled={isResolved}
-          onClick={() => onAccept(request.id)}
+          onClick={() => onUpdateStatus(request.id, "accepted")}
         >
           Accept
         </button>
@@ -202,7 +165,7 @@ function BookingRequestCard({ request, onAccept, onDecline }) {
           type="button"
           className="landlord-btn landlord-btn--danger"
           disabled={isResolved}
-          onClick={() => onDecline(request.id)}
+          onClick={() => onUpdateStatus(request.id, "declined")}
         >
           Decline
         </button>
@@ -328,44 +291,18 @@ function ListingCard({ listing, onEdit, onRemove }) {
 }
 
 export default function LandlordDashboard() {
-  const [listings, setListings] = useState(mockListings);
-  const [bookingRequests, setBookingRequests] = useState(mockBookingRequests);
-
-  const propertyPerformance = mockPropertyPerformance;
-  const topPerforming = getTopPerformingListing(propertyPerformance);
-  const summary = computeDashboardSummary(
+  const {
     listings,
     bookingRequests,
     propertyPerformance,
-  );
-
-  function handleEditListing(listing) {
-    console.log("Edit listing:", listing.id, listing);
-  }
-
-  function handleRemoveListing(id) {
-    setListings((prev) => prev.filter((item) => item.id !== id));
-  }
-
-  function handleAcceptRequest(id) {
-    setBookingRequests((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, status: "accepted" } : item,
-      ),
-    );
-  }
-
-  function handleDeclineRequest(id) {
-    setBookingRequests((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, status: "declined" } : item,
-      ),
-    );
-  }
-
-  function handleTryAiFeature(feature) {
-    console.log("AI Listing Assistant:", feature.id, feature.title);
-  }
+    listingAssistantTools,
+    summary,
+    topPerforming,
+    handleEditListing,
+    handleRemoveListing,
+    handleUpdateBookingStatus,
+    handleTryAssistantTool,
+  } = useLandlordDashboardState();
 
   return (
     <div className="page-shell landlord-dashboard">
@@ -438,8 +375,7 @@ export default function LandlordDashboard() {
                 <BookingRequestCard
                   key={request.id}
                   request={request}
-                  onAccept={handleAcceptRequest}
-                  onDecline={handleDeclineRequest}
+                  onUpdateStatus={handleUpdateBookingStatus}
                 />
               ))}
             </ul>
@@ -491,11 +427,11 @@ export default function LandlordDashboard() {
           />
 
           <ul className="landlord-card-grid landlord-card-grid--triple">
-            {mockListingAssistantTools.map((feature) => (
+            {listingAssistantTools.map((feature) => (
               <AiAssistantFeatureCard
                 key={feature.id}
                 feature={feature}
-                onTry={handleTryAiFeature}
+                onTry={handleTryAssistantTool}
               />
             ))}
           </ul>
