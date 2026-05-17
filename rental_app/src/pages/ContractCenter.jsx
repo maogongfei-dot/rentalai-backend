@@ -1,38 +1,20 @@
 import { useRef, useState } from "react";
-import { mockMissingClauses } from "../data/contractMockMissingClauses.js";
-import { mockContractRisks } from "../data/contractMockRisks.js";
+import {
+  mockContractChatExamples,
+  mockContractRisks,
+  mockContractSummary,
+  mockMissingClauses,
+} from "../data/contractMockData.js";
 import "./ContractCenter.css";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = [".pdf", ".doc", ".docx"];
 
-const CONTRACT_MODULES = [
-  {
-    id: "upload-contract",
-    title: "Upload Contract",
-    description: "Upload a tenancy agreement for AI-assisted review.",
-    active: true,
-  },
-  {
-    id: "risk-detection",
-    title: "Risk Detection",
-    description:
-      "Identify risky clauses, unclear terms, and potential tenant concerns.",
-    active: true,
-  },
-  {
-    id: "missing-clauses",
-    title: "Missing Clauses",
-    description:
-      "Check whether important tenancy terms are missing or weak.",
-    active: true,
-  },
-  {
-    id: "contract-ai-chat",
-    title: "Contract AI Chat",
-    description:
-      "Ask questions about your tenancy agreement and rental obligations.",
-  },
+const SECTION_NAV = [
+  { id: "upload-contract", label: "Upload" },
+  { id: "risk-detection", label: "Risks" },
+  { id: "missing-clauses", label: "Clauses" },
+  { id: "contract-ai-chat", label: "AI Chat" },
 ];
 
 function getFileExtension(name) {
@@ -45,9 +27,57 @@ function isAcceptedContractFile(file) {
   return ACCEPTED_EXTENSIONS.includes(ext);
 }
 
-function UploadContractSection() {
+function ContractSection({ id, step, title, subtitle, children }) {
+  return (
+    <section
+      id={id}
+      className="contract-section"
+      aria-labelledby={`${id}-heading`}
+    >
+      <header className="contract-section__header">
+        <span className="contract-section__step" aria-hidden="true">
+          {step}
+        </span>
+        <div className="contract-section__titles">
+          <h2 id={`${id}-heading`} className="contract-section__title">
+            {title}
+          </h2>
+          {subtitle ? (
+            <p className="contract-section__subtitle">{subtitle}</p>
+          ) : null}
+        </div>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function ContractSummary({ selectedFile, risks, clauses }) {
+  const items = mockContractSummary({ selectedFile, risks, clauses });
+
+  return (
+    <section className="contract-summary" aria-label="Contract summary">
+      <ul className="contract-summary__grid">
+        {items.map((item) => (
+          <li key={item.id}>
+            <article
+              className={`card contract-summary-card contract-summary-card--${item.tone}`}
+            >
+              <p className="contract-summary-card__label">{item.label}</p>
+              <p className="contract-summary-card__value" title={item.value}>
+                {item.value}
+              </p>
+              <p className="contract-summary-card__detail">{item.detail}</p>
+            </article>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function UploadContractSection({ selectedFile, onSelectedFileChange }) {
   const inputRef = useRef(null);
-  const [selectedFile, setSelectedFile] = useState(null);
   const [fileError, setFileError] = useState("");
 
   function handleChooseClick() {
@@ -59,29 +89,29 @@ function UploadContractSection() {
     setFileError("");
 
     if (!file) {
-      setSelectedFile(null);
+      onSelectedFileChange(null);
       return;
     }
 
     if (!isAcceptedContractFile(file)) {
-      setSelectedFile(null);
+      onSelectedFileChange(null);
       setFileError("Please choose a PDF, DOC, or DOCX file.");
       event.target.value = "";
       return;
     }
 
     if (file.size > MAX_FILE_BYTES) {
-      setSelectedFile(null);
+      onSelectedFileChange(null);
       setFileError("File is too large. Maximum size is 10MB.");
       event.target.value = "";
       return;
     }
 
-    setSelectedFile(file);
+    onSelectedFileChange(file);
   }
 
   function handleClearFile() {
-    setSelectedFile(null);
+    onSelectedFileChange(null);
     setFileError("");
     if (inputRef.current) {
       inputRef.current.value = "";
@@ -98,23 +128,14 @@ function UploadContractSection() {
   }
 
   return (
-    <section
+    <ContractSection
       id="upload-contract"
-      className="contract-upload"
-      aria-labelledby="upload-contract-heading"
+      step="01"
+      title="Upload Contract"
+      subtitle="Select a tenancy agreement for mock AI review (no server upload)."
     >
-      <header className="contract-upload__header">
-        <h2 id="upload-contract-heading" className="contract-upload__title">
-          Upload Contract
-        </h2>
-        <p className="contract-upload__subtitle">
-          Select a tenancy agreement to prepare for mock AI review (no upload to
-          server).
-        </p>
-      </header>
-
-      <div className="card contract-upload__panel">
-        <p className="contract-upload__label">Upload tenancy agreement</p>
+      <div className="card contract-panel">
+        <p className="contract-panel__label">Tenancy agreement</p>
 
         <div
           className={`contract-upload__dropzone${selectedFile ? " contract-upload__dropzone--ready" : ""}`}
@@ -135,7 +156,7 @@ function UploadContractSection() {
               </p>
               <button
                 type="button"
-                className="contract-upload__choose-btn"
+                className="contract-btn contract-btn--secondary"
                 onClick={handleChooseClick}
               >
                 Choose file
@@ -146,7 +167,9 @@ function UploadContractSection() {
               <p className="contract-upload__filename" title={selectedFile.name}>
                 {selectedFile.name}
               </p>
-              <span className="contract-upload__status">Ready for review</span>
+              <span className="contract-badge contract-badge--success">
+                Ready for review
+              </span>
               <button
                 type="button"
                 className="contract-upload__clear-btn"
@@ -169,27 +192,29 @@ function UploadContractSection() {
           </p>
         ) : null}
 
-        <button
-          type="button"
-          className="contract-upload__review-btn"
-          disabled={!selectedFile}
-          onClick={handleStartMockReview}
-        >
-          Start mock review
-        </button>
+        <div className="contract-panel__actions">
+          <button
+            type="button"
+            className="contract-btn contract-btn--primary"
+            disabled={!selectedFile}
+            onClick={handleStartMockReview}
+          >
+            Start mock review
+          </button>
+        </div>
       </div>
-    </section>
+    </ContractSection>
   );
 }
 
 function riskLevelLabel(level) {
-  const labels = { low: "Low", medium: "Medium", high: "High" };
+  const labels = { low: "Low risk", medium: "Medium risk", high: "High risk" };
   return labels[level] ?? level;
 }
 
 function RiskLevelBadge({ level }) {
   return (
-    <span className={`contract-risk-badge contract-risk-badge--${level}`}>
+    <span className={`contract-badge contract-badge--risk-${level}`}>
       {riskLevelLabel(level)}
     </span>
   );
@@ -197,21 +222,21 @@ function RiskLevelBadge({ level }) {
 
 function ContractRiskCard({ risk }) {
   return (
-    <li className="card contract-risk-card">
-      <div className="contract-risk-card__header">
-        <h3 className="contract-risk-card__title">{risk.clause_title}</h3>
+    <li className="card contract-item-card">
+      <div className="contract-item-card__header">
+        <h3 className="contract-item-card__title">{risk.clause_title}</h3>
         <RiskLevelBadge level={risk.risk_level} />
       </div>
-      <p className="contract-risk-card__issue">
-        <span className="contract-risk-card__label">Issue</span>
+      <p className="contract-item-card__block">
+        <span className="contract-item-card__label">Issue</span>
         {risk.issue}
       </p>
-      <p className="contract-risk-card__explanation">
-        <span className="contract-risk-card__label">Explanation</span>
+      <p className="contract-item-card__block">
+        <span className="contract-item-card__label">Explanation</span>
         {risk.explanation}
       </p>
-      <p className="contract-risk-card__action">
-        <span className="contract-risk-card__label">Suggested action</span>
+      <p className="contract-item-card__callout">
+        <span className="contract-item-card__label">Suggested action</span>
         {risk.suggested_action}
       </p>
     </li>
@@ -223,27 +248,18 @@ function RiskDetectionSection({ risks }) {
   const mediumCount = risks.filter((r) => r.risk_level === "medium").length;
 
   return (
-    <section
+    <ContractSection
       id="risk-detection"
-      className="contract-risks"
-      aria-labelledby="risk-detection-heading"
+      step="02"
+      title="Risk Detection"
+      subtitle={`${risks.length} issue${risks.length === 1 ? "" : "s"} · ${highCount} high · ${mediumCount} medium · mock data`}
     >
-      <header className="contract-risks__header">
-        <h2 id="risk-detection-heading" className="contract-risks__title">
-          Risk Detection
-        </h2>
-        <p className="contract-risks__subtitle">
-          {risks.length} issue{risks.length === 1 ? "" : "s"} found ·{" "}
-          {highCount} high · {mediumCount} medium · mock data
-        </p>
-      </header>
-
-      <ul className="contract-risks__list">
+      <ul className="contract-item-list">
         {risks.map((risk) => (
           <ContractRiskCard key={risk.id} risk={risk} />
         ))}
       </ul>
-    </section>
+    </ContractSection>
   );
 }
 
@@ -259,7 +275,7 @@ function clauseImportanceLabel(level) {
 
 function ClauseStatusBadge({ status }) {
   return (
-    <span className={`contract-clause-badge contract-clause-badge--status-${status}`}>
+    <span className={`contract-badge contract-badge--clause-${status}`}>
       {clauseStatusLabel(status)}
     </span>
   );
@@ -267,9 +283,7 @@ function ClauseStatusBadge({ status }) {
 
 function ClauseImportanceBadge({ importance }) {
   return (
-    <span
-      className={`contract-clause-badge contract-clause-badge--importance-${importance}`}
-    >
+    <span className={`contract-badge contract-badge--importance-${importance}`}>
       {clauseImportanceLabel(importance)} importance
     </span>
   );
@@ -277,20 +291,20 @@ function ClauseImportanceBadge({ importance }) {
 
 function MissingClauseCard({ clause }) {
   return (
-    <li className="card contract-missing-card">
-      <div className="contract-missing-card__header">
-        <h3 className="contract-missing-card__title">{clause.clause_name}</h3>
-        <div className="contract-missing-card__badges">
+    <li className="card contract-item-card">
+      <div className="contract-item-card__header">
+        <h3 className="contract-item-card__title">{clause.clause_name}</h3>
+        <div className="contract-item-card__badges">
           <ClauseStatusBadge status={clause.status} />
           <ClauseImportanceBadge importance={clause.importance} />
         </div>
       </div>
-      <p className="contract-missing-card__explanation">
-        <span className="contract-missing-card__label">Explanation</span>
+      <p className="contract-item-card__block">
+        <span className="contract-item-card__label">Explanation</span>
         {clause.explanation}
       </p>
-      <p className="contract-missing-card__fix">
-        <span className="contract-missing-card__label">Suggested fix</span>
+      <p className="contract-item-card__callout">
+        <span className="contract-item-card__label">Suggested fix</span>
         {clause.suggested_fix}
       </p>
     </li>
@@ -302,78 +316,149 @@ function MissingClausesSection({ clauses }) {
   const highCount = clauses.filter((c) => c.importance === "high").length;
 
   return (
-    <section
+    <ContractSection
       id="missing-clauses"
-      className="contract-missing"
-      aria-labelledby="missing-clauses-heading"
+      step="03"
+      title="Missing Clauses"
+      subtitle={`${clauses.length} item${clauses.length === 1 ? "" : "s"} · ${missingCount} missing · ${highCount} high importance · mock data`}
     >
-      <header className="contract-missing__header">
-        <h2 id="missing-clauses-heading" className="contract-missing__title">
-          Missing Clauses
-        </h2>
-        <p className="contract-missing__subtitle">
-          {clauses.length} item{clauses.length === 1 ? "" : "s"} · {missingCount}{" "}
-          missing · {highCount} high importance · mock data
-        </p>
-      </header>
-
-      <ul className="contract-missing__list">
+      <ul className="contract-item-list">
         {clauses.map((clause) => (
           <MissingClauseCard key={clause.id} clause={clause} />
         ))}
       </ul>
-    </section>
+    </ContractSection>
+  );
+}
+
+function ContractAiChatSection() {
+  const [question, setQuestion] = useState("");
+  const [messages, setMessages] = useState([]);
+
+  function handleAsk(event) {
+    event.preventDefault();
+    const trimmed = question.trim();
+    if (!trimmed) return;
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        question: trimmed,
+        answer: mockContractChatExamples.defaultReply,
+      },
+    ]);
+    setQuestion("");
+  }
+
+  return (
+    <ContractSection
+      id="contract-ai-chat"
+      step="04"
+      title="Contract AI Chat"
+      subtitle="Ask about your tenancy agreement · mock responses only"
+    >
+      <div className="card contract-panel">
+        <form className="contract-chat__form" onSubmit={handleAsk}>
+          <label className="contract-panel__label" htmlFor="contract-chat-input">
+            Your question
+          </label>
+          <div className="contract-chat__input-row">
+            <input
+              id="contract-chat-input"
+              type="text"
+              className="contract-chat__input"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder={mockContractChatExamples.placeholder}
+              autoComplete="off"
+            />
+            <button
+              type="submit"
+              className="contract-btn contract-btn--primary"
+              disabled={!question.trim()}
+            >
+              Ask
+            </button>
+          </div>
+        </form>
+
+        <div
+          className="contract-chat__responses"
+          aria-live="polite"
+          aria-label="Contract AI responses"
+        >
+          {messages.length === 0 ? (
+            <p className="contract-chat__empty">
+              {mockContractChatExamples.emptyMessage}
+            </p>
+          ) : (
+            <ul className="contract-chat__list">
+              {messages.map((entry) => (
+                <li key={entry.id} className="contract-chat__exchange">
+                  <p className="contract-chat__question">
+                    <span className="contract-badge contract-badge--tag">You</span>
+                    {entry.question}
+                  </p>
+                  <p className="contract-chat__answer">
+                    <span className="contract-badge contract-badge--tag-ai">
+                      RentalAI
+                    </span>
+                    {entry.answer}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </ContractSection>
   );
 }
 
 export default function ContractCenter() {
+  const [selectedFile, setSelectedFile] = useState(null);
+
   return (
     <div className="page-shell contract-center">
       <header className="contract-hero">
-        <p className="contract-hero__eyebrow">RentalAI Contract Hub</p>
+        <div className="contract-hero__top">
+          <p className="contract-hero__eyebrow">RentalAI Contract Hub</p>
+          <span className="contract-hero__pill">Mock preview</span>
+        </div>
         <h1 className="contract-hero__title">Contract Analysis Center</h1>
         <p className="contract-hero__subtitle">
-          Review tenancy agreements, identify rental risks, check missing
-          clauses, and understand contract issues.
+          Review tenancy agreements, surface rental risks, check missing clauses,
+          and ask contract questions — all in one workspace.
         </p>
+        <nav className="contract-hero__nav" aria-label="Contract sections">
+          <ul className="contract-hero__nav-list">
+            {SECTION_NAV.map((item) => (
+              <li key={item.id}>
+                <a className="contract-hero__nav-link" href={`#${item.id}`}>
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </header>
 
-      <UploadContractSection />
+      <ContractSummary
+        selectedFile={selectedFile}
+        risks={mockContractRisks}
+        clauses={mockMissingClauses}
+      />
 
-      <RiskDetectionSection risks={mockContractRisks} />
-
-      <MissingClausesSection clauses={mockMissingClauses} />
-
-      <section
-        className="contract-modules"
-        aria-label="Contract analysis modules"
-      >
-        <ul className="contract-modules__grid">
-          {CONTRACT_MODULES.map((module) => (
-            <li key={module.id}>
-              <article
-                className="card contract-module-card"
-                aria-labelledby={`contract-module-${module.id}-title`}
-              >
-                <h2
-                  id={`contract-module-${module.id}-title`}
-                  className="contract-module-card__title"
-                >
-                  {module.title}
-                </h2>
-                <p className="contract-module-card__text">{module.description}</p>
-                {module.active ? (
-                  <span className="contract-module-card__badge contract-module-card__badge--live">
-                    Live preview
-                  </span>
-                ) : (
-                  <span className="contract-module-card__badge">Coming soon</span>
-                )}
-              </article>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <main className="contract-main">
+        <UploadContractSection
+          selectedFile={selectedFile}
+          onSelectedFileChange={setSelectedFile}
+        />
+        <RiskDetectionSection risks={mockContractRisks} />
+        <MissingClausesSection clauses={mockMissingClauses} />
+        <ContractAiChatSection />
+      </main>
     </div>
   );
 }
