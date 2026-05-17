@@ -1,8 +1,4 @@
-import { useMemo, useState } from "react";
-import { MOCK_ANALYSIS_HISTORY } from "../data/mockAnalysisHistory.js";
-import { MOCK_BUDGET_INSIGHTS } from "../data/mockBudgetInsights.js";
-import { MOCK_COMPARE_PROPERTIES } from "../data/mockCompareProperties.js";
-import { MOCK_SAVED_PROPERTIES } from "../data/mockSavedProperties.js";
+import { useTenantDashboardState } from "../hooks/useTenantDashboardState.js";
 import "./TenantDashboard.css";
 
 const QUICK_NAV = [
@@ -20,25 +16,6 @@ function formatMoney(amount) {
   return `\u00A3${amount.toLocaleString("en-GB")}`;
 }
 
-function getAffordabilityHint(score) {
-  if (score >= 75) {
-    return {
-      text: "Affordable",
-      className: "tenant-callout--success",
-    };
-  }
-  if (score >= 50) {
-    return {
-      text: "Moderate pressure",
-      className: "tenant-callout--warning",
-    };
-  }
-  return {
-    text: "High rent pressure",
-    className: "tenant-callout--danger",
-  };
-}
-
 function riskBadgeClass(level) {
   const key = level.toLowerCase();
   if (key === "low") return "tenant-badge--low";
@@ -48,13 +25,6 @@ function riskBadgeClass(level) {
 
 function formatBillsIncluded(included) {
   return included ? "Bills included" : "Bills not included";
-}
-
-function getBestCompareOption(properties) {
-  if (properties.length === 0) return null;
-  return properties.reduce((best, current) =>
-    current.final_score > best.final_score ? current : best,
-  );
 }
 
 function formatScore(value) {
@@ -128,72 +98,19 @@ const COMPARE_METRICS = [
 ];
 
 export default function TenantDashboard() {
-  const [savedProperties, setSavedProperties] = useState(MOCK_SAVED_PROPERTIES);
-  const [detailsHint, setDetailsHint] = useState("");
-
-  const budget = MOCK_BUDGET_INSIGHTS;
-  const affordabilityHint = getAffordabilityHint(budget.affordability_score);
-  const bestCompareOption = getBestCompareOption(MOCK_COMPARE_PROPERTIES);
-
-  const bestPropertyScore = useMemo(() => {
-    const scores = [
-      ...MOCK_COMPARE_PROPERTIES.map((p) => p.final_score),
-      ...savedProperties.map((p) => p.score),
-    ];
-    return scores.length ? Math.max(...scores) : 0;
-  }, [savedProperties]);
-
-  const summaryCards = useMemo(
-    () => [
-      {
-        id: "summary-saved",
-        label: "Saved Properties",
-        value: String(savedProperties.length),
-        detail: "properties in your list",
-        href: "#saved-properties",
-      },
-      {
-        id: "summary-analysis",
-        label: "Analysis Records",
-        value: String(MOCK_ANALYSIS_HISTORY.length),
-        detail: "completed analyses",
-        href: "#analysis-history",
-      },
-      {
-        id: "summary-best",
-        label: "Best Property Score",
-        value: String(bestPropertyScore),
-        detail: bestCompareOption?.title ?? "No comparison data",
-        href: "#compare-properties",
-      },
-      {
-        id: "summary-budget",
-        label: "Budget Status",
-        value: affordabilityHint.text,
-        detail: `${budget.affordability_score}/100 affordability`,
-        href: "#budget-insights",
-        valueClass: affordabilityHint.className,
-      },
-    ],
-    [savedProperties.length, bestPropertyScore, bestCompareOption, affordabilityHint, budget.affordability_score],
-  );
-
-  function handleViewDetails(property) {
-    console.log("View saved property details:", property);
-    setDetailsHint(`Details preview: ${property.title} (${property.location})`);
-  }
-
-  function handleRemove(propertyId) {
-    setSavedProperties((prev) => prev.filter((p) => p.id !== propertyId));
-    setDetailsHint("");
-  }
-
-  function handleViewReport(record) {
-    console.log("View analysis report:", record);
-    window.alert(
-      `Report: ${record.property_title}\nType: ${record.analysis_type}\nScore: ${record.final_score}/100`,
-    );
-  }
+  const {
+    savedProperties,
+    analysisHistory,
+    compareProperties,
+    budgetInsights,
+    savedPropertyPreview,
+    summaryCards,
+    bestCompareOption,
+    affordabilityHint,
+    handleViewSavedProperty,
+    handleRemoveSavedProperty,
+    handleViewAnalysisReport,
+  } = useTenantDashboardState();
 
   return (
     <div className="page-shell tenant-dashboard">
@@ -244,9 +161,9 @@ export default function TenantDashboard() {
             description="Properties you have saved for later review. Mock data only."
           />
 
-          {detailsHint ? (
+          {savedPropertyPreview ? (
             <p className="tenant-callout tenant-callout--info" role="status">
-              {detailsHint}
+              {savedPropertyPreview}
             </p>
           ) : null}
 
@@ -297,14 +214,14 @@ export default function TenantDashboard() {
                       <button
                         type="button"
                         className="btn tenant-btn"
-                        onClick={() => handleViewDetails(property)}
+                        onClick={() => handleViewSavedProperty(property)}
                       >
                         View details
                       </button>
                       <button
                         type="button"
                         className="btn tenant-btn tenant-btn--ghost"
-                        onClick={() => handleRemove(property.id)}
+                        onClick={() => handleRemoveSavedProperty(property.id)}
                       >
                         Remove
                       </button>
@@ -328,7 +245,7 @@ export default function TenantDashboard() {
           />
 
           <ul className="tenant-item-list">
-            {MOCK_ANALYSIS_HISTORY.map((record) => (
+            {analysisHistory.map((record) => (
               <li key={record.id}>
                 <article className="card tenant-item-card">
                   <div className="tenant-item-card__head">
@@ -364,7 +281,7 @@ export default function TenantDashboard() {
                     <button
                       type="button"
                       className="btn tenant-btn"
-                      onClick={() => handleViewReport(record)}
+                      onClick={() => handleViewAnalysisReport(record)}
                     >
                       View report
                     </button>
@@ -404,7 +321,7 @@ export default function TenantDashboard() {
                     <th scope="col" className="tenant-compare-table__metric">
                       Metric
                     </th>
-                    {MOCK_COMPARE_PROPERTIES.map((property) => (
+                    {compareProperties.map((property) => (
                       <th key={property.id} scope="col">
                         {property.title}
                       </th>
@@ -424,7 +341,7 @@ export default function TenantDashboard() {
                       <th scope="row" className="tenant-compare-table__metric">
                         {metric.label}
                       </th>
-                      {MOCK_COMPARE_PROPERTIES.map((property) => {
+                      {compareProperties.map((property) => {
                         const isBest =
                           bestCompareOption?.id === property.id &&
                           metric.key === "final_score";
@@ -469,40 +386,40 @@ export default function TenantDashboard() {
             <dl className="tenant-meta-grid tenant-meta-grid--budget">
               <div className="tenant-meta-grid__row">
                 <dt>Monthly Income</dt>
-                <dd>{formatMoney(budget.monthly_income)}</dd>
+                <dd>{formatMoney(budgetInsights.monthly_income)}</dd>
               </div>
               <div className="tenant-meta-grid__row">
                 <dt>Target Rent</dt>
-                <dd>{formatRent(budget.target_rent)}</dd>
+                <dd>{formatRent(budgetInsights.target_rent)}</dd>
               </div>
               <div className="tenant-meta-grid__row">
                 <dt>Estimated Bills</dt>
-                <dd>{formatMoney(budget.estimated_bills)}</dd>
+                <dd>{formatMoney(budgetInsights.estimated_bills)}</dd>
               </div>
               <div className="tenant-meta-grid__row">
                 <dt>Transport Cost</dt>
-                <dd>{formatMoney(budget.estimated_transport)}</dd>
+                <dd>{formatMoney(budgetInsights.estimated_transport)}</dd>
               </div>
               <div className="tenant-meta-grid__row">
                 <dt>Food Cost</dt>
-                <dd>{formatMoney(budget.estimated_food_cost)}</dd>
+                <dd>{formatMoney(budgetInsights.estimated_food_cost)}</dd>
               </div>
               <div className="tenant-meta-grid__row tenant-meta-grid__row--emphasis">
                 <dt>Remaining Balance</dt>
                 <dd className="tenant-meta-grid__value--primary">
-                  {formatMoney(budget.estimated_remaining_balance)}
+                  {formatMoney(budgetInsights.estimated_remaining_balance)}
                 </dd>
               </div>
               <div className="tenant-meta-grid__row tenant-meta-grid__row--emphasis">
                 <dt>Affordability Score</dt>
                 <dd>
-                  <ScoreBadge value={budget.affordability_score} />
+                  <ScoreBadge value={budgetInsights.affordability_score} />
                 </dd>
               </div>
               <div className="tenant-meta-grid__row">
                 <dt>Rent Pressure Level</dt>
                 <dd>
-                  <RiskBadge level={budget.rent_pressure_level} />
+                  <RiskBadge level={budgetInsights.rent_pressure_level} />
                 </dd>
               </div>
             </dl>
