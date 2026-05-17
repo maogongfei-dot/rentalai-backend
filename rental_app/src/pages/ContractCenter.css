@@ -356,6 +356,154 @@
   color: var(--color-text-soft);
 }
 
+/* Missing Clauses */
+.contract-missing {
+  margin-bottom: 2.5rem;
+}
+
+.contract-missing__header {
+  margin-bottom: 1.15rem;
+}
+
+.contract-missing__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-label);
+}
+
+.contract-missing__subtitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.contract-missing__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.contract-missing-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 1.25rem 1.35rem;
+}
+
+.contract-missing-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem 0.75rem;
+}
+
+.contract-missing-card__title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  color: var(--color-label);
+  overflow-wrap: anywhere;
+}
+
+.contract-missing-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.contract-clause-badge {
+  padding: 0.22rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.contract-clause-badge--status-missing {
+  color: var(--color-danger);
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.contract-clause-badge--status-weak {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.contract-clause-badge--status-unclear {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.contract-clause-badge--importance-high {
+  color: var(--color-danger);
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.contract-clause-badge--importance-medium {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.contract-clause-badge--importance-low {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.contract-missing-card__label {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.contract-missing-card__explanation,
+.contract-missing-card__fix {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--color-text);
+}
+
+.contract-missing-card__fix {
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border-left: 3px solid #c7d7fe;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--color-text-soft);
+}
+
+@media (max-width: 479px) {
+  .contract-missing-card__badges {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 .contract-modules__grid {
   list-style: none;
   margin: 0;

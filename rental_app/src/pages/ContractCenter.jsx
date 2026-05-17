@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { mockMissingClauses } from "../data/contractMockMissingClauses.js";
 import { mockContractRisks } from "../data/contractMockRisks.js";
 import "./ContractCenter.css";
 
@@ -24,6 +25,7 @@ const CONTRACT_MODULES = [
     title: "Missing Clauses",
     description:
       "Check whether important tenancy terms are missing or weak.",
+    active: true,
   },
   {
     id: "contract-ai-chat",
@@ -245,6 +247,85 @@ function RiskDetectionSection({ risks }) {
   );
 }
 
+function clauseStatusLabel(status) {
+  const labels = { missing: "Missing", weak: "Weak", unclear: "Unclear" };
+  return labels[status] ?? status;
+}
+
+function clauseImportanceLabel(level) {
+  const labels = { low: "Low", medium: "Medium", high: "High" };
+  return labels[level] ?? level;
+}
+
+function ClauseStatusBadge({ status }) {
+  return (
+    <span className={`contract-clause-badge contract-clause-badge--status-${status}`}>
+      {clauseStatusLabel(status)}
+    </span>
+  );
+}
+
+function ClauseImportanceBadge({ importance }) {
+  return (
+    <span
+      className={`contract-clause-badge contract-clause-badge--importance-${importance}`}
+    >
+      {clauseImportanceLabel(importance)} importance
+    </span>
+  );
+}
+
+function MissingClauseCard({ clause }) {
+  return (
+    <li className="card contract-missing-card">
+      <div className="contract-missing-card__header">
+        <h3 className="contract-missing-card__title">{clause.clause_name}</h3>
+        <div className="contract-missing-card__badges">
+          <ClauseStatusBadge status={clause.status} />
+          <ClauseImportanceBadge importance={clause.importance} />
+        </div>
+      </div>
+      <p className="contract-missing-card__explanation">
+        <span className="contract-missing-card__label">Explanation</span>
+        {clause.explanation}
+      </p>
+      <p className="contract-missing-card__fix">
+        <span className="contract-missing-card__label">Suggested fix</span>
+        {clause.suggested_fix}
+      </p>
+    </li>
+  );
+}
+
+function MissingClausesSection({ clauses }) {
+  const missingCount = clauses.filter((c) => c.status === "missing").length;
+  const highCount = clauses.filter((c) => c.importance === "high").length;
+
+  return (
+    <section
+      id="missing-clauses"
+      className="contract-missing"
+      aria-labelledby="missing-clauses-heading"
+    >
+      <header className="contract-missing__header">
+        <h2 id="missing-clauses-heading" className="contract-missing__title">
+          Missing Clauses
+        </h2>
+        <p className="contract-missing__subtitle">
+          {clauses.length} item{clauses.length === 1 ? "" : "s"} · {missingCount}{" "}
+          missing · {highCount} high importance · mock data
+        </p>
+      </header>
+
+      <ul className="contract-missing__list">
+        {clauses.map((clause) => (
+          <MissingClauseCard key={clause.id} clause={clause} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function ContractCenter() {
   return (
     <div className="page-shell contract-center">
@@ -260,6 +341,8 @@ export default function ContractCenter() {
       <UploadContractSection />
 
       <RiskDetectionSection risks={mockContractRisks} />
+
+      <MissingClausesSection clauses={mockMissingClauses} />
 
       <section
         className="contract-modules"
