@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MOCK_LANDLORD_BOOKING_REQUESTS } from "../data/landlordMockBookingRequests.js";
 import { MOCK_LANDLORD_LISTINGS } from "../data/landlordMockListings.js";
+import { MOCK_AI_LISTING_ASSISTANT_FEATURES } from "../data/landlordMockAiAssistant.js";
 import { MOCK_LANDLORD_PROPERTY_PERFORMANCE } from "../data/landlordMockPropertyPerformance.js";
 import "./LandlordDashboard.css";
 
@@ -28,6 +29,7 @@ const LANDLORD_MODULES = [
     title: "AI Listing Assistant",
     description:
       "Improve descriptions, pricing, photos, and rental appeal with AI guidance.",
+    active: true,
   },
 ];
 
@@ -217,6 +219,22 @@ function PropertyPerformanceCard({ item, isTop }) {
   );
 }
 
+function AiAssistantFeatureCard({ feature, onTry }) {
+  return (
+    <li className="landlord-ai-card card">
+      <h3 className="landlord-ai-card__title">{feature.title}</h3>
+      <p className="landlord-ai-card__description">{feature.description}</p>
+      <button
+        type="button"
+        className="landlord-ai-card__btn"
+        onClick={() => onTry(feature)}
+      >
+        Try this
+      </button>
+    </li>
+  );
+}
+
 function ListingCard({ listing, onEdit, onRemove }) {
   return (
     <li className="landlord-listing-card card">
@@ -297,6 +315,10 @@ export default function LandlordDashboard() {
         item.id === id ? { ...item, status: "declined" } : item,
       ),
     );
+  }
+
+  function handleTryAiFeature(feature) {
+    console.log("AI Listing Assistant:", feature.id, feature.title);
   }
 
   const pendingRequestCount = bookingRequests.filter(
@@ -428,6 +450,34 @@ export default function LandlordDashboard() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section
+        id="ai-listing-assistant"
+        className="landlord-ai"
+        aria-labelledby="ai-listing-assistant-heading"
+      >
+        <header className="landlord-ai__header">
+          <h2
+            id="ai-listing-assistant-heading"
+            className="landlord-ai__title"
+          >
+            AI Listing Assistant
+          </h2>
+          <p className="landlord-ai__subtitle">
+            Mock tools to help optimise your listings — no real AI connected yet.
+          </p>
+        </header>
+
+        <ul className="landlord-ai__grid">
+          {MOCK_AI_LISTING_ASSISTANT_FEATURES.map((feature) => (
+            <AiAssistantFeatureCard
+              key={feature.id}
+              feature={feature}
+              onTry={handleTryAiFeature}
+            />
+          ))}
+        </ul>
       </section>
 
       <section
