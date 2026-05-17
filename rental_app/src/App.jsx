@@ -9,6 +9,7 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Profile from "./pages/Profile.jsx";
 import TenantDashboard from "./pages/TenantDashboard.jsx";
+import LandlordDashboard from "./pages/LandlordDashboard.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 function App() {
@@ -36,6 +37,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <TenantDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/landlord-dashboard"
+            element={
+              <ProtectedRoute>
+                <LandlordDashboard />
               </ProtectedRoute>
             }
           />
