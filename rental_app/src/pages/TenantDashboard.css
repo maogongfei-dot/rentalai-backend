@@ -5,6 +5,7 @@
   width: 100%;
   min-width: 0;
   padding-bottom: 3.5rem;
+  overflow-x: clip;
 }
 
 .tenant-sr-only {
@@ -98,6 +99,11 @@
   transform: translateY(-1px);
 }
 
+.tenant-summary__card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .tenant-summary__label {
   font-size: 0.8125rem;
   font-weight: 600;
@@ -167,6 +173,10 @@
 }
 
 /* Panels */
+.tenant-panel {
+  scroll-margin-top: 5rem;
+}
+
 .tenant-panels {
   display: flex;
   flex-direction: column;
@@ -411,6 +421,17 @@
   border-color: var(--color-danger);
 }
 
+@media (max-width: 519px) {
+  .tenant-actions {
+    flex-direction: column;
+  }
+
+  .tenant-btn {
+    max-width: none;
+    width: 100%;
+  }
+}
+
 /* Compare table */
 .tenant-compare-wrap {
   margin: 0;
@@ -421,6 +442,14 @@
 .tenant-compare-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.25rem;
+}
+
+.tenant-compare-table thead th:not(.tenant-compare-table__metric),
+.tenant-compare-table tbody td {
+  min-width: 7.5rem;
+  max-width: 10.5rem;
+  word-break: break-word;
 }
 
 .tenant-compare-table {
@@ -471,4 +500,35 @@
 .tenant-compare-table__cell--best {
   color: var(--color-primary-hover);
   font-weight: 700;
+}
+
+@media (max-width: 639px) {
+  .tenant-dashboard.page-shell {
+    padding-top: 1.5rem;
+  }
+
+  .tenant-hero {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .tenant-hero__title {
+    font-size: 1.625rem;
+  }
+
+  .tenant-hero__subtitle {
+    font-size: 1rem;
+  }
+
+  .tenant-panels {
+    gap: 2.25rem;
+  }
+
+  .tenant-panel__title {
+    font-size: 1.25rem;
+  }
+
+  .tenant-item-card {
+    padding: 1.1rem 1.15rem;
+  }
 }

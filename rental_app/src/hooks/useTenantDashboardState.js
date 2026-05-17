@@ -118,7 +118,7 @@ export function useTenantDashboardState() {
         budgetInsights,
       }),
     [
-      savedProperties.length,
+      savedProperties,
       analysisHistory.length,
       bestPropertyScore,
       bestCompareOption,
