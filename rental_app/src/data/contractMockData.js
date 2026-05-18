@@ -93,13 +93,23 @@ export const mockContractChatExamples = {
  * Build Contract Summary cards from mock analysis inputs.
  * Replace with API response mapping when the real contract engine is connected.
  */
-export function mockContractSummary({ selectedFile, risks, clauses }) {
+export function mockContractSummary({
+  selectedFile,
+  risks,
+  clauses,
+  reviewStatus = "Not started",
+}) {
   const highRisks = risks.filter((r) => r.risk_level === "high").length;
   const missingWeakCount = clauses.filter(
     (c) => c.status === "missing" || c.status === "weak",
   ).length;
-  const reviewStatus = selectedFile ? "Ready for review" : "Awaiting upload";
-  const reviewTone = selectedFile ? "ready" : "pending";
+
+  const reviewTone =
+    reviewStatus === "Mock review completed"
+      ? "success"
+      : reviewStatus === "Ready for review"
+        ? "ready"
+        : "pending";
 
   return [
     {
@@ -132,9 +142,12 @@ export function mockContractSummary({ selectedFile, risks, clauses }) {
       id: "review-status",
       label: "Review Status",
       value: reviewStatus,
-      detail: selectedFile
-        ? "Mock analysis sections are active"
-        : "Select a contract to begin",
+      detail:
+        reviewStatus === "Mock review completed"
+          ? "Mock analysis sections are active"
+          : reviewStatus === "Ready for review"
+            ? "Run mock review to analyse the contract"
+            : "Select a contract to begin",
       tone: reviewTone,
     },
   ];

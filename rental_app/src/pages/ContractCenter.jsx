@@ -10,6 +10,12 @@ import "./ContractCenter.css";
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ACCEPTED_EXTENSIONS = [".pdf", ".doc", ".docx"];
 
+const REVIEW_STATUS = {
+  NOT_STARTED: "Not started",
+  READY: "Ready for review",
+  COMPLETED: "Mock review completed",
+};
+
 const SECTION_NAV = [
   { id: "upload-contract", label: "Upload" },
   { id: "risk-detection", label: "Risks" },
@@ -52,8 +58,13 @@ function ContractSection({ id, step, title, subtitle, children }) {
   );
 }
 
-function ContractSummary({ selectedFile, risks, clauses }) {
-  const items = mockContractSummary({ selectedFile, risks, clauses });
+function ContractSummary({ selectedFile, risks, clauses, reviewStatus }) {
+  const items = mockContractSummary({
+    selectedFile,
+    risks,
+    clauses,
+    reviewStatus,
+  });
 
   return (
     <section className="contract-summary" aria-label="Contract summary">
@@ -76,57 +87,15 @@ function ContractSummary({ selectedFile, risks, clauses }) {
   );
 }
 
-function UploadContractSection({ selectedFile, onSelectedFileChange }) {
-  const inputRef = useRef(null);
-  const [fileError, setFileError] = useState("");
-
-  function handleChooseClick() {
-    inputRef.current?.click();
-  }
-
-  function handleFileChange(event) {
-    const file = event.target.files?.[0];
-    setFileError("");
-
-    if (!file) {
-      onSelectedFileChange(null);
-      return;
-    }
-
-    if (!isAcceptedContractFile(file)) {
-      onSelectedFileChange(null);
-      setFileError("Please choose a PDF, DOC, or DOCX file.");
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > MAX_FILE_BYTES) {
-      onSelectedFileChange(null);
-      setFileError("File is too large. Maximum size is 10MB.");
-      event.target.value = "";
-      return;
-    }
-
-    onSelectedFileChange(file);
-  }
-
-  function handleClearFile() {
-    onSelectedFileChange(null);
-    setFileError("");
-    if (inputRef.current) {
-      inputRef.current.value = "";
-    }
-  }
-
-  function handleStartMockReview() {
-    if (!selectedFile) return;
-    console.log("Start mock contract review:", {
-      name: selectedFile.name,
-      size: selectedFile.size,
-      type: selectedFile.type,
-    });
-  }
-
+function UploadContractSection({
+  selectedFile,
+  fileError,
+  inputRef,
+  onChooseClick,
+  onFileChange,
+  onClearFile,
+  onStartMockReview,
+}) {
   return (
     <ContractSection
       id="upload-contract"
@@ -146,7 +115,7 @@ function UploadContractSection({ selectedFile, onSelectedFileChange }) {
             type="file"
             className="contract-upload__input"
             accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            onChange={handleFileChange}
+            onChange={onFileChange}
           />
 
           {!selectedFile ? (
@@ -157,7 +126,7 @@ function UploadContractSection({ selectedFile, onSelectedFileChange }) {
               <button
                 type="button"
                 className="contract-btn contract-btn--secondary"
-                onClick={handleChooseClick}
+                onClick={onChooseClick}
               >
                 Choose file
               </button>
@@ -173,7 +142,7 @@ function UploadContractSection({ selectedFile, onSelectedFileChange }) {
               <button
                 type="button"
                 className="contract-upload__clear-btn"
-                onClick={handleClearFile}
+                onClick={onClearFile}
               >
                 Remove file
               </button>
@@ -197,7 +166,7 @@ function UploadContractSection({ selectedFile, onSelectedFileChange }) {
             type="button"
             className="contract-btn contract-btn--primary"
             disabled={!selectedFile}
-            onClick={handleStartMockReview}
+            onClick={onStartMockReview}
           >
             Start mock review
           </button>
@@ -331,26 +300,14 @@ function MissingClausesSection({ clauses }) {
   );
 }
 
-function ContractAiChatSection() {
-  const [question, setQuestion] = useState("");
-  const [messages, setMessages] = useState([]);
-
-  function handleAsk(event) {
-    event.preventDefault();
-    const trimmed = question.trim();
-    if (!trimmed) return;
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        question: trimmed,
-        answer: mockContractChatExamples.defaultReply,
-      },
-    ]);
-    setQuestion("");
-  }
-
+function ContractAiChatSection({
+  contractQuestion,
+  lastAskedQuestion,
+  contractAnswer,
+  onQuestionChange,
+  onAsk,
+  onClear,
+}) {
   return (
     <ContractSection
       id="contract-ai-chat"
@@ -359,7 +316,7 @@ function ContractAiChatSection() {
       subtitle="Ask about your tenancy agreement · mock responses only"
     >
       <div className="card contract-panel">
-        <form className="contract-chat__form" onSubmit={handleAsk}>
+        <form className="contract-chat__form" onSubmit={onAsk}>
           <label className="contract-panel__label" htmlFor="contract-chat-input">
             Your question
           </label>
@@ -368,15 +325,15 @@ function ContractAiChatSection() {
               id="contract-chat-input"
               type="text"
               className="contract-chat__input"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
+              value={contractQuestion}
+              onChange={onQuestionChange}
               placeholder={mockContractChatExamples.placeholder}
               autoComplete="off"
             />
             <button
               type="submit"
               className="contract-btn contract-btn--primary"
-              disabled={!question.trim()}
+              disabled={!contractQuestion.trim()}
             >
               Ask
             </button>
@@ -388,36 +345,125 @@ function ContractAiChatSection() {
           aria-live="polite"
           aria-label="Contract AI responses"
         >
-          {messages.length === 0 ? (
+          {!contractAnswer ? (
             <p className="contract-chat__empty">
               {mockContractChatExamples.emptyMessage}
             </p>
           ) : (
             <ul className="contract-chat__list">
-              {messages.map((entry) => (
-                <li key={entry.id} className="contract-chat__exchange">
-                  <p className="contract-chat__question">
-                    <span className="contract-badge contract-badge--tag">You</span>
-                    {entry.question}
-                  </p>
-                  <p className="contract-chat__answer">
-                    <span className="contract-badge contract-badge--tag-ai">
-                      RentalAI
-                    </span>
-                    {entry.answer}
-                  </p>
-                </li>
-              ))}
+              <li className="contract-chat__exchange">
+                <p className="contract-chat__question">
+                  <span className="contract-badge contract-badge--tag">You</span>
+                  {lastAskedQuestion}
+                </p>
+                <p className="contract-chat__answer">
+                  <span className="contract-badge contract-badge--tag-ai">
+                    RentalAI
+                  </span>
+                  {contractAnswer}
+                </p>
+              </li>
             </ul>
           )}
         </div>
+
+        {contractAnswer ? (
+          <button
+            type="button"
+            className="contract-upload__clear-btn contract-chat__clear-btn"
+            onClick={onClear}
+          >
+            Clear question
+          </button>
+        ) : null}
       </div>
     </ContractSection>
   );
 }
 
 export default function ContractCenter() {
+  const fileInputRef = useRef(null);
+
   const [selectedFile, setSelectedFile] = useState(null);
+  const [fileError, setFileError] = useState("");
+  const [reviewStatus, setReviewStatus] = useState(REVIEW_STATUS.NOT_STARTED);
+  const [contractQuestion, setContractQuestion] = useState("");
+  const [lastAskedQuestion, setLastAskedQuestion] = useState("");
+  const [contractAnswer, setContractAnswer] = useState("");
+
+  function resetFileInput() {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  function handleChooseFileClick() {
+    fileInputRef.current?.click();
+  }
+
+  function handleFileChange(event) {
+    const file = event.target.files?.[0];
+    setFileError("");
+
+    if (!file) {
+      setSelectedFile(null);
+      setReviewStatus(REVIEW_STATUS.NOT_STARTED);
+      return;
+    }
+
+    if (!isAcceptedContractFile(file)) {
+      setSelectedFile(null);
+      setReviewStatus(REVIEW_STATUS.NOT_STARTED);
+      setFileError("Please choose a PDF, DOC, or DOCX file.");
+      resetFileInput();
+      return;
+    }
+
+    if (file.size > MAX_FILE_BYTES) {
+      setSelectedFile(null);
+      setReviewStatus(REVIEW_STATUS.NOT_STARTED);
+      setFileError("File is too large. Maximum size is 10MB.");
+      resetFileInput();
+      return;
+    }
+
+    setSelectedFile(file);
+    setReviewStatus(REVIEW_STATUS.READY);
+  }
+
+  function handleClearFile() {
+    setSelectedFile(null);
+    setFileError("");
+    setReviewStatus(REVIEW_STATUS.NOT_STARTED);
+    resetFileInput();
+  }
+
+  function handleStartMockReview() {
+    if (!selectedFile) return;
+
+    console.log("Start mock contract review:", {
+      name: selectedFile.name,
+      size: selectedFile.size,
+      type: selectedFile.type,
+    });
+
+    setReviewStatus(REVIEW_STATUS.COMPLETED);
+  }
+
+  function handleAskContractQuestion(event) {
+    event.preventDefault();
+    const trimmed = contractQuestion.trim();
+    if (!trimmed) return;
+
+    setLastAskedQuestion(trimmed);
+    setContractAnswer(mockContractChatExamples.defaultReply);
+  }
+
+  function handleClearContractQuestion() {
+    setContractQuestion("");
+    setLastAskedQuestion("");
+    setContractAnswer("");
+  }
 
   return (
     <div className="page-shell contract-center">
@@ -448,16 +494,29 @@ export default function ContractCenter() {
         selectedFile={selectedFile}
         risks={mockContractRisks}
         clauses={mockMissingClauses}
+        reviewStatus={reviewStatus}
       />
 
       <main className="contract-main">
         <UploadContractSection
           selectedFile={selectedFile}
-          onSelectedFileChange={setSelectedFile}
+          fileError={fileError}
+          inputRef={fileInputRef}
+          onChooseClick={handleChooseFileClick}
+          onFileChange={handleFileChange}
+          onClearFile={handleClearFile}
+          onStartMockReview={handleStartMockReview}
         />
         <RiskDetectionSection risks={mockContractRisks} />
         <MissingClausesSection clauses={mockMissingClauses} />
-        <ContractAiChatSection />
+        <ContractAiChatSection
+          contractQuestion={contractQuestion}
+          lastAskedQuestion={lastAskedQuestion}
+          contractAnswer={contractAnswer}
+          onQuestionChange={(event) => setContractQuestion(event.target.value)}
+          onAsk={handleAskContractQuestion}
+          onClear={handleClearContractQuestion}
+        />
       </main>
     </div>
   );
