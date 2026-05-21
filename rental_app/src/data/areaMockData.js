@@ -24,6 +24,36 @@ export const mockTransportAccess = {
     "This area has strong public transport access with nearby bus routes, a reachable train station, and reasonable commute time to the city centre.",
 };
 
+export const mockLocalAmenities = {
+  supermarkets: ["Tesco Express", "Aldi", "Sainsbury's Local"],
+  schools: ["Bedford Primary School", "Castle Newnham School"],
+  hospitals: ["Bedford Hospital"],
+  parks: ["Bedford Park", "Russell Park"],
+  gyms: ["PureGym Bedford", "Anytime Fitness"],
+  amenities_rating: 78,
+  summary:
+    "This area offers convenient access to supermarkets, schools, healthcare, parks, and fitness facilities, making it suitable for daily living.",
+};
+
+export function getAmenitiesRatingHint(amenitiesRating) {
+  if (amenitiesRating >= 80) {
+    return {
+      label: "Excellent local amenities",
+      tone: "excellent",
+    };
+  }
+  if (amenitiesRating >= 60) {
+    return {
+      label: "Good daily living convenience",
+      tone: "good",
+    };
+  }
+  return {
+    label: "Limited local amenities",
+    tone: "limited",
+  };
+}
+
 export function getTransportRatingHint(transportRating) {
   if (transportRating >= 80) {
     return {

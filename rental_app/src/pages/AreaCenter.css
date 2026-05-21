@@ -640,6 +640,221 @@
   line-height: 1.65;
 }
 
+/* —— Local Amenities section —— */
+.area-amenities {
+  margin-bottom: 2.5rem;
+}
+
+.area-amenities__header {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.area-amenities__step {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  padding-top: 0.2rem;
+}
+
+.area-amenities__titles {
+  min-width: 0;
+}
+
+.area-amenities__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-label);
+}
+
+.area-amenities__subtitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.area-amenities-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 1.6rem;
+}
+
+.area-amenities-categories {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 520px) {
+  .area-amenities-categories {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .area-amenities-categories {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.area-amenities-category {
+  margin: 0;
+  padding: 1rem 1.05rem;
+  background: #fafafa;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid #a7f3d0;
+  min-height: 6.5rem;
+}
+
+.area-amenities-category__title {
+  margin: 0 0 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.area-amenities-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.area-amenities-list__item {
+  display: inline-block;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-label);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  line-height: 1.35;
+}
+
+.area-amenities-empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.area-amenities-rating {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding: 1.25rem 1.35rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #ecfdf5 100%);
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius-md);
+}
+
+.area-amenities-rating__label {
+  margin: 0 0 0.2rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.area-amenities-rating__value {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  line-height: 1;
+}
+
+.area-amenities-rating__number {
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.area-amenities-rating__max {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.area-amenities-rating__value--high .area-amenities-rating__number {
+  color: #047857;
+}
+
+.area-amenities-rating__value--mid .area-amenities-rating__number {
+  color: #b45309;
+}
+
+.area-amenities-rating__value--low .area-amenities-rating__number {
+  color: var(--color-danger);
+}
+
+.area-amenities-hint {
+  margin: 0;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.area-amenities-hint--excellent {
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.area-amenities-hint--good {
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.area-amenities-hint--limited {
+  color: var(--color-danger);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.area-amenities-summary {
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.area-amenities-summary__label {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.area-amenities-summary__text {
+  margin: 0;
+  font-size: 0.975rem;
+  color: var(--color-text-soft);
+  line-height: 1.65;
+}
+
 @media (max-width: 479px) {
   .area-hero {
     padding: 1.35rem 1.25rem;
@@ -676,5 +891,17 @@
 
   .area-transport-panel {
     padding: 1.25rem 1.15rem;
+  }
+
+  .area-amenities-rating__number {
+    font-size: 2.25rem;
+  }
+
+  .area-amenities-panel {
+    padding: 1.25rem 1.15rem;
+  }
+
+  .area-amenities-categories {
+    grid-template-columns: 1fr;
   }
 }

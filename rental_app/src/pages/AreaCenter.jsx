@@ -1,8 +1,10 @@
 import {
   mockAreaScore,
   mockTransportAccess,
+  mockLocalAmenities,
   getOverallScoreHint,
   getTransportRatingHint,
+  getAmenitiesRatingHint,
 } from "../data/areaMockData.js";
 import "./AreaCenter.css";
 
@@ -39,13 +41,15 @@ const AREA_MODULES = [
     status: "Coming soon",
   },
   {
-    id: "nearby-facilities",
+    id: "local-amenities",
     step: "04",
-    title: "Nearby Facilities",
+    title: "Local Amenities",
     description:
       "Explore shops, schools, parks, healthcare, and daily essentials.",
     icon: "🏪",
-    status: "Coming soon",
+    status: "Available",
+    linkHref: "#local-amenities-detail",
+    linkLabel: "View amenities",
   },
 ];
 
@@ -266,6 +270,98 @@ function TransportAccessSection({ data }) {
   );
 }
 
+const AMENITY_CATEGORIES = [
+  { key: "supermarkets", label: "Supermarkets" },
+  { key: "schools", label: "Schools" },
+  { key: "hospitals", label: "Hospitals" },
+  { key: "parks", label: "Parks" },
+  { key: "gyms", label: "Gyms" },
+];
+
+function AmenityList({ items }) {
+  if (!items?.length) {
+    return <p className="area-amenities-empty">None listed</p>;
+  }
+
+  return (
+    <ul className="area-amenities-list">
+      {items.map((name) => (
+        <li key={name}>
+          <span className="area-amenities-list__item">{name}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function LocalAmenitiesSection({ data }) {
+  const hint = getAmenitiesRatingHint(data.amenities_rating);
+
+  return (
+    <section
+      id="local-amenities-detail"
+      className="area-amenities"
+      aria-labelledby="local-amenities-heading"
+    >
+      <header className="area-amenities__header">
+        <span className="area-amenities__step" aria-hidden="true">
+          04
+        </span>
+        <div className="area-amenities__titles">
+          <h2 id="local-amenities-heading" className="area-amenities__title">
+            Local Amenities
+          </h2>
+          <p className="area-amenities__subtitle">
+            Mock nearby facilities for daily living — not connected to live
+            place data.
+          </p>
+        </div>
+      </header>
+
+      <div className="card area-amenities-panel">
+        <ul className="area-amenities-categories" aria-label="Local amenities">
+          {AMENITY_CATEGORIES.map((category) => (
+            <li key={category.key}>
+              <article className="area-amenities-category">
+                <h3 className="area-amenities-category__title">
+                  {category.label}
+                </h3>
+                <AmenityList items={data[category.key]} />
+              </article>
+            </li>
+          ))}
+        </ul>
+
+        <div className="area-amenities-rating">
+          <div className="area-amenities-rating__main">
+            <p className="area-amenities-rating__label">Amenities Rating</p>
+            <p
+              className={`area-amenities-rating__value area-amenities-rating__value--${scoreTone(data.amenities_rating)}`}
+              aria-label={`Amenities rating ${data.amenities_rating} out of 100`}
+            >
+              <span className="area-amenities-rating__number">
+                {data.amenities_rating}
+              </span>
+              <span className="area-amenities-rating__max">/ 100</span>
+            </p>
+          </div>
+          <p
+            className={`area-amenities-hint area-amenities-hint--${hint.tone}`}
+            role="status"
+          >
+            {hint.label}
+          </p>
+        </div>
+
+        <div className="area-amenities-summary">
+          <p className="area-amenities-summary__label">Summary</p>
+          <p className="area-amenities-summary__text">{data.summary}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function AreaCenter() {
   return (
     <div className="page-shell area-center">
@@ -283,6 +379,7 @@ export default function AreaCenter() {
 
       <AreaScoreSection data={mockAreaScore} />
       <TransportAccessSection data={mockTransportAccess} />
+      <LocalAmenitiesSection data={mockLocalAmenities} />
 
       <section className="area-modules" aria-label="Area analysis modules">
         <p className="area-modules__intro">
