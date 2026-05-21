@@ -1,4 +1,9 @@
-import { mockAreaScore, getOverallScoreHint } from "../data/areaMockData.js";
+import {
+  mockAreaScore,
+  mockTransportAccess,
+  getOverallScoreHint,
+  getTransportRatingHint,
+} from "../data/areaMockData.js";
 import "./AreaCenter.css";
 
 const AREA_MODULES = [
@@ -10,6 +15,8 @@ const AREA_MODULES = [
       "Review overall location quality and rental suitability.",
     icon: "📍",
     status: "Available",
+    linkHref: "#area-score-detail",
+    linkLabel: "View mock score",
   },
   {
     id: "transport-access",
@@ -18,7 +25,9 @@ const AREA_MODULES = [
     description:
       "Check nearby bus stops, commute options, and transport convenience.",
     icon: "🚌",
-    status: "Coming soon",
+    status: "Available",
+    linkHref: "#transport-access-detail",
+    linkLabel: "View transport",
   },
   {
     id: "safety-risk",
@@ -77,8 +86,8 @@ function AreaModuleCard({ module }) {
         </h2>
         <p className="area-module-card__description">{module.description}</p>
         {isAvailable ? (
-          <a className="area-module-card__link" href="#area-score-detail">
-            View mock score
+          <a className="area-module-card__link" href={module.linkHref}>
+            {module.linkLabel}
           </a>
         ) : (
           <p className="area-module-card__status">{module.status}</p>
@@ -170,6 +179,93 @@ function AreaScoreSection({ data }) {
   );
 }
 
+const TRANSPORT_DETAILS = [
+  { key: "nearest_bus_stop", label: "Nearest Bus Stop" },
+  { key: "nearest_station", label: "Nearest Station" },
+  { key: "walking_time_to_station", label: "Walking Time to Station" },
+  {
+    key: "estimated_commute_to_city_center",
+    label: "Commute to City Centre",
+  },
+];
+
+function TransportAccessSection({ data }) {
+  const hint = getTransportRatingHint(data.transport_rating);
+
+  return (
+    <section
+      id="transport-access-detail"
+      className="area-transport"
+      aria-labelledby="transport-access-heading"
+    >
+      <header className="area-transport__header">
+        <span className="area-transport__step" aria-hidden="true">
+          02
+        </span>
+        <div className="area-transport__titles">
+          <h2 id="transport-access-heading" className="area-transport__title">
+            Transport Access
+          </h2>
+          <p className="area-transport__subtitle">
+            Mock commute and public transport details — not connected to live
+            maps or timetables.
+          </p>
+        </div>
+      </header>
+
+      <div className="card area-transport-panel">
+        <ul className="area-transport-details" aria-label="Transport details">
+          {TRANSPORT_DETAILS.map((item) => (
+            <li key={item.key}>
+              <article className="area-transport-detail">
+                <p className="area-transport-detail__label">{item.label}</p>
+                <p className="area-transport-detail__value">{data[item.key]}</p>
+              </article>
+            </li>
+          ))}
+        </ul>
+
+        <div className="area-transport-rating">
+          <div className="area-transport-rating__main">
+            <p className="area-transport-rating__label">Transport Rating</p>
+            <p
+              className={`area-transport-rating__value area-transport-rating__value--${scoreTone(data.transport_rating)}`}
+              aria-label={`Transport rating ${data.transport_rating} out of 100`}
+            >
+              <span className="area-transport-rating__number">
+                {data.transport_rating}
+              </span>
+              <span className="area-transport-rating__max">/ 100</span>
+            </p>
+          </div>
+          <p
+            className={`area-transport-hint area-transport-hint--${hint.tone}`}
+            role="status"
+          >
+            {hint.label}
+          </p>
+        </div>
+
+        <div className="area-transport-night">
+          <p className="area-transport-night__label">Night Transport</p>
+          <p
+            className={`area-transport-night__badge area-transport-night__badge--${data.night_transport_available ? "yes" : "no"}`}
+          >
+            {data.night_transport_available
+              ? "Available"
+              : "Not available"}
+          </p>
+        </div>
+
+        <div className="area-transport-summary">
+          <p className="area-transport-summary__label">Summary</p>
+          <p className="area-transport-summary__text">{data.summary}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function AreaCenter() {
   return (
     <div className="page-shell area-center">
@@ -186,6 +282,7 @@ export default function AreaCenter() {
       </header>
 
       <AreaScoreSection data={mockAreaScore} />
+      <TransportAccessSection data={mockTransportAccess} />
 
       <section className="area-modules" aria-label="Area analysis modules">
         <p className="area-modules__intro">
