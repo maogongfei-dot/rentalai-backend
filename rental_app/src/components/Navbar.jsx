@@ -36,6 +36,9 @@ export default function Navbar() {
           <Link to="/contract-center" className="navbar-link">
             Contract Center
           </Link>
+          <Link to="/area-center" className="navbar-link">
+            Area Center
+          </Link>
           <Link to="/profile" className="navbar-link">
             Profile
           </Link>

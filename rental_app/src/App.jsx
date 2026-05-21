@@ -11,6 +11,7 @@ import Profile from "./pages/Profile.jsx";
 import TenantDashboard from "./pages/TenantDashboard.jsx";
 import LandlordDashboard from "./pages/LandlordDashboard.jsx";
 import ContractCenter from "./pages/ContractCenter.jsx";
+import AreaCenter from "./pages/AreaCenter.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 function App() {
@@ -54,6 +55,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ContractCenter />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/area-center"
+            element={
+              <ProtectedRoute>
+                <AreaCenter />
               </ProtectedRoute>
             }
           />
