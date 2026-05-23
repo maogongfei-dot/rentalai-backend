@@ -38,7 +38,9 @@ const AREA_MODULES = [
     description:
       "Understand safety signals and area-level rental risk.",
     icon: "🛡️",
-    status: "Coming soon",
+    status: "Available",
+    linkHref: "#safety-risk-detail",
+    linkLabel: "View safety",
   },
   {
     id: "local-amenities",
@@ -65,6 +67,190 @@ function scoreTone(value) {
   if (value >= 80) return "high";
   if (value >= 60) return "mid";
   return "low";
+}
+
+const mockAreaSafety = {
+  safety_rating: 72,
+  crime_level: "Moderate",
+  common_risks: ["Bike theft", "Night-time noise", "Parking issues"],
+  suitable_for: ["Students", "Young professionals"],
+  caution_notes:
+    "Some streets may feel less safe late at night, but daytime access and main-road visibility are generally good.",
+  summary:
+    "This area has an acceptable safety profile, but renters should pay attention to night-time travel and local street conditions.",
+};
+
+const AREA_RATING_KEYS = ["area_rating", "overall_score", "area_score"];
+const TRANSPORT_RATING_KEYS = ["transport_rating", "transport_score"];
+const AMENITIES_RATING_KEYS = ["amenities_rating", "facilities_rating"];
+const SAFETY_RATING_KEYS = ["safety_rating", "safety_score"];
+
+function pickNumericRating(source, keys) {
+  if (!source) return null;
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number" && !Number.isNaN(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function buildAreaScoreSummary(area, transport, amenities, safety) {
+  const area_rating = pickNumericRating(area, AREA_RATING_KEYS);
+  const transport_rating = pickNumericRating(transport, TRANSPORT_RATING_KEYS);
+  const amenities_rating = pickNumericRating(amenities, AMENITIES_RATING_KEYS);
+  const safety_rating = pickNumericRating(safety, SAFETY_RATING_KEYS);
+
+  const ratings = [
+    area_rating,
+    transport_rating,
+    amenities_rating,
+    safety_rating,
+  ].filter((value) => value != null);
+
+  const overall_area_score = ratings.length
+    ? Math.round(
+        ratings.reduce((sum, value) => sum + value, 0) / ratings.length,
+      )
+    : 0;
+
+  return {
+    postcode: area?.postcode ?? "",
+    area_name: area?.area_name ?? "",
+    area_rating,
+    transport_rating,
+    amenities_rating,
+    safety_rating,
+    overall_area_score,
+    summary:
+      area?.summary ??
+      "Combined area preview scores — detailed module summaries appear below.",
+  };
+}
+
+function getOverallAreaScoreHint(overallAreaScore) {
+  if (overallAreaScore >= 80) {
+    return {
+      label: "Highly recommended area",
+      tone: "highly-recommended",
+    };
+  }
+  if (overallAreaScore >= 60) {
+    return {
+      label: "Generally suitable area",
+      tone: "generally-suitable",
+    };
+  }
+  return {
+    label: "Needs careful consideration",
+    tone: "needs-consideration",
+  };
+}
+
+const SUMMARY_RATING_METRICS = [
+  { key: "area_rating", label: "Area Rating" },
+  { key: "transport_rating", label: "Transport Rating" },
+  { key: "amenities_rating", label: "Amenities Rating" },
+  { key: "safety_rating", label: "Safety Rating" },
+];
+
+function AreaScoreSummarySection({ summary }) {
+  const hint = getOverallAreaScoreHint(summary.overall_area_score);
+
+  return (
+    <section
+      id="area-score-summary"
+      className="area-summary"
+      aria-labelledby="area-summary-heading"
+    >
+      <header className="area-summary__header">
+        <h2 id="area-summary-heading" className="area-summary__title">
+          Area Score Summary
+        </h2>
+        <p className="area-summary__subtitle">
+          Combined preview scores from area, transport, amenities, and safety
+          modules — not connected to live data.
+        </p>
+      </header>
+
+      <div className="area-summary-location">
+        <div className="area-summary-location__item">
+          <p className="area-summary-location__label">Postcode</p>
+          <p className="area-summary-location__value">{summary.postcode}</p>
+        </div>
+        <div className="area-summary-location__item">
+          <p className="area-summary-location__label">Area Name</p>
+          <p className="area-summary-location__value">{summary.area_name}</p>
+        </div>
+      </div>
+
+      <div className="card area-summary-panel">
+        <div className="area-summary-overall">
+          <div className="area-summary-overall__main">
+            <p className="area-summary-overall__label">Overall Area Score</p>
+            <p
+              className={`area-summary-overall__value area-summary-overall__value--${scoreTone(summary.overall_area_score)}`}
+              aria-label={`Overall area score ${summary.overall_area_score} out of 100`}
+            >
+              <span className="area-summary-overall__number">
+                {summary.overall_area_score}
+              </span>
+              <span className="area-summary-overall__max">/ 100</span>
+            </p>
+          </div>
+          <p
+            className={`area-summary-hint area-summary-hint--${hint.tone}`}
+            role="status"
+          >
+            {hint.label}
+          </p>
+        </div>
+
+        <ul className="area-summary-metrics" aria-label="Module ratings">
+          {SUMMARY_RATING_METRICS.map((metric) => {
+            const value = summary[metric.key];
+            return (
+              <li key={metric.key}>
+                <article
+                  className={`area-summary-metric area-summary-metric--${scoreTone(value ?? 0)}`}
+                >
+                  <p className="area-summary-metric__label">{metric.label}</p>
+                  <p className="area-summary-metric__value">
+                    {value != null ? value : "—"}
+                  </p>
+                </article>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="area-summary-text">
+          <p className="area-summary-text__label">Summary Text</p>
+          <p className="area-summary-text__body">{summary.summary}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function getSafetyRatingHint(safetyRating) {
+  if (safetyRating >= 80) {
+    return {
+      label: "Low risk area",
+      tone: "low-risk",
+    };
+  }
+  if (safetyRating >= 60) {
+    return {
+      label: "Moderate risk area",
+      tone: "moderate",
+    };
+  }
+  return {
+    label: "Higher caution needed",
+    tone: "caution",
+  };
 }
 
 function AreaModuleCard({ module }) {
@@ -270,6 +456,102 @@ function TransportAccessSection({ data }) {
   );
 }
 
+function SafetyTagList({ items }) {
+  if (!items?.length) {
+    return <p className="area-safety-empty">None listed</p>;
+  }
+
+  return (
+    <ul className="area-safety-list">
+      {items.map((item) => (
+        <li key={item}>
+          <span className="area-safety-list__item">{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function SafetyAreaRiskSection({ data }) {
+  const hint = getSafetyRatingHint(data.safety_rating);
+
+  return (
+    <section
+      id="safety-risk-detail"
+      className="area-safety"
+      aria-labelledby="safety-risk-heading"
+    >
+      <header className="area-safety__header">
+        <span className="area-safety__step" aria-hidden="true">
+          03
+        </span>
+        <div className="area-safety__titles">
+          <h2 id="safety-risk-heading" className="area-safety__title">
+            Safety & Area Risk
+          </h2>
+          <p className="area-safety__subtitle">
+            Mock safety and risk signals for preview — not connected to live
+            crime or incident data.
+          </p>
+        </div>
+      </header>
+
+      <div className="card area-safety-panel">
+        <div className="area-safety-rating">
+          <div className="area-safety-rating__main">
+            <p className="area-safety-rating__label">Safety Rating</p>
+            <p
+              className={`area-safety-rating__value area-safety-rating__value--${scoreTone(data.safety_rating)}`}
+              aria-label={`Safety rating ${data.safety_rating} out of 100`}
+            >
+              <span className="area-safety-rating__number">
+                {data.safety_rating}
+              </span>
+              <span className="area-safety-rating__max">/ 100</span>
+            </p>
+          </div>
+          <p
+            className={`area-safety-hint area-safety-hint--${hint.tone}`}
+            role="status"
+          >
+            {hint.label}
+          </p>
+        </div>
+
+        <div className="area-safety-crime">
+          <p className="area-safety-crime__label">Crime Level</p>
+          <p className="area-safety-crime__value">{data.crime_level}</p>
+        </div>
+
+        <ul className="area-safety-categories" aria-label="Safety details">
+          <li>
+            <article className="area-safety-category">
+              <h3 className="area-safety-category__title">Common Risks</h3>
+              <SafetyTagList items={data.common_risks} />
+            </article>
+          </li>
+          <li>
+            <article className="area-safety-category">
+              <h3 className="area-safety-category__title">Suitable For</h3>
+              <SafetyTagList items={data.suitable_for} />
+            </article>
+          </li>
+        </ul>
+
+        <div className="area-safety-caution">
+          <p className="area-safety-caution__label">Caution Notes</p>
+          <p className="area-safety-caution__text">{data.caution_notes}</p>
+        </div>
+
+        <div className="area-safety-summary">
+          <p className="area-safety-summary__label">Summary</p>
+          <p className="area-safety-summary__text">{data.summary}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 const AMENITY_CATEGORIES = [
   { key: "supermarkets", label: "Supermarkets" },
   { key: "schools", label: "Schools" },
@@ -363,6 +645,13 @@ function LocalAmenitiesSection({ data }) {
 }
 
 export default function AreaCenter() {
+  const areaScoreSummary = buildAreaScoreSummary(
+    mockAreaScore,
+    mockTransportAccess,
+    mockLocalAmenities,
+    mockAreaSafety,
+  );
+
   return (
     <div className="page-shell area-center">
       <header className="area-hero">
@@ -377,8 +666,10 @@ export default function AreaCenter() {
         </p>
       </header>
 
+      <AreaScoreSummarySection summary={areaScoreSummary} />
       <AreaScoreSection data={mockAreaScore} />
       <TransportAccessSection data={mockTransportAccess} />
+      <SafetyAreaRiskSection data={mockAreaSafety} />
       <LocalAmenitiesSection data={mockLocalAmenities} />
 
       <section className="area-modules" aria-label="Area analysis modules">
