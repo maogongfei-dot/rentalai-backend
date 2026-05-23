@@ -8,7 +8,34 @@ import {
 } from "../data/areaMockData.js";
 import "./AreaCenter.css";
 
+/**
+ * Area Center — mock preview data (frontend only, no API).
+ * - mockAreaScore, mockTransportAccess, mockLocalAmenities → areaMockData.js
+ * - mockAreaSafety → defined below for Safety & Area Risk
+ */
+const mockAreaSafety = {
+  safety_rating: 72,
+  crime_level: "Moderate",
+  common_risks: ["Bike theft", "Night-time noise", "Parking issues"],
+  suitable_for: ["Students", "Young professionals"],
+  caution_notes:
+    "Some streets may feel less safe late at night, but daytime access and main-road visibility are generally good.",
+  summary:
+    "This area has an acceptable safety profile, but renters should pay attention to night-time travel and local street conditions.",
+};
+
 const AREA_MODULES = [
+  {
+    id: "area-score-summary",
+    step: "00",
+    title: "Area Score Summary",
+    description:
+      "See combined area, transport, amenities, and safety ratings at a glance.",
+    icon: "📊",
+    status: "Available",
+    linkHref: "#area-score-summary",
+    linkLabel: "View summary",
+  },
   {
     id: "area-score",
     step: "01",
@@ -69,17 +96,6 @@ function scoreTone(value) {
   return "low";
 }
 
-const mockAreaSafety = {
-  safety_rating: 72,
-  crime_level: "Moderate",
-  common_risks: ["Bike theft", "Night-time noise", "Parking issues"],
-  suitable_for: ["Students", "Young professionals"],
-  caution_notes:
-    "Some streets may feel less safe late at night, but daytime access and main-road visibility are generally good.",
-  summary:
-    "This area has an acceptable safety profile, but renters should pay attention to night-time travel and local street conditions.",
-};
-
 const AREA_RATING_KEYS = ["area_rating", "overall_score", "area_score"];
 const TRANSPORT_RATING_KEYS = ["transport_rating", "transport_score"];
 const AMENITIES_RATING_KEYS = ["amenities_rating", "facilities_rating"];
@@ -116,8 +132,6 @@ function buildAreaScoreSummary(area, transport, amenities, safety) {
     : 0;
 
   return {
-    postcode: area?.postcode ?? "",
-    area_name: area?.area_name ?? "",
     area_rating,
     transport_rating,
     amenities_rating,
@@ -155,6 +169,37 @@ const SUMMARY_RATING_METRICS = [
   { key: "safety_rating", label: "Safety Rating" },
 ];
 
+function BasicAreaInfoSection({ postcode, areaName }) {
+  return (
+    <section
+      id="basic-area-info"
+      className="area-basic"
+      aria-labelledby="basic-area-info-heading"
+    >
+      <header className="area-basic__header">
+        <h2 id="basic-area-info-heading" className="area-basic__title">
+          Basic Area Info
+        </h2>
+        <p className="area-basic__subtitle">
+          Mock location identifiers for this preview — not connected to live
+          address lookup.
+        </p>
+      </header>
+
+      <div className="area-basic-location">
+        <div className="area-basic-location__item">
+          <p className="area-basic-location__label">Postcode</p>
+          <p className="area-basic-location__value">{postcode}</p>
+        </div>
+        <div className="area-basic-location__item">
+          <p className="area-basic-location__label">Area Name</p>
+          <p className="area-basic-location__value">{areaName}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function AreaScoreSummarySection({ summary }) {
   const hint = getOverallAreaScoreHint(summary.overall_area_score);
 
@@ -173,17 +218,6 @@ function AreaScoreSummarySection({ summary }) {
           modules — not connected to live data.
         </p>
       </header>
-
-      <div className="area-summary-location">
-        <div className="area-summary-location__item">
-          <p className="area-summary-location__label">Postcode</p>
-          <p className="area-summary-location__value">{summary.postcode}</p>
-        </div>
-        <div className="area-summary-location__item">
-          <p className="area-summary-location__label">Area Name</p>
-          <p className="area-summary-location__value">{summary.area_name}</p>
-        </div>
-      </div>
 
       <div className="card area-summary-panel">
         <div className="area-summary-overall">
@@ -312,17 +346,6 @@ function AreaScoreSection({ data }) {
       </header>
 
       <div className="card area-score-panel">
-        <div className="area-score-location">
-          <div className="area-score-location__item">
-            <p className="area-score-location__label">Postcode</p>
-            <p className="area-score-location__value">{data.postcode}</p>
-          </div>
-          <div className="area-score-location__item">
-            <p className="area-score-location__label">Area Name</p>
-            <p className="area-score-location__value">{data.area_name}</p>
-          </div>
-        </div>
-
         <div className="area-score-overall">
           <div className="area-score-overall__main">
             <p className="area-score-overall__label">Overall Score</p>
@@ -666,11 +689,15 @@ export default function AreaCenter() {
         </p>
       </header>
 
+      <BasicAreaInfoSection
+        postcode={mockAreaScore.postcode}
+        areaName={mockAreaScore.area_name}
+      />
       <AreaScoreSummarySection summary={areaScoreSummary} />
-      <AreaScoreSection data={mockAreaScore} />
       <TransportAccessSection data={mockTransportAccess} />
-      <SafetyAreaRiskSection data={mockAreaSafety} />
       <LocalAmenitiesSection data={mockLocalAmenities} />
+      <SafetyAreaRiskSection data={mockAreaSafety} />
+      <AreaScoreSection data={mockAreaScore} />
 
       <section className="area-modules" aria-label="Area analysis modules">
         <p className="area-modules__intro">
