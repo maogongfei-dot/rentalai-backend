@@ -314,6 +314,97 @@
   line-height: 1.65;
 }
 
+/* —— Complaint signals —— */
+.landlord-complaints {
+  margin-bottom: 2.5rem;
+}
+
+.landlord-complaints__header {
+  margin-bottom: 1.25rem;
+}
+
+.landlord-complaints__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-label);
+}
+
+.landlord-complaints__subtitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.landlord-complaints-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 1.6rem;
+}
+
+.landlord-complaints-risk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.landlord-complaints-block {
+  padding: 0.95rem 1rem;
+  background: #fafafa;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid #fdba74;
+  min-width: 0;
+}
+
+.landlord-complaint-types {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.landlord-complaint-types__item {
+  display: inline-block;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 999px;
+  line-height: 1.35;
+}
+
+.landlord-complaint-empty {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.landlord-complaints-severity {
+  border-left: 3px solid #fdba74;
+}
+
+.landlord-complaints-severity__badge {
+  margin: 0;
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 999px;
+}
+
 @media (max-width: 479px) {
   .landlord-center-hero {
     padding: 1.35rem 1.25rem;
@@ -346,5 +437,9 @@
 
   .landlord-overview-hint {
     width: 100%;
+  }
+
+  .landlord-complaints-panel {
+    padding: 1.25rem 1.15rem;
   }
 }
