@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   mockAreaScore,
   mockTransportAccess,
@@ -168,6 +169,73 @@ const SUMMARY_RATING_METRICS = [
   { key: "amenities_rating", label: "Amenities Rating" },
   { key: "safety_rating", label: "Safety Rating" },
 ];
+
+function AreaSearchSection({
+  areaSearchInput,
+  onInputChange,
+  onAnalyze,
+  feedback,
+}) {
+  return (
+    <section className="area-basic" aria-label="Area search">
+      <header className="area-basic__header">
+        <h2 className="area-basic__title">Search Area</h2>
+        <p className="area-basic__subtitle">
+          Enter a postcode or area name to preview mock location analysis below.
+        </p>
+      </header>
+
+      <div className="area-basic-location">
+        <form
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.75rem",
+            alignItems: "flex-end",
+            width: "100%",
+          }}
+          onSubmit={onAnalyze}
+          noValidate
+        >
+          <label
+            className="field"
+            style={{ flex: "1 1 12rem", margin: 0, minWidth: 0 }}
+          >
+            <span className="field-label">Postcode or area</span>
+            <input
+              type="text"
+              name="areaSearchInput"
+              value={areaSearchInput}
+              onChange={onInputChange}
+              placeholder="Enter postcode or area name"
+              className="input"
+              autoComplete="off"
+            />
+          </label>
+          <button
+            type="submit"
+            className="btn"
+            style={{ marginTop: 0, flex: "0 0 auto" }}
+          >
+            Analyze Area
+          </button>
+        </form>
+
+        {feedback ? (
+          <p
+            className={
+              feedback.type === "error" ? "text-error" : "text-success"
+            }
+            role="status"
+            style={{ margin: "0.75rem 0 0", width: "100%" }}
+          >
+            {feedback.message}
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
 
 function BasicAreaInfoSection({ postcode, areaName }) {
   return (
@@ -668,12 +736,37 @@ function LocalAmenitiesSection({ data }) {
 }
 
 export default function AreaCenter() {
+  const [areaSearchInput, setAreaSearchInput] = useState("");
+  const [areaSearchFeedback, setAreaSearchFeedback] = useState(null);
+
   const areaScoreSummary = buildAreaScoreSummary(
     mockAreaScore,
     mockTransportAccess,
     mockLocalAmenities,
     mockAreaSafety,
   );
+
+  function handleAreaSearchInputChange(event) {
+    setAreaSearchInput(event.target.value);
+  }
+
+  function handleAnalyzeArea(event) {
+    event.preventDefault();
+    const trimmed = areaSearchInput.trim();
+
+    if (!trimmed) {
+      setAreaSearchFeedback({
+        type: "error",
+        message: "Please enter a postcode or area name.",
+      });
+      return;
+    }
+
+    setAreaSearchFeedback({
+      type: "success",
+      message: `Showing mock area analysis for: ${trimmed}`,
+    });
+  }
 
   return (
     <div className="page-shell area-center">
@@ -688,6 +781,13 @@ export default function AreaCenter() {
           nearby facilities before choosing a rental property.
         </p>
       </header>
+
+      <AreaSearchSection
+        areaSearchInput={areaSearchInput}
+        onInputChange={handleAreaSearchInputChange}
+        onAnalyze={handleAnalyzeArea}
+        feedback={areaSearchFeedback}
+      />
 
       <BasicAreaInfoSection
         postcode={mockAreaScore.postcode}
