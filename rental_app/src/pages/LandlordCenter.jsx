@@ -23,12 +23,12 @@ function trustScoreTone(score) {
 
 function getTrustScoreHint(score) {
   if (score >= 80) {
-    return { label: "Strong trust profile", tone: "high" };
+    return { label: "High trust landlord", tone: "high" };
   }
   if (score >= 60) {
-    return { label: "Generally acceptable trust", tone: "mid" };
+    return { label: "Moderate trust landlord", tone: "mid" };
   }
-  return { label: "Review carefully before renting", tone: "low" };
+  return { label: "Caution recommended", tone: "low" };
 }
 
 function LandlordReputationOverviewSection({ data }) {
