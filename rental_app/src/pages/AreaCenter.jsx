@@ -25,6 +25,24 @@ const mockAreaSafety = {
     "This area has an acceptable safety profile, but renters should pay attention to night-time travel and local street conditions.",
 };
 
+const mockAreaExplanation = {
+  recommendation_level: "Generally suitable",
+  main_reason:
+    "This area offers balanced transport access, daily amenities, and acceptable safety conditions.",
+  good_points: [
+    "Good access to public transport",
+    "Convenient daily amenities nearby",
+    "Reasonable commute time to the city centre",
+  ],
+  caution_points: [
+    "Some night-time safety concerns",
+    "Parking may be limited in certain streets",
+  ],
+  best_for: ["Students", "Young professionals", "Small families"],
+  final_advice:
+    "This area is generally suitable for renters, but users should check the exact street condition and transport options before making a decision.",
+};
+
 const AREA_MODULES = [
   {
     id: "area-score-summary",
@@ -161,6 +179,56 @@ function getOverallAreaScoreHint(overallAreaScore) {
     label: "Needs careful consideration",
     tone: "needs-consideration",
   };
+}
+
+function getRecommendationLevelTone(recommendationLevel) {
+  const normalized = recommendationLevel.trim().toLowerCase();
+
+  if (
+    normalized.includes("highly") ||
+    normalized.includes("strongly recommended")
+  ) {
+    return "highly-recommended";
+  }
+  if (
+    normalized.includes("generally") ||
+    normalized.includes("suitable") ||
+    normalized.includes("recommended")
+  ) {
+    return "generally-suitable";
+  }
+  return "needs-consideration";
+}
+
+function ExplanationBulletList({ items }) {
+  if (!items?.length) {
+    return <p className="area-safety-empty">None listed</p>;
+  }
+
+  return (
+    <ul
+      style={{
+        margin: 0,
+        paddingLeft: "1.15rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.45rem",
+      }}
+    >
+      {items.map((item) => (
+        <li
+          key={item}
+          style={{
+            fontSize: "0.9rem",
+            lineHeight: 1.55,
+            color: "var(--color-text-soft)",
+          }}
+        >
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 const SUMMARY_RATING_METRICS = [
@@ -330,6 +398,84 @@ function AreaScoreSummarySection({ summary }) {
         <div className="area-summary-text">
           <p className="area-summary-text__label">Summary Text</p>
           <p className="area-summary-text__body">{summary.summary}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AreaExplanationSection({ data }) {
+  const recommendationTone = getRecommendationLevelTone(data.recommendation_level);
+
+  return (
+    <section
+      id="ai-area-explanation"
+      className="area-summary"
+      aria-labelledby="area-explanation-heading"
+    >
+      <header className="area-summary__header">
+        <h2 id="area-explanation-heading" className="area-summary__title">
+          AI Area Explanation
+        </h2>
+        <p className="area-summary__subtitle">
+          Plain-language mock guidance on whether this area suits everyday
+          renting — not connected to live AI services.
+        </p>
+      </header>
+
+      <div className="card area-summary-panel">
+        <div className="area-summary-overall">
+          <div className="area-summary-overall__main">
+            <p className="area-summary-overall__label">Recommendation Level</p>
+          </div>
+          <p
+            className={`area-summary-hint area-summary-hint--${recommendationTone}`}
+            role="status"
+          >
+            {data.recommendation_level}
+          </p>
+        </div>
+
+        <div className="area-summary-text">
+          <p className="area-summary-text__label">Main Reason</p>
+          <p className="area-summary-text__body">{data.main_reason}</p>
+        </div>
+
+        <ul
+          className="area-safety-categories"
+          aria-label="Area explanation highlights"
+        >
+          <li>
+            <article
+              className="area-safety-category"
+              style={{ borderLeftColor: "#34d399" }}
+            >
+              <h3 className="area-safety-category__title">Good Points</h3>
+              <ExplanationBulletList items={data.good_points} />
+            </article>
+          </li>
+          <li>
+            <article
+              className="area-safety-category"
+              style={{ borderLeftColor: "#fdba74" }}
+            >
+              <h3 className="area-safety-category__title">Caution Points</h3>
+              <ExplanationBulletList items={data.caution_points} />
+            </article>
+          </li>
+        </ul>
+
+        <div
+          className="area-safety-category"
+          style={{ borderLeftColor: "#93c5fd" }}
+        >
+          <h3 className="area-safety-category__title">Best For</h3>
+          <SafetyTagList items={data.best_for} />
+        </div>
+
+        <div className="area-safety-summary">
+          <p className="area-safety-summary__label">Final Advice</p>
+          <p className="area-safety-summary__text">{data.final_advice}</p>
         </div>
       </div>
     </section>
@@ -794,6 +940,7 @@ export default function AreaCenter() {
         areaName={mockAreaScore.area_name}
       />
       <AreaScoreSummarySection summary={areaScoreSummary} />
+      <AreaExplanationSection data={mockAreaExplanation} />
       <TransportAccessSection data={mockTransportAccess} />
       <LocalAmenitiesSection data={mockLocalAmenities} />
       <SafetyAreaRiskSection data={mockAreaSafety} />
