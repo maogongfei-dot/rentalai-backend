@@ -99,6 +99,17 @@ const AREA_MODULES = [
     linkHref: "#local-amenities-detail",
     linkLabel: "View amenities",
   },
+  {
+    id: "ai-area-explanation",
+    step: "05",
+    title: "AI Area Explanation",
+    description:
+      "Read plain-language guidance on whether this area suits everyday renting.",
+    icon: "🤖",
+    status: "Available",
+    linkHref: "#ai-area-explanation",
+    linkLabel: "View explanation",
+  },
 ];
 
 const SCORE_METRICS = [
@@ -182,7 +193,7 @@ function getOverallAreaScoreHint(overallAreaScore) {
 }
 
 function getRecommendationLevelTone(recommendationLevel) {
-  const normalized = recommendationLevel.trim().toLowerCase();
+  const normalized = (recommendationLevel ?? "").trim().toLowerCase();
 
   if (
     normalized.includes("highly") ||
@@ -259,8 +270,9 @@ function AreaSearchSection({
             display: "flex",
             flexWrap: "wrap",
             gap: "0.75rem",
-            alignItems: "flex-end",
+            alignItems: "stretch",
             width: "100%",
+            minWidth: 0,
           }}
           onSubmit={onAnalyze}
           noValidate
@@ -283,7 +295,7 @@ function AreaSearchSection({
           <button
             type="submit"
             className="btn"
-            style={{ marginTop: 0, flex: "0 0 auto" }}
+            style={{ marginTop: 0, flex: "1 1 8rem", minWidth: 0 }}
           >
             Analyze Area
           </button>
@@ -507,7 +519,6 @@ function AreaModuleCard({ module }) {
   return (
     <li>
       <article
-        id={module.id}
         className="card area-module-card"
         aria-labelledby={`${module.id}-heading`}
       >
@@ -894,6 +905,9 @@ export default function AreaCenter() {
 
   function handleAreaSearchInputChange(event) {
     setAreaSearchInput(event.target.value);
+    if (areaSearchFeedback) {
+      setAreaSearchFeedback(null);
+    }
   }
 
   function handleAnalyzeArea(event) {
@@ -940,10 +954,10 @@ export default function AreaCenter() {
         areaName={mockAreaScore.area_name}
       />
       <AreaScoreSummarySection summary={areaScoreSummary} />
-      <AreaExplanationSection data={mockAreaExplanation} />
       <TransportAccessSection data={mockTransportAccess} />
       <LocalAmenitiesSection data={mockLocalAmenities} />
       <SafetyAreaRiskSection data={mockAreaSafety} />
+      <AreaExplanationSection data={mockAreaExplanation} />
       <AreaScoreSection data={mockAreaScore} />
 
       <section className="area-modules" aria-label="Area analysis modules">
