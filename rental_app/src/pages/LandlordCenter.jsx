@@ -49,6 +49,18 @@ const mockVerificationSignals = {
     "This landlord has basic identity and contact verification, but property ownership has not yet been verified.",
 };
 
+const mockRiskSummary = {
+  overall_risk: "Medium Risk",
+  trust_score: 78,
+  complaint_level: "Low",
+  rental_history_level: "Moderate",
+  verification_level: "Basic",
+  recommendation:
+    "Proceed with normal due diligence before signing a tenancy agreement.",
+  summary:
+    "Overall landlord risk appears moderate based on available reputation, complaint, rental history and verification signals.",
+};
+
 function trustScoreTone(score) {
   if (score >= 80) return "high";
   if (score >= 60) return "mid";
@@ -102,6 +114,16 @@ function getVerificationHints(data) {
   }
 
   return hints;
+}
+
+function getRiskLevelHint(trustScore) {
+  if (trustScore >= 85) {
+    return { label: "Low Risk", tone: "high" };
+  }
+  if (trustScore >= 60) {
+    return { label: "Medium Risk", tone: "mid" };
+  }
+  return { label: "High Risk", tone: "low" };
 }
 
 function VerificationStatusField({ label, verified }) {
@@ -477,6 +499,100 @@ function LandlordVerificationSignalsSection({ data }) {
   );
 }
 
+function LandlordRiskSummarySection({ data }) {
+  const riskHint = getRiskLevelHint(data.trust_score);
+  const scoreTone = trustScoreTone(data.trust_score);
+
+  return (
+    <section
+      id="landlord-risk-summary"
+      className="landlord-risk"
+      aria-labelledby="landlord-risk-heading"
+    >
+      <header className="landlord-risk__header">
+        <h2 id="landlord-risk-heading" className="landlord-risk__title">
+          Landlord Risk Summary
+        </h2>
+        <p className="landlord-risk__subtitle">
+          Combined mock risk assessment from reputation, complaints, history, and
+          verification — not connected to live risk scoring.
+        </p>
+      </header>
+
+      <div className="card landlord-risk-panel">
+        <div className="landlord-risk-badge-wrap" role="status">
+          <p
+            className={`landlord-overview-hint landlord-overview-hint--${riskHint.tone} landlord-risk-badge`}
+          >
+            {riskHint.label}
+          </p>
+        </div>
+
+        <div className="landlord-overview-trust landlord-risk-trust">
+          <div className="landlord-overview-trust__main">
+            <p className="landlord-overview-trust__label">Trust Score</p>
+            <p
+              className={`landlord-overview-trust__value landlord-overview-trust__value--${scoreTone}`}
+              aria-label={`Trust score ${data.trust_score} out of 100`}
+            >
+              <span className="landlord-overview-trust__number">
+                {data.trust_score}
+              </span>
+              <span className="landlord-overview-trust__max">/ 100</span>
+            </p>
+          </div>
+          <div className="landlord-overview-detail landlord-risk-overall">
+            <p className="landlord-overview-detail__label">Overall Risk</p>
+            <p className="landlord-overview-detail__value">{data.overall_risk}</p>
+          </div>
+        </div>
+
+        <ul
+          className="landlord-overview-metrics landlord-risk-metrics"
+          aria-label="Risk level breakdown"
+        >
+          <li>
+            <article className="landlord-overview-metric">
+              <p className="landlord-overview-metric__label">Complaint Level</p>
+              <p className="landlord-overview-metric__value">
+                {data.complaint_level}
+              </p>
+            </article>
+          </li>
+          <li>
+            <article className="landlord-overview-metric">
+              <p className="landlord-overview-metric__label">
+                Rental History Level
+              </p>
+              <p className="landlord-overview-metric__value">
+                {data.rental_history_level}
+              </p>
+            </article>
+          </li>
+          <li>
+            <article className="landlord-overview-metric">
+              <p className="landlord-overview-metric__label">Verification Level</p>
+              <p className="landlord-overview-metric__value">
+                {data.verification_level}
+              </p>
+            </article>
+          </li>
+        </ul>
+
+        <div className="landlord-risk-recommendation">
+          <p className="landlord-overview-summary__label">Recommendation</p>
+          <p className="landlord-overview-summary__text">{data.recommendation}</p>
+        </div>
+
+        <div className="landlord-overview-summary">
+          <p className="landlord-overview-summary__label">Summary</p>
+          <p className="landlord-overview-summary__text">{data.summary}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function LandlordCenter() {
   return (
     <div className="page-shell landlord-center">
@@ -496,6 +612,7 @@ export default function LandlordCenter() {
       <ComplaintSignalsSection data={mockComplaintSignals} />
       <RentalHistorySignalsSection data={mockRentalHistory} />
       <LandlordVerificationSignalsSection data={mockVerificationSignals} />
+      <LandlordRiskSummarySection data={mockRiskSummary} />
     </div>
   );
 }
