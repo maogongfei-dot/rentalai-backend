@@ -13,6 +13,7 @@ import LandlordDashboard from "./pages/LandlordDashboard.jsx";
 import LandlordCenter from "./pages/LandlordCenter.jsx";
 import ContractCenter from "./pages/ContractCenter.jsx";
 import AreaCenter from "./pages/AreaCenter.jsx";
+import PropertyIntelligenceCenter from "./pages/PropertyIntelligenceCenter.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 function App() {
@@ -72,6 +73,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <AreaCenter />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/property-intelligence-center"
+            element={
+              <ProtectedRoute>
+                <PropertyIntelligenceCenter />
               </ProtectedRoute>
             }
           />
