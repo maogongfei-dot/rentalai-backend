@@ -26,6 +26,29 @@ const mockComplaintSignals = {
     "There are some complaint signals, mainly around repair response and deposit handling. Renters should review contract terms and communication records carefully.",
 };
 
+const mockRentalHistory = {
+  years_active: 4,
+  estimated_tenancies: 12,
+  repeat_tenant_signal:
+    "Some tenants appear to have stayed for more than 12 months",
+  average_tenancy_length: "10 months",
+  rent_increase_signal: "No strong rent increase pattern detected",
+  property_maintenance_signal: "Mixed maintenance feedback",
+  summary:
+    "This landlord has some rental history signals, with moderate experience and mixed maintenance feedback.",
+};
+
+const mockVerificationSignals = {
+  identity_verified: true,
+  email_verified: true,
+  phone_verified: true,
+  ownership_verification: "Not verified",
+  response_rate: "82%",
+  average_response_time: "6 hours",
+  summary:
+    "This landlord has basic identity and contact verification, but property ownership has not yet been verified.",
+};
+
 function trustScoreTone(score) {
   if (score >= 80) return "high";
   if (score >= 60) return "mid";
@@ -50,6 +73,48 @@ function getComplaintRiskHint(unresolvedComplaints) {
     return { label: "Some complaint risk", tone: "mid" };
   }
   return { label: "No major complaint signal", tone: "high" };
+}
+
+function getRentalHistoryHint(yearsActive) {
+  if (yearsActive >= 5) {
+    return { label: "Experienced landlord", tone: "high" };
+  }
+  if (yearsActive >= 2) {
+    return { label: "Some rental history", tone: "mid" };
+  }
+  return { label: "Limited rental history", tone: "low" };
+}
+
+function getVerificationHints(data) {
+  const hints = [];
+
+  if (data.identity_verified && data.email_verified && data.phone_verified) {
+    hints.push({
+      label: "Basic landlord verification complete",
+      tone: "high",
+    });
+  }
+
+  if (data.ownership_verification === "Verified") {
+    hints.push({ label: "Property ownership verified", tone: "high" });
+  } else {
+    hints.push({ label: "Property ownership not verified", tone: "mid" });
+  }
+
+  return hints;
+}
+
+function VerificationStatusField({ label, verified }) {
+  return (
+    <div className="landlord-overview-detail">
+      <p className="landlord-overview-detail__label">{label}</p>
+      <p
+        className={`landlord-verification-status landlord-verification-status--${verified ? "yes" : "no"}`}
+      >
+        {verified ? "Verified" : "Not verified"}
+      </p>
+    </div>
+  );
 }
 
 function ComplaintTypeList({ items }) {
@@ -238,6 +303,180 @@ function ComplaintSignalsSection({ data }) {
   );
 }
 
+function RentalHistorySignalsSection({ data }) {
+  const hint = getRentalHistoryHint(data.years_active);
+
+  return (
+    <section
+      id="rental-history-signals"
+      className="landlord-history"
+      aria-labelledby="rental-history-heading"
+    >
+      <header className="landlord-history__header">
+        <h2 id="rental-history-heading" className="landlord-history__title">
+          Rental History Signals
+        </h2>
+        <p className="landlord-history__subtitle">
+          Mock rental history and tenancy patterns for preview — not connected
+          to live tenancy records.
+        </p>
+      </header>
+
+      <div className="card landlord-history-panel">
+        <div className="landlord-history-hint-wrap">
+          <p
+            className={`landlord-overview-hint landlord-overview-hint--${hint.tone}`}
+            role="status"
+          >
+            {hint.label}
+          </p>
+        </div>
+
+        <ul className="landlord-overview-metrics" aria-label="Rental history metrics">
+          <li>
+            <article className="landlord-overview-metric">
+              <p className="landlord-overview-metric__label">Years Active</p>
+              <p className="landlord-overview-metric__value">{data.years_active}</p>
+            </article>
+          </li>
+          <li>
+            <article className="landlord-overview-metric">
+              <p className="landlord-overview-metric__label">Estimated Tenancies</p>
+              <p className="landlord-overview-metric__value">
+                {data.estimated_tenancies}
+              </p>
+            </article>
+          </li>
+        </ul>
+
+        <div className="landlord-overview-details">
+          <div className="landlord-overview-detail">
+            <p className="landlord-overview-detail__label">Repeat Tenant Signal</p>
+            <p className="landlord-overview-detail__value">
+              {data.repeat_tenant_signal}
+            </p>
+          </div>
+          <div className="landlord-overview-detail">
+            <p className="landlord-overview-detail__label">Average Tenancy Length</p>
+            <p className="landlord-overview-detail__value">
+              {data.average_tenancy_length}
+            </p>
+          </div>
+          <div className="landlord-overview-detail">
+            <p className="landlord-overview-detail__label">Rent Increase Signal</p>
+            <p className="landlord-overview-detail__value">
+              {data.rent_increase_signal}
+            </p>
+          </div>
+          <div className="landlord-overview-detail">
+            <p className="landlord-overview-detail__label">
+              Property Maintenance Signal
+            </p>
+            <p className="landlord-overview-detail__value">
+              {data.property_maintenance_signal}
+            </p>
+          </div>
+        </div>
+
+        <div className="landlord-overview-summary">
+          <p className="landlord-overview-summary__label">Summary</p>
+          <p className="landlord-overview-summary__text">{data.summary}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function LandlordVerificationSignalsSection({ data }) {
+  const hints = getVerificationHints(data);
+
+  return (
+    <section
+      id="landlord-verification-signals"
+      className="landlord-verification"
+      aria-labelledby="landlord-verification-heading"
+    >
+      <header className="landlord-verification__header">
+        <h2
+          id="landlord-verification-heading"
+          className="landlord-verification__title"
+        >
+          Landlord Verification Signals
+        </h2>
+        <p className="landlord-verification__subtitle">
+          Mock identity and contact verification signals for preview — not
+          connected to live verification services.
+        </p>
+      </header>
+
+      <div className="card landlord-verification-panel">
+        <div className="landlord-verification-hints" role="status">
+          {hints.map((hint) => (
+            <p
+              key={hint.label}
+              className={`landlord-overview-hint landlord-overview-hint--${hint.tone}`}
+            >
+              {hint.label}
+            </p>
+          ))}
+        </div>
+
+        <div className="landlord-overview-details">
+          <VerificationStatusField
+            label="Identity Verified"
+            verified={data.identity_verified}
+          />
+          <VerificationStatusField
+            label="Email Verified"
+            verified={data.email_verified}
+          />
+          <VerificationStatusField
+            label="Phone Verified"
+            verified={data.phone_verified}
+          />
+          <div className="landlord-overview-detail">
+            <p className="landlord-overview-detail__label">
+              Ownership Verification
+            </p>
+            <p
+              className={`landlord-verification-status landlord-verification-status--${data.ownership_verification === "Verified" ? "yes" : "no"}`}
+            >
+              {data.ownership_verification}
+            </p>
+          </div>
+        </div>
+
+        <ul
+          className="landlord-overview-metrics"
+          aria-label="Verification response metrics"
+        >
+          <li>
+            <article className="landlord-overview-metric">
+              <p className="landlord-overview-metric__label">Response Rate</p>
+              <p className="landlord-overview-metric__value">{data.response_rate}</p>
+            </article>
+          </li>
+          <li>
+            <article className="landlord-overview-metric">
+              <p className="landlord-overview-metric__label">
+                Average Response Time
+              </p>
+              <p className="landlord-overview-metric__value">
+                {data.average_response_time}
+              </p>
+            </article>
+          </li>
+        </ul>
+
+        <div className="landlord-overview-summary">
+          <p className="landlord-overview-summary__label">Summary</p>
+          <p className="landlord-overview-summary__text">{data.summary}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function LandlordCenter() {
   return (
     <div className="page-shell landlord-center">
@@ -255,6 +494,8 @@ export default function LandlordCenter() {
 
       <LandlordReputationOverviewSection data={mockLandlordOverview} />
       <ComplaintSignalsSection data={mockComplaintSignals} />
+      <RentalHistorySignalsSection data={mockRentalHistory} />
+      <LandlordVerificationSignalsSection data={mockVerificationSignals} />
     </div>
   );
 }

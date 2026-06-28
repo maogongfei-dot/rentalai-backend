@@ -405,6 +405,104 @@
   border-radius: 999px;
 }
 
+/* —— Rental history signals —— */
+.landlord-history {
+  margin-bottom: 2.5rem;
+}
+
+.landlord-history__header {
+  margin-bottom: 1.25rem;
+}
+
+.landlord-history__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-label);
+}
+
+.landlord-history__subtitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.landlord-history-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 1.6rem;
+}
+
+.landlord-history-hint-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* —— Verification signals —— */
+.landlord-verification {
+  margin-bottom: 2.5rem;
+}
+
+.landlord-verification__header {
+  margin-bottom: 1.25rem;
+}
+
+.landlord-verification__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-label);
+}
+
+.landlord-verification__subtitle {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.landlord-verification-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem 1.6rem;
+}
+
+.landlord-verification-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.landlord-verification-status {
+  margin: 0;
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: 999px;
+  line-height: 1.35;
+}
+
+.landlord-verification-status--yes {
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.landlord-verification-status--no {
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
 @media (max-width: 479px) {
   .landlord-center-hero {
     padding: 1.35rem 1.25rem;
@@ -440,6 +538,14 @@
   }
 
   .landlord-complaints-panel {
+    padding: 1.25rem 1.15rem;
+  }
+
+  .landlord-history-panel {
+    padding: 1.25rem 1.15rem;
+  }
+
+  .landlord-verification-panel {
     padding: 1.25rem 1.15rem;
   }
 }
