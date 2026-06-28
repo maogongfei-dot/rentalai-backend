@@ -1,4 +1,4 @@
-/* Landlord Center — reputation mock layout */
+/* Landlord Center — unified reputation layout */
 
 .landlord-center.page-shell {
   max-width: min(68rem, 100%);
@@ -11,15 +11,18 @@
 
 .landlord-center .card {
   min-width: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
 }
 
-/* —— Page header —— */
+/* —— Page hero —— */
 .landlord-center-hero {
   margin-bottom: 2rem;
   padding: 1.75rem 1.85rem;
   background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 55%, #fff 100%);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
 }
 
 .landlord-center-hero__top {
@@ -69,16 +72,16 @@
   line-height: 1.6;
 }
 
-/* —— Reputation overview —— */
-.landlord-overview {
+/* —— Shared module layout —— */
+.landlord-section {
   margin-bottom: 2.5rem;
 }
 
-.landlord-overview__header {
+.landlord-section__header {
   margin-bottom: 1.25rem;
 }
 
-.landlord-overview__title {
+.landlord-section__title {
   margin: 0 0 0.35rem;
   font-size: 1.5rem;
   font-weight: 700;
@@ -86,27 +89,23 @@
   color: var(--color-label);
 }
 
-.landlord-overview__subtitle {
+.landlord-section__subtitle {
   margin: 0;
   font-size: 0.9375rem;
   color: var(--color-text-muted);
   line-height: 1.55;
 }
 
-.landlord-overview-panel {
+.landlord-panel {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   padding: 1.5rem 1.6rem;
 }
 
-.landlord-overview-identity {
-  padding-bottom: 0.25rem;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.landlord-overview-identity__label {
-  margin: 0 0 0.35rem;
+/* —— Shared field typography —— */
+.landlord-field__label {
+  margin: 0 0 0.4rem;
   font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -114,7 +113,87 @@
   color: var(--color-text-muted);
 }
 
-.landlord-overview-identity__value {
+.landlord-field__label--summary {
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.landlord-field__value {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-label);
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.landlord-field__value--metric {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* —— Unified badges (risk / verification / complaint) —— */
+.landlord-badge {
+  margin: 0;
+  display: inline-block;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  border-radius: 999px;
+  line-height: 1.35;
+}
+
+.landlord-badge--high {
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.landlord-badge--mid {
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.landlord-badge--low {
+  color: var(--color-danger);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.landlord-badge--info {
+  color: #4338ca;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+}
+
+.landlord-badge--neutral {
+  color: var(--color-label);
+  background: #fafafa;
+  border: 1px solid var(--color-border);
+}
+
+.landlord-badge--tag {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.landlord-hint-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* —— Identity & trust score —— */
+.landlord-identity {
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.landlord-identity__name {
   margin: 0;
   font-size: 1.35rem;
   font-weight: 700;
@@ -122,7 +201,7 @@
   color: var(--color-label);
 }
 
-.landlord-overview-trust {
+.landlord-trust-block {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -132,22 +211,23 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   border-left: 3px solid #6366f1;
-}
-
-.landlord-overview-trust__main {
   min-width: 0;
 }
 
-.landlord-overview-trust__label {
-  margin: 0 0 0.25rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+.landlord-trust-block--split .landlord-detail {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
 }
 
-.landlord-overview-trust__value {
+.landlord-trust-block__main {
+  min-width: 0;
+}
+
+.landlord-trust-block__value {
   margin: 0;
   display: flex;
   align-items: baseline;
@@ -155,58 +235,32 @@
   line-height: 1;
 }
 
-.landlord-overview-trust__number {
+.landlord-trust-block__number {
   font-size: 2.5rem;
   font-weight: 800;
   letter-spacing: -0.03em;
 }
 
-.landlord-overview-trust__max {
+.landlord-trust-block__max {
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-text-muted);
 }
 
-.landlord-overview-trust__value--high .landlord-overview-trust__number {
+.landlord-trust-block__value--high .landlord-trust-block__number {
   color: #047857;
 }
 
-.landlord-overview-trust__value--mid .landlord-overview-trust__number {
+.landlord-trust-block__value--mid .landlord-trust-block__number {
   color: #b45309;
 }
 
-.landlord-overview-trust__value--low .landlord-overview-trust__number {
+.landlord-trust-block__value--low .landlord-trust-block__number {
   color: var(--color-danger);
 }
 
-.landlord-overview-hint {
-  margin: 0;
-  padding: 0.45rem 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  border-radius: 999px;
-  line-height: 1.35;
-}
-
-.landlord-overview-hint--high {
-  color: #047857;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-}
-
-.landlord-overview-hint--mid {
-  color: #b45309;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-}
-
-.landlord-overview-hint--low {
-  color: var(--color-danger);
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-}
-
-.landlord-overview-metrics {
+/* —— Metrics & details —— */
+.landlord-metrics {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -215,7 +269,15 @@
   gap: 0.85rem;
 }
 
-.landlord-overview-metric {
+.landlord-metrics--dashboard {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.landlord-metrics--risk {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.landlord-metric {
   margin: 0;
   padding: 0.95rem 1rem;
   background: #fafafa;
@@ -224,39 +286,17 @@
   min-width: 0;
 }
 
-.landlord-overview-metric--caution {
+.landlord-metric--caution {
   border-left: 3px solid #fdba74;
 }
 
-.landlord-overview-metric__label {
-  margin: 0 0 0.35rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.landlord-overview-metric__value {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-label);
-}
-
-.landlord-overview-details {
+.landlord-details {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.85rem;
 }
 
-@media (min-width: 520px) {
-  .landlord-overview-details {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.landlord-overview-detail {
+.landlord-detail {
   padding: 0.95rem 1rem;
   background: #fafafa;
   border: 1px solid var(--color-border);
@@ -264,104 +304,39 @@
   min-width: 0;
 }
 
-.landlord-overview-detail__label {
-  margin: 0 0 0.4rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+.landlord-detail--accent {
+  border-left: 3px solid #fdba74;
 }
 
-.landlord-overview-detail__value {
-  margin: 0;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--color-label);
-  line-height: 1.5;
-}
-
-.landlord-overview-detail__badge {
-  margin: 0;
-  display: inline-block;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: #4338ca;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
-  border-radius: 999px;
-}
-
-.landlord-overview-summary {
+.landlord-summary {
   padding-top: 0.25rem;
   border-top: 1px solid var(--color-border);
 }
 
-.landlord-overview-summary__label {
-  margin: 0 0 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+.landlord-summary--highlight {
+  padding: 1rem 1.05rem;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid #6366f1;
+  border-top: none;
 }
 
-.landlord-overview-summary__text {
+.landlord-summary__text {
   margin: 0;
   font-size: 0.975rem;
   color: var(--color-text-soft);
   line-height: 1.65;
 }
 
-/* —— Complaint signals —— */
-.landlord-complaints {
-  margin-bottom: 2.5rem;
-}
-
-.landlord-complaints__header {
-  margin-bottom: 1.25rem;
-}
-
-.landlord-complaints__title {
-  margin: 0 0 0.35rem;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--color-label);
-}
-
-.landlord-complaints__subtitle {
-  margin: 0;
-  font-size: 0.9375rem;
+.landlord-empty {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
   color: var(--color-text-muted);
-  line-height: 1.55;
+  font-style: italic;
 }
 
-.landlord-complaints-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem 1.6rem;
-}
-
-.landlord-complaints-risk {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.landlord-complaints-block {
-  padding: 0.95rem 1rem;
-  background: #fafafa;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  border-left: 3px solid #fdba74;
-  min-width: 0;
-}
-
-.landlord-complaint-types {
+.landlord-tag-list {
   list-style: none;
   margin: 0.35rem 0 0;
   padding: 0;
@@ -370,210 +345,167 @@
   gap: 0.4rem;
 }
 
-.landlord-complaint-types__item {
-  display: inline-block;
-  padding: 0.3rem 0.65rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #b45309;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 999px;
-  line-height: 1.35;
+/* —— Dashboard summary cards —— */
+.landlord-dashboard-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
 }
 
-.landlord-complaint-empty {
-  margin: 0.35rem 0 0;
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  font-style: italic;
+.landlord-dashboard-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1rem 1.05rem;
+  min-height: 6.5rem;
+  min-width: 0;
 }
 
-.landlord-complaints-severity {
+.landlord-dashboard-card--high {
+  border-left: 3px solid #34d399;
+}
+
+.landlord-dashboard-card--mid {
   border-left: 3px solid #fdba74;
 }
 
-.landlord-complaints-severity__badge {
+.landlord-dashboard-card--low {
+  border-left: 3px solid #f87171;
+}
+
+.landlord-dashboard-card--info,
+.landlord-dashboard-card--neutral {
+  border-left: 3px solid #93c5fd;
+}
+
+.landlord-dashboard-card__value {
   margin: 0;
-  display: inline-block;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: #b45309;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 999px;
-}
-
-/* —— Rental history signals —— */
-.landlord-history {
-  margin-bottom: 2.5rem;
-}
-
-.landlord-history__header {
-  margin-bottom: 1.25rem;
-}
-
-.landlord-history__title {
-  margin: 0 0 0.35rem;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   color: var(--color-label);
+  line-height: 1.1;
 }
 
-.landlord-history__subtitle {
+.landlord-dashboard-card__detail {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
   color: var(--color-text-muted);
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
-.landlord-history-panel {
+/* —— Timeline —— */
+.landlord-timeline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem 1.6rem;
+  gap: 0;
+  min-width: 0;
 }
 
-.landlord-history-hint-wrap {
+.landlord-timeline-item {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-/* —— Verification signals —— */
-.landlord-verification {
-  margin-bottom: 2.5rem;
-}
-
-.landlord-verification__header {
-  margin-bottom: 1.25rem;
-}
-
-.landlord-verification__title {
-  margin: 0 0 0.35rem;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--color-label);
-}
-
-.landlord-verification__subtitle {
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0 0 1.25rem 0.15rem;
   margin: 0;
-  font-size: 0.9375rem;
-  color: var(--color-text-muted);
-  line-height: 1.55;
+  position: relative;
+  min-width: 0;
 }
 
-.landlord-verification-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem 1.6rem;
+.landlord-timeline-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 0.95rem;
+  top: 2.1rem;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border);
 }
 
-.landlord-verification-hints {
-  display: flex;
-  flex-wrap: wrap;
+.landlord-timeline-item__icon {
+  flex: 0 0 1.9rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-}
-
-.landlord-verification-status {
-  margin: 0;
-  display: inline-block;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.875rem;
-  font-weight: 700;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 800;
   border-radius: 999px;
-  line-height: 1.35;
+  line-height: 1;
+  z-index: 1;
 }
 
-.landlord-verification-status--yes {
+.landlord-timeline-item--success .landlord-timeline-item__icon {
   color: #047857;
   background: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  border: 2px solid #a7f3d0;
 }
 
-.landlord-verification-status--no {
+.landlord-timeline-item--warning .landlord-timeline-item__icon {
   color: #b45309;
   background: #fffbeb;
-  border: 1px solid #fde68a;
+  border: 2px solid #fde68a;
 }
 
-/* —— Risk summary —— */
-.landlord-risk {
-  margin-bottom: 2.5rem;
+.landlord-timeline-item--info .landlord-timeline-item__icon {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 2px solid #bfdbfe;
 }
 
-.landlord-risk__header {
-  margin-bottom: 1.25rem;
-}
-
-.landlord-risk__title {
-  margin: 0 0 0.35rem;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--color-label);
-}
-
-.landlord-risk__subtitle {
-  margin: 0;
-  font-size: 0.9375rem;
-  color: var(--color-text-muted);
-  line-height: 1.55;
-}
-
-.landlord-risk-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem 1.6rem;
-}
-
-.landlord-risk-badge-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.landlord-risk-badge {
-  font-size: 0.875rem;
-  padding: 0.5rem 0.9rem;
-}
-
-.landlord-risk-trust {
-  border-left-color: #6366f1;
-}
-
-.landlord-risk-overall {
-  flex: 1 1 12rem;
+.landlord-timeline-item__body {
+  flex: 1;
   min-width: 0;
-  margin: 0;
-  background: transparent;
-  border: none;
-  padding: 0;
-}
-
-.landlord-risk-recommendation {
-  padding: 1rem 1.05rem;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  padding: 0.15rem 0.85rem 0.85rem;
+  background: #fafafa;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  border-left: 3px solid #6366f1;
+  border-left-width: 3px;
 }
 
-.landlord-risk-metrics {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.landlord-timeline-item--success .landlord-timeline-item__body {
+  border-left-color: #34d399;
 }
 
+.landlord-timeline-item--warning .landlord-timeline-item__body {
+  border-left-color: #fdba74;
+}
+
+.landlord-timeline-item--info .landlord-timeline-item__body {
+  border-left-color: #60a5fa;
+}
+
+/* —— Responsive —— */
 @media (min-width: 520px) {
-  .landlord-risk-metrics {
+  .landlord-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .landlord-metrics--dashboard {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .landlord-metrics--risk {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 720px) {
+  .landlord-dashboard-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .landlord-metrics--dashboard {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -595,35 +527,22 @@
     padding-right: 1rem;
   }
 
-  .landlord-overview-panel {
+  .landlord-panel {
     padding: 1.25rem 1.15rem;
   }
 
-  .landlord-overview-metrics {
+  .landlord-dashboard-cards,
+  .landlord-metrics,
+  .landlord-metrics--dashboard,
+  .landlord-metrics--risk {
     grid-template-columns: 1fr;
   }
 
-  .landlord-overview-trust__number {
+  .landlord-trust-block__number {
     font-size: 2.25rem;
   }
 
-  .landlord-overview-hint {
-    width: 100%;
-  }
-
-  .landlord-complaints-panel {
-    padding: 1.25rem 1.15rem;
-  }
-
-  .landlord-history-panel {
-    padding: 1.25rem 1.15rem;
-  }
-
-  .landlord-verification-panel {
-    padding: 1.25rem 1.15rem;
-  }
-
-  .landlord-risk-panel {
-    padding: 1.25rem 1.15rem;
+  .landlord-hint-row .landlord-badge {
+    flex: 1 1 100%;
   }
 }
